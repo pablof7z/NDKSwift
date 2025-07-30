@@ -55,7 +55,7 @@ public enum Bech32 {
     }
 
     /// Convert bits
-    private static func convertBits(data: [UInt8], fromBits: Int, toBits: Int, pad: Bool) throws -> [UInt8] {
+    static func convertBits(data: [UInt8], fromBits: Int, toBits: Int, pad: Bool) throws -> [UInt8] {
         var acc = 0
         var bits = 0
         var result: [UInt8] = []

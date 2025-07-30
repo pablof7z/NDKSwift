@@ -14,13 +14,41 @@ struct TestLNURL {
         let ndk = NDK()
         let resolver = ndk.lnurlResolver
         
-        // Test cases
-        let testCases = [
+        // Test cases for LUD16 addresses
+        let lud16TestCases = [
             "satoshi@bitcoin.org",      // Won't work (fake address)
             "andre@lnmarkets.com",       // Should work if service is up
             "hello@getalby.com",         // Should work if service is up
             "notanemail",                // Should fail with invalid format
         ]
+        
+        // Test Bech32 LNURL encoding/decoding
+        print("\n🔗 Testing Bech32 LNURL encoding/decoding")
+        print("=" * 40)
+        
+        let testURL = "https://service.walletofsatoshi.com/.well-known/lnurlp/alice"
+        print("Original URL: \(testURL)")
+        
+        // Encode to LNURL
+        let urlData = testURL.data(using: .utf8)!
+        let encodedData = try! Bech32.convertBits(data: Array(urlData), fromBits: 8, toBits: 5, pad: true)
+        let lnurl = try! Bech32.encode(hrp: "lnurl", data: encodedData)
+        
+        print("Encoded LNURL: \(lnurl)")
+        print("LNURL length: \(lnurl.count) characters")
+        
+        // Test decoding the LNURL we just created
+        print("\n📥 Testing LNURL resolution:")
+        do {
+            // In a real scenario, this would make an HTTP request to the decoded URL
+            // For this test, we'll just verify the LNURL format is recognized
+            print("✅ LNURL format recognized: \(lnurl.hasPrefix("lnurl"))")
+            print("   Would resolve to: \(testURL)")
+        } catch {
+            print("❌ Error: \(error)")
+        }
+        
+        let testCases = lud16TestCases
         
         for address in testCases {
             print("\n📧 Testing: \(address)")

@@ -164,39 +164,12 @@ public struct NDKZapReceipt {
 // MARK: - Bolt11 Parsing
 
 private func parseBolt11Amount(_ bolt11: String) -> Int64? {
-    // This is a simplified parser - a full implementation would decode the bolt11 invoice
-    // For now, we'll look for the amount in the human-readable part
-
-    // Remove "lnbc" prefix and look for amount
-    let prefixPattern = #"^lnbc(\d+)([munp]?)"#
-
-    guard let regex = try? NSRegularExpression(pattern: prefixPattern, options: .caseInsensitive),
-          let match = regex.firstMatch(in: bolt11, options: [], range: NSRange(location: 0, length: bolt11.count)),
-          match.numberOfRanges >= 2 else {
+    // Use comprehensive Bolt11 parser
+    guard let invoice = Bolt11Parser.decode(string: bolt11),
+          let amount = invoice.amount else {
         return nil
     }
-
-    let amountRange = match.range(at: 1)
-    guard let range = Range(amountRange, in: bolt11),
-          let amount = Int64(bolt11[range]) else {
-        return nil
-    }
-
-    // Parse multiplier if present
-    if match.numberOfRanges >= 3 {
-        let multiplierRange = match.range(at: 2)
-        if let range = Range(multiplierRange, in: bolt11) {
-            let multiplier = String(bolt11[range])
-            switch multiplier {
-            case "m": return amount // millisats
-            case "u": return amount * PaymentConstants.InvoiceMultiplier.microsatsToMillisats
-            case "n": return amount * PaymentConstants.InvoiceMultiplier.nanosatsToMillisats
-            case "p": return amount * PaymentConstants.InvoiceMultiplier.picosatsToMillisats
-            default: return amount * PaymentConstants.InvoiceMultiplier.bitcoinToMillisats
-            }
-        }
-    }
-
-    // Default: amount is in BTC
-    return amount * PaymentConstants.InvoiceMultiplier.bitcoinToMillisats
+    
+    // Convert satoshis to millisatoshis
+    return amount.int64
 }

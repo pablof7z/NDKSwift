@@ -405,8 +405,7 @@ private class ZapState: ObservableObject {
         for tag in event.tags {
             if tag.count >= 2 && tag[0] == "bolt11" {
                 let invoice = tag[1]
-                // Parse Lightning invoice for amount (simplified)
-                // In a real implementation, you'd use a proper Lightning invoice parser
+                // Parse Lightning invoice for amount using comprehensive Bolt11 parser
                 return parseInvoiceAmount(invoice)
             }
         }
@@ -427,10 +426,14 @@ private class ZapState: ObservableObject {
     }
 
     private func parseInvoiceAmount(_ invoice: String) -> Int? {
-        // Simplified Lightning invoice parsing
-        // In production, use a proper Lightning library
-        // For now, return a placeholder amount
-        return 1000
+        // Use comprehensive Bolt11 parser
+        guard let parsedInvoice = Bolt11Parser.decode(string: invoice),
+              let amount = parsedInvoice.amount else {
+            return nil
+        }
+        
+        // Convert millisatoshis to satoshis for display
+        return Int(PaymentConstants.millisatsToSats(amount.int64))
     }
 
     private func parseZapRequestSender(_ json: String) -> String? {
