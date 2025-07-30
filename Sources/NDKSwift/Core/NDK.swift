@@ -21,7 +21,7 @@ public final class NDK {
     public internal(set) var sessionData: NDKSessionData?
 
     /// Cache for storing events (always present, defaults to in-memory)
-    public let cache: NDKCache
+    public var cache: NDKCache
 
     /// Active user (derived from signer)
     public var activeUser: NDKUser? {
@@ -414,12 +414,12 @@ public final class NDK {
     ///
     /// ## Usage
     /// ```swift
-    /// let profileData = NDKDataSource<NDKUserProfile>(
+    /// let profileData = NDKDataSource<NDKUserMetadata>(
     ///     ndk: ndk,
     ///     filter: NDKFilter(authors: [pubkey], kinds: [0])
     /// ) { event in
-    ///     // Transform event to profile
-    ///     try? JSONCoding.decode(NDKUserProfile.self, from: event.content)
+    ///     // Transform event to metadata
+    ///     NDKUserMetadata(event: event)
     /// }
     /// ```
     ///
@@ -457,7 +457,7 @@ public final class NDK {
     /// let profiles = ndk.observe(
     ///     filter: NDKFilter(authors: [pubkey], kinds: [0])
     /// ) { event in
-    ///     try? JSONCoding.decode(NDKUserProfile.self, from: event.content)
+    ///     NDKUserMetadata(event: event)
     /// }
     ///
     /// // With options
@@ -824,6 +824,7 @@ public final class NDK {
             return (user: user, nip05: entry.identifier, status: entry.status)
         }
     }
+    
 
     /// Verify a NIP-05 identifier for a user
     /// - Parameters:
@@ -831,7 +832,12 @@ public final class NDK {
     ///   - maxAge: Maximum age before re-verification is needed (default: 24 hours)
     /// - Returns: True if the NIP-05 is verified and belongs to this user
     public func verifyNIP05(for user: NDKUser, maxAge: TimeInterval = TimeConstants.day) async throws -> Bool {
-        guard let nip05 = await user.nip05 else { return false }
+        var metadata: NDKUserMetadata?
+        for await m in await profileManager.observe(for: user.pubkey, maxAge: maxAge) {
+            metadata = m
+            break
+        }
+        guard let nip05 = metadata?.nip05 else { return false }
         return try await nip05Manager.verify(identifier: nip05, expectedPubkey: user.pubkey, maxAge: maxAge)
     }
 

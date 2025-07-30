@@ -82,16 +82,14 @@ final class AuthenticationE2ETests: XCTestCase {
             website: nil
         )
         
-        session.updateProfile(profile)
-        try await authManager.updateActiveSessionProfile(profile)
+        // Note: Sessions don't store profile data anymore
+        // Profile data would be published as metadata events (kind 0)
         
         let createTime = Date()
         print("[\(timestamp())] Session created in \(createTime.timeIntervalSince(createStart))s")
         
         // Verify session properties
         XCTAssertEqual(session.pubkey, pubkey)
-        XCTAssertEqual(authManager.activeSession?.profileName, "Test User")
-        XCTAssertEqual(authManager.activeSession?.about, "This is a test account for E2E testing")
         XCTAssertTrue(authManager.activeSession?.isActive ?? false)
         XCTAssertNotNil(authManager.activeSession)
         XCTAssertEqual(authManager.activeSession?.id, session.id)
@@ -149,7 +147,6 @@ final class AuthenticationE2ETests: XCTestCase {
         XCTAssertNotNil(restoredSession)
         XCTAssertEqual(restoredSession?.id, session.id)
         XCTAssertEqual(restoredSession?.pubkey, pubkey)
-        XCTAssertEqual(restoredSession?.profileName, "Test User")
         XCTAssertTrue(restoredSession?.isActive ?? false)
         
         // Verify NDK has restored signer
@@ -215,7 +212,7 @@ final class AuthenticationE2ETests: XCTestCase {
                 lud06: nil,
                 website: nil
             )
-            session.updateProfile(profile)
+            // Profile would be published as metadata event
             
             sessions.append((session, pubkey))
             print("[\(timestamp())] Created account \(i): \(pubkey)")
@@ -320,8 +317,8 @@ final class AuthenticationE2ETests: XCTestCase {
             lud06: nil,
             website: nil
         )
-        session.updateProfile(profile)
-        try await authManager.updateActiveSessionProfile(profile)
+        // Profile would be published as metadata event
+        // Profile would be published as metadata event via NDK
         
         print("[\(timestamp())] Created session with pubkey: \(pubkey)")
         
@@ -355,10 +352,6 @@ final class AuthenticationE2ETests: XCTestCase {
             XCTAssertNotNil(restored)
             XCTAssertEqual(restored?.id, session.id)
             XCTAssertEqual(restored?.pubkey, pubkey)
-            XCTAssertEqual(restored?.profileName, "Persistent User")
-            XCTAssertEqual(restored?.about, "Testing persistence")
-            XCTAssertEqual(restored?.avatarURL?.absoluteString, "https://example.com/pic.jpg")
-            XCTAssertEqual(restored?.nip05, "test@example.com")
             
             // Verify signer works
             let restoredPubkey = try await ndk.signer?.pubkey
@@ -408,8 +401,8 @@ final class AuthenticationE2ETests: XCTestCase {
             lud06: nil,
             website: nil
         )
-        session.updateProfile(initialProfile)
-        try await authManager.updateActiveSessionProfile(initialProfile)
+        // Profile would be published as metadata event
+        // Profile would be published as metadata event via NDK
         
         print("[\(timestamp())] Created session: \(session.id)")
         
@@ -430,7 +423,7 @@ final class AuthenticationE2ETests: XCTestCase {
             website: nil
         )
         
-        try await authManager.updateActiveSessionProfile(updatedProfile)
+        // Profile would be published as metadata event via NDK
         
         let updateTime = Date()
         print("[\(timestamp())] Profile updated in \(updateTime.timeIntervalSince(updateStart))s")
@@ -450,10 +443,7 @@ final class AuthenticationE2ETests: XCTestCase {
         let restored = newAuthManager.activeSession
         
         XCTAssertNotNil(restored)
-        XCTAssertEqual(restored?.profileName, "Updated Name")
-        XCTAssertEqual(restored?.about, "Updated bio with more information")
-        XCTAssertEqual(restored?.avatarURL?.absoluteString, "https://example.com/new-pic.jpg")
-        XCTAssertEqual(restored?.nip05, "updated@example.com")
+        // Profile data would be in metadata events, not session
         
         print("[\(timestamp())] All profile updates persisted successfully")
         
@@ -508,7 +498,7 @@ final class AuthenticationE2ETests: XCTestCase {
             lud06: nil,
             website: nil
         )
-        try await authManager.updateActiveSessionProfile(aliceProfile)
+        // Profile would be published as metadata event via NDK
         
         let session2 = try await authManager.addSession(
             signer2,
@@ -527,7 +517,7 @@ final class AuthenticationE2ETests: XCTestCase {
             lud06: nil,
             website: nil
         )
-        try await authManager.updateActiveSessionProfile(bobProfile)
+        // Profile would be published as metadata event via NDK
         
         // Verify sessions are isolated
         XCTAssertNotEqual(session1.id, session2.id)

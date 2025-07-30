@@ -16,7 +16,7 @@ public struct NDKProfileConfig {
 
 /// Entry in the profile cache
 private struct ProfileCacheEntry {
-    let profile: NDKUserProfile
+    let metadata: NDKUserMetadata
 }
 
 /// Manager for efficient profile fetching with caching
@@ -52,8 +52,8 @@ public actor NDKProfileManager {
 
     /// Active profile observations
     private class ContinuationWrapper {
-        let continuation: AsyncStream<NDKUserProfile?>.Continuation
-        init(_ continuation: AsyncStream<NDKUserProfile?>.Continuation) {
+        let continuation: AsyncStream<NDKUserMetadata?>.Continuation
+        init(_ continuation: AsyncStream<NDKUserMetadata?>.Continuation) {
             self.continuation = continuation
         }
     }
@@ -77,7 +77,7 @@ public actor NDKProfileManager {
     /// - Parameters:
     ///   - pubkey: The public key to observe
     ///   - maxAge: Maximum age of cached data in seconds (0 = always get real-time updates)
-    public func observe(for pubkey: PublicKey, maxAge: TimeInterval = TimeConstants.hour) -> AsyncStream<NDKUserProfile?> {
+    public func observe(for pubkey: PublicKey, maxAge: TimeInterval = TimeConstants.hour) -> AsyncStream<NDKUserMetadata?> {
         AsyncStream { continuation in
             Task {
                 // Add continuation to active observations
@@ -87,8 +87,8 @@ public actor NDKProfileManager {
                 }
                 activeObservations[pubkey]?.append(wrapper)
 
-                // Yield cached profile immediately if available and maxAge allows it
-                if maxAge > 0, let cached = getCachedProfile(for: pubkey) {
+                // Yield cached metadata immediately if available and maxAge allows it
+                if maxAge > 0, let cached = await getCachedMetadata(for: pubkey) {
                     continuation.yield(cached)
                 }
 
@@ -109,19 +109,28 @@ public actor NDKProfileManager {
 
                 // Process events from data source
                 for await event in dataSource.events {
-                    if let profileData = event.content.data(using: .utf8),
-                       let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: profileData) {
-                        // Update cache
-                        updateCache(pubkey: pubkey, profile: profile)
+                    let metadata = NDKUserMetadata(event: event, ndk: ndk)
+                    
+                    // Update memory cache
+                    updateCache(pubkey: pubkey, metadata: metadata)
 
-                        // Notify all observers for this pubkey
-                        activeObservations[pubkey]?.forEach { wrapper in
-                            wrapper.continuation.yield(profile)
-                        }
-
-                        // Save to persistent cache
-                        try? await ndk.cache.saveProfile(profile, pubkey: pubkey)
+                    // Save parsed metadata to SQLite cache
+                    if let parsedData = metadata.metadata {
+                        try? await ndk.cache.saveProfileMetadata(
+                            pubkey: pubkey,
+                            metadata: parsedData,
+                            updatedAt: event.createdAt,
+                            eventId: event.id
+                        )
                     }
+
+                    // Notify all observers for this pubkey
+                    activeObservations[pubkey]?.forEach { wrapper in
+                        wrapper.continuation.yield(metadata)
+                    }
+
+                    // Save event to persistent cache
+                    try? await ndk.cache.saveEvent(event)
                 }
 
                 // Clean up when done
@@ -134,49 +143,79 @@ public actor NDKProfileManager {
         }
     }
 
-    /// Load a profile from cache without subscribing to updates
+    /// Load metadata from cache without subscribing to updates
     /// - Parameter pubkey: The public key to load
-    /// - Returns: The cached profile if available, nil otherwise
-    public func loadProfile(for pubkey: PublicKey) async -> NDKUserProfile? {
-        return getCachedProfile(for: pubkey)
+    /// - Returns: The cached metadata if available, nil otherwise
+    public func loadMetadata(for pubkey: PublicKey) async -> NDKUserMetadata? {
+        return await getCachedMetadata(for: pubkey)
     }
     
-    /// Load multiple profiles from cache
+    /// Load multiple metadata entries from cache
     /// - Parameter pubkeys: Array of public keys to load
-    /// - Returns: Dictionary mapping pubkeys to their profiles (if found)
-    public func loadProfiles(for pubkeys: [PublicKey]) async -> [PublicKey: NDKUserProfile] {
-        var profiles: [PublicKey: NDKUserProfile] = [:]
+    /// - Returns: Dictionary mapping pubkeys to their metadata (if found)
+    public func loadMetadata(for pubkeys: [PublicKey]) async -> [PublicKey: NDKUserMetadata] {
+        var metadata: [PublicKey: NDKUserMetadata] = [:]
+        
+        // First check memory cache
+        var missingPubkeys: [PublicKey] = []
         for pubkey in pubkeys {
-            if let profile = getCachedProfile(for: pubkey) {
-                profiles[pubkey] = profile
+            if let entry = profileCache[pubkey] {
+                updateCacheOrder(for: pubkey)
+                metadata[pubkey] = entry.metadata
+            } else {
+                missingPubkeys.append(pubkey)
             }
         }
-        return profiles
+        
+        // Then check SQLite cache for missing ones
+        if !missingPubkeys.isEmpty, let ndk = ndk {
+            let cachedProfiles = await ndk.cache.getMultipleProfileMetadata(pubkeys: missingPubkeys)
+            
+            for (pubkey, profileData) in cachedProfiles {
+                let userMetadata = NDKUserMetadata(
+                    pubkey: pubkey,
+                    parsedMetadata: profileData.metadata,
+                    updatedAt: profileData.updatedAt,
+                    eventId: profileData.eventId,
+                    ndk: ndk
+                )
+                
+                // Update memory cache
+                updateCache(pubkey: pubkey, metadata: userMetadata)
+                
+                metadata[pubkey] = userMetadata
+            }
+        }
+        
+        return metadata
     }
     
-    /// Save a profile to cache
+    /// Save metadata to cache
     /// - Parameters:
-    ///   - profile: The profile to save
-    ///   - pubkey: The public key associated with the profile
+    ///   - metadata: The metadata to save
+    ///   - pubkey: The public key associated with the metadata
     ///   - expiresIn: Optional expiry time in seconds (not implemented)
-    public func saveProfile(_ profile: NDKUserProfile, for pubkey: PublicKey, expiresIn: TimeInterval? = nil) async {
-        updateCache(pubkey: pubkey, profile: profile)
+    public func saveMetadata(_ metadata: NDKUserMetadata, for pubkey: PublicKey, expiresIn: TimeInterval? = nil) async {
+        updateCache(pubkey: pubkey, metadata: metadata)
         
-        // Also save to persistent cache if available
-        if let ndk = ndk {
-            try? await ndk.cache.saveProfile(profile, pubkey: pubkey)
+        // Save parsed metadata to SQLite cache
+        if let ndk = ndk, let parsedData = metadata.metadata {
+            try? await ndk.cache.saveProfileMetadata(
+                pubkey: pubkey,
+                metadata: parsedData,
+                updatedAt: metadata.updatedAt,
+                eventId: metadata.eventId
+            )
         }
     }
     
-    /// Process a profile event from a relay
-    /// - Parameter event: The kind 0 event containing profile metadata
-    public func processProfileEvent(_ event: NDKEvent) async {
+    /// Process a metadata event from a relay
+    /// - Parameter event: The kind 0 event containing user metadata
+    public func processMetadataEvent(_ event: NDKEvent) async {
         guard event.kind == EventKind.metadata else { return }
         
-        if let profileData = event.content.data(using: .utf8),
-           let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: profileData) {
-            await saveProfile(profile, for: event.pubkey)
-        }
+        let metadata = NDKUserMetadata(event: event, ndk: ndk)
+        await saveMetadata(metadata, for: event.pubkey)
     }
 
     /// Clear the profile cache
@@ -193,23 +232,43 @@ public actor NDKProfileManager {
 
     // MARK: - Private Methods
 
-    private func getCachedProfile(for pubkey: PublicKey) -> NDKUserProfile? {
-        guard let entry = profileCache[pubkey] else { return nil }
-
-        // Update LRU order
-        updateCacheOrder(for: pubkey)
-
-        return entry.profile
+    private func getCachedMetadata(for pubkey: PublicKey) async -> NDKUserMetadata? {
+        // Check memory cache first
+        if let entry = profileCache[pubkey] {
+            // Update LRU order
+            updateCacheOrder(for: pubkey)
+            return entry.metadata
+        }
+        
+        // Check SQLite cache
+        guard let ndk = ndk else { return nil }
+        if let cached = await ndk.cache.getProfileMetadata(pubkey: pubkey) {
+            // Create NDKUserMetadata with pre-parsed data
+            let metadata = NDKUserMetadata(
+                pubkey: pubkey,
+                parsedMetadata: cached.metadata,
+                updatedAt: cached.updatedAt,
+                eventId: cached.eventId,
+                ndk: ndk
+            )
+            
+            // Update memory cache
+            updateCache(pubkey: pubkey, metadata: metadata)
+            
+            return metadata
+        }
+        
+        return nil
     }
 
-    private func updateCache(pubkey: PublicKey, profile: NDKUserProfile) {
+    private func updateCache(pubkey: PublicKey, metadata: NDKUserMetadata) {
         // Remove old entry if exists
         if profileCache[pubkey] != nil {
             cacheOrder.removeAll { $0 == pubkey }
         }
 
         // Add new entry
-        profileCache[pubkey] = ProfileCacheEntry(profile: profile)
+        profileCache[pubkey] = ProfileCacheEntry(metadata: metadata)
         cacheOrder.append(pubkey)
 
         // Enforce cache size limit

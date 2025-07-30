@@ -1,6 +1,6 @@
 import XCTest
 @testable import NDKSwift
-@testable import CashuSwift
+import CashuSwift
 
 final class NIP60BackupTests: XCTestCase {
     

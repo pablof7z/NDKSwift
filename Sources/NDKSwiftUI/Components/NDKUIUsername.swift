@@ -13,17 +13,19 @@ import NDKSwift
 ///     .foregroundStyle(.secondary)
 /// ```
 public struct NDKUIUsername: View {
+    private let ndk: NDK
     private let pubkey: String
     private let maxLength: Int
     
-    @Environment(\.ndk) private var ndk
     @StateObject private var profileState: ProfileState
     
     /// Initialize a username display component
     /// - Parameters:
+    ///   - ndk: The NDK instance
     ///   - pubkey: The user's public key (hex format)
     ///   - maxLength: Maximum length before truncation (default: 20)
-    public init(pubkey: String, maxLength: Int = 20) {
+    public init(ndk: NDK, pubkey: String, maxLength: Int = 20) {
+        self.ndk = ndk
         self.pubkey = pubkey
         self.maxLength = maxLength
         self._profileState = StateObject(wrappedValue: ProfileState(pubkey: pubkey))
@@ -44,9 +46,7 @@ public struct NDKUIUsername: View {
         }
         .onAppear {
             Task {
-                if let ndk = ndk {
-                    await profileState.loadProfile(ndk: ndk)
-                }
+                await profileState.loadProfile(profileManager: ndk.profileManager)
             }
         }
     }
@@ -95,12 +95,12 @@ private class ProfileState: ObservableObject {
         loadTask?.cancel()
     }
     
-    func loadProfile(ndk: NDK) async {
+    func loadProfile(profileManager: NDKProfileManager) async {
         loadTask?.cancel()
         
         loadTask = Task {
             // Use profile manager to observe profile updates
-            for await profile in await ndk.profileManager.observe(for: pubkey) {
+            for await profile in await profileManager.observe(for: pubkey) {
                 if !Task.isCancelled {
                     self.name = profile?.displayName ?? profile?.name
                     self.nip05 = profile?.nip05
@@ -116,21 +116,23 @@ private class ProfileState: ObservableObject {
 #if DEBUG
 struct NDKUIUsername_Previews: PreviewProvider {
     static var previews: some View {
+        // Create a mock NDK for preview
+        let mockNDK = NDK(relayUrls: [])
+        
         VStack(spacing: 16) {
             // With NIP-05
-            NDKUIUsername(pubkey: "mock_pubkey_with_nip05")
+            NDKUIUsername(ndk: mockNDK, pubkey: "mock_pubkey_with_nip05")
             
             // With display name only
-            NDKUIUsername(pubkey: "mock_pubkey_with_name")
+            NDKUIUsername(ndk: mockNDK, pubkey: "mock_pubkey_with_name")
             
             // Fallback to npub
-            NDKUIUsername(pubkey: "mock_pubkey_no_profile")
+            NDKUIUsername(ndk: mockNDK, pubkey: "mock_pubkey_no_profile")
             
             // Custom max length
-            NDKUIUsername(pubkey: "mock_pubkey_long_name", maxLength: 15)
+            NDKUIUsername(ndk: mockNDK, pubkey: "mock_pubkey_long_name", maxLength: 15)
         }
         .padding()
-        .environment(\.ndk, nil) // Mock environment
     }
 }
 #endif

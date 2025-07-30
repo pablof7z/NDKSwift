@@ -23,32 +23,21 @@ struct Example04_UserProfile {
             kinds: [EventKind.metadata]
         )
         
-        // Fetch profile using observe
-        let profileSource = ndk.observe(filter: profileFilter, cachePolicy: .cacheWithNetwork)
-        
-        // Wait for profile to arrive
-        var fetchedProfile: NDKUserProfile?
-        let fetchTask = Task {
-            for await event in profileSource.events {
-                if event.kind == EventKind.metadata,
-                   let profileData = JSONCoding.safeDecode(NDKUserProfile.self, from: event.content) {
-                    fetchedProfile = profileData
-                    break
-                }
-            }
+        // Fetch profile using profileManager
+        var fetchedMetadata: NDKUserMetadata?
+        for await metadata in await ndk.profileManager.observe(for: jackPubkey) {
+            fetchedMetadata = metadata
+            break // Get first result
         }
         
-        try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
-        fetchTask.cancel()
-        
-        if let profile = fetchedProfile {
+        if let metadata = fetchedMetadata {
             print("✅ Profile found!")
-            print("📍 Name: \(profile.name ?? "N/A")")
-            print("📍 Display Name: \(profile.displayName ?? "N/A")")
-            print("📍 About: \(String((profile.about ?? "N/A").prefix(100)))...")
-            print("📍 Picture: \(profile.picture != nil ? "✓" : "✗")")
-            print("📍 NIP-05: \(profile.nip05 ?? "N/A")")
-            print("📍 Lightning: \(profile.lud16 ?? profile.lud06 ?? "N/A")")
+            print("📍 Name: \(metadata.name ?? "N/A")")
+            print("📍 Display Name: \(metadata.displayName ?? "N/A")")
+            print("📍 About: \(String((metadata.about ?? "N/A").prefix(100)))...")
+            print("📍 Picture: \(metadata.picture != nil ? "✓" : "✗")")
+            print("📍 NIP-05: \(metadata.nip05 ?? "N/A")")
+            print("📍 Lightning: \(metadata.lud16 ?? metadata.lud06 ?? "N/A")")
         } else {
             print("❌ Profile not found")
         }
@@ -59,21 +48,18 @@ struct Example04_UserProfile {
         let signer = try NDKPrivateKeySigner.generate()
         ndk.signer = signer
         
-        let myProfile = NDKUserProfile(
-            name: "ndkswift_example",
-            displayName: "NDKSwift Example User",
-            about: "Learning Nostr development with NDKSwift! 🚀",
-            picture: "https://robohash.org/ndkswiftexample.png",
-            banner: nil,
-            nip05: "example@nostr.directory",
-            lud16: "example@getalby.com",
-            lud06: nil,
-            website: "https://github.com/nostr-dev-kit/ndk-swift"
-        )
+        let myMetadata = [
+            "name": "ndkswift_example",
+            "display_name": "NDKSwift Example User",
+            "about": "Learning Nostr development with NDKSwift! 🚀",
+            "picture": "https://robohash.org/ndkswiftexample.png",
+            "nip05": "example@nostr.directory",
+            "lud16": "example@getalby.com",
+            "website": "https://github.com/nostr-dev-kit/ndk-swift"
+        ]
         
-        // Create metadata event manually
-        let profileContent = try JSONCoding.encode(myProfile)
-        let profileString = String(data: profileContent, encoding: .utf8)!
+        // Create metadata event
+        let profileString = try JSONCoding.encodeToString(myMetadata)
         
         let (profileEvent, result) = try await ndk.publish { builder in
             builder
@@ -99,30 +85,20 @@ struct Example04_UserProfile {
             kinds: [EventKind.metadata]
         )
         
-        let multiProfileSource = ndk.observe(filter: multiProfileFilter, cachePolicy: .cacheWithNetwork)
-        var profileEvents: [NDKEvent] = []
-        
-        let multiTask = Task {
-            for await event in multiProfileSource.events {
-                profileEvents.append(event)
-                if profileEvents.count >= pubkeys.count {
-                    break
+        // Fetch profiles for multiple users
+        var foundProfiles = 0
+        for pubkey in pubkeys {
+            for await metadata in await ndk.profileManager.observe(for: pubkey, maxAge: 0) {
+                if let metadata = metadata {
+                    foundProfiles += 1
+                    print("\n👤 Profile: \(metadata.name ?? "Unknown")")
+                    print("   Pubkey: \(String(pubkey.prefix(16)))...")
                 }
+                break // Get first result
             }
         }
         
-        try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
-        multiTask.cancel()
-        
-        print("📊 Found \(profileEvents.count) profile events")
-        
-        for event in profileEvents {
-            if event.kind == EventKind.metadata,
-               let profileData = JSONCoding.safeDecode(NDKUserProfile.self, from: event.content) {
-                print("\n👤 Profile: \(profileData.name ?? "Unknown")")
-                print("   Pubkey: \(String(event.pubkey.prefix(16)))...")
-            }
-        }
+        print("\n📊 Found \(foundProfiles) profiles")
         
         // Step 5: Subscribe to profile updates
         print("\n📡 Subscribing to profile updates (5 seconds)...")
@@ -138,9 +114,9 @@ struct Example04_UserProfile {
             var updateCount = 0
             for await event in updateSource.events {
                 updateCount += 1
-                if event.kind == EventKind.metadata,
-                   let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: event.content) {
-                    print("🔔 Profile update #\(updateCount): \(profile.name ?? "Unknown")")
+                if event.kind == EventKind.metadata {
+                    let metadata = NDKUserMetadata(event: event)
+                    print("🔔 Profile update #\(updateCount): \(metadata.name ?? "Unknown")")
                 }
                 if updateCount >= 3 {
                     break

@@ -32,6 +32,7 @@ public struct NDKUIProfilePicture: View {
 
     // MARK: - Properties
 
+    private let ndk: NDK
     private let pubkey: String
     private let size: CGFloat
     private let cornerRadius: CGFloat?
@@ -39,43 +40,45 @@ public struct NDKUIProfilePicture: View {
     private let borderWidth: CGFloat
     private var tapAction: (() -> Void)?
 
-    @Environment(\.ndk) private var ndk
-    @State private var profile: NDKUserProfile?
+    @State private var metadata: NDKUserMetadata?
     @State private var profileTask: Task<Void, Never>?
 
     // MARK: - Initialization
 
-    /// Initialize with a public key
+    /// Initialize with NDK instance and public key
     /// - Parameters:
+    ///   - ndk: The NDK instance
     ///   - pubkey: The user's public key (hex format)
     ///   - size: The size of the profile picture (default: 40)
     ///   - cornerRadius: Custom corner radius (default: circular)
     ///   - borderColor: Optional border color
     ///   - borderWidth: Border width (default: 0)
     public init(
+        ndk: NDK,
         pubkey: String,
         size: CGFloat = 40,
         cornerRadius: CGFloat? = nil,
         borderColor: Color? = nil,
         borderWidth: CGFloat = 0
     ) {
+        self.ndk = ndk
         self.pubkey = pubkey
         self.size = size
         self.cornerRadius = cornerRadius
         self.borderColor = borderColor
         self.borderWidth = borderWidth
-
-        // Profile will be loaded in onAppear when we have access to the environment NDK
     }
 
-    /// Initialize with an NDKUser
+    /// Initialize with NDK instance and NDKUser
     /// - Parameters:
+    ///   - ndk: The NDK instance
     ///   - user: The NDKUser instance
     ///   - size: The size of the profile picture (default: 40)
     ///   - cornerRadius: Custom corner radius (default: circular)
     ///   - borderColor: Optional border color
     ///   - borderWidth: Border width (default: 0)
     public init(
+        ndk: NDK,
         user: NDKUser,
         size: CGFloat = 40,
         cornerRadius: CGFloat? = nil,
@@ -83,6 +86,7 @@ public struct NDKUIProfilePicture: View {
         borderWidth: CGFloat = 0
     ) {
         self.init(
+            ndk: ndk,
             pubkey: user.pubkey,
             size: size,
             cornerRadius: cornerRadius,
@@ -147,15 +151,15 @@ public struct NDKUIProfilePicture: View {
     }
 
     private var pictureURL: URL? {
-        guard let picture = profile?.picture, !picture.isEmpty else { return nil }
+        guard let picture = metadata?.picture, !picture.isEmpty else { return nil }
         return URL(string: picture)
     }
 
     private var displayName: String {
-        if let displayName = profile?.displayName, !displayName.isEmpty {
+        if let displayName = metadata?.displayName, !displayName.isEmpty {
             return displayName
         }
-        if let name = profile?.name, !name.isEmpty {
+        if let name = metadata?.name, !name.isEmpty {
             return name
         }
         // Fallback to shortened pubkey
@@ -167,12 +171,10 @@ public struct NDKUIProfilePicture: View {
     private func loadProfile() {
         profileTask?.cancel()
 
-        guard let ndk = ndk else { return }
-
         profileTask = Task {
-            for await profile in await ndk.profileManager.observe(for: pubkey) {
+            for await metadata in await ndk.profileManager.observe(for: pubkey) {
                 await MainActor.run {
-                    self.profile = profile
+                    self.metadata = metadata
                 }
                 // Continue listening for updates
             }
@@ -194,17 +196,21 @@ public struct NDKUIProfilePicture: View {
 #if DEBUG
 struct NDKUIProfilePicture_Previews: PreviewProvider {
     static var previews: some View {
+        // Create a mock NDK for preview
+        let mockNDK = NDK(relayUrls: [])
+        
         VStack(spacing: 20) {
             // Different sizes
             HStack(spacing: 16) {
-                NDKUIProfilePicture(pubkey: "sample_pubkey", size: 30)
-                NDKUIProfilePicture(pubkey: "sample_pubkey", size: UIConstants.ProfilePictureSize.small)
-                NDKUIProfilePicture(pubkey: "sample_pubkey", size: UIConstants.ProfilePictureSize.medium)
-                NDKUIProfilePicture(pubkey: "sample_pubkey", size: UIConstants.ProfilePictureSize.large)
+                NDKUIProfilePicture(ndk: mockNDK, pubkey: "sample_pubkey", size: 30)
+                NDKUIProfilePicture(ndk: mockNDK, pubkey: "sample_pubkey", size: UIConstants.ProfilePictureSize.small)
+                NDKUIProfilePicture(ndk: mockNDK, pubkey: "sample_pubkey", size: UIConstants.ProfilePictureSize.medium)
+                NDKUIProfilePicture(ndk: mockNDK, pubkey: "sample_pubkey", size: UIConstants.ProfilePictureSize.large)
             }
 
             // With border
             NDKUIProfilePicture(
+                ndk: mockNDK,
                 pubkey: "sample_pubkey",
                 size: UIConstants.ProfilePictureSize.medium,
                 borderColor: .blue,
@@ -213,13 +219,13 @@ struct NDKUIProfilePicture_Previews: PreviewProvider {
 
             // Square with custom corner radius
             NDKUIProfilePicture(
+                ndk: mockNDK,
                 pubkey: "sample_pubkey",
                 size: UIConstants.ProfilePictureSize.medium,
                 cornerRadius: 12
             )
         }
         .padding()
-        .environment(\.ndk, nil) // Mock environment
     }
 }
 #endif

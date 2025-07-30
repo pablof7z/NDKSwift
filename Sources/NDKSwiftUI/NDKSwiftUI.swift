@@ -24,16 +24,18 @@ import NDKSwift
 ///
 ///     var body: some View {
 ///         VStack {
-///             NDKProfilePicture(pubkey: pubkey)
-///             NDKDisplayName(pubkey: pubkey)
+///             // Profile components take explicit NDK parameter
+///             NDKUIProfilePicture(ndk: ndk, pubkey: pubkey)
+///             NDKUIDisplayName(ndk: ndk, pubkey: pubkey)
 ///
+///             // Action buttons still use environment for now
 ///             HStack {
-///                 NDKReactionButton.like(event: event)
-///                 NDKZapButton(event: event)
-///                 NDKFollowButton(pubkey: pubkey)
+///                 NDKUIReactionButton.like(event: event)
+///                 NDKUIZapButton(event: event)
+///                 NDKUIFollowButton(pubkey: pubkey)
 ///             }
 ///         }
-///         .environment(\.ndk, ndk)
+///         .environment(\.ndk, ndk) // Only needed for action buttons
 ///     }
 /// }
 /// ```

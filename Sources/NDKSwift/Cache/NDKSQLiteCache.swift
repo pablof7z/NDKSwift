@@ -85,6 +85,7 @@ public actor NDKSQLiteCache: NDKCache {
         Self.registerV9NIP05CacheMigration(&migrator)
         Self.registerV10RelayPreferencesMigration(&migrator)
         Self.registerV11ProfileAdditionalFieldsMigration(&migrator)
+        Self.registerV12AddEventIdToProfilesMigration(&migrator)
 
         try migrator.migrate(dbQueue)
     }
@@ -235,129 +236,157 @@ public actor NDKSQLiteCache: NDKCache {
         }
     }
 
-    // MARK: - Profile Operations
-
-    public func saveProfile(_ profile: NDKUserProfile, pubkey: String) async throws {
-        // Still store JSON for backward compatibility during transition
-        let jsonString = try JSONCoding.encodeToString(profile)
-
-        // Encode additional fields as property list for efficient storage
+    // MARK: - Profile Metadata Operations
+    
+    public func saveProfileMetadata(pubkey: String, metadata: [String: Any], updatedAt: Timestamp, eventId: String) async throws {
+        // Extract standard fields
+        let name = metadata["name"] as? String
+        let displayName = metadata["display_name"] as? String
+        let about = metadata["about"] as? String
+        let picture = metadata["picture"] as? String
+        let banner = metadata["banner"] as? String
+        let website = metadata["website"] as? String
+        let nip05 = metadata["nip05"] as? String
+        let lud06 = metadata["lud06"] as? String
+        let lud16 = metadata["lud16"] as? String
+        
+        // Extract additional fields
+        let knownKeys = ["name", "display_name", "about", "picture", "banner", "nip05", "lud16", "lud06", "website"]
+        var additionalFields: [String: String] = [:]
+        
+        for (key, value) in metadata {
+            if !knownKeys.contains(key), let stringValue = value as? String {
+                additionalFields[key] = stringValue
+            }
+        }
+        
+        // Encode additional fields as property list data
         let additionalFieldsData: Data?
-        if !profile.allAdditionalFields.isEmpty {
-            additionalFieldsData = try PropertyListSerialization.data(
-                fromPropertyList: profile.allAdditionalFields,
-                format: .binary,
-                options: 0
-            )
+        if !additionalFields.isEmpty {
+            additionalFieldsData = try? PropertyListSerialization.data(fromPropertyList: additionalFields, format: .binary, options: 0)
         } else {
             additionalFieldsData = nil
         }
-
+        
+        // Reconstruct JSON for backward compatibility
+        let jsonData = try JSONSerialization.data(withJSONObject: metadata, options: [])
+        let json = String(data: jsonData, encoding: .utf8) ?? "{}"
+        
         try await dbQueue.write { db in
             try db.execute(
                 sql: """
-                INSERT OR REPLACE INTO profiles
-                (pubkey, name, display_name, about, picture, nip05, lud06, lud16, banner, website, updated_at, json, additional_fields)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT OR REPLACE INTO profiles 
+                (pubkey, name, display_name, about, picture, nip05, lud06, lud16, banner, website, 
+                 additional_fields, updated_at, event_id, json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 arguments: [
-                    pubkey,
-                    profile.name,
-                    profile.displayName,
-                    profile.about,
-                    profile.picture,
-                    profile.nip05,
-                    profile.lud06,
-                    profile.lud16,
-                    profile.banner,
-                    profile.website,
-                    Timestamp.now,
-                    jsonString,
-                    additionalFieldsData
+                    pubkey, name, displayName, about, picture, nip05, lud06, lud16, banner, website,
+                    additionalFieldsData, updatedAt, eventId, json
                 ]
             )
         }
+        
+        if debugMode {
+            NDKLogger.log(.debug, category: .cache, "Saved profile metadata for \(pubkey.prefix(8))...")
+        }
     }
-
-    public func getProfile(pubkey: String) async -> NDKUserProfile? {
+    
+    public func getProfileMetadata(pubkey: String) async -> (metadata: [String: Any], updatedAt: Timestamp, eventId: String)? {
         do {
             return try await dbQueue.read { db in
-                guard let row = try Row.fetchOne(db,
-                    sql: "SELECT name, display_name, about, picture, banner, nip05, lud16, lud06, website, additional_fields, json FROM profiles WHERE pubkey = ?",
-                    arguments: [pubkey]) else {
+                guard let row = try Row.fetchOne(db, sql: "SELECT * FROM profiles WHERE pubkey = ?", arguments: [pubkey]) else {
                     return nil
                 }
-
-                // First try to reconstruct from individual fields (semantic caching)
-                if row["name"] != nil || row["display_name"] != nil {
-                    var profile = NDKUserProfile(
-                        name: row["name"] as? String,
-                        displayName: row["display_name"] as? String,
-                        about: row["about"] as? String,
-                        picture: row["picture"] as? String,
-                        banner: row["banner"] as? String,
-                        nip05: row["nip05"] as? String,
-                        lud16: row["lud16"] as? String,
-                        lud06: row["lud06"] as? String,
-                        website: row["website"] as? String
-                    )
-
-                    // Decode additional fields from property list
-                    if let additionalFieldsData = row["additional_fields"] as? Data,
-                       let additionalFields = try? PropertyListSerialization.propertyList(from: additionalFieldsData, options: [], format: nil) as? [String: String] {
-                        for (key, value) in additionalFields {
-                            profile.setAdditionalField(key, value: value)
-                        }
+                
+                // Reconstruct metadata dictionary
+                var metadata: [String: Any] = [:]
+                
+                // Add standard fields if present
+                if let name = row["name"] as? String { metadata["name"] = name }
+                if let displayName = row["display_name"] as? String { metadata["display_name"] = displayName }
+                if let about = row["about"] as? String { metadata["about"] = about }
+                if let picture = row["picture"] as? String { metadata["picture"] = picture }
+                if let banner = row["banner"] as? String { metadata["banner"] = banner }
+                if let website = row["website"] as? String { metadata["website"] = website }
+                if let nip05 = row["nip05"] as? String { metadata["nip05"] = nip05 }
+                if let lud06 = row["lud06"] as? String { metadata["lud06"] = lud06 }
+                if let lud16 = row["lud16"] as? String { metadata["lud16"] = lud16 }
+                
+                // Add additional fields if present
+                if let additionalFieldsData = row["additional_fields"] as? Data,
+                   let additionalFields = try? PropertyListSerialization.propertyList(from: additionalFieldsData, format: nil) as? [String: String] {
+                    for (key, value) in additionalFields {
+                        metadata[key] = value
                     }
-
-                    return profile
                 }
-
-                // Fallback to JSON parsing for old data (before migration)
-                if let jsonString = row["json"] as? String,
-                   let jsonData = jsonString.data(using: .utf8) {
-                    return try JSONCoding.decode(NDKUserProfile.self, from: jsonData)
-                }
-
-                return nil
+                
+                let updatedAt = row["updated_at"] as? Timestamp ?? 0
+                let eventId = row["event_id"] as? String ?? ""
+                
+                return (metadata, updatedAt, eventId)
             }
         } catch {
-            logError(operation: "get profile", parameter: pubkey, error: error)
+            logError(operation: "get profile metadata", parameter: pubkey, error: error)
             return nil
         }
     }
-
-    // MARK: - Performance-optimized profile methods
-
-    public func getProfileName(pubkey: String) async -> String? {
-        return try? await dbQueue.read { db in
-            try String.fetchOne(db, sql: "SELECT name FROM profiles WHERE pubkey = ?", arguments: [pubkey])
-        }
-    }
-
-    public func getProfilePicture(pubkey: String) async -> String? {
-        return try? await dbQueue.read { db in
-            try String.fetchOne(db, sql: "SELECT picture FROM profiles WHERE pubkey = ?", arguments: [pubkey])
-        }
-    }
-
-    public func searchProfiles(nameContains: String, limit: Int = 50) async -> [(pubkey: String, name: String)] {
+    
+    public func getMultipleProfileMetadata(pubkeys: [String]) async -> [String: (metadata: [String: Any], updatedAt: Timestamp, eventId: String)] {
+        guard !pubkeys.isEmpty else { return [:] }
+        
         do {
             return try await dbQueue.read { db in
-                let rows = try Row.fetchAll(
-                    db,
-                    sql: "SELECT pubkey, name FROM profiles WHERE name LIKE ? ORDER BY name LIMIT ?",
-                    arguments: ["%\(nameContains)%", limit]
-                )
-                return rows.compactMap { row in
-                    guard let pubkey = row["pubkey"] as? String,
-                          let name = row["name"] as? String else { return nil }
-                    return (pubkey: pubkey, name: name)
+                var result: [String: (metadata: [String: Any], updatedAt: Timestamp, eventId: String)] = [:]
+                
+                // Batch fetch in groups to avoid SQLite limits
+                let chunks = stride(from: 0, to: pubkeys.count, by: SQLiteConstants.queryBatchSize).map {
+                    Array(pubkeys[$0..<min($0 + SQLiteConstants.queryBatchSize, pubkeys.count)])
                 }
+                
+                for chunk in chunks {
+                    let placeholders = chunk.map { _ in "?" }.joined(separator: ",")
+                    let sql = "SELECT * FROM profiles WHERE pubkey IN (\(placeholders))"
+                    
+                    let rows = try Row.fetchAll(db, sql: sql, arguments: StatementArguments(chunk))
+                    
+                    for row in rows {
+                        guard let pubkey = row["pubkey"] as? String else { continue }
+                        
+                        // Reconstruct metadata dictionary
+                        var metadata: [String: Any] = [:]
+                        
+                        // Add standard fields if present
+                        if let name = row["name"] as? String { metadata["name"] = name }
+                        if let displayName = row["display_name"] as? String { metadata["display_name"] = displayName }
+                        if let about = row["about"] as? String { metadata["about"] = about }
+                        if let picture = row["picture"] as? String { metadata["picture"] = picture }
+                        if let banner = row["banner"] as? String { metadata["banner"] = banner }
+                        if let website = row["website"] as? String { metadata["website"] = website }
+                        if let nip05 = row["nip05"] as? String { metadata["nip05"] = nip05 }
+                        if let lud06 = row["lud06"] as? String { metadata["lud06"] = lud06 }
+                        if let lud16 = row["lud16"] as? String { metadata["lud16"] = lud16 }
+                        
+                        // Add additional fields if present
+                        if let additionalFieldsData = row["additional_fields"] as? Data,
+                           let additionalFields = try? PropertyListSerialization.propertyList(from: additionalFieldsData, format: nil) as? [String: String] {
+                            for (key, value) in additionalFields {
+                                metadata[key] = value
+                            }
+                        }
+                        
+                        let updatedAt = row["updated_at"] as? Timestamp ?? 0
+                        let eventId = row["event_id"] as? String ?? ""
+                        
+                        result[pubkey] = (metadata, updatedAt, eventId)
+                    }
+                }
+                
+                return result
             }
         } catch {
-            logError(operation: "search profiles", parameter: "query", error: error)
-            return []
+            logError(operation: "get multiple profile metadata", parameter: "batch", error: error)
+            return [:]
         }
     }
 
@@ -1930,93 +1959,6 @@ public actor NDKSQLiteCache: NDKCache {
         }
     }
     
-    /// Create a reactive query for profile changes
-    /// - Parameters:
-    ///   - pubkey: The public key to observe
-    ///   - includeExisting: Whether to emit the existing profile immediately (default: true)
-    /// - Returns: An AsyncThrowingStream that emits the profile when it changes
-    public func observeProfile(
-        pubkey: String,
-        includeExisting: Bool = true
-    ) async -> AsyncThrowingStream<NDKUserProfile?, Error> {
-        let dbQueue = self.dbQueue
-        
-        return AsyncThrowingStream { continuation in
-            let observationId = UUID()
-            
-            Task {
-                    // Create observation for profile
-                    let observation = ValueObservation.tracking { db -> NDKUserProfile? in
-                        guard let row = try Row.fetchOne(db,
-                            sql: "SELECT name, display_name, about, picture, banner, nip05, lud16, lud06, website, additional_fields, json FROM profiles WHERE pubkey = ?",
-                            arguments: [pubkey]) else {
-                            return nil
-                        }
-                        
-                        // First try to reconstruct from individual fields
-                        if row["name"] != nil || row["display_name"] != nil {
-                            var profile = NDKUserProfile(
-                                name: row["name"] as? String,
-                                displayName: row["display_name"] as? String,
-                                about: row["about"] as? String,
-                                picture: row["picture"] as? String,
-                                banner: row["banner"] as? String,
-                                nip05: row["nip05"] as? String,
-                                lud16: row["lud16"] as? String,
-                                lud06: row["lud06"] as? String,
-                                website: row["website"] as? String
-                            )
-                            
-                            // Decode additional fields
-                            if let additionalFieldsData = row["additional_fields"] as? Data,
-                               let additionalFields = try? PropertyListSerialization.propertyList(from: additionalFieldsData, options: [], format: nil) as? [String: String] {
-                                for (key, value) in additionalFields {
-                                    profile.setAdditionalField(key, value: value)
-                                }
-                            }
-                            
-                            return profile
-                        }
-                        
-                        // Fallback to JSON parsing
-                        if let jsonString = row["json"] as? String,
-                           let jsonData = jsonString.data(using: .utf8) {
-                            return try? JSONCoding.decode(NDKUserProfile.self, from: jsonData)
-                        }
-                        
-                        return nil
-                    }
-                    
-                    // Start the observation
-                    let cancellable = observation.start(
-                        in: dbQueue,
-                        onError: { error in
-                            continuation.finish(throwing: error)
-                        },
-                        onChange: { profile in
-                            continuation.yield(profile)
-                        }
-                    )
-                    
-                    // Store the cancellable
-                    await self.storeObservation(id: observationId, cancellable: cancellable)
-                    
-                    // If includeExisting, immediately fetch and emit current profile
-                    if includeExisting {
-                        if let existingProfile = await self.getProfile(pubkey: pubkey) {
-                            continuation.yield(existingProfile)
-                        }
-                    }
-                    
-                    // Set up cleanup
-                    continuation.onTermination = { @Sendable _ in
-                        Task {
-                            await self.removeObservation(id: observationId)
-                        }
-                    }
-            }
-        }
-    }
 }
 
 // MARK: - Cache Statistics Models

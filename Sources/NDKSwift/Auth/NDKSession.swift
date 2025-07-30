@@ -42,19 +42,6 @@ public struct NDKSession: Codable, Identifiable, Sendable {
     /// Whether this is the currently active session
     public var isActive: Bool
 
-    // MARK: - Profile Metadata
-
-    /// User's avatar URL
-    public var avatarURL: URL?
-
-    /// User's NIP-05 identifier
-    public var nip05: String?
-
-    /// User's about/bio text
-    public var about: String?
-
-    /// User's display name from profile metadata
-    public var profileName: String?
 
     // MARK: - Security Settings
 
@@ -157,17 +144,6 @@ public struct NDKSession: Codable, Identifiable, Sendable {
         lastUsed = Date()
     }
 
-    /// Update profile metadata from NDKUserProfile
-    /// - Parameter profile: The user profile to update from
-    public mutating func updateProfile(_ profile: NDKUserProfile) {
-        profileName = profile.name
-        about = profile.about
-        nip05 = profile.nip05
-
-        if let picture = profile.picture, let url = URL(string: picture) {
-            avatarURL = url
-        }
-    }
 
     // MARK: - Validation
 

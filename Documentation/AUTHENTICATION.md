@@ -6,6 +6,8 @@ This guide covers the authentication system in NDKSwift, including session manag
 
 NDKSwift provides a comprehensive authentication system through **NDKAuthManager** - the core authentication manager that handles session management, secure storage, and biometric authentication.
 
+**Important**: NDKAuthManager is NOT a singleton and is NOT accessed through NDK instance. You must create and manage your own instance.
+
 ## Key Features
 
 - 🔐 **Secure Session Management**: Sessions are stored securely in the iOS Keychain
@@ -22,26 +24,38 @@ NDKSwift provides a comprehensive authentication system through **NDKAuthManager
 import SwiftUI
 import NDKSwift
 
+@Observable
+class AppModel {
+    let ndk: NDK
+    let authManager: NDKAuthManager
+    
+    init() {
+        self.ndk = NDK(relayUrls: ["wss://relay.damus.io"])
+        self.authManager = NDKAuthManager(ndk: ndk)
+    }
+}
+
 @main
 struct MyApp: App {
-    @State private var ndk = NDK(relayUrls: ["wss://relay.damus.io"])
+    @State private var appModel = AppModel()
     
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environment(\.ndk, ndk)
+                .environment(appModel)
                 .task {
-                    await ndk.auth.initialize()  // Restores previous session
+                    await appModel.authManager.initialize()  // Restores previous session
+                    await appModel.ndk.connect()
                 }
         }
     }
 }
 
 struct ContentView: View {
-    @Environment(\.ndk) private var ndk
+    @Environment(AppModel.self) var appModel
     
     var body: some View {
-        if ndk.auth.isAuthenticated {
+        if appModel.authManager.isAuthenticated {
             MainAppView()
         } else {
             LoginView()
@@ -67,11 +81,11 @@ The `initialize()` method automatically:
 - Handles biometric authentication if required
 - Sets up the NDK signer
 
-### Accessing the Manager
+### Creating and Accessing the Manager
 
 ```swift
-// Access through NDK instance
-let authManager = ndk.auth
+// Create auth manager instance
+let authManager = NDKAuthManager(ndk: ndk)
 
 // Check authentication status
 if authManager.isAuthenticated {
@@ -93,11 +107,9 @@ if let session = authManager.activeSession {
 let signer = try NDKPrivateKeySigner.generate()
 
 // Create session
-let session = try await authManager.createSession(
-    with: signer,
-    displayName: "Alice",
-    requiresBiometric: true,  // Enable Face ID/Touch ID
-    isHardwareBacked: false
+let session = try await authManager.addSession(
+    signer,
+    requiresBiometric: true  // Enable Face ID/Touch ID
 )
 
 // The session is automatically activated
@@ -113,10 +125,7 @@ let signer = try NDKPrivateKeySigner(nsec: "nsec1...")
 let signer = try NDKPrivateKeySigner(privateKey: "hex_private_key")
 
 // Create session
-let session = try await authManager.createSession(
-    with: signer,
-    displayName: displayName
-)
+let session = try await authManager.addSession(signer)
 ```
 
 ### Managing Sessions
@@ -144,15 +153,20 @@ try await authManager.switchToSession(sessions[1])
 #### Update Session Profile
 
 ```swift
-// Update the profile for the active session
-let profile = NDKUserProfile(
-    name: "Alice",
-    displayName: "Alice in Nostrland",
-    about: "Building cool stuff",
-    picture: "https://example.com/avatar.jpg"
-)
+// Update profile by publishing a metadata event
+let profileData = [
+    "name": "Alice",
+    "display_name": "Alice in Nostrland",
+    "about": "Building cool stuff",
+    "picture": "https://example.com/avatar.jpg"
+]
 
-try await authManager.updateActiveSessionProfile(profile)
+let profileEvent = try await NDKEventBuilder()
+    .kind(0)  // Metadata
+    .content(JSONCoding.encode(profileData))
+    .build(signer: ndk.signer!)
+
+try await ndk.publish(profileEvent)
 ```
 
 #### Delete Session
@@ -188,10 +202,8 @@ func performCompleteLogout() async {
 
 // Alternative: Delete only the active session
 func logoutCurrentUser() async {
-    if let activeSession = authManager.activeSession {
-        try? await authManager.removeSession(activeSession)
-    }
-    authManager.logout()
+    // Use logoutAsync() to ensure keychain deletion completes
+    await authManager.logoutAsync()
 }
 ```
 
@@ -200,19 +212,15 @@ func logoutCurrentUser() async {
 The manager tracks authentication state:
 
 ```swift
-switch authManager.authenticationState {
-case .unauthenticated:
+switch authManager.sessionState {
+case .noSession:
     // Show login UI
-case .authenticating:
+case .loading:
     // Show loading indicator
-case .authenticated:
+case .active:
     // Show main app
-case .biometricRequired:
-    // Prompt for Face ID/Touch ID
-case .authenticationFailed(let error):
+case .error(let error):
     // Show error message
-case .sessionExpired:
-    // Session needs refresh
 }
 ```
 
@@ -239,10 +247,7 @@ struct LoginView: View {
                 Task {
                     do {
                         let signer = try NDKPrivateKeySigner(nsec: nsecInput)
-                        _ = try await authManager.createSession(
-                            with: signer,
-                            displayName: "Nostr User"
-                        )
+                        _ = try await authManager.addSession(signer)
                     } catch {
                         errorMessage = error.localizedDescription
                         showError = true
@@ -254,9 +259,9 @@ struct LoginView: View {
                 Task {
                     do {
                         let signer = try NDKPrivateKeySigner.generate()
-                        _ = try await authManager.createSession(
-                            with: signer,
-                            displayName: "New User"
+                        _ = try await authManager.addSession(
+                            signer,
+                            requiresBiometric: true
                         )
                     } catch {
                         errorMessage = error.localizedDescription
@@ -323,9 +328,8 @@ struct SessionSelectionView: View {
 When creating a session, enable biometric authentication:
 
 ```swift
-let session = try await authManager.createSession(
-    with: signer,
-    displayName: "Alice",
+let session = try await authManager.addSession(
+    signer,
     requiresBiometric: true  // Enable Face ID/Touch ID
 )
 ```
@@ -350,7 +354,11 @@ if authManager.biometricAuthAvailable {
 When a session requires biometric authentication:
 
 ```swift
-if authManager.authenticationState == .biometricRequired {
+// Biometric authentication is handled automatically when switching to a protected session
+// You can catch the error if biometric fails:
+do {
+    try await authManager.switchToSession(biometricSession)
+} catch NDKAuthError.biometricAuthenticationFailed {
     // The system will automatically prompt for biometric authentication
     // You can show a custom UI explaining why biometric auth is needed
 }
@@ -376,19 +384,16 @@ let bunkerSigner = NDKBunkerSigner(
 )
 
 // Create session with remote signer
-let session = try await authManager.createSession(
-    with: bunkerSigner,
-    displayName: "Alice"
-)
+let session = try await authManager.addSession(bunkerSigner)
 ```
 
-### Handling Multiple NDK Instances
+### Linking with NDK
+
+The auth manager is initialized with an NDK instance:
 
 ```swift
-// Set NDK instance on auth manager
-authManager.setNDK(myNDKInstance)
-
-// Auth manager will automatically configure the signer
+let authManager = NDKAuthManager(ndk: ndk)
+// The auth manager will automatically configure the NDK's signer
 ```
 
 ### Observing Authentication State Changes
@@ -399,13 +404,13 @@ struct MyView: View {
     
     var body: some View {
         Text("Status: \(authManager.isAuthenticated ? "Logged In" : "Logged Out")")
-            .onChange(of: authManager.authenticationState) { oldState, newState in
-                // React to authentication state changes
+            .onChange(of: authManager.sessionState) { oldState, newState in
+                // React to session state changes
                 switch newState {
-                case .authenticated:
+                case .active:
                     // User logged in
                     loadUserData()
-                case .unauthenticated:
+                case .noSession:
                     // User logged out
                     clearUserData()
                 default:
@@ -422,8 +427,8 @@ struct MyView: View {
 
 If sessions aren't persisting across app launches:
 
-1. Ensure you're accessing auth through the same NDK instance
-2. Use `ndk.auth` consistently
+1. Ensure you're calling `initialize()` on app launch
+2. Make sure the NDKAuthManager instance is retained properly
 3. Check for Keychain access errors in logs
 
 ### Biometric Authentication Fails
@@ -433,7 +438,7 @@ If sessions aren't persisting across app launches:
 3. Handle biometric errors gracefully:
 
 ```swift
-if case .authenticationFailed(let error) = authManager.authenticationState {
+if case .error(let error) = authManager.sessionState {
     // Check if it's a biometric error
     if (error as NSError).code == LAError.biometryNotAvailable.rawValue {
         // Biometrics not available
@@ -455,20 +460,31 @@ Here's a complete example showing account creation, login, and session managemen
 import SwiftUI
 import NDKSwift
 
+@Observable
+class AppModel {
+    let ndk: NDK
+    let authManager: NDKAuthManager
+    
+    init() {
+        self.ndk = NDK(relayUrls: [
+            "wss://relay.damus.io",
+            "wss://relay.primal.net"
+        ])
+        self.authManager = NDKAuthManager(ndk: ndk)
+    }
+}
+
 @main
 struct NostrApp: App {
-    @State private var ndk = NDK(relayUrls: [
-        "wss://relay.damus.io",
-        "wss://relay.primal.net"
-    ])
+    @State private var appModel = AppModel()
     
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environment(\.ndk, ndk)
+                .environment(appModel)
                 .task {
-                    await ndk.auth.initialize()  // Restore sessions
-                    await ndk.connect()
+                    await appModel.authManager.initialize()  // Restore sessions
+                    await appModel.ndk.connect()
                 }
         }
     }
@@ -479,19 +495,19 @@ struct ContentView: View {
     
     var body: some View {
         Group {
-            switch authManager.authenticationState {
-            case .authenticated:
+            switch authManager.sessionState {
+            case .active:
                 AuthenticatedView()
-            case .authenticating:
-                ProgressView("Authenticating...")
-            case .biometricRequired:
-                BiometricPromptView()
-            case .unauthenticated, .authenticationFailed, .sessionExpired:
+            case .loading:
+                ProgressView("Loading...")
+            case .noSession:
                 if authManager.hasSessions {
                     SessionSelectionView()
                 } else {
                     AuthenticationView()
                 }
+            case .error(let error):
+                ErrorView(error: error)
             }
         }
     }

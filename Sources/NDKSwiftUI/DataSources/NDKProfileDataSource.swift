@@ -23,8 +23,8 @@ import Combine
 ///
 /// var body: some View {
 ///     VStack {
-///         if let profile = profileDataSource.profile {
-///             Text(profile.displayName ?? "Unknown")
+///         if let metadata = profileDataSource.metadata {
+///             Text(metadata.displayName ?? "Unknown")
 ///         } else {
 ///             Text("Loading...")
 ///         }
@@ -36,8 +36,8 @@ public final class NDKProfileDataSource: ObservableObject, @preconcurrency NDKDa
 
     // MARK: - Published Properties
 
-    /// The user profile, if available
-    @Published public private(set) var profile: NDKUserProfile?
+    /// The user profile metadata, if available
+    @Published public private(set) var metadata: NDKUserMetadata?
 
     /// Whether the data source is currently loading
     @Published public private(set) var isLoading = false
@@ -89,11 +89,11 @@ public final class NDKProfileDataSource: ObservableObject, @preconcurrency NDKDa
                     .first
             }
             .compactMap { event in
-                // Parse the profile JSON content
-                JSONCoding.safeDecode(NDKUserProfile.self, from: event.content.data(using: .utf8) ?? Data())
+                // Create metadata wrapper
+                NDKUserMetadata(event: event)
             }
             .receive(on: DispatchQueue.main)
-            .assign(to: &$profile)
+            .assign(to: &$metadata)
 
         // Map loading state
         dataSource.$isLoading
@@ -110,10 +110,10 @@ public final class NDKProfileDataSource: ObservableObject, @preconcurrency NDKDa
 
     /// Get a display name for the user, with fallback logic
     public var displayName: String {
-        if let displayName = profile?.displayName, !displayName.isEmpty {
+        if let displayName = metadata?.displayName, !displayName.isEmpty {
             return displayName
         }
-        if let name = profile?.name, !name.isEmpty {
+        if let name = metadata?.name, !name.isEmpty {
             return name
         }
         // Fallback to shortened npub
@@ -123,17 +123,17 @@ public final class NDKProfileDataSource: ObservableObject, @preconcurrency NDKDa
 
     /// Get a profile picture URL, if available
     public var pictureURL: URL? {
-        guard let picture = profile?.picture, !picture.isEmpty else { return nil }
+        guard let picture = metadata?.picture, !picture.isEmpty else { return nil }
         return URL(string: picture)
     }
 
     /// Get the NIP-05 identifier, if available and valid
     public var nip05: String? {
-        profile?.nip05
+        metadata?.nip05
     }
 
     /// Get the profile description/about text
     public var about: String? {
-        profile?.about
+        metadata?.about
     }
 }

@@ -416,8 +416,9 @@ public class NDKAuthManager {
         // Set signer on NDK if available
         ndk.signer = signer
         
-        // Start NDK session immediately
-        do {
+        // Start NDK session in background - don't block login
+        Task {
+            do {
                 _ = try await ndk.startSession(
                     signer: signer,
                     config: NDKSessionConfiguration(
@@ -425,10 +426,11 @@ public class NDKAuthManager {
                         preloadStrategy: .progressive
                     )
                 )
+                NDKLogger.log(.info, category: .auth, "NDK session started successfully")
             } catch {
-                // Log error but don't fail the session creation
                 NDKLogger.log(.warning, category: .auth, "Failed to start NDK session: \(error)")
             }
+        }
 
         return session
     }
@@ -519,14 +521,75 @@ public class NDKAuthManager {
         NDKLogger.log(.info, category: .auth, "Deleted session for user: \(session.pubkey)")
     }
 
-    /// Logout from the current session (only clears active state, doesn't remove from storage)
+    /// Logout from the current session and remove it from storage
+    /// 
+    /// This method performs a complete logout by:
+    /// - Removing the active session from keychain storage
+    /// - Clearing all in-memory state for the active session
+    /// - Removing the session from available sessions list
+    /// 
+    /// Other sessions remain in storage and can be switched to later.
+    /// 
+    /// - Note: This is an async operation. Use `logoutAsync()` if you need to wait for completion.
     public func logout() {
+        guard let session = activeSession else {
+            // Already logged out
+            activeSession = nil
+            activeSigner = nil
+            sessionState = .noSession
+            ndk.signer = nil
+            return
+        }
+        
+        // Clear state immediately for responsive UI
         activeSession = nil
         activeSigner = nil
         sessionState = .noSession
         ndk.signer = nil
         
-        // Don't modify availableSessions here - they remain in storage
+        // Remove from available sessions immediately
+        availableSessions.removeAll { $0.id == session.id }
+        
+        // Remove from storage in background
+        Task {
+            do {
+                try await keychainManager.deleteSignerData(identifier: session.id)
+                try await keychainManager.deleteSessionMetadata(identifier: session.id)
+                NDKLogger.log(.info, category: .auth, "Logged out and removed session for user: \(session.pubkey)")
+            } catch {
+                NDKLogger.log(.error, category: .auth, "Failed to remove session from keychain during logout: \(error)")
+            }
+        }
+    }
+    
+    /// Logout from the current session and remove it from storage (async version)
+    /// 
+    /// Same as `logout()` but waits for the keychain deletion to complete.
+    /// Use this when you need to ensure the session is fully removed before proceeding.
+    public func logoutAsync() async throws {
+        guard let session = activeSession else {
+            // Already logged out
+            activeSession = nil
+            activeSigner = nil
+            sessionState = .noSession
+            ndk.signer = nil
+            return
+        }
+        
+        // Clear state immediately
+        activeSession = nil
+        activeSigner = nil
+        sessionState = .noSession
+        ndk.signer = nil
+        
+        // Remove from available sessions
+        availableSessions.removeAll { $0.id == session.id }
+        
+        // Remove from storage and wait
+        try await keychainManager.deleteSignerData(identifier: session.id)
+        try await keychainManager.deleteSessionMetadata(identifier: session.id)
+        
+        NDKLogger.log(.info, category: .auth, "Logged out and removed session for user: \(session.pubkey)")
     }
     
     /// Remove all sessions from storage and logout
@@ -592,32 +655,6 @@ public class NDKAuthManager {
             NDKLogger.log(.error, category: .auth, "Biometric authentication failed: \(error)")
             return false
         }
-    }
-
-    // MARK: - Profile Management
-
-    /// Update the active session's profile information
-    /// - Parameter profile: The profile to update with
-    public func updateActiveSessionProfile(_ profile: NDKUserProfile) async throws {
-        guard var session = activeSession else {
-            throw NDKAuthError.noActiveSession
-        }
-
-        // Update session with profile data
-        session.updateProfile(profile)
-
-        // Update in available sessions array
-        if let index = availableSessions.firstIndex(where: { $0.id == session.id }) {
-            availableSessions[index] = session
-        }
-
-        // Update active session
-        activeSession = session
-
-        // Save updated metadata
-        try await saveSessionMetadata(session)
-
-        NDKLogger.log(.info, category: .auth, "Updated profile for session: \(session.pubkey)")
     }
 
     // MARK: - Private Helpers

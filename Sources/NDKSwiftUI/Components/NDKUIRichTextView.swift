@@ -11,7 +11,7 @@ public struct NDKUIRichTextView: View {
     
     @Environment(\.ndk) private var ndk
     @State private var parsedContent: NDKParsedContent?
-    @State private var profileCache: [String: NDKUserProfile] = [:]
+    @State private var profileCache: [String: NDKUserMetadata] = [:]
     @State private var profileTasks: [String: Task<Void, Never>] = [:]
     @State private var trackedPubkeys: Set<String> = []
     
@@ -372,7 +372,7 @@ public struct NDKUIRichTextInline: View {
     
     @Environment(\.ndk) private var ndk
     @State private var parsedContent: NDKParsedContent?
-    @State private var profileCache: [String: NDKUserProfile] = [:]
+    @State private var profileCache: [String: NDKUserMetadata] = [:]
     @State private var profileTasks: [String: Task<Void, Never>] = [:]
     @State private var trackedPubkeys: Set<String> = []
     

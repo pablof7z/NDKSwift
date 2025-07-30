@@ -8,7 +8,7 @@ import Combine
 /// Data source for multiple user profiles (e.g., for contact lists)
 @MainActor
 public class NDKUIMultipleProfilesDataSource: ObservableObject {
-    @Published public private(set) var profiles: [String: NDKUserProfile] = [:]
+    @Published public private(set) var profiles: [String: NDKUserMetadata] = [:]
     @Published public private(set) var isLoading = false
     @Published public private(set) var error: Error?
     
@@ -34,16 +34,15 @@ public class NDKUIMultipleProfilesDataSource: ObservableObject {
     private func observeProfiles() async {
         dataSource.$data
             .map { events in
-                var profileDict: [String: NDKUserProfile] = [:]
+                var profileDict: [String: NDKUserMetadata] = [:]
                 
                 // Group events by author
                 let eventsByAuthor = Dictionary(grouping: events) { $0.pubkey }
                 
                 // Get the latest profile for each author
                 for (pubkey, authorEvents) in eventsByAuthor {
-                    if let latestEvent = authorEvents.sorted(by: { $0.createdAt > $1.createdAt }).first,
-                       let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: latestEvent.content.data(using: .utf8) ?? Data()) {
-                        profileDict[pubkey] = profile
+                    if let latestEvent = authorEvents.sorted(by: { $0.createdAt > $1.createdAt }).first {
+                        profileDict[pubkey] = NDKUserMetadata(event: latestEvent)
                     }
                 }
                 
@@ -55,7 +54,7 @@ public class NDKUIMultipleProfilesDataSource: ObservableObject {
         dataSource.$error.assign(to: &$error)
     }
     
-    public func profile(for pubkey: String) -> NDKUserProfile? {
+    public func profile(for pubkey: String) -> NDKUserMetadata? {
         profiles[pubkey]
     }
 }

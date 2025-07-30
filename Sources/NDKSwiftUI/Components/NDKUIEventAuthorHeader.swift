@@ -28,12 +28,11 @@ public struct NDKUIEventAuthorHeader: View {
 
     // MARK: - Properties
 
+    private let ndk: NDK
     private let pubkey: String
     private let timestamp: Timestamp?
     private let style: Style
     private var authorTapAction: ((String) -> Void)?
-
-    @Environment(\.ndk) private var ndk
 
     // MARK: - Supporting Types
 
@@ -47,14 +46,17 @@ public struct NDKUIEventAuthorHeader: View {
 
     /// Initialize with author information
     /// - Parameters:
+    ///   - ndk: The NDK instance
     ///   - pubkey: The author's public key
     ///   - timestamp: Optional timestamp to display
     ///   - style: The presentation style
     public init(
+        ndk: NDK,
         pubkey: String,
         timestamp: Timestamp? = nil,
         style: Style = .standard
     ) {
+        self.ndk = ndk
         self.pubkey = pubkey
         self.timestamp = timestamp
         self.style = style
@@ -65,7 +67,7 @@ public struct NDKUIEventAuthorHeader: View {
     public var body: some View {
         HStack(spacing: horizontalSpacing) {
             // Profile picture
-            NDKUIProfilePicture(pubkey: pubkey, size: avatarSize)
+            NDKUIProfilePicture(ndk: ndk, pubkey: pubkey, size: avatarSize)
                 .onTapGesture {
                     authorTapAction?(pubkey)
                 }
@@ -73,7 +75,7 @@ public struct NDKUIEventAuthorHeader: View {
             // Author info
             VStack(alignment: .leading, spacing: nameSpacing) {
                 // Display name
-                NDKUIDisplayName(pubkey: pubkey)
+                NDKUIDisplayName(ndk: ndk, pubkey: pubkey)
                     .font(nameFont)
                     .fontWeight(.medium)
                     .onTapGesture {
@@ -82,7 +84,7 @@ public struct NDKUIEventAuthorHeader: View {
 
                 // Username (detailed style only)
                 if style == .detailed {
-                    NDKUIUsername(pubkey: pubkey)
+                    NDKUIUsername(ndk: ndk, pubkey: pubkey)
                         .font(usernameFont)
                         .foregroundStyle(.secondary)
                         .onTapGesture {
@@ -360,20 +362,26 @@ private struct InteractionButton: View {
 #if DEBUG
 struct NDKUIEventAuthorHeader_Previews: PreviewProvider {
     static var previews: some View {
+        // Create a mock NDK for preview
+        let mockNDK = NDK(relayUrls: [])
+        
         VStack(spacing: 20) {
             NDKUIEventAuthorHeader(
+                ndk: mockNDK,
                 pubkey: "sample_pubkey",
                 timestamp: 1640995200,
                 style: .minimal
             )
 
             NDKUIEventAuthorHeader(
+                ndk: mockNDK,
                 pubkey: "sample_pubkey",
                 timestamp: 1640995200,
                 style: .standard
             )
 
             NDKUIEventAuthorHeader(
+                ndk: mockNDK,
                 pubkey: "sample_pubkey",
                 timestamp: 1640995200,
                 style: .detailed
@@ -385,7 +393,6 @@ struct NDKUIEventAuthorHeader_Previews: PreviewProvider {
             // NDKEventInteractionBar(event: mockEvent, style: .standard)
         }
         .padding()
-        .environment(\.ndk, nil) // Mock environment
     }
 }
 #endif

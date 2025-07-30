@@ -3,12 +3,12 @@ import Foundation
 /// Ranks relays based on various criteria for optimal selection
 actor NDKRelayRanker {
     private let ndk: NDK
-    private let tracker: NDKOutboxTracker
+    private let tracker: any RelayPreferenceProvider
 
     /// Cache of relay scores
     private var relayScores: [String: RelayScore] = [:]
 
-    public init(ndk: NDK, tracker: NDKOutboxTracker) {
+    public init(ndk: NDK, tracker: any RelayPreferenceProvider) {
         self.ndk = ndk
         self.tracker = tracker
     }
@@ -22,7 +22,7 @@ actor NDKRelayRanker {
         var relayAuthorCount: [String: Int] = [:]
 
         for pubkey in pubkeys {
-            if let item = await tracker.getRelaysSyncFor(pubkey: pubkey) {
+            if let item = await tracker.getRelaysSyncFor(pubkey: pubkey, type: .both) {
                 for relayURL in item.allRelayURLs {
                     relayAuthorCount[relayURL, default: 0] += 1
                 }
@@ -133,7 +133,7 @@ actor NDKRelayRanker {
         // Author coverage component
         var authorCoverage = 0
         for pubkey in pubkeys {
-            if let item = await tracker.getRelaysSyncFor(pubkey: pubkey),
+            if let item = await tracker.getRelaysSyncFor(pubkey: pubkey, type: .both),
                item.allRelayURLs.contains(relayURL) {
                 authorCoverage += 1
             }

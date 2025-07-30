@@ -241,8 +241,8 @@ actor MockNDKCache: NDKCache {
     func deleteEvent(id: String) async throws {}
     
     // Profile operations
-    func saveProfile(_ profile: NDKUserProfile, pubkey: String) async throws {}
-    func getProfile(pubkey: String) async -> NDKUserProfile? { nil }
+    func saveProfileMetadata(pubkey: String, metadata: [String: Any], updatedAt: Timestamp, eventId: String) async throws {}
+    func getProfileMetadata(pubkey: String) async -> (metadata: [String: Any], updatedAt: Timestamp, eventId: String)? { nil }
     
     // Cache management
     func clear() async throws {}

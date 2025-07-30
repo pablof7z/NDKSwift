@@ -21,10 +21,10 @@ public protocol RelayDiscoverySelectionStrategy {
 
 /// Default implementation that prioritizes already-connected relays and overlapping relays
 struct DefaultRelayDiscoverySelector: RelayDiscoverySelectionStrategy {
-    private let tracker: NDKOutboxTracker
+    private let tracker: any RelayPreferenceProvider
     private let ranker: NDKRelayRanker?
     
-    init(tracker: NDKOutboxTracker, ranker: NDKRelayRanker? = nil) {
+    init(tracker: any RelayPreferenceProvider, ranker: NDKRelayRanker? = nil) {
         self.tracker = tracker
         self.ranker = ranker
     }
@@ -72,7 +72,7 @@ struct DefaultRelayDiscoverySelector: RelayDiscoverySelectionStrategy {
                 
                 // Count how many of our authors use this relay
                 for author in authors {
-                    if let relayInfo = await tracker.getRelaysSyncFor(pubkey: author) {
+                    if let relayInfo = await tracker.getRelaysSyncFor(pubkey: author, type: .both) {
                         let allRelays = relayInfo.readRelays.union(relayInfo.writeRelays)
                         if allRelays.contains(where: { $0.url == relay }) {
                             score += 1
@@ -143,7 +143,7 @@ struct OverlapOptimizedRelaySelector: RelayDiscoverySelectionStrategy {
         var relayToAuthors: [RelayURL: Set<String>] = [:]
         
         for author in authors {
-            if let relayInfo = await tracker.getRelaysSyncFor(pubkey: author) {
+            if let relayInfo = await tracker.getRelaysSyncFor(pubkey: author, type: .both) {
                 let allRelays = relayInfo.readRelays.union(relayInfo.writeRelays)
                 for relay in allRelays {
                     if candidateRelays.contains(relay.url) {

@@ -120,12 +120,12 @@ public actor NIP05Manager {
     /// Process a metadata event to extract NIP-05 identifier
     /// - Parameters:
     ///   - event: The kind:0 metadata event
-    ///   - profile: The parsed user profile
+    ///   - metadata: The user metadata
     public func processMetadataEvent(
         _ event: NDKEvent,
-        profile: NDKUserProfile
+        metadata: NDKUserMetadata
     ) async {
-        guard let nip05 = profile.nip05,
+        guard let nip05 = metadata.nip05,
               !nip05.isEmpty else { return }
 
         let normalizedNip05 = nip05.lowercased()
