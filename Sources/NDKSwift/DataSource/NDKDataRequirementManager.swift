@@ -42,7 +42,7 @@ actor NDKDataRequirementManager {
     ///   - cachePolicy: How to handle cache vs network
     ///   - relays: Optional set of specific relay URLs to query
     ///   - subscriptionId: Optional custom subscription ID (for debugging/tracing)
-    /// - Returns: Handle for managing the requirement lifecycle
+    /// - Returns: Handle for managing the requirement lifecycle and event/relay update streams
     func registerRequirement(
         filter: NDKFilter,
         maxAge: TimeInterval = 0,
@@ -51,7 +51,7 @@ actor NDKDataRequirementManager {
         exclusiveRelays: Bool = false,
         subscriptionId: String? = nil,
         closeOnEose: Bool? = nil
-    ) async -> (handle: DataRequirementHandle, events: AsyncStream<NDKEvent>) {
+    ) async -> (handle: DataRequirementHandle, events: AsyncStream<NDKEvent>, relayUpdates: AsyncStream<RelayUpdate>) {
         let requirementId = RequirementID()
         let correlationId = requirementId.uuidString.prefix(8)
 
@@ -89,8 +89,8 @@ actor NDKDataRequirementManager {
         // Always create the data requirement, even for cache-only
         // This ensures all subscriptions participate in the reactive system
 
-        // Create the data requirement and get the event stream
-        let (requirement, eventStream) = await createRequirement(
+        // Create the data requirement and get the streams
+        let (requirement, eventStream, relayUpdateStream) = await createRequirement(
             filter: filter,
             maxAge: maxAge,
             cachePolicy: cachePolicy,
@@ -119,7 +119,8 @@ actor NDKDataRequirementManager {
                 manager: self,
                 requirement: requirement
             ),
-            events: eventStream
+            events: eventStream,
+            relayUpdates: relayUpdateStream
         )
     }
 
@@ -134,7 +135,7 @@ actor NDKDataRequirementManager {
         closeOnEose: Bool,
         requirementId: RequirementID,
         shouldFetchFromNetwork: Bool
-    ) async -> (DataRequirement, AsyncStream<NDKEvent>) {
+    ) async -> (DataRequirement, AsyncStream<NDKEvent>, AsyncStream<RelayUpdate>) {
         // Optimize filter for cache - remove event IDs we already have
         let optimizedFilter = await optimizeFilterForCache(filter) ?? filter
 
@@ -176,11 +177,12 @@ actor NDKDataRequirementManager {
 
         // Add observer and get the event stream
         let eventStream = await requirement.addObserver(id: requirementId, individualFilter: filter)
+        let relayUpdateStream = await requirement.addRelayUpdateObserver(id: requirementId)
 
         // Record fetch time
         await ndk.cache.recordFetchTime(for: optimizedFilter, timestamp: Date())
 
-        return (requirement, eventStream)
+        return (requirement, eventStream, relayUpdateStream)
     }
 
     /// Determine relay selection strategy based on filter and configuration
@@ -319,8 +321,8 @@ actor NDKDataRequirementManager {
             let observerCount = await requirement.getObserverCount()
             guard observerCount > 0 else { continue }
             
-            // Get existing relays used by this requirement
-            let existingRelays = await requirement.getActiveRelays()
+            // Get relays that are already serving these specific authors
+            let existingRelays = await requirement.getRelaysServingAuthors(relevantAuthors)
             let connectedRelays = await ndk.pool.connectedRelayURLs
             
             NDKLogger.log(.debug, category: .subscription,
@@ -350,7 +352,8 @@ actor NDKDataRequirementManager {
                     NDKLogger.log(.info, category: .subscription,
                                  "🔌 Adding and connecting to discovered relay: \(relayURL)")
                     let originAuthor = relevantAuthors.first ?? "unknown"
-                    await ndk.pool.addRelayAndConnect(url: relayURL, origin: .outbox(authorPubkey: originAuthor))
+                    // Use ndk.addRelay instead of pool.addRelay to ensure auto-connect happens
+                    await ndk.addRelay(relayURL, origin: .outbox(authorPubkey: originAuthor))
                 }
             }
             
@@ -370,7 +373,7 @@ actor NDKDataRequirementManager {
                 // Create enhanced requirement for this specific relay
                 // This follows the outbox model: create a new requirement for discovered relays
                 let enhancedRequirementId = UUID()
-                let (enhancedRequirement, _) = await createRequirement(
+                let (enhancedRequirement, _, _) = await createRequirement(
                     filter: enhancedFilter,
                     maxAge: 0, // Enhanced requirements are live subscriptions
                     cachePolicy: .networkOnly, // Fetch fresh data from discovered relays

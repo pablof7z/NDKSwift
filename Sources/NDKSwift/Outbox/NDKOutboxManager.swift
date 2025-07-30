@@ -331,24 +331,49 @@ public actor NDKOutboxManager {
         }
 
         NDKLogger.log(.info, category: .outbox, "📊 Relay mapping: \(unknownAuthors.count) unknown authors, \(authorsToDiscover.count) to discover")
+        
+        // Log current state of relayToAuthors before adding unknown authors
+        if NDKLogger.logLevel >= .debug && !relayToAuthors.isEmpty {
+            NDKLogger.log(.debug, category: .outbox, "📋 Current relayToAuthors mapping before adding unknown authors:")
+            for (relay, authors) in relayToAuthors {
+                NDKLogger.log(.debug, category: .outbox, "  - \(relay): \(authors.count) authors")
+            }
+        }
 
-        // Add unknown authors to app's default relays
+        // Add unknown authors to app's explicit relays (NOT outbox relays)
         if !unknownAuthors.isEmpty {
-            let defaultRelays = await ndk.pool.connectedRelayURLs
-            NDKLogger.log(.debug, category: .outbox, "🔄 Adding \(unknownAuthors.count) unknown authors to \(defaultRelays.count) default relays")
-            for relay in defaultRelays {
+            // Get only the explicit relays, excluding outbox relays
+            let allConnectedRelays = await ndk.pool.connectedRelayURLs
+            // Normalize outbox relay URLs to match the format of connected relays
+            let normalizedOutboxRelays = Set(ndk.outboxConfig.outboxRelays.map { $0.normalizedRelayURL })
+            let explicitRelays = allConnectedRelays.subtracting(normalizedOutboxRelays)
+            
+            NDKLogger.log(.debug, category: .outbox, "🔍 Relay filtering details:")
+            NDKLogger.log(.debug, category: .outbox, "  - Connected relays: \(allConnectedRelays.sorted())")
+            NDKLogger.log(.debug, category: .outbox, "  - Outbox config relays (raw): \(ndk.outboxConfig.outboxRelays.sorted())")
+            NDKLogger.log(.debug, category: .outbox, "  - Outbox config relays (normalized): \(normalizedOutboxRelays.sorted())")
+            NDKLogger.log(.debug, category: .outbox, "  - Explicit (non-outbox) relays: \(explicitRelays.sorted())")
+            NDKLogger.log(.debug, category: .outbox, "🔄 Adding \(unknownAuthors.count) unknown authors to \(explicitRelays.count) explicit relays (excluding outbox relays)")
+            for relay in explicitRelays {
                 relayToAuthors[relay, default: []].formUnion(unknownAuthors)
             }
         }
 
         // Create relay-specific filters
+        NDKLogger.log(.debug, category: .outbox, "📝 Creating filters from relayToAuthors mapping with \(relayToAuthors.count) entries")
         for (relay, relayAuthors) in relayToAuthors {
+            NDKLogger.log(.debug, category: .outbox, "  - Relay \(relay): \(relayAuthors.count) authors")
             var relayFilter = filter
             relayFilter.authors = Array(relayAuthors)
             filtersByRelay[relay] = relayFilter
         }
 
         NDKLogger.log(.info, category: .outbox, "✅ Created \(filtersByRelay.count) relay-specific filters")
+        if NDKLogger.logLevel >= .debug {
+            for (relay, _) in filtersByRelay {
+                NDKLogger.log(.debug, category: .outbox, "  - Filter for relay: \(relay)")
+            }
+        }
 
         return OutboxFilterStrategy(
             filtersByRelay: filtersByRelay,
@@ -377,8 +402,15 @@ public actor NDKOutboxManager {
             let connectedRelays = await ndk.pool.connectedRelayURLs
             
             if !ndk.outboxConfig.outboxRelays.isEmpty {
-                // Check if any outbox relays are connected
-                let connectedOutboxRelays = ndk.outboxConfig.outboxRelays.intersection(connectedRelays)
+                // Check if any outbox relays are connected (normalize for comparison)
+                let normalizedOutboxRelays = Set(ndk.outboxConfig.outboxRelays.map { $0.normalizedRelayURL })
+                let connectedOutboxRelays = normalizedOutboxRelays.intersection(connectedRelays)
+                
+                NDKLogger.log(.debug, category: .outbox, "🔍 Checking outbox relay connectivity:")
+                NDKLogger.log(.debug, category: .outbox, "  - Configured outbox relays (raw): \(ndk.outboxConfig.outboxRelays.sorted())")
+                NDKLogger.log(.debug, category: .outbox, "  - Configured outbox relays (normalized): \(normalizedOutboxRelays.sorted())")
+                NDKLogger.log(.debug, category: .outbox, "  - Connected relays: \(connectedRelays.sorted())")
+                NDKLogger.log(.debug, category: .outbox, "  - Intersection: \(connectedOutboxRelays.sorted())")
                 
                 if !connectedOutboxRelays.isEmpty {
                     // Use connected outbox relays
@@ -426,47 +458,34 @@ public actor NDKOutboxManager {
 
         NDKLogger.log(.debug, category: .outbox, "📋 Processing relay list for \(event.pubkey.prefix(StringConstants.DisplayFormatting.hexPrefixLength))")
 
-        // Parse relay list from event
-        var readRelays = Set<RelayInfo>()
-        var writeRelays = Set<RelayInfo>()
-
-        for tag in event.tags {
-            guard tag.count >= 2, tag[0] == "r" else { continue }
-            let url = tag[1]
-            let isWrite = tag.count < 3 || tag[2].isEmpty || tag[2] == "write"
-            let isRead = tag.count < 3 || tag[2].isEmpty || tag[2] == "read"
-
-            let relayInfo = RelayInfo(url: url)
-            if isRead {
-                readRelays.insert(relayInfo)
-            }
-            if isWrite {
-                writeRelays.insert(relayInfo)
-            }
-        }
+        // Use NDKRelayList to parse the event - single source of truth
+        let relayList = NDKRelayList.fromEvent(event)
+        
+        let readRelayUrls = Set(relayList.readRelays.map { $0.url })
+        let writeRelayUrls = Set(relayList.writeRelays.map { $0.url })
 
         // Update tracker
         await tracker.track(
             pubkey: event.pubkey,
-            readRelays: Set(readRelays.map { $0.url }),
-            writeRelays: Set(writeRelays.map { $0.url }),
+            readRelays: readRelayUrls,
+            writeRelays: writeRelayUrls,
             source: .nip65
         )
 
-        NDKLogger.log(.info, category: .outbox, "✅ Updated relay info for \(event.pubkey.prefix(StringConstants.DisplayFormatting.hexPrefixLength)): \(readRelays.count) read, \(writeRelays.count) write")
+        NDKLogger.log(.info, category: .outbox, "✅ Updated relay info for \(event.pubkey.prefix(StringConstants.DisplayFormatting.hexPrefixLength)): \(readRelayUrls.count) read, \(writeRelayUrls.count) write")
         
         // Log specific relays discovered
         if NDKLogger.logLevel >= .debug {
-            NDKLogger.log(.debug, category: .outbox, "📋 Read relays: \(readRelays.map { $0.url })")
-            NDKLogger.log(.debug, category: .outbox, "📋 Write relays: \(writeRelays.map { $0.url })")
+            NDKLogger.log(.debug, category: .outbox, "📋 Read relays: \(readRelayUrls.sorted())")
+            NDKLogger.log(.debug, category: .outbox, "📋 Write relays: \(writeRelayUrls.sorted())")
         }
         
         // Emit relay discovery event
-        let allRelays = readRelays.union(writeRelays)
+        let allRelays = readRelayUrls.union(writeRelayUrls)
         if !allRelays.isEmpty {
             let discovery = RelayDiscovery(
                 authors: Set([event.pubkey]),
-                relays: Set(allRelays.map { $0.url })
+                relays: allRelays
             )
             NDKLogger.log(.info, category: .outbox, "📡 Emitting relay discovery event for \(event.pubkey.prefix(StringConstants.DisplayFormatting.hexPrefixLength)) with \(allRelays.count) relays")
             discoveryContinuation?.yield(discovery)
