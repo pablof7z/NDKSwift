@@ -129,7 +129,7 @@ actor NDKRelaySubscriptionGroup {
         guard await relay.isConnected else {
             status = .waiting
             NDKLogger.log(.debug, category: .subscription,
-                         "⏳ Relay not connected, waiting for group \(fingerprint)")
+                         "⏳ Relay \(relay.url) not connected, waiting for group \(fingerprint)")
             return
         }
         

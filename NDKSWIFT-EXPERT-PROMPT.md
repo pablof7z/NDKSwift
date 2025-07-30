@@ -38,9 +38,14 @@ await ndk.connect() // Connect to the initial relays
 
 NDKSwift provides a powerful, self-contained authentication system via `NDKAuthManager`.
 
+**IMPORTANT:** NDKAuthManager is NOT a singleton. You must create an instance and manage its lifecycle:
+```swift
+let authManager = NDKAuthManager(ndk: ndk)
+```
+
 **Key Components:**
 
-*   **`NDKAuthManager`**: An `@Observable` singleton (`NDKAuthManager.shared`) that manages all authentication state, sessions, and the active signer. Use this as the source of truth for your UI.
+*   **`NDKAuthManager`**: An `@Observable` class that manages all authentication state, sessions, and the active signer. Create an instance with `NDKAuthManager(ndk: ndk)` and use it as the source of truth for your UI.
 *   **`NDKSession`**: Represents a single user login. It stores public metadata (profile info, pubkey) and security settings.
 *   **`NDKKeychainManager`**: Securely stores sensitive signer data in the iOS Keychain, handling biometric protection. This is used internally by the `AuthManager`.
 *   **`NDKSigner` Protocol**: An abstraction for signing events. `NDKPrivateKeySigner` is the primary implementation for local private keys.
@@ -50,12 +55,28 @@ NDKSwift provides a powerful, self-contained authentication system via `NDKAuthM
 1.  **Build your own authentication UI:**
 
     ```swift
+    // In your App or main view model
+    @Observable
+    class AppModel {
+        let ndk: NDK
+        let authManager: NDKAuthManager
+        
+        init() {
+            // Initialize NDK with cache
+            let cache = try? await NDKSQLiteCache(path: nil)
+            self.ndk = NDK(relayUrls: ["wss://relay.damus.io"], cache: cache ?? MemoryCache())
+            
+            // Create auth manager
+            self.authManager = NDKAuthManager(ndk: ndk)
+        }
+    }
+    
     // In your ContentView.swift
     struct ContentView: View {
-        @State private var authManager = NDKAuthManager.shared
+        @Environment(AppModel.self) var appModel
 
         var body: some View {
-            if authManager.isAuthenticated {
+            if appModel.authManager.isAuthenticated {
                 // This is your main app view, shown when authenticated
                 MainAppView()
             } else {
@@ -72,12 +93,22 @@ NDKSwift provides a powerful, self-contained authentication system via `NDKAuthM
     ```swift
     // In YourLoginOrCreateAccountView.swift
     let signer = try NDKPrivateKeySigner.generate()
-    let session = try await authManager.createSession(
-        with: signer,
-        displayName: "My New Account",
+    let session = try await authManager.addSession(
+        signer,
         requiresBiometric: true // Recommended for security
     )
-    try await authManager.switchToSession(session)
+    // Session is automatically activated - no need to switch
+    
+    // To set display name and profile, publish a metadata event
+    let profileEvent = try await NDKEventBuilder()
+        .kind(0) // metadata
+        .content(JSONCoding.encode([
+            "name": "My Display Name",
+            "about": "My bio",
+            "picture": "https://example.com/avatar.jpg"
+        ]))
+        .build(signer: signer)
+    try await ndk.publish(profileEvent)
     ```
 
 3.  **Importing an Account (nsec):**
@@ -86,11 +117,20 @@ NDKSwift provides a powerful, self-contained authentication system via `NDKAuthM
     ```swift
     let nsec = "nsec1..."
     let signer = try NDKPrivateKeySigner(nsec: nsec)
-    let session = try await authManager.createSession(with: signer, displayName: "Imported Account")
-    try await authManager.switchToSession(session)
+    let session = try await authManager.addSession(signer)
+    // Session is automatically activated
     ```
 
-4.  **Session Management on App Launch:**
+4.  **Read-Only Sessions:**
+    Create sessions for viewing other users' content without signing capabilities.
+    
+    ```swift
+    let user = NDKUser(pubkey: "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e53f")
+    let readOnlySession = try await authManager.addSession(user: user)
+    // Can now view this user's data without ability to sign
+    ```
+
+5.  **Session Management on App Launch:**
     NDKSwift provides a simple `initialize()` method that handles all session restoration automatically.
 
     ```swift
@@ -108,7 +148,7 @@ NDKSwift provides a powerful, self-contained authentication system via `NDKAuthM
     - Sets up the NDK signer
     - No manual session switching needed for common cases
 
-5.  **Handling Multiple Sessions:**
+6.  **Handling Multiple Sessions:**
     When multiple sessions exist, `initialize()` automatically restores the most recent active session. To switch between sessions manually:
 
     ```swift
@@ -121,14 +161,13 @@ NDKSwift provides a powerful, self-contained authentication system via `NDKAuthM
     }
     ```
 
-6.  **Biometric Authentication Flow:**
+7.  **Biometric Authentication Flow:**
     Sessions with biometric protection automatically prompt when accessed.
 
     ```swift
     // Creating a biometric-protected session
-    let session = try await authManager.createSession(
-        with: signer,
-        displayName: "Secure Account",
+    let session = try await authManager.addSession(
+        signer,
         requiresBiometric: true
     )
     
@@ -150,7 +189,22 @@ NDKSwift provides a powerful, self-contained authentication system via `NDKAuthM
 
 2. **Error Handling**: The authentication system provides specific error types (`NDKAuthError`) for different failure scenarios. Handle these appropriately in your UI.
 
-3. **NostrManager Pattern**: Create a `NostrManager` as an `@ObservableObject` or `@Environment` object that holds the `ndk` instance and interacts with `NDKAuthManager`. This keeps your views clean and centralizes Nostr operations.
+3. **NostrManager Pattern**: Create a `NostrManager` as an `@Observable` or `@Environment` object that holds both the `ndk` instance and `authManager`. This keeps your views clean and centralizes Nostr operations.
+
+```swift
+@Observable
+class NostrManager {
+    let ndk: NDK
+    let authManager: NDKAuthManager
+    
+    init() async throws {
+        let cache = try await NDKSQLiteCache(path: nil)
+        self.ndk = NDK(relayUrls: ["wss://relay.damus.io"], cache: cache)
+        self.authManager = NDKAuthManager(ndk: ndk)
+        await authManager.initialize()
+    }
+}
+```
 
 4. **Biometric Security**: Always recommend `requiresBiometric: true` for new sessions to enhance security. The system handles all the complexity of biometric prompts and fallbacks.
 
@@ -239,8 +293,8 @@ func softLogout() {
 func testProperLogout() async {
     // 1. Create and activate a session
     let signer = try NDKPrivateKeySigner.generate()
-    let session = try await authManager.createSession(with: signer)
-    try await authManager.switchToSession(session)
+    let session = try await authManager.addSession(signer)
+    // Session is automatically activated
     
     // 2. Perform logout
     await performLogout()
@@ -1484,7 +1538,8 @@ let relays = await ndk.relays
 let activeRelays = relays.filter { await $0.isConnected }
 
 // Add/remove relays
-await ndk.addRelayAndConnect("wss://new-relay.com")
+await ndk.addRelay("wss://new-relay.com")
+await ndk.connect() // Connect to all relays including outbox relays
 await relay.disconnect()
 
 // Monitor relay health

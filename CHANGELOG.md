@@ -4,6 +4,40 @@ All notable changes to NDKSwift will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Updated NDKSWIFT-EXPERT-PROMPT.md documentation to match actual NDKAuthManager implementation:
+  - Removed incorrect references to `NDKAuthManager.shared` singleton (doesn't exist)
+  - Changed all `createSession()` method calls to correct `addSession()` method
+  - Updated initialization pattern to show proper instantiation: `NDKAuthManager(ndk: ndk)`
+  - Added documentation for read-only sessions via `addSession(user:)`
+  - Fixed inline documentation in NDKAuthManager.swift
+  - Added example of how to set profile metadata after creating account
+
+## [0.10.0] - 2025-01-29
+
+### Added
+- Smart EOSE aggregation matching ndk-core behavior for `collect()` method
+- Progressive timeout algorithm that reduces wait time as more relays respond
+- Query fulfillment detection for ID-based and limit-based queries
+- `EOSETracker` actor for sophisticated relay EOSE management
+- New `RelayUpdate.aggregatedEose` event type for unified EOSE handling
+- Example demonstrating smart collect behavior (Example11_SmartCollect.swift)
+
+### Changed
+- **BREAKING**: `NDKDataRequirementManager.registerRequirement()` now returns relay updates stream
+- `collect()` method now returns immediately when:
+  - All requested event IDs are found
+  - Query limit is reached
+  - Progressive timeout triggers based on relay response percentage
+- Replaceable events (profiles, contact lists) always wait for all relays to ensure latest version
+
+### Fixed
+- `collect()` no longer waits for full timeout when data requirements are satisfied
+- Improved performance for fetching relay lists and other one-shot queries
+- Better handling of partial relay responses
+
 ## [0.9.1] - 2025-01-29
 
 ### Added

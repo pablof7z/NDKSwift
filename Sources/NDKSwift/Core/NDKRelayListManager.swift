@@ -56,7 +56,7 @@ public class NDKRelayListManager: ObservableObject {
         }
         
         // Add to NDK
-        _ = await ndk.addRelayAndConnect(url)
+        _ = await ndk.addRelay(url)
         
         // Update relay list event
         await updateRelayList()
@@ -88,7 +88,7 @@ public class NDKRelayListManager: ObservableObject {
         
         // Add default relays
         for relayURL in defaultRelays {
-            _ = await ndk.addRelayAndConnect(relayURL)
+            _ = await ndk.addRelay(relayURL)
         }
         
         // Update relay list event
@@ -142,12 +142,12 @@ public class NDKRelayListManager: ObservableObject {
         
         // Connect to all relays in the list
         for entry in relayList.relayEntries {
-            _ = await ndk.addRelayAndConnect(entry.relay.url)
+            _ = await ndk.addRelay(entry.relay.url)
         }
         
         // Also connect to any locally added relays
         for url in getUserAddedRelays() {
-            _ = await ndk.addRelayAndConnect(url)
+            _ = await ndk.addRelay(url)
         }
     }
     
@@ -155,7 +155,7 @@ public class NDKRelayListManager: ObservableObject {
         // Connect to default relays and any user-added ones
         let allRelays = Set(defaultRelays + getUserAddedRelays())
         for url in allRelays {
-            _ = await ndk.addRelayAndConnect(url)
+            _ = await ndk.addRelay(url)
         }
     }
     

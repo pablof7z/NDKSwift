@@ -17,6 +17,8 @@ public enum RelayUpdate {
     case event(NDKEvent, relay: String)
     /// End of stored events from a specific relay
     case eose(relay: String)
+    /// Aggregated EOSE - all or enough relays have sent EOSE
+    case aggregatedEose
     /// Subscription closed on a specific relay
     case closed(relay: String)
 }
@@ -169,7 +171,7 @@ public final class NDKDataSource<T>: ObservableObject {
         if let requirementManager = ndk.dataRequirementManager {
             NDKLogger.log(.debug, category: .subscription, "✅ Found dataRequirementManager, registering requirement", correlationId: correlationId)
             
-            let (handle, eventStream) = await requirementManager.registerRequirement(
+            let (handle, eventStream, relayUpdateStream) = await requirementManager.registerRequirement(
                 filter: filter,
                 maxAge: maxAge,
                 cachePolicy: cachePolicy,
@@ -185,6 +187,14 @@ public final class NDKDataSource<T>: ObservableObject {
                 guard let self = self else { return }
                 for await event in eventStream {
                     await self.handleEvent(event)
+                }
+            }
+            
+            // Process relay updates from the stream
+            Task { [weak self] in
+                guard let self = self else { return }
+                for await update in relayUpdateStream {
+                    self.relayUpdatesContinuation.yield(update)
                 }
             }
             
@@ -300,6 +310,12 @@ public final class NDKDataSource<T>: ObservableObject {
                             return nil
                         }
 
+                    case .aggregatedEose:
+                        // Aggregated EOSE received with no events
+                        if self.data.isEmpty {
+                            return nil
+                        }
+
                     case .closed:
                         break
                     }
@@ -322,7 +338,7 @@ public final class NDKDataSource<T>: ObservableObject {
 
     /// Collect all events until EOSE or timeout
     /// - Parameters:
-    ///   - timeout: Maximum time to wait (default: 10 seconds)
+    ///   - timeout: Maximum time to wait if no EOSE received (default: 10 seconds)
     ///   - limit: Maximum number of events to collect (nil = unlimited)
     /// - Returns: Array of collected events
     ///
@@ -336,12 +352,12 @@ public final class NDKDataSource<T>: ObservableObject {
     /// let limitedEvents = await dataSource.collect(limit: 100)
     /// ```
     /// 
-    /// - Note: This method waits for EOSE from all relays or until timeout/limit is reached
+    /// - Note: This method returns immediately when aggregated EOSE is received (using smart timeout logic from ndk-core)
     public func collect(timeout: TimeInterval = 10.0, limit: Int? = nil) async -> [T] {
         var collected: [T] = []
 
         await withTaskGroup(of: Void.self) { group in
-            // Timeout task
+            // Timeout task (only as fallback)
             group.addTask {
                 try? await Task.sleep(nanoseconds: UInt64(timeout * Double(TimeConstants.nanosecondsPerSecond)))
             }
@@ -350,8 +366,6 @@ public final class NDKDataSource<T>: ObservableObject {
             group.addTask { [weak self] in
                 guard let self = self else { return }
 
-                var activeRelays = Set<String>()
-                var eoseReceived = Set<String>()
                 var eventTask: Task<Void, Never>?
 
                 // Start event collection
@@ -364,21 +378,21 @@ public final class NDKDataSource<T>: ObservableObject {
                     }
                 }
 
-                // Monitor relay updates
+                // Monitor relay updates for aggregated EOSE
                 for await update in self.relayUpdates {
                     switch update {
-                    case .event(_, let relay):
-                        activeRelays.insert(relay)
+                    case .event:
+                        // Events are handled by the event collection task
+                        break
 
-                    case .eose(let relay):
-                        activeRelays.insert(relay)
-                        eoseReceived.insert(relay)
+                    case .eose:
+                        // Individual relay EOSE - handled by EOSETracker
+                        break
 
-                        // Check if all active relays have sent EOSE
-                        if !activeRelays.isEmpty && activeRelays == eoseReceived {
-                            eventTask?.cancel()
-                            return
-                        }
+                    case .aggregatedEose:
+                        // All/enough relays have sent EOSE - we're done!
+                        eventTask?.cancel()
+                        return
 
                     case .closed:
                         eventTask?.cancel()
@@ -405,9 +419,6 @@ public final class NDKDataSource<T>: ObservableObject {
                     return
                 }
 
-                var activeRelays = Set<String>()
-                var eoseReceived = Set<String>()
-
                 // Start forwarding events
                 let eventTask = Task {
                     for await event in self.events {
@@ -415,22 +426,22 @@ public final class NDKDataSource<T>: ObservableObject {
                     }
                 }
 
-                // Monitor for EOSE
+                // Monitor for aggregated EOSE
                 for await update in self.relayUpdates {
                     switch update {
-                    case .event(_, let relay):
-                        activeRelays.insert(relay)
+                    case .event:
+                        // Events are handled by the event task
+                        break
 
-                    case .eose(let relay):
-                        activeRelays.insert(relay)
-                        eoseReceived.insert(relay)
+                    case .eose:
+                        // Individual relay EOSE - handled by EOSETracker
+                        break
 
-                        // Check if all active relays have sent EOSE
-                        if !activeRelays.isEmpty && activeRelays == eoseReceived {
-                            eventTask.cancel()
-                            continuation.finish()
-                            return
-                        }
+                    case .aggregatedEose:
+                        // All/enough relays have sent EOSE - complete the stream
+                        eventTask.cancel()
+                        continuation.finish()
+                        return
 
                     case .closed:
                         eventTask.cancel()
