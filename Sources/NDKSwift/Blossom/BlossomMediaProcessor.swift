@@ -1,18 +1,17 @@
 import Foundation
-// import UnifiedBlurHash
 #if canImport(UIKit)
 import UIKit
 #elseif canImport(AppKit)
 import AppKit
 #endif
 
-/// Processes media files to extract metadata like blurhash and dimensions
+/// Processes media files to extract metadata like dimensions
 public enum BlossomMediaProcessor {
 
-    /// Process image data to extract metadata
+    /// Process image data to extract dimensions
     /// - Parameter data: The image data
-    /// - Returns: Tuple containing blurhash and dimensions, or nil if not an image
-    public static func processImage(_ data: Data) -> (blurhash: String, dimensions: (width: Int, height: Int))? {
+    /// - Returns: Image dimensions, or nil if not an image
+    public static func processImage(_ data: Data) -> (width: Int, height: Int)? {
         #if canImport(UIKit)
         guard let image = UIImage(data: data) else { return nil }
         let size = image.size
@@ -20,11 +19,7 @@ public enum BlossomMediaProcessor {
         let pixelWidth = Int(size.width * scale)
         let pixelHeight = Int(size.height * scale)
 
-        // For now, return a placeholder blurhash since we can't use external dependencies
-        // A real implementation would calculate the actual blurhash
-        let blurhash = "L00000fQfQfQfQfQfQfQfQfQfQfQ"
-
-        return (blurhash: blurhash, dimensions: (width: pixelWidth, height: pixelHeight))
+        return (width: pixelWidth, height: pixelHeight)
 
         #elseif canImport(AppKit)
         guard let image = NSImage(data: data) else { return nil }
@@ -37,12 +32,7 @@ public enum BlossomMediaProcessor {
         let pixelWidth = cgImage.width
         let pixelHeight = cgImage.height
 
-        // For now, return a placeholder blurhash since we can't use external dependencies
-        // A real implementation would calculate the actual blurhash with component counts
-        // based on image dimensions (e.g., min(9, max(4, pixelWidth / 100)))
-        let blurhash = "L00000fQfQfQfQfQfQfQfQfQfQfQ"
-
-        return (blurhash: blurhash, dimensions: (width: pixelWidth, height: pixelHeight))
+        return (width: pixelWidth, height: pixelHeight)
         #endif
     }
 

@@ -102,13 +102,9 @@ final class BlossomMediaProcessorTests: XCTestCase {
         XCTAssertNotNil(result)
         
         if let result = result {
-            // Check blurhash
-            XCTAssertFalse(result.blurhash.isEmpty)
-            XCTAssertTrue(result.blurhash.hasPrefix("L")) // Blurhash typically starts with L
-            
             // Check dimensions
-            XCTAssertEqual(result.dimensions.width, 100)
-            XCTAssertEqual(result.dimensions.height, 100)
+            XCTAssertEqual(result.width, 100)
+            XCTAssertEqual(result.height, 100)
         }
     }
     
@@ -131,12 +127,9 @@ final class BlossomMediaProcessorTests: XCTestCase {
         XCTAssertNotNil(result)
         
         if let result = result {
-            // Check blurhash
-            XCTAssertFalse(result.blurhash.isEmpty)
-            
             // Check dimensions
-            XCTAssertEqual(result.dimensions.width, 200)
-            XCTAssertEqual(result.dimensions.height, 150)
+            XCTAssertEqual(result.width, 200)
+            XCTAssertEqual(result.height, 150)
         }
     }
     
@@ -165,11 +158,8 @@ final class BlossomMediaProcessorTests: XCTestCase {
         
         if let result = result {
             // Check dimensions
-            XCTAssertEqual(result.dimensions.width, 1920)
-            XCTAssertEqual(result.dimensions.height, 1080)
-            
-            // Blurhash should have reasonable length (components capped at 9x9)
-            XCTAssertTrue(result.blurhash.count < 200)
+            XCTAssertEqual(result.width, 1920)
+            XCTAssertEqual(result.height, 1080)
         }
     }
     
@@ -208,22 +198,22 @@ final class BlossomMediaProcessorTests: XCTestCase {
         
         if let result = result {
             // Should report pixel dimensions, not logical dimensions
-            XCTAssertEqual(result.dimensions.width, 200) // 100 * 2
-            XCTAssertEqual(result.dimensions.height, 200) // 100 * 2
+            XCTAssertEqual(result.width, 200) // 100 * 2
+            XCTAssertEqual(result.height, 200) // 100 * 2
         }
     }
     #endif
     
-    // MARK: - Component Calculation Tests
+    // MARK: - Dimension Tests
     
-    func testBlurhashComponentCalculation() {
-        // Test the component calculation logic indirectly through different image sizes
+    func testImageDimensionsCalculation() {
+        // Test dimension extraction for different image sizes
         #if canImport(UIKit)
         let testCases: [(width: Int, height: Int)] = [
-            (50, 50),      // Very small - should use minimum components
-            (400, 400),    // Medium - should use 4 components
-            (1000, 1000),  // Large - should use more components
-            (2000, 2000),  // Very large - should cap at 9 components
+            (50, 50),      // Small square
+            (400, 200),    // Wide rectangle
+            (100, 300),    // Tall rectangle
+            (1920, 1080),  // HD dimensions
         ]
         
         for testCase in testCases {
@@ -245,20 +235,8 @@ final class BlossomMediaProcessorTests: XCTestCase {
             
             if let result = result {
                 // Verify dimensions are correct
-                XCTAssertEqual(result.dimensions.width, testCase.width)
-                XCTAssertEqual(result.dimensions.height, testCase.height)
-                
-                // Verify blurhash exists and is reasonable
-                XCTAssertFalse(result.blurhash.isEmpty)
-                
-                // Smaller images should have shorter blurhashes (fewer components)
-                // Larger images should have longer blurhashes (more components)
-                // This is a rough heuristic check
-                if testCase.width <= 100 {
-                    XCTAssertLessThan(result.blurhash.count, 30)
-                } else if testCase.width >= 1000 {
-                    XCTAssertGreaterThan(result.blurhash.count, 30)
-                }
+                XCTAssertEqual(result.width, testCase.width)
+                XCTAssertEqual(result.height, testCase.height)
             }
         }
         #endif

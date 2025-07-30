@@ -10,7 +10,6 @@ final class BlossomBlobTests: XCTestCase {
             size: 1024,
             type: "image/jpeg",
             uploaded: Date(),
-            blurhash: "LGF5]+Yk^6#M@-5c,1J5@[or[Q6.",
             dimensions: (width: 1920, height: 1080)
         )
         
@@ -18,7 +17,6 @@ final class BlossomBlobTests: XCTestCase {
         XCTAssertEqual(blob.url, "https://example.com/abc123.jpg")
         XCTAssertEqual(blob.size, 1024)
         XCTAssertEqual(blob.type, "image/jpeg")
-        XCTAssertEqual(blob.blurhash, "LGF5]+Yk^6#M@-5c,1J5@[or[Q6.")
         XCTAssertEqual(blob.dimensions?.width, 1920)
         XCTAssertEqual(blob.dimensions?.height, 1080)
     }
@@ -31,7 +29,6 @@ final class BlossomBlobTests: XCTestCase {
             type: "application/pdf"
         )
         
-        XCTAssertNil(blob.blurhash)
         XCTAssertNil(blob.dimensions)
         XCTAssertNil(blob.dimensionsString)
     }
@@ -64,7 +61,6 @@ final class BlossomBlobTests: XCTestCase {
             size: 1024,
             type: "image/jpeg",
             uploaded: Date(),
-            blurhash: "LGF5]+Yk^6#M@-5c,1J5@[or[Q6.",
             dimensions: (width: 1920, height: 1080)
         )
         
@@ -79,7 +75,6 @@ final class BlossomBlobTests: XCTestCase {
         XCTAssertEqual(decodedBlob.url, originalBlob.url)
         XCTAssertEqual(decodedBlob.size, originalBlob.size)
         XCTAssertEqual(decodedBlob.type, originalBlob.type)
-        XCTAssertEqual(decodedBlob.blurhash, originalBlob.blurhash)
         XCTAssertEqual(decodedBlob.dimensions?.width, originalBlob.dimensions?.width)
         XCTAssertEqual(decodedBlob.dimensions?.height, originalBlob.dimensions?.height)
         
@@ -89,7 +84,6 @@ final class BlossomBlobTests: XCTestCase {
         XCTAssertNotNil(json?["url"])
         XCTAssertNotNil(json?["size"])
         XCTAssertNotNil(json?["type"])
-        XCTAssertNotNil(json?["blurhash"])
         XCTAssertNotNil(json?["dimensionWidth"])
         XCTAssertNotNil(json?["dimensionHeight"])
     }
@@ -114,12 +108,10 @@ final class BlossomBlobTests: XCTestCase {
         
         // Verify optional fields are nil
         XCTAssertNil(decodedBlob.type)
-        XCTAssertNil(decodedBlob.blurhash)
         XCTAssertNil(decodedBlob.dimensions)
         
         // Check the JSON doesn't include nil fields
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        XCTAssertNil(json?["blurhash"])
         XCTAssertNil(json?["dimensionWidth"])
         XCTAssertNil(json?["dimensionHeight"])
     }
@@ -152,7 +144,6 @@ final class BlossomBlobTests: XCTestCase {
         XCTAssertEqual(blob.url, "https://example.com/legacy.jpg")
         XCTAssertEqual(blob.size, 512)
         XCTAssertEqual(blob.type, "image/jpeg")
-        XCTAssertNil(blob.blurhash)
         XCTAssertNil(blob.dimensions)
     }
     

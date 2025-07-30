@@ -78,7 +78,7 @@ let event = try await NDKEventBuilder(ndk: ndk)
 
 ## Blossom Integration
 
-NDKSwift provides seamless integration with Blossom file uploads, **automatically extracting blurhash and dimensions** during upload:
+NDKSwift provides seamless integration with Blossom file uploads, **automatically extracting dimensions** during upload:
 
 ```swift
 // Upload file to Blossom
@@ -105,9 +105,8 @@ The Blossom integration **automatically** includes:
 When you upload an image to Blossom, NDKSwift automatically:
 
 1. **Detects MIME type** from file signature if not provided
-2. **Calculates blurhash** for supported image formats (JPEG, PNG, WebP, HEIC)
-3. **Extracts dimensions** from the image data
-4. **Includes all metadata** in the returned `BlossomBlob`
+2. **Extracts dimensions** from the image data for supported formats (JPEG, PNG, WebP, HEIC)
+3. **Includes all metadata** in the returned `BlossomBlob`
 
 This means your `imeta` tags are complete without any extra work:
 
@@ -117,7 +116,6 @@ upload.first!.url         // "https://blossom.example.com/abc123..."
 upload.first!.sha256      // "abc123def456..."
 upload.first!.size        // 512000
 upload.first!.type        // "image/jpeg"
-upload.first!.blurhash    // "LGF5]+Yk^6#M@-5c,1J5@[or[Q6."
 upload.first!.dimensions  // (width: 3024, height: 4032)
 ```
 

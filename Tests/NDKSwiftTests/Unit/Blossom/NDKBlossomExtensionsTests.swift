@@ -51,8 +51,8 @@ final class NDKBlossomExtensionsTests: XCTestCase {
     func testUploadToBlossomWithCustomServers() async throws {
         ndk.signer = mockSigner
         
-        let testData = Data("test content".utf8)
-        let customServers = ["https://custom1.example.com", "https://custom2.example.com"]
+        _ = Data("test content".utf8)
+        _ = ["https://custom1.example.com", "https://custom2.example.com"]
         
         // We can't easily mock the Blossom client since it's internal to NDK
         // Instead, we'll just verify that the method accepts custom servers
@@ -70,7 +70,6 @@ final class NDKBlossomExtensionsTests: XCTestCase {
             url: "https://blossom.example.com/abc123",
             size: 1024,
             type: "image/jpeg",
-            blurhash: "L6PZfSi_.AyE_3t7t7R**0o#DgR4",
             dimensions: (width: 800, height: 600)
         )
         
@@ -89,8 +88,10 @@ final class NDKBlossomExtensionsTests: XCTestCase {
         XCTAssertTrue(event.tags.contains { $0[0] == "x" && $0[1] == blob.sha256 })
         XCTAssertTrue(event.tags.contains { $0[0] == "size" && $0[1] == String(blob.size) })
         XCTAssertTrue(event.tags.contains { $0[0] == "m" && $0[1] == "image/jpeg" })
-        XCTAssertTrue(event.tags.contains { $0[0] == "blurhash" && $0[1] == "L6PZfSi_.AyE_3t7t7R**0o#DgR4" })
         XCTAssertTrue(event.tags.contains { $0[0] == "dim" && $0[1] == "800x600" })
+        
+        // Check that no blurhash tag is present since it's not in the blob
+        XCTAssertFalse(event.tags.contains { $0[0] == "blurhash" })
     }
     
     func testCreateFileMetadataWithMultipleBlobs() async throws {

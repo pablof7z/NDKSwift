@@ -62,8 +62,7 @@ final class BlossomClientMetadataTests: NDKTestCase {
         // Verify metadata was extracted
         XCTAssertEqual(blob.sha256, sha256)
         XCTAssertEqual(blob.type, "image/jpeg")
-        XCTAssertNotNil(blob.blurhash)
-        XCTAssertFalse(blob.blurhash!.isEmpty)
+        XCTAssertNil(blob.blurhash) // Blurhash no longer auto-generated
         XCTAssertNotNil(blob.dimensions)
         XCTAssertEqual(blob.dimensions?.width, 200)
         XCTAssertEqual(blob.dimensions?.height, 100)
@@ -143,7 +142,6 @@ final class BlossomClientMetadataTests: NDKTestCase {
         // Verify no image metadata was extracted
         XCTAssertEqual(blob.sha256, sha256)
         XCTAssertEqual(blob.type, "application/pdf")
-        XCTAssertNil(blob.blurhash)
         XCTAssertNil(blob.dimensions)
     }
     
@@ -182,7 +180,6 @@ final class BlossomClientMetadataTests: NDKTestCase {
         
         // Verify no metadata extraction occurred due to MIME type
         XCTAssertEqual(blob.type, "application/octet-stream")
-        XCTAssertNil(blob.blurhash)
         XCTAssertNil(blob.dimensions)
     }
     
@@ -232,7 +229,7 @@ final class BlossomClientMetadataTests: NDKTestCase {
         
         // Verify metadata was extracted for PNG
         XCTAssertEqual(blob.type, "image/png")
-        XCTAssertNotNil(blob.blurhash)
+        XCTAssertNil(blob.blurhash) // Blurhash no longer auto-generated
         XCTAssertNotNil(blob.dimensions)
         XCTAssertEqual(blob.dimensions?.width, 150)
         XCTAssertEqual(blob.dimensions?.height, 150)

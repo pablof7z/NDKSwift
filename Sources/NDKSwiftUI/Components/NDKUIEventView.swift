@@ -165,108 +165,30 @@ public struct NDKTextNoteView: View {
     let showInteractions: Bool
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: verticalSpacing) {
+        VStack(alignment: .leading, spacing: NDKEventViewStyles.verticalSpacing(for: style)) {
             // Author header
             if showAuthor {
                 NDKUIEventAuthorHeader(
                     ndk: ndk,
                     pubkey: event.pubkey,
                     timestamp: showTimestamp ? event.createdAt : nil,
-                    style: authorHeaderStyle
+                    style: NDKEventViewStyles.authorHeaderStyle(for: style)
                 )
             }
 
             // Content
             NDKRichText(content: event.content)
-                .font(contentFont)
-                .lineLimit(contentLineLimit)
+                .font(NDKEventViewStyles.contentFont(for: style))
+                .lineLimit(NDKEventViewStyles.contentLineLimit(for: style))
 
             // Media/URL previews would go here in full implementation
 
             // Interactions
             if showInteractions {
-                NDKEventInteractionBar(event: event, style: interactionStyle)
+                NDKEventInteractionBar(event: event, style: NDKEventViewStyles.interactionBarStyle(for: style))
             }
         }
-        .padding(containerPadding)
-        .background(backgroundColor)
-        .cornerRadius(cornerRadius)
-    }
-
-    // MARK: - Style Properties
-
-    private var verticalSpacing: CGFloat {
-        switch style {
-        case .full: return 12
-        case .feed: return 8
-        case .compact: return 6
-        case .thread: return 10
-        case .embedded: return 6
-        }
-    }
-
-    private var contentFont: Font {
-        switch style {
-        case .full: return .body
-        case .feed: return .body
-        case .compact: return .callout
-        case .thread: return .body
-        case .embedded: return .callout
-        }
-    }
-
-    private var contentLineLimit: Int? {
-        switch style {
-        case .full: return nil
-        case .feed: return 6
-        case .compact: return 3
-        case .thread: return nil
-        case .embedded: return 3
-        }
-    }
-
-    private var authorHeaderStyle: NDKUIEventAuthorHeader.Style {
-        switch style {
-        case .full: return .detailed
-        case .feed: return .standard
-        case .compact: return .minimal
-        case .thread: return .standard
-        case .embedded: return .minimal
-        }
-    }
-
-    private var interactionStyle: NDKEventInteractionBar.Style {
-        switch style {
-        case .full: return .detailed
-        case .feed: return .standard
-        case .compact: return .minimal
-        case .thread: return .standard
-        case .embedded: return .minimal
-        }
-    }
-
-    private var containerPadding: EdgeInsets {
-        switch style {
-        case .full: return EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16)
-        case .feed: return EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16)
-        case .compact: return EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12)
-        case .thread: return EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16)
-        case .embedded: return EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12)
-        }
-    }
-
-    private var backgroundColor: Color {
-        switch style {
-        case .embedded, .compact: return Color.ndkSecondaryBackground
-        default: return Color.clear
-        }
-    }
-
-    private var cornerRadius: CGFloat {
-        switch style {
-        case .embedded, .compact: return 12
-        default: return 0
-        }
+        .ndkEventViewStyle(style)
     }
 }
 
@@ -281,19 +203,19 @@ public struct NDKLongFormArticleView: View {
     let showTimestamp: Bool
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: NDKEventViewStyles.verticalSpacing(for: style)) {
             // Author header
             if showAuthor {
                 NDKUIEventAuthorHeader(
                     ndk: ndk,
                     pubkey: event.pubkey,
                     timestamp: showTimestamp ? event.createdAt : nil,
-                    style: .standard
+                    style: NDKEventViewStyles.authorHeaderStyle(for: style)
                 )
             }
 
             // Article preview card
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: NDKEventViewStyles.horizontalSpacing(for: style) / 2) {
                 // Article image if available
                 if let imageURL = extractImageURL() {
                     CachedAsyncImage(url: imageURL) { image in
@@ -304,49 +226,47 @@ public struct NDKLongFormArticleView: View {
                         Rectangle()
                             .fill(Color.ndkGray5)
                     }
-                    .frame(height: 120)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .frame(height: NDKEventViewStyles.imageHeight(for: style) * 0.6)
+                    .clipShape(RoundedRectangle(cornerRadius: NDKEventViewStyles.cardCornerRadius(for: style) / 2))
                 }
 
                 // Title
                 if let title = extractTitle() {
                     Text(title)
-                        .font(.headline)
+                        .font(NDKEventViewStyles.titleFont(for: style))
                         .fontWeight(.semibold)
-                        .lineLimit(2)
+                        .lineLimit(NDKEventViewStyles.titleLineLimit(for: style))
                 }
 
                 // Summary
                 if let summary = extractSummary() {
                     Text(summary)
-                        .font(.body)
+                        .font(NDKEventViewStyles.contentFont(for: style))
                         .foregroundStyle(.secondary)
-                        .lineLimit(3)
+                        .lineLimit(NDKEventViewStyles.contentLineLimit(for: style))
                 }
 
                 // Article metadata
                 HStack {
                     Image(systemName: "doc.text")
-                        .font(.caption)
+                        .font(NDKEventViewStyles.captionFont(for: style))
                         .foregroundStyle(.secondary)
 
                     Text("Article")
-                        .font(.caption)
+                        .font(NDKEventViewStyles.captionFont(for: style))
                         .foregroundStyle(.secondary)
 
                     Spacer()
 
                     if let publishedAt = extractPublishedAt() {
                         NDKUIRelativeTime(timestamp: publishedAt)
-                            .font(.caption)
+                            .font(NDKEventViewStyles.captionFont(for: style))
                     }
                 }
             }
-            .padding(12)
-            .background(Color.ndkSecondaryBackground)
-            .cornerRadius(12)
+            .ndkEventCardStyle(style)
         }
-        .padding(.horizontal, 16)
+        .ndkEventViewStyle(style)
     }
 
     // MARK: - Helper Methods
@@ -386,37 +306,37 @@ public struct NDKCashuTokenView: View {
     let showTimestamp: Bool
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: NDKEventViewStyles.verticalSpacing(for: style)) {
             // Author header
             if showAuthor {
                 NDKUIEventAuthorHeader(
                     ndk: ndk,
                     pubkey: event.pubkey,
                     timestamp: showTimestamp ? event.createdAt : nil,
-                    style: .minimal
+                    style: NDKEventViewStyles.authorHeaderStyle(for: style)
                 )
             }
 
             // Token preview card
-            HStack(spacing: 12) {
+            HStack(spacing: NDKEventViewStyles.horizontalSpacing(for: style)) {
                 // Cashu icon
                 Image(systemName: "bitcoinsign.circle.fill")
-                    .font(.title2)
+                    .font(NDKEventViewStyles.titleFont(for: style))
                     .foregroundStyle(.orange)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Cashu Token")
-                        .font(.subheadline)
+                        .font(NDKEventViewStyles.contentFont(for: style))
                         .fontWeight(.medium)
 
                     if let memo = extractMemo() {
                         Text(memo)
-                            .font(.caption)
+                            .font(NDKEventViewStyles.captionFont(for: style))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     } else {
                         Text("Tap to view token")
-                            .font(.caption)
+                            .font(NDKEventViewStyles.captionFont(for: style))
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -427,24 +347,22 @@ public struct NDKCashuTokenView: View {
                 VStack(alignment: .trailing, spacing: 2) {
                     if let amount = extractAmount() {
                         Text("\(amount) sats")
-                            .font(.caption)
+                            .font(NDKEventViewStyles.captionFont(for: style))
                             .fontWeight(.medium)
                     }
 
                     Text("Token")
-                        .font(.caption2)
+                        .font(NDKEventViewStyles.captionFont(for: style))
                         .foregroundStyle(.secondary)
                 }
             }
-            .padding(12)
-            .background(Color.ndkSecondaryBackground)
-            .cornerRadius(12)
+            .ndkEventCardStyle(style)
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: NDKEventViewStyles.cardCornerRadius(for: style))
                     .stroke(Color.orange.opacity(OpacityConstants.border), lineWidth: 1)
             )
         }
-        .padding(.horizontal, 16)
+        .ndkEventViewStyle(style)
     }
 
     // MARK: - Helper Methods
@@ -473,23 +391,23 @@ public struct NDKPictureEventView: View {
     let showTimestamp: Bool
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: NDKEventViewStyles.verticalSpacing(for: style)) {
             // Author header
             if showAuthor {
                 NDKUIEventAuthorHeader(
                     ndk: ndk,
                     pubkey: event.pubkey,
                     timestamp: showTimestamp ? event.createdAt : nil,
-                    style: .standard
+                    style: NDKEventViewStyles.authorHeaderStyle(for: style)
                 )
             }
 
             // Title if available
             if let title = extractTitle() {
                 Text(title)
-                    .font(.headline)
+                    .font(NDKEventViewStyles.titleFont(for: style))
                     .fontWeight(.semibold)
-                    .lineLimit(2)
+                    .lineLimit(NDKEventViewStyles.titleLineLimit(for: style))
             }
 
             // Images from imeta tags
@@ -501,24 +419,24 @@ public struct NDKPictureEventView: View {
             // Description content
             if !event.content.isEmpty {
                 NDKRichText(content: event.content)
-                    .font(.body)
-                    .lineLimit(style == .compact ? 3 : nil)
+                    .font(NDKEventViewStyles.contentFont(for: style))
+                    .lineLimit(NDKEventViewStyles.contentLineLimit(for: style))
             }
 
             // Location if available
             if let location = extractLocation() {
                 HStack(spacing: 4) {
                     Image(systemName: "location")
-                        .font(.caption)
+                        .font(NDKEventViewStyles.captionFont(for: style))
                         .foregroundStyle(.secondary)
 
                     Text(location)
-                        .font(.caption)
+                        .font(NDKEventViewStyles.captionFont(for: style))
                         .foregroundStyle(.secondary)
                 }
             }
         }
-        .padding(.horizontal, 16)
+        .ndkEventViewStyle(style)
     }
 
     // MARK: - Helper Methods
@@ -592,11 +510,7 @@ private struct PictureGrid: View {
     }
 
     private var imageHeight: CGFloat {
-        switch style {
-        case .compact: return 120
-        case .embedded: return 150
-        default: return 200
-        }
+        return NDKEventViewStyles.imageHeight(for: style)
     }
 
     private func overlayForExtraImages(count: Int) -> some View {
@@ -641,11 +555,7 @@ private struct SingleImageView: View {
     }
 
     private var imageHeight: CGFloat {
-        switch style {
-        case .compact: return UIConstants.EventImageHeight.compact
-        case .embedded: return UIConstants.EventImageHeight.embedded
-        default: return UIConstants.EventImageHeight.default
-        }
+        return NDKEventViewStyles.imageHeight(for: style)
     }
 }
 
@@ -677,11 +587,7 @@ private struct GridImageView: View {
     }
 
     private var gridImageHeight: CGFloat {
-        switch style {
-        case .compact: return 80
-        case .embedded: return 100
-        default: return 120
-        }
+        return NDKEventViewStyles.gridImageHeight(for: style)
     }
 }
 
@@ -696,47 +602,45 @@ public struct NDKGenericEventView: View {
     let showTimestamp: Bool
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: NDKEventViewStyles.verticalSpacing(for: style)) {
             // Author header
             if showAuthor {
                 NDKUIEventAuthorHeader(
                     ndk: ndk,
                     pubkey: event.pubkey,
                     timestamp: showTimestamp ? event.createdAt : nil,
-                    style: .minimal
+                    style: NDKEventViewStyles.authorHeaderStyle(for: style)
                 )
             }
 
             // Generic event card
-            HStack(spacing: 12) {
+            HStack(spacing: NDKEventViewStyles.horizontalSpacing(for: style)) {
                 Image(systemName: "doc.text")
-                    .font(.title2)
+                    .font(NDKEventViewStyles.titleFont(for: style))
                     .foregroundStyle(.secondary)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Event")
-                        .font(.subheadline)
+                        .font(NDKEventViewStyles.contentFont(for: style))
                         .fontWeight(.medium)
 
                     Text("Kind \(event.kind)")
-                        .font(.caption)
+                        .font(NDKEventViewStyles.captionFont(for: style))
                         .foregroundStyle(.secondary)
                 }
 
                 Spacer()
             }
-            .padding(12)
-            .background(Color.ndkTertiaryBackground)
-            .cornerRadius(8)
+            .ndkEventCardStyle(style, backgroundColor: Color.ndkTertiaryBackground)
 
             // Show alt tag content if available
             if let altContent = event.tagValue("alt") {
                 Text(altContent)
-                    .font(.body)
-                    .lineLimit(3)
+                    .font(NDKEventViewStyles.contentFont(for: style))
+                    .lineLimit(NDKEventViewStyles.contentLineLimit(for: style))
             }
         }
-        .padding(.horizontal, 16)
+        .ndkEventViewStyle(style)
     }
 }
 

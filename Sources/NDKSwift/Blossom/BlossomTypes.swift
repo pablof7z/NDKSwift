@@ -34,7 +34,6 @@ public struct BlossomBlob: Codable, Sendable {
     public let uploaded: Date
 
     // Media metadata (calculated client-side for images)
-    public let blurhash: String?
     public let dimensions: (width: Int, height: Int)?
 
     public init(
@@ -43,7 +42,6 @@ public struct BlossomBlob: Codable, Sendable {
         size: Int64,
         type: String? = nil,
         uploaded: Date = Date(),
-        blurhash: String? = nil,
         dimensions: (width: Int, height: Int)? = nil
     ) {
         self.sha256 = sha256
@@ -51,7 +49,6 @@ public struct BlossomBlob: Codable, Sendable {
         self.size = size
         self.type = type
         self.uploaded = uploaded
-        self.blurhash = blurhash
         self.dimensions = dimensions
     }
 
@@ -63,7 +60,7 @@ public struct BlossomBlob: Codable, Sendable {
 
     // Custom coding to handle tuple
     enum CodingKeys: String, CodingKey {
-        case sha256, url, size, type, uploaded, blurhash
+        case sha256, url, size, type, uploaded
         case dimensionWidth, dimensionHeight
     }
 
@@ -74,7 +71,6 @@ public struct BlossomBlob: Codable, Sendable {
         size = try container.decode(Int64.self, forKey: .size)
         type = try container.decodeIfPresent(String.self, forKey: .type)
         uploaded = try container.decode(Date.self, forKey: .uploaded)
-        blurhash = try container.decodeIfPresent(String.self, forKey: .blurhash)
 
         if let width = try container.decodeIfPresent(Int.self, forKey: .dimensionWidth),
            let height = try container.decodeIfPresent(Int.self, forKey: .dimensionHeight) {
@@ -91,7 +87,6 @@ public struct BlossomBlob: Codable, Sendable {
         try container.encode(size, forKey: .size)
         try container.encodeIfPresent(type, forKey: .type)
         try container.encode(uploaded, forKey: .uploaded)
-        try container.encodeIfPresent(blurhash, forKey: .blurhash)
         try container.encodeIfPresent(dimensions?.width, forKey: .dimensionWidth)
         try container.encodeIfPresent(dimensions?.height, forKey: .dimensionHeight)
     }
