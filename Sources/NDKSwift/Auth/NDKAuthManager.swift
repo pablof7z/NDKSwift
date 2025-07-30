@@ -21,7 +21,13 @@ import LocalAuthentication
 /// ```swift
 /// @Observable
 /// class AppModel {
-///     let authManager = NDKAuthManager.shared
+///     let ndk: NDK
+///     let authManager: NDKAuthManager
+///     
+///     init() {
+///         self.ndk = NDK(relayUrls: ["wss://relay.damus.io"], cache: MemoryCache())
+///         self.authManager = NDKAuthManager(ndk: ndk)
+///     }
 /// }
 ///
 /// struct ContentView: View {

@@ -106,7 +106,7 @@ public struct NDKUIRelayManagementView: View {
         
         // Add relay
         do {
-            let relay = await ndk.addRelayAndConnect(cleanUrl)
+            let relay = await ndk.addRelay(cleanUrl)
             if relay != nil {
                 await loadRelays()
                 

@@ -87,8 +87,11 @@ public actor NIP60Wallet: NDKPaymentProvider {
 
     /// Process configuration events (17375 and 10020)
     private func processConfigurationEvent(_ event: NDKEvent) async {
+        NDKLogger.log(.info, category: .wallet, "🔄 processConfigurationEvent called with kind: \(event.kind)")
+        
         switch event.kind {
         case EventKind.cashuWalletConfig:  // 17375
+            NDKLogger.log(.info, category: .wallet, "📋 Processing wallet config event (17375)")
 
             // Only process if this is newer than what we've seen
             if event.createdAt <= newestConfigTimestamp {
@@ -893,7 +896,10 @@ public actor NIP60Wallet: NDKPaymentProvider {
             }
 
             // Process configuration events as they arrive
+            var configEventCount = 0
             for await event in dataSource.events {
+                configEventCount += 1
+                NDKLogger.log(.info, category: .wallet, "📥 Received configuration event #\(configEventCount) - kind: \(event.kind), id: \(event.id)")
                 await self.processConfigurationEvent(event)
             }
 

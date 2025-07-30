@@ -46,18 +46,6 @@ public enum RelayConstants {
     /// Primal relay - Popular relay with good performance
     public static let primal = "wss://relay.primal.net"
 
-    /// Snort Social relay
-    public static let snortSocial = "wss://relay.snort.social"
-
-    /// Nostr Wine relay
-    public static let nostrWine = "wss://nostr.wine"
-
-    /// Current.fyi relay
-    public static let currentFyi = "wss://relay.current.fyi"
-
-    /// Oxtr.dev relay - Developer-friendly relay
-    public static let oxtrDev = "wss://nostr.oxtr.dev"
-
     // MARK: - Specialized Relays
 
     // MARK: - Documentation Examples
@@ -70,23 +58,6 @@ public enum RelayConstants {
     /// Default set of relays for general use
     public static let defaultRelays: [String] = [
         damus,
-        nostrBand,
-        nosLol
-    ]
-
-    /// Extended set of relays for broader reach
-    public static let extendedRelays: [String] = [
-        damus,
-        nostrBand,
-        nosLol,
-        primal,
-        snortSocial
-    ]
-
-    /// Relays commonly used for testing
-    public static let testRelays: [String] = [
-        damus,
-        nostrBand,
         nosLol
     ]
 
@@ -99,6 +70,6 @@ public enum RelayConstants {
 
     /// Default outbox relays
     public static let defaultOutboxRelays: Set<String> = [
-        "wss://relay.nostr.band"
+        "wss://purplepag.es"
     ]
 }

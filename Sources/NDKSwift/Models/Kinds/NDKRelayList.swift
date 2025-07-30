@@ -79,7 +79,12 @@ public class NDKRelayList: NDKList {
             // Parse access markers from additional elements
             var access: Set<NDKRelayAccess> = []
             for i in 2 ..< tag.count {
-                if let relayAccess = NDKRelayAccess(rawValue: tag[i]) {
+                let marker = tag[i]
+                if marker == "both" {
+                    // "both" marker means read and write
+                    access = [.read, .write]
+                    break
+                } else if let relayAccess = NDKRelayAccess(rawValue: marker) {
                     access.insert(relayAccess)
                 }
             }

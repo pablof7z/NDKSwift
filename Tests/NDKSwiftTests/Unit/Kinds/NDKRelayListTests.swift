@@ -312,4 +312,45 @@ final class NDKRelayListTests: XCTestCase {
         XCTAssertTrue(NDKRelayAccess.allCases.contains(.read))
         XCTAssertTrue(NDKRelayAccess.allCases.contains(.write))
     }
+    
+    // MARK: - "both" Marker Tests
+    
+    func testRelayListWithBothMarkers() {
+        // Test that "both" markers are parsed correctly according to NIP-65
+        let event = NDKEvent(
+            id: "test-both-markers",
+            pubkey: "test-pubkey",
+            createdAt: Timestamp.now,
+            kind: EventKind.relayList,
+            tags: [
+                ["r", "wss://relay1.com", "both"],  // Explicit "both" marker
+                ["r", "wss://relay2.com", "read"],   // Read only
+                ["r", "wss://relay3.com", "write"],  // Write only
+                ["r", "wss://relay4.com"],          // No marker - defaults to both
+                ["r", "wss://relay5.com", ""]       // Empty marker - defaults to both
+            ],
+            content: "",
+            sig: "test-sig"
+        )
+        
+        let relayList = NDKRelayList.fromEvent(event, ndk: ndk)
+        
+        // Check read relays
+        let readRelayURLs = Set(relayList.readRelays.map { $0.url })
+        XCTAssertEqual(readRelayURLs.count, 4)
+        XCTAssertTrue(readRelayURLs.contains("wss://relay1.com")) // "both" marker
+        XCTAssertTrue(readRelayURLs.contains("wss://relay2.com")) // "read" marker
+        XCTAssertTrue(readRelayURLs.contains("wss://relay4.com")) // no marker
+        XCTAssertTrue(readRelayURLs.contains("wss://relay5.com")) // empty marker
+        XCTAssertFalse(readRelayURLs.contains("wss://relay3.com")) // write only
+        
+        // Check write relays
+        let writeRelayURLs = Set(relayList.writeRelays.map { $0.url })
+        XCTAssertEqual(writeRelayURLs.count, 4)
+        XCTAssertTrue(writeRelayURLs.contains("wss://relay1.com")) // "both" marker
+        XCTAssertTrue(writeRelayURLs.contains("wss://relay3.com")) // "write" marker
+        XCTAssertTrue(writeRelayURLs.contains("wss://relay4.com")) // no marker
+        XCTAssertTrue(writeRelayURLs.contains("wss://relay5.com")) // empty marker
+        XCTAssertFalse(writeRelayURLs.contains("wss://relay2.com")) // read only
+    }
 }

@@ -111,12 +111,16 @@ public enum EventKind {
     // MARK: - Core Events (0-999)
     /// User metadata (NIP-01) - Contains profile information like name, picture, about
     public static let metadata = 0
+    /// User metadata (NIP-01) - Alias for metadata
+    public static let profile = 0
     /// Short text note (NIP-01) - Main content type, like tweets
     public static let textNote = 1
     /// Relay recommendation (NIP-01, deprecated) - Suggests relays to connect to
     public static let recommendRelay = 2
     /// Contact list (NIP-02) - List of pubkeys the user follows
     public static let contacts = 3
+    /// Contact list (NIP-02) - Alias for contacts
+    public static let contactList = 3
     /// Encrypted direct message (NIP-04)
     public static let encryptedDirectMessage = 4
     /// Event deletion (NIP-09) - Requests deletion of previous events
@@ -259,9 +263,12 @@ public extension EventKind {
     /// Parameterized replaceable events (30000-39999)
     static let parameterizedReplaceableRange = 30000..<40000
 
-    /// Check if a kind is replaceable
+    /// Check if a kind is replaceable (matching ndk-core logic)
+    /// Includes kinds 0, 3, and 10000-19999, 30000-39999
     static func isReplaceable(_ kind: Int) -> Bool {
-        return replaceableRange.contains(kind)
+        return [0, 3].contains(kind) || 
+               replaceableRange.contains(kind) || 
+               parameterizedReplaceableRange.contains(kind)
     }
 
     /// Check if a kind is ephemeral

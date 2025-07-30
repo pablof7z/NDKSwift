@@ -423,6 +423,8 @@ public actor NDKOutboxTracker {
         var eoseRelays = Set<String>()
         var relayListEvent: NDKEvent?
 
+        NDKLogger.log(.info, category: .outbox, "🔍 Fetching relay list (10002) for \(pubkey.prefix(8))...")
+        
         let filter = NDKFilter(
             authors: [pubkey],
             kinds: [EventKind.relayList]
@@ -438,11 +440,11 @@ public actor NDKOutboxTracker {
         if !connectedOutboxRelays.isEmpty {
             // Use connected outbox relays
             relaysToUse = connectedOutboxRelays
-            NDKLogger.log(.debug, category: .outbox, "📡 Using \(connectedOutboxRelays.count) connected outbox relays for relay list fetch")
+            NDKLogger.log(.debug, category: .outbox, "📡 Using \(connectedOutboxRelays.count) connected outbox relays for relay list fetch: \(connectedOutboxRelays.sorted())")
         } else if !connectedRelays.isEmpty {
             // Fall back to any connected relays
             relaysToUse = connectedRelays
-            NDKLogger.log(.warning, category: .outbox, "⚠️ No outbox relays connected, falling back to \(connectedRelays.count) explicit relays")
+            NDKLogger.log(.warning, category: .outbox, "⚠️ No outbox relays connected, falling back to \(connectedRelays.count) explicit relays: \(connectedRelays.sorted())")
         } else {
             // No relays connected at all
             NDKLogger.log(.error, category: .outbox, "❌ No relays connected for relay list fetch")
@@ -491,10 +493,18 @@ public actor NDKOutboxTracker {
 
         // Parse relay list if found
         guard let event = relayListEvent else {
+            NDKLogger.log(.info, category: .outbox, "📭 No relay list (10002) found for \(pubkey.prefix(8))... from \(eoseRelays.count) relays: \(eoseRelays.sorted())")
             return (nil, eoseRelays)
         }
 
+        NDKLogger.log(.info, category: .outbox, "📬 Found relay list (10002) for \(pubkey.prefix(8))... created at: \(Date(timeIntervalSince1970: TimeInterval(event.createdAt)))")
+        
+        // Debug log the actual event tags
+        NDKLogger.log(.debug, category: .outbox, "📋 Event tags: \(event.tags)")
+
         let relayList = NDKRelayList.fromEvent(event)
+        
+        NDKLogger.log(.debug, category: .outbox, "📝 Raw relay list data - Read: \(relayList.readRelays.map { $0.url }), Write: \(relayList.writeRelays.map { $0.url })")
 
         let readRelayUrls = Set(relayList.readRelays.map { $0.url })
             .subtracting(blacklistedRelays)
@@ -504,12 +514,18 @@ public actor NDKOutboxTracker {
         let readRelayInfos = readRelayUrls.map { RelayInfo(url: $0) }
         let writeRelayInfos = writeRelayUrls.map { RelayInfo(url: $0) }
 
+        if !blacklistedRelays.isEmpty && (relayList.readRelays.count != readRelayUrls.count || relayList.writeRelays.count != writeRelayUrls.count) {
+            NDKLogger.log(.debug, category: .outbox, "🚫 Filtered blacklisted relays - Final Read: \(readRelayUrls), Write: \(writeRelayUrls)")
+        }
+
         let item = NDKOutboxItem(
             pubkey: pubkey,
             readRelays: Set(readRelayInfos),
             writeRelays: Set(writeRelayInfos),
             source: .nip65
         )
+        
+        NDKLogger.log(.info, category: .outbox, "✅ Processed relay list for \(pubkey.prefix(8))... - \(readRelayUrls.count) read relays, \(writeRelayUrls.count) write relays")
 
         return (item, eoseRelays)
     }

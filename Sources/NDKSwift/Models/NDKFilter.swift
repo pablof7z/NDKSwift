@@ -93,6 +93,13 @@ public struct NDKFilter: Codable, Equatable, Sendable {
         }
         return result
     }
+    
+    /// Check if this filter is for replaceable events
+    /// Replaceable events are kinds 0, 3, 10000-19999, and 30000-39999
+    public var isReplaceable: Bool {
+        guard let kinds = kinds else { return false }
+        return kinds.allSatisfy { EventKind.isReplaceable($0) }
+    }
 
     // MARK: - Codable
 

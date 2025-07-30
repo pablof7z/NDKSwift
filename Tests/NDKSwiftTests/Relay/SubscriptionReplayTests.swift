@@ -258,7 +258,7 @@ final class SubscriptionReplayTests: XCTestCase {
 
 // MARK: - Mock Relay for Testing
 
-private actor MockRelay: NDKRelay {
+private final class MockRelay: NDKRelay {
     let url: String
     var activeSubscriptions: [String: [NDKFilter]] = [:]
     private var isConnected = false

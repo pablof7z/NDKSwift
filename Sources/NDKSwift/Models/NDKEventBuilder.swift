@@ -409,6 +409,53 @@ public final class NDKEventBuilder {
         return self.tag(["d", identifier])
     }
 
+    /// Add an imeta tag for a media URL
+    /// - Parameters:
+    ///   - url: The media URL to tag
+    ///   - configure: A closure to configure additional imeta metadata
+    /// - Returns: Self for chaining
+    @discardableResult
+    public func imetaTag(url: String, configure: ((inout NDKImetaTag) -> Void)? = nil) -> NDKEventBuilder {
+        var imeta = NDKImetaTag(url: url)
+        configure?(&imeta)
+        
+        // Convert imeta to tag form and append
+        let tag = ImetaUtils.imetaTagToTag(imeta)
+        self.tags.append(tag)
+        
+        return self
+    }
+
+    /// Add a pre-configured imeta tag
+    /// - Parameter imeta: The NDKImetaTag to add
+    /// - Returns: Self for chaining
+    @discardableResult
+    public func imetaTag(_ imeta: NDKImetaTag) -> NDKEventBuilder {
+        let tag = ImetaUtils.imetaTagToTag(imeta)
+        self.tags.append(tag)
+        return self
+    }
+
+    /// Add an imeta tag from a BlossomBlob
+    /// - Parameter blob: The BlossomBlob to extract metadata from
+    /// - Returns: Self for chaining
+    @discardableResult
+    public func imetaTag(from blob: BlossomBlob) -> NDKEventBuilder {
+        let imeta = NDKImetaTag(
+            url: blob.url,
+            blurhash: blob.blurhash,
+            dim: blob.dimensionsString,
+            m: blob.type,
+            x: blob.sha256,
+            size: "\(blob.size)"
+        )
+        
+        let tag = ImetaUtils.imetaTagToTag(imeta)
+        self.tags.append(tag)
+        
+        return self
+    }
+
     /// Add a 'client' tag for NIP-89 client identification
     ///
     /// This tag identifies the client that published the event, providing a way for
