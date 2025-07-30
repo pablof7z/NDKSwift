@@ -82,7 +82,7 @@ final class RelayOriginTests: XCTestCase {
         await ndk.pool.addRelay("wss://discovered2.com", origin: .outbox(authorPubkey: "another_author"))
         
         // Create relay selector
-        let relaySelector = NDKRelaySelector(ndk: ndk, tracker: ndk.outboxTracker, ranker: ndk.relayRanker)
+        let relaySelector = NDKRelaySelector(ndk: ndk, tracker: ndk.outbox, ranker: ndk.relayRanker)
         
         // Create an event that will need fallback relays
         let event = try await NDKEventBuilder(ndk: ndk)

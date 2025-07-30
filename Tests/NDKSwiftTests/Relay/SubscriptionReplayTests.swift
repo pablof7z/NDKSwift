@@ -162,10 +162,11 @@ final class SubscriptionReplayTests: XCTestCase {
         
         // Mock outbox tracker to return relay preferences
         let author = "test-pubkey"
-        await outboxNDK.outboxTracker?.cacheRelayList(
+        await outboxNDK.outbox.track(
             pubkey: author,
-            read: [relay1URL],
-            write: [relay1URL, relay2URL]
+            readRelays: Set([relay1URL]),
+            writeRelays: Set([relay1URL, relay2URL]),
+            source: .nip65
         )
         
         // Create a subscription that will use outbox model

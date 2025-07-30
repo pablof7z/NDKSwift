@@ -107,7 +107,6 @@ public final class NDK {
 
     // MARK: - Lazy Internal Components
 
-    internal var _outboxTracker: NDKOutboxTracker?
     internal var _relayRanker: NDKRelayRanker?
     internal var _relaySelector: NDKRelaySelector?
     internal var _publishingStrategy: NDKPublishingStrategy?
@@ -128,7 +127,7 @@ public final class NDK {
 
     internal var relaySelector: NDKRelaySelector {
         lazyInit(&_relaySelector) {
-            NDKRelaySelector(ndk: self, tracker: outboxTracker, ranker: relayRanker)
+            NDKRelaySelector(ndk: self, tracker: outbox, ranker: relayRanker)
         }
     }
 

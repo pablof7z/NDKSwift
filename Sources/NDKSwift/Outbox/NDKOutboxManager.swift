@@ -1,5 +1,46 @@
 import Foundation
 
+/// Protocol for relay preference tracking functionality
+/// This allows both NDKOutboxManager and future implementations to provide the same interface
+public protocol RelayPreferenceProvider {
+    func getRelaysSyncFor(pubkey: String, type: RelayListType) async -> NDKOutboxItem?
+    func getRelaysFor(pubkey: String, maxAge: TimeInterval, type: RelayListType) async throws -> NDKOutboxItem?
+    func getAllCachedItems() async -> [NDKOutboxItem]
+    func track(pubkey: String, readRelays: Set<String>, writeRelays: Set<String>, source: RelayListSource, emitDiscoveryEvent: Bool) async
+    func clear() async
+    func cleanupExpired() async
+}
+
+/// Event emitted when relay information is discovered for a user
+public struct RelayDiscoveryEvent: Sendable {
+    public let pubkey: String
+    public let readRelays: Set<RelayURL>
+    public let writeRelays: Set<RelayURL>
+    public let source: RelayListSource
+    public let timestamp: Date
+    
+    public init(
+        pubkey: String,
+        readRelays: Set<RelayURL>,
+        writeRelays: Set<RelayURL>,
+        source: RelayListSource,
+        timestamp: Date = Date()
+    ) {
+        self.pubkey = pubkey
+        self.readRelays = readRelays
+        self.writeRelays = writeRelays
+        self.source = source
+        self.timestamp = timestamp
+    }
+}
+
+/// Type of relay list to fetch
+public enum RelayListType {
+    case read
+    case write
+    case both
+}
+
 /// Represents a relay discovery event
 public struct RelayDiscovery: Sendable {
     public let authors: Set<String>
@@ -572,7 +613,7 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         }
     }
     
-    // MARK: - Cache Methods (Merged from NDKOutboxTracker)
+    // MARK: - Cache Methods
     
     /// Get relay information for a user
     public func getRelaysFor(

@@ -301,7 +301,7 @@ actor NDKDataRequirementManager {
         // and attach them to the same observers as the original subscription
         
         // Create relay selection strategy
-        let relaySelector = OverlapOptimizedRelaySelector(tracker: ndk.outboxTracker)
+        let relaySelector = OverlapOptimizedRelaySelector(tracker: ndk.outbox)
         
         // Find requirements that need enhancement with these relays
         for (requirementId, requirement) in activeRequirements {

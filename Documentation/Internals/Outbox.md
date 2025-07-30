@@ -223,7 +223,7 @@ Unlike subscriptions which can be long-lived, publishing is a one-time operation
 
 ### Separation of Concerns
 
-- **NDKOutboxTracker**: Manages relay information cache and emits discovery events
+- **NDKOutboxManager**: Manages relay information cache and emits discovery events
 - **NDKDataRequirementManager**: Handles subscription updates when relays are discovered
 - **NDKPublishingStrategy**: Manages publishing with background relay discovery
 - **NDKRelaySelector**: Implements relay selection logic based on NIP-65 rules

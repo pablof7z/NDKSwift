@@ -266,7 +266,7 @@ public final class NDKEventBuilder {
             relayHint = relay
         } else if let ndk = self.ndk {
             // Try to get relay hint from user's relay list or outbox
-            if let outboxItem = await ndk.outboxTracker.getRelaysSyncFor(pubkey: pubkey, type: .read),
+            if let outboxItem = await ndk.outbox.getRelaysSyncFor(pubkey: pubkey, type: .read),
                let firstRelay = outboxItem.readRelays.first?.url {
                 relayHint = firstRelay
             } else {
@@ -443,7 +443,7 @@ public final class NDKEventBuilder {
     public func imetaTag(from blob: BlossomBlob) -> NDKEventBuilder {
         let imeta = NDKImetaTag(
             url: blob.url,
-            blurhash: blob.blurhash,
+            blurhash: nil,
             dim: blob.dimensionsString,
             m: blob.type,
             x: blob.sha256,
