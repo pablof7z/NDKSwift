@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11] - 2025-01-30
+
 ### Fixed
 - Updated NDKSWIFT-EXPERT-PROMPT.md documentation to match actual NDKAuthManager implementation:
   - Removed incorrect references to `NDKAuthManager.shared` singleton (doesn't exist)
@@ -14,6 +16,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added documentation for read-only sessions via `addSession(user:)`
   - Fixed inline documentation in NDKAuthManager.swift
   - Added example of how to set profile metadata after creating account
+- Fixed relay list parsing bug where relay tags marked with "both" weren't being recognized
+- Fixed duplicate relay list parsing code in NDKOutboxManager to use NDKRelayList.fromEvent()
+
+### Changed
+- **Major refactoring**: Merged NDKOutboxTracker functionality into NDKOutboxManager to eliminate duplicate code paths
+  - Moved all cache implementation from NDKOutboxTracker to NDKOutboxManager
+  - Created RelayPreferenceProvider protocol to allow components to work with both
+  - Updated NDKRelaySelector, NDKRelayRanker, and RelayDiscoverySelector to use the protocol
+  - NDKOutboxTracker is now deprecated but remains for backward compatibility
+- Updated CashuSwift dependency to use remote version 0.1.1 from fork
 
 ## [0.10.0] - 2025-01-29
 

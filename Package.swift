@@ -26,7 +26,7 @@ let package = Package(
         .package(url: "https://github.com/anquii/CryptoSwiftWrapper.git", from: "1.4.3"),
         .package(url: "https://github.com/zeugmaster/swift-secp256k1.git", branch: "main"),
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "6.29.3"),
-        .package(url: "https://github.com/zeugmaster/CashuSwift.git", branch: "main"),
+        .package(url: "https://github.com/pablof7z/CashuSwift.git", revision: "v0.1.1"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -51,7 +51,10 @@ let package = Package(
         ),
         .testTarget(
             name: "NDKSwiftTests",
-            dependencies: ["NDKSwift"],
+            dependencies: [
+                "NDKSwift",
+                .product(name: "CashuSwift", package: "CashuSwift"),
+            ],
             resources: [
                 .process("Integration/README_OutboxTests.md")
             ]
