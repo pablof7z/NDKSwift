@@ -96,9 +96,9 @@ struct DefaultRelayDiscoverySelector: RelayDiscoverySelectionStrategy {
 
 /// Overlap-optimized selector that prioritizes relays serving multiple authors
 struct OverlapOptimizedRelaySelector: RelayDiscoverySelectionStrategy {
-    private let tracker: NDKOutboxTracker
+    private let tracker: any RelayPreferenceProvider
     
-    init(tracker: NDKOutboxTracker) {
+    init(tracker: any RelayPreferenceProvider) {
         self.tracker = tracker
     }
     

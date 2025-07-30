@@ -496,7 +496,7 @@ if !selection.missingRelayInfoPubkeys.isEmpty {
     print("Users without relay lists: \(selection.missingRelayInfoPubkeys)")
     // Optionally fetch their relay lists
     for pubkey in selection.missingRelayInfoPubkeys {
-        try? await ndk.outboxTracker.getRelaysFor(pubkey: pubkey)
+        try? await ndk.outbox.getRelaysFor(pubkey: pubkey)
     }
 }
 
@@ -516,7 +516,7 @@ print("Target relays: \(selection.relays.joined(separator: ", "))")
 print("Missing relay info for: \(selection.missingRelayInfoPubkeys)")
 
 // Check outbox tracker status
-let userRelays = await ndk.outboxTracker.getRelaysSyncFor(pubkey: userPubkey)
+let userRelays = await ndk.outbox.getRelaysSyncFor(pubkey: userPubkey)
 if let relays = userRelays {
     print("User has \(relays.readRelays.count) read relays, \(relays.writeRelays.count) write relays")
 } else {
@@ -563,14 +563,14 @@ let dm = try await NDKEventBuilder()
 // Test setup for outbox model
 func setupTestRelayLists() async {
     // Mock relay lists for test users
-    await ndk.outboxTracker.track(
+    await ndk.outbox.track(
         pubkey: "alice_pubkey",
         readRelays: ["wss://alice-read1.com", "wss://alice-read2.com"],
         writeRelays: ["wss://alice-write1.com"],
         source: .nip65
     )
     
-    await ndk.outboxTracker.track(
+    await ndk.outbox.track(
         pubkey: "bob_pubkey", 
         readRelays: ["wss://bob-read1.com"],
         writeRelays: ["wss://bob-write1.com", "wss://bob-write2.com"],
@@ -636,7 +636,7 @@ let fetchSelection = await ndk.relaySelector.selectRelaysForFetching(filter: fil
 2. **Respect P-tag Limits**: The 10-p-tag limit protects the network - don't try to circumvent it
 3. **Handle Fallbacks Gracefully**: Users may not have read relays configured
 4. **Test Edge Cases**: Users with no relay lists, mixed relay availability, etc.
-5. **Cache Relay Lists**: Use `NDKOutboxTracker` efficiently to avoid repeated fetches
+5. **Cache Relay Lists**: Use `NDKOutboxManager` efficiently to avoid repeated fetches
 6. **Monitor Relay Health**: Blacklisted or failing relays are automatically avoided
 
 **Performance Considerations:**

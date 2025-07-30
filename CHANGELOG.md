@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Moved all cache implementation from NDKOutboxTracker to NDKOutboxManager
   - Created RelayPreferenceProvider protocol to allow components to work with both
   - Updated NDKRelaySelector, NDKRelayRanker, and RelayDiscoverySelector to use the protocol
-  - NDKOutboxTracker is now deprecated but remains for backward compatibility
+  - NDKOutboxTracker has been completely removed - all functionality is now handled by NDKOutboxManager
 - Updated CashuSwift dependency to use remote version 0.1.1 from fork
 
 ## [0.10.0] - 2025-01-29

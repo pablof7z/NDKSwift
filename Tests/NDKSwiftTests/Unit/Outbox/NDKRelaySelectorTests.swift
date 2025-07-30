@@ -370,7 +370,7 @@ final class NDKRelaySelectorTests: XCTestCase {
             NDKLogger.log(.warning, category: .cache, "Failed to cache relay list event: \(error)")
         }
         
-        await ndk.outboxTracker.track(
+        await ndk.outbox.track(
             pubkey: pubkey,
             readRelays: Set(readRelays),
             writeRelays: Set(writeRelays),

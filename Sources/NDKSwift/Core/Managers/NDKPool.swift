@@ -364,8 +364,8 @@ public actor NDKPool {
         do {
             let userPubkey = try await signer.pubkey
 
-            // Try to get the user's relay list from outbox tracker
-            if let relayItem = await ndk.outboxTracker.getRelaysSyncFor(pubkey: userPubkey, type: .both) {
+            // Try to get the user's relay list from outbox manager
+            if let relayItem = await ndk.outbox.getRelaysSyncFor(pubkey: userPubkey, type: .both) {
                 var userRelays = Set<String>()
 
                 // Add both read and write relays

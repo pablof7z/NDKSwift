@@ -4,16 +4,6 @@ import Foundation
 extension NDK {
     // MARK: - Internal Outbox Components
 
-    /// Outbox tracker for relay information
-    /// Deprecated: Use NDKOutboxManager directly via ndk.outbox
-    public var outboxTracker: NDKOutboxTracker {
-        lazyInit(&_outboxTracker) {
-            NDKOutboxTracker(
-                ndk: self,
-                blacklistedRelays: outboxConfig.blacklistedRelays
-            )
-        }
-    }
 
     /// Relay ranker for intelligent selection
     var relayRanker: NDKRelayRanker {

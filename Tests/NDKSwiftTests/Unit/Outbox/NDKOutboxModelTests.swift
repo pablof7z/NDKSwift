@@ -301,7 +301,7 @@ final class NDKOutboxModelTests: XCTestCase {
         }
         
         // Manually populate the outbox tracker cache using the track method
-        await ndk.outboxTracker.track(
+        await ndk.outbox.track(
             pubkey: pubkey,
             readRelays: Set(readRelays),
             writeRelays: Set(writeRelays),
