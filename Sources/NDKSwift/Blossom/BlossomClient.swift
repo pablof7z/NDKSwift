@@ -305,14 +305,10 @@ public actor BlossomClient {
         let finalMimeType = mimeType ?? BlossomMediaProcessor.inferMimeType(from: data)
 
         // Extract media metadata if it's an image
-        var blurhash: String?
         var dimensions: (width: Int, height: Int)?
 
         if BlossomMediaProcessor.isProcessableImageType(finalMimeType) {
-            if let metadata = BlossomMediaProcessor.processImage(data) {
-                blurhash = metadata.blurhash
-                dimensions = metadata.dimensions
-            }
+            dimensions = BlossomMediaProcessor.processImage(data)
         }
 
         // Create auth
@@ -340,7 +336,6 @@ public actor BlossomClient {
             size: blob.size,
             type: blob.type,
             uploaded: blob.uploaded,
-            blurhash: blurhash,
             dimensions: dimensions
         )
     }

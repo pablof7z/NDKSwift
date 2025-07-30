@@ -10,7 +10,7 @@ import UIKit
 extension Color {
 
     /// Background colors for different component contexts
-    static var ndkPrimaryBackground: Color {
+    public static var ndkPrimaryBackground: Color {
         #if canImport(UIKit)
         return Color(UIColor.systemBackground)
         #else
@@ -18,7 +18,7 @@ extension Color {
         #endif
     }
 
-    static var ndkSecondaryBackground: Color {
+    public static var ndkSecondaryBackground: Color {
         #if canImport(UIKit)
         return Color(UIColor.secondarySystemBackground)
         #else
@@ -26,7 +26,7 @@ extension Color {
         #endif
     }
 
-    static var ndkTertiaryBackground: Color {
+    public static var ndkTertiaryBackground: Color {
         #if canImport(UIKit)
         return Color(UIColor.tertiarySystemBackground)
         #else
@@ -34,7 +34,7 @@ extension Color {
         #endif
     }
 
-    static var ndkGray5: Color {
+    public static var ndkGray5: Color {
         #if canImport(UIKit)
         return Color(UIColor.systemGray5)
         #else
@@ -42,7 +42,7 @@ extension Color {
         #endif
     }
 
-    static var ndkSeparator: Color {
+    public static var ndkSeparator: Color {
         #if canImport(UIKit)
         return Color(UIColor.separator)
         #else
@@ -51,12 +51,12 @@ extension Color {
     }
 
     /// Accent color for interactive elements and highlights
-    static var ndkAccent: Color {
+    public static var ndkAccent: Color {
         Color.accentColor
     }
     
     /// Border color for UI elements
-    static var ndkBorder: Color {
+    public static var ndkBorder: Color {
         #if canImport(UIKit)
         return Color(UIColor.separator).opacity(0.3)
         #else

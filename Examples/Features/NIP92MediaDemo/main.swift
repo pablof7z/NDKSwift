@@ -73,7 +73,7 @@ struct NIP92MediaDemo {
         print()
         
         // Example 5: Blossom integration with automatic metadata extraction
-        print("5. Blossom upload with automatic blurhash (simulated):")
+        print("5. Blossom upload with automatic dimension extraction (simulated):")
         
         // Simulate a Blossom upload result with automatically extracted metadata
         let blossomUpload = BlossomBlob(
@@ -82,7 +82,6 @@ struct NIP92MediaDemo {
             size: 1024 * 500, // 500KB
             type: "image/jpeg",
             uploaded: Date(),
-            blurhash: "LGF5]+Yk^6#M@-5c,1J5@[or[Q6.", // Automatically calculated during upload
             dimensions: (width: 3024, height: 4032) // Automatically extracted during upload
         )
         
@@ -106,10 +105,10 @@ struct NIP92MediaDemo {
         let upload = try await ndk.uploadToBlossom(data: imageData, mimeType: "image/jpeg")
         
         // The upload result now automatically includes:
-        // - blurhash (calculated from the image)
         // - dimensions (extracted from the image)
         // - SHA256 hash
         // - file size
+        // Note: blurhash is not auto-generated - set manually if needed
         
         let event = try await NDKEventBuilder(ndk: ndk)
             .content("Check out my photo: \\(upload.first!.url)")
