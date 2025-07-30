@@ -219,19 +219,43 @@ final class NDKAuthManagerTests: XCTestCase {
     
     func testLogout() async throws {
         let signer = MockNDKSigner()
-        _ = try await authManager.addSession( signer
-        )
+        _ = try await authManager.addSession(signer)
         
         XCTAssertTrue(authManager.hasActiveSession)
         XCTAssertNotNil(ndk.signer)
+        XCTAssertEqual(authManager.availableSessions.count, 1)
         
         authManager.logout()
+        
+        // Verify immediate state changes
+        XCTAssertFalse(authManager.hasActiveSession)
+        XCTAssertNil(authManager.activeSession)
+        XCTAssertNil(ndk.signer)
+        
+        // The new logout() immediately removes the session from available sessions
+        XCTAssertEqual(authManager.availableSessions.count, 0)
+    }
+    
+    func testLogoutAsync() async throws {
+        let signer = MockNDKSigner()
+        let session = try await authManager.addSession(signer)
+        
+        XCTAssertTrue(authManager.hasActiveSession)
+        XCTAssertNotNil(ndk.signer)
+        XCTAssertEqual(authManager.availableSessions.count, 1)
+        
+        // Use async version to ensure keychain deletion completes
+        try await authManager.logoutAsync()
         
         XCTAssertFalse(authManager.hasActiveSession)
         XCTAssertNil(authManager.activeSession)
         XCTAssertNil(ndk.signer)
-        XCTAssertEqual(authManager.availableSessions.count, 1)
-        XCTAssertFalse(authManager.availableSessions[0].isActive)
+        XCTAssertEqual(authManager.availableSessions.count, 0)
+        
+        // Verify session is not restored after logout
+        await authManager.restoreSessions()
+        XCTAssertFalse(authManager.hasActiveSession)
+        XCTAssertEqual(authManager.availableSessions.count, 0)
     }
     
     // MARK: - Clear All Sessions Tests
@@ -286,19 +310,9 @@ final class NDKAuthManagerTests: XCTestCase {
         let session = try await authManager.addSession( signer
         )
         
-        let avatarURL = URL(string: "https://example.com/avatar.jpg")!
-        
-        // Since NDKAuthManager doesn't expose updateSessionProfile,
-        // we'll test that sessions can store profile data
-        var updatedSession = session
-        updatedSession.profileName = "Updated Name"
-        updatedSession.about = "Updated bio"
-        updatedSession.avatarURL = avatarURL
-        
-        // Verify the updated values
-        XCTAssertEqual(updatedSession.profileName, "Updated Name")
-        XCTAssertEqual(updatedSession.avatarURL, avatarURL)
-        XCTAssertEqual(updatedSession.about, "Updated bio")
+        // Sessions don't have profile properties, so we'll just verify the session exists
+        let signerPubkey = try await signer.pubkey
+        XCTAssertEqual(session.pubkey, signerPubkey)
     }
     
     // MARK: - Session Persistence Tests

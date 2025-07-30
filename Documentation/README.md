@@ -17,19 +17,17 @@ Welcome to the NDKSwift documentation. This directory contains comprehensive gui
 - [Optimistic Publishing](OPTIMISTIC_PUBLISHING.md) - Fast event publishing with eventual consistency
 
 ### Feature Guides
-- [Authentication Guide](AUTHENTICATION_GUIDE.md) - **NEW: Standardized authentication patterns for NDKSwift apps**
-- [Authentication Reference](AUTHENTICATION.md) - Complete guide to authentication, sessions, and multi-account support
+- [Authentication](AUTHENTICATION.md) - Complete guide to authentication, sessions, and multi-account support
 - [Session Data Management](SESSION_DATA_MANAGEMENT.md) - Reactive filters, follow lists, and web-of-trust
 - [NIP-44 Encryption Guide](NIP44_ENCRYPTION_GUIDE.md) - End-to-end encryption implementation
 - [NIP-77 Implementation](NIP77Implementation.md) - Negentropy protocol for set reconciliation
 - [NIP-92 Media Attachments](NIP92_MEDIA_ATTACHMENTS.md) - Media file handling and metadata
 - [Signature Verification Sampling](SIGNATURE_VERIFICATION_SAMPLING.md) - Performance optimization for signature verification
 - [Relay Health Monitoring](RELAY_HEALTH_MONITORING.md) - Monitoring and managing relay connections
-- [Reactive Profiles](ReactiveProfiles.md) - Real-time profile updates and caching
+- [Profile Management](PROFILE_MANAGEMENT.md) - User profile management with caching and real-time updates
 
 ### Wallet Features
 - [Cashu Retry Mechanism](CASHU_RETRY_MECHANISM.md) - Robust payment retry handling
-- [API Reference - Cashu Retry](API_REFERENCE_CASHU_RETRY.md) - Cashu retry API documentation
 
 ### Advanced Topics
 - [Negentropy Protocol](Negentropy.md) - Set reconciliation algorithm

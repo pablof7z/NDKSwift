@@ -32,6 +32,7 @@ public typealias Signature = String
 /// Unix timestamp in seconds
 public typealias Timestamp = Int64
 
+
 // MARK: - Time Constants
 
 /// Constants for time conversion and common intervals

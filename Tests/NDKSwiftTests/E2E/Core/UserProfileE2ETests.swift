@@ -59,19 +59,19 @@ final class UserProfileE2ETests: XCTestCase {
         
         // Step 1: Create and publish initial profile
         print("[\(timestamp())] Creating initial user profile...")
-        let initialProfile = NDKUserProfile(
-            name: "Test User \(Int.random(in: 1000...9999))",
-            displayName: "Test Display Name",
-            about: "This is a test profile created by NDKSwift E2E tests",
-            picture: "https://example.com/avatar.jpg",
-            banner: "https://example.com/banner.jpg",
-            nip05: "testuser@example.com",
-            lud16: "testuser@getalby.com",
-            website: "https://example.com"
-        )
+        let initialMetadata = [
+            "name": "Test User \(Int.random(in: 1000...9999))",
+            "display_name": "Test Display Name",
+            "about": "This is a test profile created by NDKSwift E2E tests",
+            "picture": "https://example.com/avatar.jpg",
+            "banner": "https://example.com/banner.jpg",
+            "nip05": "testuser@example.com",
+            "lud16": "testuser@getalby.com",
+            "website": "https://example.com"
+        ]
         
         // Create metadata event (kind 0)
-        let profileContent = try JSONCoding.encodeToString(initialProfile)
+        let profileContent = try JSONCoding.encodeToString(initialMetadata)
         let profileEvent = try await NDKEventBuilder(ndk: publisherNDK)
             .content(profileContent)
             .kind(0) // Metadata kind
@@ -96,40 +96,40 @@ final class UserProfileE2ETests: XCTestCase {
             kinds: [0] // Metadata kind
         )
         
-        let fetchedProfile = try await fetchProfile(ndk: fetcherNDK, filter: profileFilter, pubkey: pubkey)
+        let fetchedMetadata = try await fetchProfileMetadata(ndk: fetcherNDK, filter: profileFilter, pubkey: pubkey)
         let fetchTime = Date()
         print("[\(timestamp())] Profile fetched in \(fetchTime.timeIntervalSince(fetchStart))s")
         
         // Verify initial profile data
-        XCTAssertNotNil(fetchedProfile, "Should fetch profile successfully")
-        if let profile = fetchedProfile {
+        XCTAssertNotNil(fetchedMetadata, "Should fetch profile successfully")
+        if let metadata = fetchedMetadata {
             print("[\(timestamp())] Verifying initial profile data...")
-            XCTAssertEqual(profile.name, initialProfile.name)
-            XCTAssertEqual(profile.displayName, initialProfile.displayName)
-            XCTAssertEqual(profile.about, initialProfile.about)
-            XCTAssertEqual(profile.picture, initialProfile.picture)
-            XCTAssertEqual(profile.banner, initialProfile.banner)
-            XCTAssertEqual(profile.nip05, initialProfile.nip05)
-            XCTAssertEqual(profile.lud16, initialProfile.lud16)
-            XCTAssertEqual(profile.website, initialProfile.website)
+            XCTAssertEqual(metadata.name, initialMetadata["name"])
+            XCTAssertEqual(metadata.displayName, initialMetadata["display_name"])
+            XCTAssertEqual(metadata.about, initialMetadata["about"])
+            XCTAssertEqual(metadata.picture, initialMetadata["picture"])
+            XCTAssertEqual(metadata.banner, initialMetadata["banner"])
+            XCTAssertEqual(metadata.nip05, initialMetadata["nip05"])
+            XCTAssertEqual(metadata.lud16, initialMetadata["lud16"])
+            XCTAssertEqual(metadata.website, initialMetadata["website"])
             print("[\(timestamp())] Initial profile verification successful")
         }
         
         // Step 3: Update the profile
         print("[\(timestamp())] Updating user profile...")
-        let updatedProfile = NDKUserProfile(
-            name: "Updated Test User",
-            displayName: "Updated Display Name",
-            about: "This profile has been updated by NDKSwift E2E tests",
-            picture: "https://example.com/new-avatar.jpg",
-            banner: "https://example.com/new-banner.jpg",
-            nip05: "updateduser@example.com",
-            lud16: "updateduser@getalby.com",
-            website: "https://newexample.com"
-        )
+        let updatedMetadata = [
+            "name": "Updated Test User",
+            "display_name": "Updated Display Name",
+            "about": "This profile has been updated by NDKSwift E2E tests",
+            "picture": "https://example.com/new-avatar.jpg",
+            "banner": "https://example.com/new-banner.jpg",
+            "nip05": "updateduser@example.com",
+            "lud16": "updateduser@getalby.com",
+            "website": "https://newexample.com"
+        ]
         
         // Create updated metadata event
-        let updateContent = try JSONCoding.encodeToString(updatedProfile)
+        let updateContent = try JSONCoding.encodeToString(updatedMetadata)
         let updateEvent = try await NDKEventBuilder(ndk: publisherNDK)
             .content(updateContent)
             .kind(0) // Metadata kind
@@ -148,22 +148,22 @@ final class UserProfileE2ETests: XCTestCase {
         try await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
         
         let fetchUpdateStart = Date()
-        let updatedFetchedProfile = try await fetchProfile(ndk: fetcherNDK, filter: profileFilter, pubkey: pubkey)
+        let updatedFetchedMetadata = try await fetchProfileMetadata(ndk: fetcherNDK, filter: profileFilter, pubkey: pubkey)
         let fetchUpdateTime = Date()
         print("[\(timestamp())] Updated profile fetched in \(fetchUpdateTime.timeIntervalSince(fetchUpdateStart))s")
         
         // Verify updated profile data
-        XCTAssertNotNil(updatedFetchedProfile, "Should fetch updated profile successfully")
-        if let profile = updatedFetchedProfile {
+        XCTAssertNotNil(updatedFetchedMetadata, "Should fetch updated profile successfully")
+        if let metadata = updatedFetchedMetadata {
             print("[\(timestamp())] Verifying updated profile data...")
-            XCTAssertEqual(profile.name, updatedProfile.name)
-            XCTAssertEqual(profile.displayName, updatedProfile.displayName)
-            XCTAssertEqual(profile.about, updatedProfile.about)
-            XCTAssertEqual(profile.picture, updatedProfile.picture)
-            XCTAssertEqual(profile.banner, updatedProfile.banner)
-            XCTAssertEqual(profile.nip05, updatedProfile.nip05)
-            XCTAssertEqual(profile.lud16, updatedProfile.lud16)
-            XCTAssertEqual(profile.website, updatedProfile.website)
+            XCTAssertEqual(metadata.name, updatedMetadata["name"])
+            XCTAssertEqual(metadata.displayName, updatedMetadata["display_name"])
+            XCTAssertEqual(metadata.about, updatedMetadata["about"])
+            XCTAssertEqual(metadata.picture, updatedMetadata["picture"])
+            XCTAssertEqual(metadata.banner, updatedMetadata["banner"])
+            XCTAssertEqual(metadata.nip05, updatedMetadata["nip05"])
+            XCTAssertEqual(metadata.lud16, updatedMetadata["lud16"])
+            XCTAssertEqual(metadata.website, updatedMetadata["website"])
             print("[\(timestamp())] Updated profile verification successful")
         }
         
@@ -183,8 +183,8 @@ final class UserProfileE2ETests: XCTestCase {
         print("[\(timestamp())] Cache check completed in \(cacheTime.timeIntervalSince(cacheStart))s")
         
         if let cachedEvent = cachedEvents.first {
-            let cachedProfile = try JSONCoding.decode(NDKUserProfile.self, from: cachedEvent.content)
-            XCTAssertEqual(cachedProfile.name, updatedProfile.name)
+            let cachedMetadata = NDKUserMetadata(event: cachedEvent)
+            XCTAssertEqual(cachedMetadata.name, updatedMetadata["name"])
             print("[\(timestamp())] Profile found in cache")
         } else {
             print("[\(timestamp())] Profile not in cache")
@@ -200,7 +200,7 @@ final class UserProfileE2ETests: XCTestCase {
             authors: [nonExistentPubkey],
             kinds: [0]
         )
-        let nilProfile = try await fetchProfile(ndk: fetcherNDK, filter: nilFilter, pubkey: nonExistentPubkey)
+        let nilProfile = try await fetchProfileMetadata(ndk: fetcherNDK, filter: nilFilter, pubkey: nonExistentPubkey)
         let nilTime = Date()
         print("[\(timestamp())] Non-existent profile fetch completed in \(nilTime.timeIntervalSince(nilStart))s")
         XCTAssertNil(nilProfile, "Should return nil for non-existent profile")
@@ -237,11 +237,9 @@ final class UserProfileE2ETests: XCTestCase {
         
         // Create minimal profile with only name
         print("[\(timestamp())] Creating minimal profile...")
-        let minimalProfile = NDKUserProfile(
-            name: "Minimal User"
-        )
+        let minimalMetadata = ["name": "Minimal User"]
         
-        let profileContent = try JSONCoding.encodeToString(minimalProfile)
+        let profileContent = try JSONCoding.encodeToString(minimalMetadata)
         let profileEvent = try await NDKEventBuilder(ndk: ndk)
             .content(profileContent)
             .kind(0)
@@ -259,13 +257,13 @@ final class UserProfileE2ETests: XCTestCase {
             authors: [pubkey],
             kinds: [0]
         )
-        let fetchedProfile = try await fetchProfile(ndk: ndk, filter: filter, pubkey: pubkey)
+        let fetchedMetadata = try await fetchProfileMetadata(ndk: ndk, filter: filter, pubkey: pubkey)
         
-        XCTAssertNotNil(fetchedProfile)
-        XCTAssertEqual(fetchedProfile?.name, "Minimal User")
-        XCTAssertNil(fetchedProfile?.displayName)
-        XCTAssertNil(fetchedProfile?.about)
-        XCTAssertNil(fetchedProfile?.picture)
+        XCTAssertNotNil(fetchedMetadata)
+        XCTAssertEqual(fetchedMetadata?.name, "Minimal User")
+        XCTAssertNil(fetchedMetadata?.displayName)
+        XCTAssertNil(fetchedMetadata?.about)
+        XCTAssertNil(fetchedMetadata?.picture)
         
         await ndk.disconnect()
         print("[\(timestamp())] Minimal profile test completed")
@@ -304,17 +302,20 @@ final class UserProfileE2ETests: XCTestCase {
             authors: [pubkey],
             kinds: [0]
         )
-        let fetchedProfile = try await fetchProfile(ndk: ndk, filter: filter, pubkey: pubkey)
+        let fetchedMetadata = try await fetchProfileMetadata(ndk: ndk, filter: filter, pubkey: pubkey)
         
-        // Should return nil or empty profile for invalid JSON
-        XCTAssertNil(fetchedProfile, "Should return nil for invalid JSON profile")
+        // Should handle invalid JSON gracefully - NDKUserMetadata returns empty fields
+        if let metadata = fetchedMetadata {
+            XCTAssertNil(metadata.name, "Should have nil name for invalid JSON")
+            XCTAssertNil(metadata.displayName, "Should have nil displayName for invalid JSON")
+        }
         
         await ndk.disconnect()
         print("[\(timestamp())] Invalid JSON test completed")
     }
     
-    // Helper function to fetch profile
-    private func fetchProfile(ndk: NDK, filter: NDKFilter, pubkey: PublicKey) async throws -> NDKUserProfile? {
+    // Helper function to fetch profile metadata
+    private func fetchProfileMetadata(ndk: NDK, filter: NDKFilter, pubkey: PublicKey) async throws -> NDKUserMetadata? {
         // Create data source with network-only policy to ensure fresh data
         let dataSource = ndk.observe(
             filter: filter,
@@ -335,13 +336,8 @@ final class UserProfileE2ETests: XCTestCase {
             return nil
         }
         
-        // Parse the profile from the event content
-        do {
-            return try JSONCoding.decode(NDKUserProfile.self, from: event.content)
-        } catch {
-            print("[\(timestamp())] Failed to decode profile: \(error)")
-            return nil
-        }
+        // Return NDKUserMetadata which handles JSON parsing internally
+        return NDKUserMetadata(event: event)
     }
     
     private func timestamp() -> String {

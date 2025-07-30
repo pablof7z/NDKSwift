@@ -33,7 +33,7 @@ The most feature-complete Swift implementation of the Nostr Development Kit. Bui
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/nostr-dev-kit/ndk-swift", from: "0.10.0")
+    .package(url: "https://github.com/pablof7z/NDKSwift", from: "0.11.0")
 ]
 ```
 
@@ -56,15 +56,16 @@ await ndk.connect()
 
 // Stream real-time notes
 // Multiple subscriptions with similar filters are automatically merged!
-let subscription = ndk.subscribe(filter: NDKFilter(kinds: [1], limit: 50))
-for await note in subscription {
-    print("\(note.content)")
+let dataSource = ndk.observe(filter: NDKFilter(kinds: [1], limit: 50))
+for await event in dataSource.events {
+    print("\(event.content)")
 }
 
 // Publish (works offline!)
-let event = NDKEvent(kind: .text)
-event.content = "Hello, Nostr! 🎉"
-try event.sign(with: signer)
+let event = try await NDKEventBuilder(ndk: ndk)
+    .kind(1)
+    .content("Hello, Nostr! 🎉")
+    .build(signer: signer)
 try await ndk.publish(event)
 ```
 
@@ -79,10 +80,10 @@ All image components automatically cache to memory and disk for blazing-fast scr
 import NDKSwiftUI
 
 // Profile pictures with automatic caching
-NDKUIProfilePicture(pubkey: userPubkey, size: 50)
+NDKUIProfilePicture(ndk: ndk, pubkey: userPubkey, size: 50)
 
 // Event view with cached embedded images
-NDKUIEventView(event: event)
+NDKUIEventView(event: event, ndk: ndk)
     .onEventTapped { event in
         // Handle tap
     }

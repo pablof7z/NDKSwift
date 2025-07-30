@@ -1,5 +1,16 @@
 import Foundation
 
+/// Protocol for relay preference tracking functionality
+/// This allows both NDKOutboxTracker and NDKOutboxManager to provide the same interface
+public protocol RelayPreferenceProvider {
+    func getRelaysSyncFor(pubkey: String, type: RelayListType) async -> NDKOutboxItem?
+    func getRelaysFor(pubkey: String, maxAge: TimeInterval, type: RelayListType) async throws -> NDKOutboxItem?
+    func getAllCachedItems() async -> [NDKOutboxItem]
+    func track(pubkey: String, readRelays: Set<String>, writeRelays: Set<String>, source: RelayListSource, emitDiscoveryEvent: Bool) async
+    func clear() async
+    func cleanupExpired() async
+}
+
 /// Event emitted when relay information is discovered for a user
 public struct RelayDiscoveryEvent: Sendable {
     public let pubkey: String
@@ -24,7 +35,7 @@ public struct RelayDiscoveryEvent: Sendable {
 }
 
 /// Tracks relay information for users to implement the outbox model
-public actor NDKOutboxTracker {
+public actor NDKOutboxTracker: RelayPreferenceProvider {
     /// Default TTL for positive cache entries (24 hours)
     static let positiveEntryTTL: TimeInterval = TimeConstants.day
 
@@ -96,7 +107,7 @@ public actor NDKOutboxTracker {
     ///     type: .read
     /// )
     /// ```
-    func getRelaysFor(
+    public func getRelaysFor(
         pubkey: String,
         maxAge: TimeInterval = TimeConstants.hour,
         type: RelayListType = .both
@@ -160,7 +171,7 @@ public actor NDKOutboxTracker {
 
     /// Get all cached outbox items
     /// - Returns: Array of all valid cached items (excludes negative cache entries)
-    func getAllCachedItems() async -> [NDKOutboxItem] {
+    public func getAllCachedItems() async -> [NDKOutboxItem] {
         var items: [NDKOutboxItem] = []
 
         // Get all items from memory cache
@@ -199,7 +210,7 @@ public actor NDKOutboxTracker {
     ///     source: .nip65
     /// )
     /// ```
-    func track(
+    public func track(
         pubkey: String,
         readRelays: Set<String> = [],
         writeRelays: Set<String> = [],
@@ -292,13 +303,13 @@ public actor NDKOutboxTracker {
     }
 
     /// Clear the cache
-    func clear() async {
+    public func clear() async {
         await memoryCache.clear()
         pendingFetches.removeAll()
     }
 
     /// Clean up expired entries
-    func cleanupExpired() async {
+    public func cleanupExpired() async {
         await memoryCache.cleanupExpired()
     }
 
@@ -560,3 +571,4 @@ public enum RelayListType {
     case write
     case both
 }
+

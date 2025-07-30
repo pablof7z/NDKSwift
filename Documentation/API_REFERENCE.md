@@ -35,8 +35,7 @@ public init(
     relayUrls: [RelayURL] = [],
     signer: NDKSigner? = nil,
     cache: NDKCache? = nil,
-    signatureVerificationConfig: NDKSignatureVerificationConfig = .default,
-    subscriptionTrackingConfig: SubscriptionTrackingConfig = .default
+    signatureVerificationConfig: NDKSignatureVerificationConfig = .default
 )
 ```
 
@@ -45,15 +44,19 @@ public init(
 ```swift
 public var signer: NDKSigner?                    // Active signer for event signing
 public var cache: NDKCache?                      // Cache implementation
-public var activeUser: NDKUser? { get }          // Current user (from signer)
+public var activeUser: NDKUser? { get async }    // Current user (from signer)
 public var debugMode: Bool                       // Enable debug logging
 public var outboxEnabled: Bool                   // Outbox model enabled (default: true)
 public var outboxConfig: NDKOutboxConfig         // Outbox configuration
 public var outbox: NDKOutboxManager { get }      // Simplified outbox API
-public var subscriptionTracker: NDKSubscriptionTracker { get }
 public var signatureVerificationConfig: NDKSignatureVerificationConfig { get }
-public var relays: [NDKRelay] { get }           // All configured relays
-public var pool: NDKRelayPool { get }           // Relay pool manager
+public var relays: [NDKRelay] { get async }     // All configured relays
+// Additional properties accessed via managers:
+// pool - Internal relay pool (access via relay management methods)
+// profileManager - User profile management
+// eventTracker - Event metadata tracking
+// blossomServerManager - Blossom server management
+// nip05Manager - NIP-05 resolution and caching
 ```
 
 #### Connection Management
@@ -201,8 +204,8 @@ let walletSource = ndk.observe(
 // With transformation
 let profiles = ndk.observe(
     filter: NDKFilter(kinds: [0]),
-    transform: { event -> NDKUserProfile? in
-        try? event.decodeMetadata()
+    transform: { event -> NDKUserMetadata? in
+        NDKUserMetadata(event: event)
     }
 )
 ```
@@ -379,24 +382,27 @@ public func encode(includeRelays: Bool = false) throws -> String
 
 // NIP-18: Reposts
 // Create a repost of this event
-public func repost(signer: NDKSigner) async throws -> NDKEvent
+public func repost(signer: NDKSigner, ndk: NDK) async throws -> NDKEvent
 
 // Create a quote repost of this event (kind 1 with q tag)
-public func quoteRepost(comment: String, signer: NDKSigner) async throws -> NDKEvent
+public func quoteRepost(comment: String, signer: NDKSigner, ndk: NDK) async throws -> NDKEvent
 
 // NIP-25: Reactions
 // Create a reaction to this event
-public func react(with content: String, signer: NDKSigner) async throws -> NDKEvent
+public func react(with content: String, signer: NDKSigner, ndk: NDK) async throws -> NDKEvent
 
 // Create a like reaction (+)
-public func like(signer: NDKSigner) async throws -> NDKEvent
+public func like(signer: NDKSigner, ndk: NDK) async throws -> NDKEvent
 
 // Create a dislike reaction (-)
-public func dislike(signer: NDKSigner) async throws -> NDKEvent
+public func dislike(signer: NDKSigner, ndk: NDK) async throws -> NDKEvent
 
 // NIP-09: Event Deletion
 // Create a deletion request for this event
-public func createDeletionRequest(reason: String = "", signer: NDKSigner) async throws -> NDKEvent
+public func createDeletionRequest(reason: String = "", signer: NDKSigner, ndk: NDK) async throws -> NDKEvent
+
+// Delete this event (creates and publishes deletion request)
+public func delete(reason: String = "", signer: NDKSigner, ndk: NDK) async throws -> NDKEvent
 
 // Create a reply
 public func createReply(
@@ -509,8 +515,13 @@ static func multipleKinds(_ kinds: [EventKind], by pubkey: String, limit: Int? =
 **Examples:**
 ```swift
 // Fetch user profile
-let profileFilter = NDKFilter.profile(for: pubkey)
-let profile = await ndk.fetchEvent(with: profileFilter)
+// Fetch profile using ProfileManager
+for await metadata in await ndk.profileManager.observe(for: pubkey) {
+    if let metadata = metadata {
+        print(metadata.displayName ?? metadata.name ?? "Unknown")
+    }
+    break
+}
 
 // Stream user's recent notes
 let notesFilter = NDKFilter.textNotes(by: pubkey, limit: 20)
@@ -564,7 +575,7 @@ public static func fromNip05(
 
 ```swift
 public let pubkey: PublicKey                     // User's public key
-public var profile: NDKUserProfile?              // Profile metadata
+public var metadata: NDKUserMetadata?            // Profile metadata
 public var relayList: [NDKRelayInfo]            // User's relay list
 public var npub: String { get }                  // Bech32 encoded pubkey
 
@@ -585,10 +596,10 @@ public var shortPubkey: String { get }           // First 8 chars of pubkey
 #### Methods
 
 ```swift
-// Fetch user profile
-public func fetchProfile(
+// Fetch user metadata
+public func fetchMetadata(
     forceRefresh: Bool = false
-) async throws -> NDKUserProfile?
+) async throws -> NDKUserMetadata?
 
 // Fetch relay list
 public func fetchRelayList() async throws -> [NDKRelayInfo]
@@ -608,25 +619,28 @@ public func pay(
 
 ```
 
-### NDKUserProfile
+### NDKUserMetadata
 
-User profile metadata (kind 0).
+User profile metadata (kind 0). NDKUserMetadata is a wrapper that stores profile data as a dictionary for flexibility.
 
 ```swift
-public struct NDKUserProfile: Codable {
-    public var name: String?
-    public var displayName: String?
-    public var about: String?
-    public var picture: String?
-    public var banner: String?
-    public var nip05: String?
-    public var lud16: String?                    // Lightning address
-    public var lud06: String?                    // LNURL
-    public var website: String?
+public class NDKUserMetadata {
+    public let event: NDKEvent?                  // Source event
+    public let metadata: [String: Any]           // Raw metadata dictionary
     
-    // Additional fields
-    public func additionalField(_ key: String) -> Any?
-    public mutating func setAdditionalField(_ key: String, value: Any?)
+    // Convenience accessors
+    public var name: String? { get }
+    public var displayName: String? { get }
+    public var about: String? { get }
+    public var picture: String? { get }
+    public var banner: String? { get }
+    public var nip05: String? { get }
+    public var lud16: String? { get }            // Lightning address
+    public var lud06: String? { get }            // LNURL
+    public var website: String? { get }
+    
+    // Access any field
+    public func field(_ key: String) -> Any?
 }
 ```
 
@@ -849,13 +863,13 @@ public func getBalance() async throws -> GetBalanceResponse
 public func listTransactions(params: ListTransactionsRequest?) async throws -> ListTransactionsResponse
 ```
 
-#### NDKCashuWallet
+#### NIP60Wallet
 
 Cashu wallet implementation (NIP-60/61):
 
 ```swift
 // Initialize wallet
-public init(signer: NDKSigner, ndk: NDK)
+public init(ndk: NDK, relays: [String]? = nil)
 
 // Connection
 public func connect() async
@@ -1185,17 +1199,6 @@ public struct NDKOutboxConfig {
 }
 ```
 
-### SubscriptionTrackingConfig
-
-```swift
-public struct SubscriptionTrackingConfig {
-    public var enabled: Bool = false
-    public var dedupingWindow: TimeInterval = 1.0
-    public var groupingDelay: TimeInterval = 0.1
-    
-    public static let `default` = SubscriptionTrackingConfig()
-}
-```
 
 ## Logging and Debugging
 

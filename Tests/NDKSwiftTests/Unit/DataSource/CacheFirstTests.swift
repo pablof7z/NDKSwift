@@ -88,7 +88,7 @@ class CacheFirstTests: XCTestCase {
         }
         
         // Add a relay to test network behavior
-        await ndk.addRelayAndConnect("wss://test.relay")
+        await ndk.addRelay("wss://test.relay")
         
         // Act: Create data source with maxAge that makes cache fresh
         let dataSource = NDKDataSource(

@@ -1,5 +1,6 @@
 import SwiftUI
 import NDKSwift
+import os.log
 
 // MARK: - NDKUIDisplayName
 
@@ -28,12 +29,12 @@ public struct NDKUIDisplayName: View {
 
     // MARK: - Properties
 
+    private let ndk: NDK
     private let pubkey: String
     private let fallbackStyle: FallbackStyle
     private var tapAction: (() -> Void)?
 
-    @Environment(\.ndk) private var ndk
-    @State private var profile: NDKUserProfile?
+    @State private var metadata: NDKUserMetadata?
     @State private var profileTask: Task<Void, Never>?
 
     // MARK: - Supporting Types
@@ -46,27 +47,32 @@ public struct NDKUIDisplayName: View {
 
     // MARK: - Initialization
 
-    /// Initialize with a public key
+    /// Initialize with NDK instance and public key
     /// - Parameters:
+    ///   - ndk: The NDK instance
     ///   - pubkey: The user's public key (hex format)
     ///   - fallbackStyle: How to display name when profile is unavailable
     public init(
+        ndk: NDK,
         pubkey: String,
         fallbackStyle: FallbackStyle = .npub
     ) {
+        self.ndk = ndk
         self.pubkey = pubkey
         self.fallbackStyle = fallbackStyle
     }
 
-    /// Initialize with an NDKUser
+    /// Initialize with NDK instance and NDKUser
     /// - Parameters:
+    ///   - ndk: The NDK instance
     ///   - user: The NDKUser instance
     ///   - fallbackStyle: How to display name when profile is unavailable
     public init(
+        ndk: NDK,
         user: NDKUser,
         fallbackStyle: FallbackStyle = .npub
     ) {
-        self.init(pubkey: user.pubkey, fallbackStyle: fallbackStyle)
+        self.init(ndk: ndk, pubkey: user.pubkey, fallbackStyle: fallbackStyle)
     }
 
     // MARK: - Body
@@ -92,13 +98,13 @@ public struct NDKUIDisplayName: View {
 
     private var displayText: String {
         // Try display name first
-        if let displayName = profile?.displayName,
+        if let displayName = metadata?.displayName,
            displayName.hasContent {
             return displayName
         }
 
         // Try regular name
-        if let name = profile?.name,
+        if let name = metadata?.name,
            name.hasContent {
             return name
         }
@@ -124,14 +130,22 @@ public struct NDKUIDisplayName: View {
     private func loadProfile() {
         profileTask?.cancel()
 
-        guard let ndk = ndk else { return }
-
         profileTask = Task {
-            for await profile in await ndk.profileManager.observe(for: pubkey) {
+            os_log(.debug, "NDKUIDisplayName: Starting profile observation for %{public}@", pubkey)
+            var receivedProfile = false
+            
+            for await metadata in await ndk.profileManager.observe(for: pubkey) {
+                receivedProfile = true
+                os_log(.debug, "NDKUIDisplayName: Received metadata for %{public}@: %{public}@", pubkey, metadata?.displayName ?? metadata?.name ?? "<nil>")
+                
                 await MainActor.run {
-                    self.profile = profile
+                    self.metadata = metadata
                 }
                 // Continue listening for updates
+            }
+            
+            if !receivedProfile {
+                os_log(.debug, "NDKUIDisplayName: No profiles received for %{public}@", pubkey)
             }
         }
     }
@@ -153,28 +167,42 @@ public struct NDKUIDisplayName: View {
 #if DEBUG
 struct NDKUIDisplayName_Previews: PreviewProvider {
     static var previews: some View {
+        // Create a mock NDK for preview
+        let mockNDK = NDK(relayUrls: [])
+        
         VStack(alignment: .leading, spacing: 16) {
             Group {
                 // Different fallback styles
-                NDKUIDisplayName(pubkey: "sample_pubkey", fallbackStyle: .npub)
-                    .font(.headline)
+                NDKUIDisplayName(
+                    ndk: mockNDK,
+                    pubkey: "sample_pubkey",
+                    fallbackStyle: .npub
+                )
+                .font(.headline)
 
-                NDKUIDisplayName(pubkey: "sample_pubkey", fallbackStyle: .placeholder)
-                    .font(.body)
+                NDKUIDisplayName(
+                    ndk: mockNDK,
+                    pubkey: "sample_pubkey",
+                    fallbackStyle: .placeholder
+                )
+                .font(.body)
 
-                NDKUIDisplayName(pubkey: "sample_pubkey", fallbackStyle: .pubkey)
-                    .font(.caption)
+                NDKUIDisplayName(
+                    ndk: mockNDK,
+                    pubkey: "sample_pubkey",
+                    fallbackStyle: .pubkey
+                )
+                .font(.caption)
 
                 Divider()
 
-                // Username variant
-                NDKUIUsername(pubkey: "sample_pubkey")
+                // Username variant would need similar update
+                Text("NDKUIUsername needs update")
                     .font(.body)
                     .foregroundStyle(.secondary)
             }
         }
         .padding()
-        .environment(\.ndk, nil) // Mock environment
     }
 }
 #endif

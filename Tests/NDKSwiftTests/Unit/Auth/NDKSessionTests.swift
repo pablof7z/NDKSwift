@@ -15,14 +15,12 @@ final class NDKSessionTests: XCTestCase {
         XCTAssertEqual(session.pubkey, "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e53f")
         XCTAssertEqual(session.signerType, "privatekey")
         XCTAssertFalse(session.isActive)
-        XCTAssertNil(session.avatarURL)
         XCTAssertEqual(session.requiresBiometric, false)
         XCTAssertEqual(session.isHardwareBacked, false)
         XCTAssertNil(session.autoLockTimeout)
     }
     
     func testSessionWithCompleteInitialization() {
-        let avatarURL = URL(string: "https://example.com/avatar.jpg")!
         var session = NDKSession(
             pubkey: "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e53f",
             signerType: "privatekey",
@@ -33,17 +31,11 @@ final class NDKSessionTests: XCTestCase {
         
         // Set additional properties
         session.isActive = true
-        session.avatarURL = avatarURL
-        session.about = "Test user profile"
-        session.profileName = "Complete User"
         
         XCTAssertTrue(session.isActive)
-        XCTAssertEqual(session.avatarURL, avatarURL)
-        XCTAssertEqual(session.profileName, "Complete User")
         XCTAssertTrue(session.requiresBiometric)
         XCTAssertTrue(session.isHardwareBacked)
         XCTAssertEqual(session.autoLockTimeout, 300)
-        XCTAssertEqual(session.about, "Test user profile")
     }
     
     // MARK: - Security Settings Tests
@@ -105,35 +97,27 @@ final class NDKSessionTests: XCTestCase {
     // MARK: - Profile Metadata Tests
     
     func testProfileMetadataUpdate() {
-        var session = NDKSession(
+        let session = NDKSession(
             pubkey: "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e53f",
             signerType: "privatekey"
         )
         
-        XCTAssertNil(session.profileName)
-        XCTAssertNil(session.about)
-        
-        session.profileName = "Updated Name"
-        session.about = "Updated bio"
-        session.avatarURL = URL(string: "https://example.com/pic.jpg")
-        
-        XCTAssertEqual(session.profileName, "Updated Name")
-        XCTAssertEqual(session.about, "Updated bio")
-        XCTAssertEqual(session.avatarURL?.absoluteString, "https://example.com/pic.jpg")
+        // Sessions don't have profile metadata - that's stored separately
+        // This test just verifies the session exists with correct pubkey
+        XCTAssertEqual(session.pubkey, "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e53f")
+        XCTAssertEqual(session.signerType, "privatekey")
     }
     
     func testAvatarURLUpdate() {
-        var session = NDKSession(
+        let session = NDKSession(
             pubkey: "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e53f",
             signerType: "privatekey"
         )
         
-        XCTAssertNil(session.avatarURL)
-        
-        let newURL = URL(string: "https://example.com/avatar.jpg")!
-        session.avatarURL = newURL
-        
-        XCTAssertEqual(session.avatarURL, newURL)
+        // Sessions don't have avatarURL - profiles are stored separately
+        // This test just verifies the session state
+        XCTAssertEqual(session.pubkey, "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e53f")
+        XCTAssertFalse(session.isActive)
     }
     
     // MARK: - Codable Tests
@@ -147,9 +131,6 @@ final class NDKSessionTests: XCTestCase {
             autoLockTimeout: 300
         )
         originalSession.isActive = true
-        originalSession.avatarURL = URL(string: "https://example.com/avatar.jpg")
-        originalSession.profileName = "Test User"
-        originalSession.about = "Bio"
         
         let data = try JSONCoding.encode(originalSession)
         
@@ -159,10 +140,9 @@ final class NDKSessionTests: XCTestCase {
         XCTAssertEqual(originalSession.pubkey, decodedSession.pubkey)
         XCTAssertEqual(originalSession.signerType, decodedSession.signerType)
         XCTAssertEqual(originalSession.isActive, decodedSession.isActive)
-        XCTAssertEqual(originalSession.avatarURL, decodedSession.avatarURL)
-        XCTAssertEqual(originalSession.profileName, decodedSession.profileName)
         XCTAssertEqual(originalSession.requiresBiometric, decodedSession.requiresBiometric)
-        XCTAssertEqual(originalSession.about, decodedSession.about)
+        XCTAssertEqual(originalSession.isHardwareBacked, decodedSession.isHardwareBacked)
+        XCTAssertEqual(originalSession.autoLockTimeout, decodedSession.autoLockTimeout)
     }
     
     // MARK: - Array Extension Tests

@@ -2,12 +2,8 @@ import Foundation
 
 /// Actor for thread-safe user state management
 actor UserStateActor {
-    var profile: NDKUserProfile?
     var relayList: [NDKRelayInfo] = []
     var nip46Urls: [String]?
-
-    func getProfile() -> NDKUserProfile? { profile }
-    func setProfile(_ newProfile: NDKUserProfile?) { profile = newProfile }
 
     func getRelayList() -> [NDKRelayInfo] { relayList }
     func setRelayList(_ newList: [NDKRelayInfo]) { relayList = newList }
@@ -27,38 +23,18 @@ public final class NDKUser: Equatable, Hashable, Sendable {
     /// Internal state actor that manages all mutable state
     private let stateActor = UserStateActor()
 
-    /// User's profile metadata
-    public var profile: NDKUserProfile? {
-        get async { await stateActor.getProfile() }
-    }
 
     /// Relay list (NIP-65)
     public var relayList: [NDKRelayInfo] {
         get async { await stateActor.getRelayList() }
     }
 
-    /// User's NIP-05 identifier
-    public var nip05: String? {
-        get async { await stateActor.getProfile()?.nip05 }
-    }
 
     /// NIP-46 relay URLs (for remote signing)
     public var nip46Urls: [String]? {
         get async { await stateActor.getNip46Urls() }
     }
 
-    /// Display name (from profile)
-    public var displayName: String? {
-        get async {
-            let userProfile = await stateActor.getProfile()
-            return userProfile?.displayName ?? userProfile?.name
-        }
-    }
-
-    /// Profile name
-    public var name: String? {
-        get async { await stateActor.getProfile()?.name }
-    }
 
     // MARK: - Initialization
 
@@ -96,29 +72,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
 
     // MARK: - Profile Management
 
-    /// Update the user's profile
-    internal func updateProfile(_ profile: NDKUserProfile) async {
-        await stateActor.setProfile(profile)
-    }
 
-    /// Process a metadata event to update the user's profile
-    /// Used internally when fetching profiles from events
-    public func processMetadataEvent(_ event: NDKEvent) {
-        Task {
-            let eventContent = event.content
-            if let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: eventContent) {
-                await updateProfile(profile)
-
-                // Save to cache if available
-                if let ndk = ndk {
-                    try? await ndk.cache.saveProfile(profile, pubkey: pubkey)
-
-                    // Proactively cache NIP-05 identifier if present
-                    await ndk.nip05Manager.processMetadataEvent(event, profile: profile)
-                }
-            }
-        }
-    }
 
     /// Fetch user's relay list (NIP-65)
     @discardableResult
@@ -279,145 +233,3 @@ public final class NDKUser: Equatable, Hashable, Sendable {
 
 }
 
-/// User profile metadata (kind 0)
-public struct NDKUserProfile: Codable, Sendable {
-    public var name: String?
-    public var displayName: String?
-    public var about: String?
-    public var picture: String?
-    public var banner: String?
-    public var nip05: String?
-    public var lud16: String?
-    public var lud06: String?
-    public var website: String?
-
-    // Additional fields
-    private var additionalFields: [String: String] = [:]
-
-    public init(
-        name: String? = nil,
-        displayName: String? = nil,
-        about: String? = nil,
-        picture: String? = nil,
-        banner: String? = nil,
-        nip05: String? = nil,
-        lud16: String? = nil,
-        lud06: String? = nil,
-        website: String? = nil
-    ) {
-        self.name = name
-        self.displayName = displayName
-        self.about = about
-        self.picture = picture
-        self.banner = banner
-        self.nip05 = nip05
-        self.lud16 = lud16
-        self.lud06 = lud06
-        self.website = website
-    }
-
-    // MARK: - Codable
-
-    private struct DynamicCodingKey: CodingKey {
-        var stringValue: String
-        var intValue: Int?
-
-        init?(stringValue: String) {
-            self.stringValue = stringValue
-        }
-
-        init?(intValue _: Int) {
-            return nil
-        }
-    }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: DynamicCodingKey.self)
-
-        self.name = try container.decodeIfPresent(String.self, forKey: DynamicCodingKey(stringValue: NostrConstants.ProfileField.name)!)
-        self.displayName = try container.decodeIfPresent(String.self, forKey: DynamicCodingKey(stringValue: NostrConstants.ProfileField.displayName)!)
-        self.about = try container.decodeIfPresent(String.self, forKey: DynamicCodingKey(stringValue: NostrConstants.ProfileField.about)!)
-        self.picture = try container.decodeIfPresent(String.self, forKey: DynamicCodingKey(stringValue: NostrConstants.ProfileField.picture)!)
-        self.banner = try container.decodeIfPresent(String.self, forKey: DynamicCodingKey(stringValue: NostrConstants.ProfileField.banner)!)
-        self.nip05 = try container.decodeIfPresent(String.self, forKey: DynamicCodingKey(stringValue: NostrConstants.ProfileField.nip05)!)
-        self.lud16 = try container.decodeIfPresent(String.self, forKey: DynamicCodingKey(stringValue: NostrConstants.ProfileField.lud16)!)
-        self.lud06 = try container.decodeIfPresent(String.self, forKey: DynamicCodingKey(stringValue: NostrConstants.ProfileField.lud06)!)
-        self.website = try container.decodeIfPresent(String.self, forKey: DynamicCodingKey(stringValue: NostrConstants.ProfileField.website)!)
-
-        // Store any additional fields
-        let knownKeys = [
-            NostrConstants.ProfileField.name,
-            NostrConstants.ProfileField.displayName,
-            NostrConstants.ProfileField.about,
-            NostrConstants.ProfileField.picture,
-            NostrConstants.ProfileField.banner,
-            NostrConstants.ProfileField.nip05,
-            NostrConstants.ProfileField.lud16,
-            NostrConstants.ProfileField.lud06,
-            NostrConstants.ProfileField.website
-        ]
-        for key in container.allKeys {
-            if !knownKeys.contains(key.stringValue) {
-                if let value = try container.decodeIfPresent(String.self, forKey: key) {
-                    additionalFields[key.stringValue] = value
-                }
-            }
-        }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: DynamicCodingKey.self)
-
-        try container.encodeIfPresent(name, forKey: DynamicCodingKey(stringValue: NostrConstants.ProfileField.name)!)
-        try container.encodeIfPresent(displayName, forKey: DynamicCodingKey(stringValue: NostrConstants.ProfileField.displayName)!)
-        try container.encodeIfPresent(about, forKey: DynamicCodingKey(stringValue: NostrConstants.ProfileField.about)!)
-        try container.encodeIfPresent(picture, forKey: DynamicCodingKey(stringValue: NostrConstants.ProfileField.picture)!)
-        try container.encodeIfPresent(banner, forKey: DynamicCodingKey(stringValue: NostrConstants.ProfileField.banner)!)
-        try container.encodeIfPresent(nip05, forKey: DynamicCodingKey(stringValue: NostrConstants.ProfileField.nip05)!)
-        try container.encodeIfPresent(lud16, forKey: DynamicCodingKey(stringValue: NostrConstants.ProfileField.lud16)!)
-        try container.encodeIfPresent(lud06, forKey: DynamicCodingKey(stringValue: NostrConstants.ProfileField.lud06)!)
-        try container.encodeIfPresent(website, forKey: DynamicCodingKey(stringValue: NostrConstants.ProfileField.website)!)
-
-        // Encode additional fields
-        for (key, value) in additionalFields {
-            try container.encode(value, forKey: DynamicCodingKey(stringValue: key)!)
-        }
-    }
-
-    /// Get additional field value
-    public func additionalField(_ key: String) -> String? {
-        return additionalFields[key]
-    }
-
-    /// Set additional field value
-    public mutating func setAdditionalField(_ key: String, value: String?) {
-        additionalFields[key] = value
-    }
-
-    /// Get all additional fields
-    public var allAdditionalFields: [String: String] {
-        return additionalFields
-    }
-    
-    // MARK: - Convenience Initializers
-    
-    /// Initialize from an NDKEvent (Kind 0 metadata event)
-    /// - Parameter event: The metadata event to parse
-    /// - Returns: A user profile if the event is valid and can be parsed, nil otherwise
-    public init?(from event: NDKEvent) {
-        guard event.kind == EventKind.metadata else { return nil }
-        
-        guard let data = event.content.data(using: .utf8) else { return nil }
-        
-        guard let decoded = JSONCoding.safeDecode(NDKUserProfile.self, from: data) else { return nil }
-        
-        self = decoded
-    }
-    
-    /// Create from an NDKEvent (static factory method)
-    /// - Parameter event: The metadata event to parse
-    /// - Returns: A user profile if the event is valid and can be parsed, nil otherwise
-    public static func from(event: NDKEvent) -> NDKUserProfile? {
-        return NDKUserProfile(from: event)
-    }
-}

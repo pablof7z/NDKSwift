@@ -96,34 +96,36 @@ struct NotesView: View {
 Use the fetch and subscribe APIs with different strategies:
 
 ```swift
-// Get user profile
-let user = NDKUser.fromNostrURI("npub1...", ndk: ndk)!
-let profile = try await ndk.fetchProfile(user.pubkey)
-if let profile = profile {
-    print("Name: \(profile.name ?? "Unknown")")
+// Get user profile using ProfileManager (recommended)
+let user = ndk.getUser(npub: "npub1...")!
+for await metadata in await ndk.profileManager.observe(for: user.pubkey, maxAge: TimeConstants.hour) {
+    if let metadata = metadata {
+        print("Name: \(metadata.displayName ?? metadata.name ?? "Unknown")")
+    }
+    break  // If you only need the current profile
 }
 
 // Stream recent notes
 for await event in ndk.observe(filter: NDKFilter(kinds: [1], limit: 10)).events {
     print("Note: \(event.content)")
 }
-for event in events {
-    print(event.content)
-}
 
-// Subscribe to real-time updates
-let subscription = ndk.subscribe(
-    filter: NDKFilter(kinds: [1], limit: 10)
+// Subscribe to real-time updates using observe API
+let dataSource = ndk.observe(
+    filter: NDKFilter(kinds: [1], limit: 10),
+    maxAge: 0  // Real-time updates
 )
-for await event in subscription {
+for await event in dataSource.events {
     print("New event: \(event.content)")
 }
 
 // Get specific event by ID
-let event = try await ndk.fetchEvent(
-    NDKFilter(ids: ["eventId..."])
+let eventSource = ndk.observe(
+    filter: NDKFilter(ids: ["eventId..."]),
     cachePolicy: .networkOnly  // Skip cache entirely
 )
+let events = await eventSource.collect(timeout: 5.0)
+let event = events.first
 
 // Cache-only access for offline support
 let cachedNotes = ndk.observe(
@@ -171,19 +173,15 @@ print("Published to \(publishedToRelays.count) relays")
 Events are the core data structure in Nostr:
 
 ```swift
-// Create event with full control
-let event = NDKEvent(
-    pubkey: signer.publicKey,
-    createdAt: Timestamp.now,
-    kind: 1,  // Text note
-    tags: [
-        ["p", "recipient-pubkey"],  // Mention someone
-        ["t", "swift"],             // Add hashtag
-    ],
-    content: "Building with #swift on Nostr!"
-)
+// Create event using builder pattern (recommended)
+let event = try await NDKEventBuilder()
+    .content("Building with #swift on Nostr!")
+    .kind(1)  // Text note
+    .tag(["p", "recipient-pubkey"])  // Mention someone
+    .tag(["t", "swift"])             // Add hashtag
+    .build(signer: ndk.signer!)
 
-// Events are automatically signed when published
+// Publish the signed event
 try await ndk.publish(event)
 ```
 
@@ -221,17 +219,22 @@ let user = ndk.getUser("hex-pubkey")
 // Or by npub
 let user = ndk.getUser(npub: "npub1...")
 
-// Fetch their profile using observe API
+// Fetch profile using NDKProfileManager (recommended approach)
+// The profile manager is built into NDK - no need to create one
 if let user = user {
-    let profileSource = ndk.observe(
-        filter: NDKFilter(kinds: [0], authors: [user.pubkey]),
-        maxAge: 3600  // 1 hour cache
-    )
+    // This returns cached data immediately if available, then fetches fresh data
+    for await profile in await ndk.profileManager.observe(for: user.pubkey, maxAge: TimeConstants.hour) {
+        if let profile = profile {
+            print("Name: \(profile.displayName ?? profile.name ?? "Unknown")")
+            print("About: \(profile.about ?? "")")
+        }
+        break  // If you only need the profile once
+    }
     
-    let events = await profileSource.collect(timeout: 5.0)
-    if let profile = try? events.first?.decodeMetadata() {
-        print("Name: \(profile.name ?? "Unknown")")
-        print("About: \(profile.about ?? "")")
+    // For continuous profile updates (e.g., on a profile page)
+    for await profile in await ndk.profileManager.observe(for: user.pubkey, maxAge: 0) {
+        // This will keep the subscription open and yield updates
+        updateUI(with: profile)
     }
     
     // Get who they follow
@@ -241,7 +244,7 @@ if let user = user {
     
     let contactEvents = await contactsSource.collect(timeout: 5.0)
     if let contactEvent = contactEvents.first {
-        let following = contactEvent.referencedPubkeys()
+        let following = contactEvent.taggedUsers()
         print("Following \(following.count) users")
     }
 }
@@ -311,7 +314,12 @@ let chatSource = ndk.observe(
 
 for await message in chatSource.events {
     let author = ndk.getUser(message.pubkey)
-    print("\(author?.displayName ?? "Unknown"): \(message.content)")
+    // Fetch profile if needed
+    if let metadata = await ndk.profileManager.getCachedProfile(for: message.pubkey) {
+        print("\(metadata.displayName ?? metadata.name ?? "Unknown"): \(message.content)")
+    } else {
+        print("\(message.pubkey.prefix(8))...: \(message.content)")
+    }
 }
 ```
 
@@ -319,17 +327,17 @@ for await message in chatSource.events {
 
 ```swift
 // Update your profile
-let profileEvent = NDKEvent(
-    kind: 0,  // Metadata
-    content: """
-    {
-        "name": "Alice",
-        "about": "Building on Nostr with Swift",
-        "picture": "https://example.com/avatar.jpg",
-        "nip05": "alice@example.com"
-    }
-    """
-)
+let profileData = [
+    "name": "Alice",
+    "about": "Building on Nostr with Swift",
+    "picture": "https://example.com/avatar.jpg",
+    "nip05": "alice@example.com"
+]
+
+let profileEvent = try await NDKEventBuilder()
+    .kind(0)  // Metadata
+    .content(JSONCoding.encode(profileData))
+    .build(signer: ndk.signer!)
 
 try await ndk.publish(profileEvent)
 ```
@@ -344,27 +352,34 @@ let eventSource = ndk.observe(
 
 let events = await eventSource.collect(timeout: 5.0)
 if let originalEvent = events.first {
-    // Create a reply using the builder
-    let reply = try await NDKEventBuilder.reply(to: originalEvent, ndk: ndk)
-        .content("Great post! 👍")
-        .build()
+    // Create a reply
+    let reply = originalEvent.createReply(
+        content: "Great post! 👍",
+        mentionAuthor: true
+    )
     
-    try await ndk.publish(reply)
+    // Sign and publish
+    let signedReply = try await NDKEventBuilder(ndk: ndk)
+        .event(reply)
+        .build(signer: ndk.signer!)
+    
+    try await ndk.publish(signedReply)
 }
 ```
 
 ### Reactions
 
 ```swift
-// React to an event
-let reaction = try await NDKEventBuilder(ndk: ndk)
-    .kind(EventKind.reaction)
-    .content("🔥")
-    .tag(["e", event.id])
-    .tag(["p", event.pubkey])
-    .build()
+// React to an event (using NDK interaction methods)
+try await ndk.react(to: event, with: "🔥")
 
+// Or use the event methods directly
+let reaction = try await event.react(with: "🔥", signer: ndk.signer!, ndk: ndk)
 try await ndk.publish(reaction)
+
+// Like/dislike shortcuts
+try await ndk.like(event)     // + reaction
+try await ndk.dislike(event)  // - reaction
 ```
 
 ## Best Practices
@@ -422,7 +437,7 @@ Task {
 Use caching for better performance:
 
 ```swift
-let cache = try NDKSQLiteCache()
+let cache = try await NDKSQLiteCache(path: nil)
 let ndk = NDK(
     relayUrls: relayUrls,
     cache: cache
@@ -465,21 +480,22 @@ let regionalRelays = [
 NDKSwift includes built-in support for Cashu wallets:
 
 ```swift
-// Initialize Cashu wallet
-let cashuWallet = NDKCashuWallet(signer: signer, ndk: ndk)
+// Initialize Cashu wallet (NIP-60)
+let cashuWallet = NIP60Wallet(ndk: ndk)
 await cashuWallet.connect()
 
 // Check balance
 let balance = await cashuWallet.totalBalance
 
 // Send a nutzap (NIP-61)
-let recipient = ndk.getUser(pubkey: "recipientPubkey")
-let nutzap = try await cashuWallet.nutzap(
+let recipient = ndk.getUser("recipientPubkey")
+let nutzapRequest = NutzapRequest(
+    recipient: recipient,
     amount: 100,
     comment: "Great post!",
-    recipient: recipient,
     eventId: "eventToZap"
 )
+let nutzap = try await cashuWallet.pay(nutzapRequest)
 
 // Mint new tokens
 let mintQuote = try await cashuWallet.mintQuote(amount: 1000)
@@ -514,8 +530,10 @@ If relays aren't connecting:
 ndk.debugMode = true
 
 // Monitor relay connections
-for await relay in ndk.pool.relays {
-    print("Relay \(relay.url): \(relay.connectionState)")
+let relays = await ndk.relays
+for relay in relays {
+    let state = await relay.connectionState
+    print("Relay \(relay.url): \(state)")
 }
 ```
 
@@ -533,8 +551,8 @@ guard ndk.signer != nil else {
     return
 }
 
-let connectedRelays = ndk.pool.connectedRelays()
-print("Connected to \(connectedRelays.count) relays")
+let (connected, total) = await ndk.getRelayConnectionSummary()
+print("Connected to \(connected) of \(total) relays")
 
 // Validate event before publishing
 try event.validate()
@@ -545,17 +563,12 @@ try event.validate()
 For large-scale applications:
 
 ```swift
-// Limit concurrent subscriptions
-let options = NDKSubscriptionOptions(
-    limit: 100,
-    timeout: 30.0
-)
-
 // Use specific relays for queries
-let fastRelays = Set([relay1, relay2])
+let fastRelays = Set(["wss://relay1.com", "wss://relay2.com"])
 for await event in ndk.observe(
     filter: filter,
-    relays: fastRelays
+    relays: fastRelays,
+    exclusiveRelays: true  // Only use specified relays
 ).events {
     print("Event from fast relay: \(event.content)")
 }

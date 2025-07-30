@@ -3,7 +3,7 @@ import Foundation
 /// All zap-related information for a recipient, fetched once and cached
 public struct RecipientZapInfo {
     public let pubkey: String
-    public let profile: NDKUserProfile?              // From kind:0
+    public let metadata: NDKUserMetadata?              // From kind:0
     public let nutzapPreferences: NDKNutzapPreferences? // From kind:10019
     public let fetchedAt: Date
 
@@ -11,7 +11,7 @@ public struct RecipientZapInfo {
 
     /// Lightning address from profile (lud16 or lud06)
     public var lightningAddress: String? {
-        profile?.lud16 ?? profile?.lud06
+        metadata?.lud16 ?? metadata?.lud06
     }
 
     /// Whether the recipient supports Lightning zaps
@@ -86,15 +86,13 @@ extension RecipientZapInfo {
         pubkey: String,
         events: [NDKEvent]
     ) async -> RecipientZapInfo {
-        var profile: NDKUserProfile?
+        var metadata: NDKUserMetadata?
         var nutzapPreferences: NDKNutzapPreferences?
 
         for event in events {
             switch event.kind {
             case EventKind.metadata:
-                if let decodedProfile = JSONCoding.safeDecode(NDKUserProfile.self, from: event.content) {
-                    profile = decodedProfile
-                }
+                metadata = NDKUserMetadata(event: event)
 
             case EventKind.nutzapPreferences:
                 nutzapPreferences = NDKNutzapPreferences(event: event)
@@ -106,7 +104,7 @@ extension RecipientZapInfo {
 
         return RecipientZapInfo(
             pubkey: pubkey,
-            profile: profile,
+            metadata: metadata,
             nutzapPreferences: nutzapPreferences,
             fetchedAt: Date()
         )

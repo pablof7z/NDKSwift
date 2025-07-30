@@ -37,16 +37,12 @@ Task {
         print("  Created at: \(event.createdAt)")
         print("  Content preview: \(event.content.prefix(100))...")
         
-        if let profileData = event.content.data(using: .utf8),
-           let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: profileData) {
-            print("\n✅ Successfully parsed profile:")
-            print("  Name: \(profile.name ?? "N/A")")
-            print("  Display Name: \(profile.displayName ?? "N/A")")
-            print("  Picture: \(profile.picture ?? "N/A")")
-            print("  NIP-05: \(profile.nip05 ?? "N/A")")
-        } else {
-            print("❌ Failed to parse profile JSON")
-        }
+        let metadata = NDKUserMetadata(event: event)
+        print("\n✅ Successfully created metadata:")
+        print("  Name: \(metadata.name ?? "N/A")")
+        print("  Display Name: \(metadata.displayName ?? "N/A")")
+        print("  Picture: \(metadata.picture ?? "N/A")")
+        print("  NIP-05: \(metadata.nip05 ?? "N/A")")
         
         break
     }

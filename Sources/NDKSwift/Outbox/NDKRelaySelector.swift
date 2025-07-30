@@ -8,14 +8,14 @@ import Foundation
 /// - When fetching: considers p-tagged users regardless of count
 actor NDKRelaySelector {
     private let ndk: NDK
-    let tracker: NDKOutboxTracker
+    let tracker: any RelayPreferenceProvider
     private let ranker: NDKRelayRanker
 
     /// Cache for blocked relays to avoid repeated fetches
     private var blockedRelaysCache: Set<String>?
     private var blockedRelaysCacheExpiry: Date?
 
-    public init(ndk: NDK, tracker: NDKOutboxTracker, ranker: NDKRelayRanker) {
+    public init(ndk: NDK, tracker: any RelayPreferenceProvider, ranker: NDKRelayRanker) {
         self.ndk = ndk
         self.tracker = tracker
         self.ranker = ranker
@@ -325,7 +325,7 @@ actor NDKRelaySelector {
             // For events with less than 10 p-tags, apply NIP-65 outbox model:
             // Send to read relays of each tagged user
             for pubkey in pTags {
-                if let item = await tracker.getRelaysSyncFor(pubkey: pubkey) {
+                if let item = await tracker.getRelaysSyncFor(pubkey: pubkey, type: .both) {
                     // According to NIP-65: "Send the event to all read relays of each tagged user"
                     relays.formUnion(item.readRelays.map { $0.url })
                     // If no read relays available, fallback to write relays
@@ -343,7 +343,7 @@ actor NDKRelaySelector {
         } else {
             // For fetching, always consider p-tagged users regardless of count
             for pubkey in pTags {
-                if let item = await tracker.getRelaysSyncFor(pubkey: pubkey) {
+                if let item = await tracker.getRelaysSyncFor(pubkey: pubkey, type: .both) {
                     // Fetch from where mentioned users read
                     relays.formUnion(item.readRelays.map { $0.url })
                     if item.readRelays.isEmpty {
@@ -367,7 +367,7 @@ actor NDKRelaySelector {
         // Extract from #p tags
         if let pTags = filter.tags?["p"] {
             for pubkey in pTags {
-                if let item = await tracker.getRelaysSyncFor(pubkey: pubkey) {
+                if let item = await tracker.getRelaysSyncFor(pubkey: pubkey, type: .both) {
                     relays.formUnion(item.readRelays.map { $0.url })
                     if item.readRelays.isEmpty {
                         relays.formUnion(item.writeRelays.map { $0.url })
@@ -560,7 +560,7 @@ actor NDKRelaySelector {
         var missing = Set<String>()
         
         for pubkey in pubkeys {
-            let hasRelayInfo = await tracker.getRelaysSyncFor(pubkey: pubkey) != nil
+            let hasRelayInfo = await tracker.getRelaysSyncFor(pubkey: pubkey, type: .both) != nil
             if !hasRelayInfo {
                 missing.insert(pubkey)
             }

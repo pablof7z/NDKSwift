@@ -341,9 +341,10 @@ public class NDKSessionData {
 
         var scores: [String: Int] = [:]
 
-        // Direct follows get maximum score
+        // Direct follows get maximum score (use a large but safe value)
+        let maxScore = 1_000_000
         for follow in followList {
-            scores[follow] = Int.max
+            scores[follow] = maxScore
         }
 
         // Fetch follows of follows
@@ -370,7 +371,11 @@ public class NDKSessionData {
                 let followsOfFollow = extractFollows(from: event)
                 for pubkey in followsOfFollow {
                     if pubkey != self.pubkey { // Don't count self
-                        scores[pubkey, default: 0] += 1
+                        // Prevent overflow by checking current value
+                        let currentScore = scores[pubkey, default: 0]
+                        if currentScore < Int.max - 1 {
+                            scores[pubkey] = currentScore + 1
+                        }
                     }
                 }
             }

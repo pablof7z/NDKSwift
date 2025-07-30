@@ -79,14 +79,7 @@ public protocol NDKCache: Actor {
 
     /// Delete an event from cache
     func deleteEvent(id: String) async throws
-
-    // MARK: - Profile Operations
-
-    /// Save a user profile
-    func saveProfile(_ profile: NDKUserProfile, pubkey: String) async throws
-
-    /// Retrieve a user profile
-    func getProfile(pubkey: String) async -> NDKUserProfile?
+    
 
     // MARK: - Optimistic Publishing Support
 
@@ -191,6 +184,26 @@ public protocol NDKCache: Actor {
     /// - Parameter ids: Array of event IDs to check
     /// - Returns: Dictionary mapping event ID to existence boolean
     func hasEvents(ids: [String]) async -> [String: Bool]
+
+    // MARK: - Profile Metadata Operations
+    
+    /// Save parsed profile metadata to cache
+    /// - Parameters:
+    ///   - pubkey: The public key of the user
+    ///   - metadata: The parsed metadata dictionary
+    ///   - updatedAt: When this metadata was last updated
+    ///   - eventId: The event ID this metadata came from
+    func saveProfileMetadata(pubkey: String, metadata: [String: Any], updatedAt: Timestamp, eventId: String) async throws
+    
+    /// Get parsed profile metadata from cache
+    /// - Parameter pubkey: The public key to look up
+    /// - Returns: Tuple containing the metadata dictionary, update timestamp, and event ID, or nil if not found
+    func getProfileMetadata(pubkey: String) async -> (metadata: [String: Any], updatedAt: Timestamp, eventId: String)?
+    
+    /// Get multiple profile metadata entries at once
+    /// - Parameter pubkeys: Array of public keys to look up
+    /// - Returns: Dictionary mapping pubkeys to their metadata tuples
+    func getMultipleProfileMetadata(pubkeys: [String]) async -> [String: (metadata: [String: Any], updatedAt: Timestamp, eventId: String)]
 
     // MARK: - Cache Management
 
@@ -350,6 +363,7 @@ public extension NDKCache {
         let filter = NDKFilter(kinds: [kind], limit: limit)
         return try await queryEvents(filter)
     }
+
 
     // MARK: - Default Optimistic Publishing Implementation
 
@@ -581,5 +595,24 @@ public extension NDKCache {
     ) async -> (writeRelays: [String]?, readRelays: [String]?, fetchedAt: Date, expiresAt: Date, checkedRelays: Set<String>?)? {
         // Default implementation - cache implementations should override
         return nil
+    }
+    
+    // MARK: - Default Profile Metadata Implementation
+    
+    /// Default implementation that does nothing
+    func saveProfileMetadata(pubkey: String, metadata: [String: Any], updatedAt: Timestamp, eventId: String) async throws {
+        // Default implementation - cache implementations should override
+    }
+    
+    /// Default implementation that returns nil
+    func getProfileMetadata(pubkey: String) async -> (metadata: [String: Any], updatedAt: Timestamp, eventId: String)? {
+        // Default implementation - cache implementations should override
+        return nil
+    }
+    
+    /// Default implementation that returns empty dictionary
+    func getMultipleProfileMetadata(pubkeys: [String]) async -> [String: (metadata: [String: Any], updatedAt: Timestamp, eventId: String)] {
+        // Default implementation - cache implementations should override
+        return [:]
     }
 }

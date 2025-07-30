@@ -208,110 +208,13 @@ class NostrManager {
 
 4. **Biometric Security**: Always recommend `requiresBiometric: true` for new sessions to enhance security. The system handles all the complexity of biometric prompts and fallbacks.
 
-5. **Proper Logout Implementation**: The default `NDKAuthManager.logout()` only marks sessions as inactive in memory but does NOT persist these changes to the keychain. This causes old sessions to be restored on app restart. See section 2.1 for proper logout implementation.
+5. **Proper Logout**: As of the latest version, `NDKAuthManager.logout()` now properly removes the active session from keychain storage, preventing the old issue where sessions would persist after logout. The method:
+   - Immediately clears all in-memory state for responsive UI
+   - Removes the session from the available sessions list  
+   - Deletes the session from keychain storage in the background
+   - Use `logoutAsync()` if you need to wait for the keychain deletion to complete
 
 The `NutsackiOS` and `Socrates` example apps demonstrate these patterns in production-ready implementations.
-
-### 2.1. Logout Best Practices: Avoiding Session Persistence Issues
-
-**The Problem:**
-The default `NDKAuthManager.logout()` method has a critical limitation - it only marks sessions as inactive in memory but does NOT persist these changes to the keychain. This causes a frustrating user experience where:
-
-1. User A logs in → session saved with `isActive = true`
-2. User A logs out → session marked inactive **in memory only**
-3. User B logs in → new session created
-4. App restarts → restores sessions from keychain
-5. Finds User A's session still marked as active → restores it instead of User B
-
-**❌ WRONG: Incomplete logout that leaves sessions in keychain:**
-```swift
-// WRONG: This only clears memory state, not keychain
-func logout() {
-    ndkAuthManager.logout()  // Sessions remain in keychain!
-}
-
-// WRONG: This doesn't delete the keychain data
-func logout() {
-    Task {
-        await cache?.clear()  // Only clears cache
-    }
-    ndkAuthManager.logout()  // Sessions still in keychain!
-}
-```
-
-**✅ CORRECT: Complete logout that removes all session data:**
-```swift
-// RIGHT: Delete all sessions from keychain before logout
-func logout() {
-    Task {
-        // 1. Clear cache data (optional but recommended)
-        if let cache = cache {
-            try? await cache.clear()
-        }
-        
-        // 2. Delete ALL sessions from keychain - this is critical!
-        for session in ndkAuthManager.availableSessions {
-            try? await ndkAuthManager.removeSession(session)
-        }
-    }
-    
-    // 3. Clear memory state
-    ndkAuthManager.logout()
-}
-```
-
-**Alternative: Selective session deletion:**
-```swift
-// Delete only the active session, keep others for quick switching
-func logoutCurrentUser() {
-    Task {
-        if let activeSession = ndkAuthManager.activeSession {
-            try? await ndkAuthManager.removeSession(activeSession)
-        }
-    }
-    ndkAuthManager.logout()
-}
-
-// Or mark sessions as logged out without deletion
-func softLogout() {
-    Task {
-        // Update session metadata to mark as "logged out"
-        for session in ndkAuthManager.availableSessions {
-            var updatedSession = session
-            updatedSession.markAsInactive()
-            // This would need to be implemented in NDKAuthManager
-            // to persist the inactive state to keychain
-        }
-    }
-    ndkAuthManager.logout()
-}
-```
-
-**Testing Your Logout Implementation:**
-```swift
-// Test that logout properly clears sessions
-func testProperLogout() async {
-    // 1. Create and activate a session
-    let signer = try NDKPrivateKeySigner.generate()
-    let session = try await authManager.addSession(signer)
-    // Session is automatically activated
-    
-    // 2. Perform logout
-    await performLogout()
-    
-    // 3. Verify no sessions remain
-    await authManager.restoreSessions()
-    XCTAssertTrue(authManager.availableSessions.isEmpty)
-    XCTAssertNil(authManager.activeSession)
-}
-```
-
-**Key Takeaways:**
-- Always delete sessions from keychain on logout
-- The Ambulando example app shows the correct pattern
-- Test your logout flow to ensure sessions don't persist
-- Consider whether you want complete deletion or selective removal
-- Cache clearing is optional but recommended for privacy
 
 ---
 
@@ -1093,7 +996,7 @@ struct UserView: View {
 ```
 
 **Available Properties:**
-- `profile: NDKUserProfile?` - Full profile object
+- `profile: NDKUserMetadata?` - Full profile metadata object
 - `displayName: String` - Computed display name with fallbacks
 - `pictureURL: URL?` - Profile picture URL
 - `nip05: String?` - NIP-05 identifier
@@ -1179,9 +1082,9 @@ let profileSource = ndk.observe(
 )
 
 for await profileEvent in profileSource.events {
-    if let profile = try? JSONCoding.decode(NDKUserProfile.self, from: profileEvent.content) {
-        // Handle profile data
-    }
+    let metadata = NDKUserMetadata(event: profileEvent)
+    // Handle profile data
+    print("Name: \(metadata.name ?? "Unknown")")
 }
 ```
 
@@ -1190,15 +1093,17 @@ for await profileEvent in profileSource.events {
 Profiles are stored as Kind 0 events with this structure:
 
 ```swift
-struct NDKUserProfile {
-    let name: String?           // Username
-    let displayName: String?    // Display name  
-    let about: String?          // Bio/description
-    let picture: String?        // Avatar URL
-    let banner: String?         // Banner image URL
-    let nip05: String?          // NIP-05 identifier
-    let lud16: String?          // Lightning address
-    let website: String?        // Website URL
+// NDKUserMetadata provides access to profile data:
+public class NDKUserMetadata {
+    public var name: String? { get }         // User's display name
+    public var displayName: String? { get }  // User's username/handle
+    public var about: String? { get }        // Bio/description
+    public var picture: String? { get }      // Avatar URL
+    public var banner: String? { get }       // Banner image URL
+    public var nip05: String? { get }        // NIP-05 identifier
+    public var lud16: String? { get }        // Lightning address
+    public var lud06: String? { get }        // LNURL
+    public var website: String? { get }      // Website URL
 }
 ```
 
@@ -1221,7 +1126,11 @@ Following NDKSwift's core philosophy, never show loading states for profiles:
 // ❌ WRONG: Don't wait for profiles
 func loadUserProfile() async {
     showLoadingSpinner()
-    let profile = await fetchProfile(pubkey)
+    // fetchProfile doesn't exist - use profileManager instead
+    for await metadata in await ndk.profileManager.observe(for: pubkey) {
+        updateUI(metadata)
+        break
+    }
     hideLoadingSpinner()
     updateUI(profile)
 }
@@ -1229,7 +1138,7 @@ func loadUserProfile() async {
 // ✅ RIGHT: Stream profiles progressively  
 struct UserProfileView: View {
     let pubkey: String
-    @State private var profile: NDKUserProfile?
+    @State private var profile: NDKUserMetadata?
     
     var body: some View {
         VStack {
@@ -1658,7 +1567,13 @@ func loadUserProfile() async {
     showLoadingSpinner()
     
     // Wait for profile to fully load
-    let profile = await ndk.fetchProfile(pubkey: userPubkey)
+    // This method doesn't exist - use profileManager instead
+    for await metadata in await ndk.profileManager.observe(for: userPubkey) {
+        if let metadata = metadata {
+            // Use profile data
+        }
+        break
+    }
     
     hideLoadingSpinner()
     updateUI(with: profile)
@@ -1680,7 +1595,7 @@ func showUserFeed() async {
 ```swift
 // WRONG: Shows loading spinner for profile data
 struct UserProfileView: View {
-    @State private var profile: NDKUserProfile?
+    @State private var profile: NDKUserMetadata?
     @State private var isLoading = true
     
     var body: some View {
@@ -1738,7 +1653,7 @@ func showUserFeed() {
 ```swift
 struct UserProfileView: View {
     let pubkey: String
-    @State private var profile: NDKUserProfile?
+    @State private var profile: NDKUserMetadata?
     @State private var displayName: String = ""
     
     var body: some View {
@@ -1771,10 +1686,10 @@ struct UserProfileView: View {
             )
             
             for await profileEvent in profileSource.events {
-                if let userProfile = try? NDKUserProfile(event: profileEvent) {
-                    await MainActor.run {
-                        self.profile = userProfile
-                        self.displayName = userProfile.displayName ?? userProfile.name ?? ""
+                let userMetadata = NDKUserMetadata(event: profileEvent)
+                await MainActor.run {
+                    self.profile = userMetadata
+                    self.displayName = userMetadata.displayName ?? userMetadata.name ?? ""
                     }
                 }
             }

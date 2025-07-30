@@ -46,6 +46,18 @@ public enum RelayConstants {
     /// Primal relay - Popular relay with good performance
     public static let primal = "wss://relay.primal.net"
 
+    /// Snort Social relay
+    public static let snortSocial = "wss://relay.snort.social"
+    
+    /// Nostr Wine relay
+    public static let nostrWine = "wss://relay.nostr.wine"
+    
+    /// Current FYI relay
+    public static let currentFyi = "wss://relay.current.fyi"
+    
+    /// Oxtr Dev relay
+    public static let oxtrDev = "wss://relay.dev.oxtr.dev"
+
     // MARK: - Specialized Relays
 
     // MARK: - Documentation Examples
@@ -59,6 +71,22 @@ public enum RelayConstants {
     public static let defaultRelays: [String] = [
         damus,
         nosLol
+    ]
+
+    /// Extended set of relays for better coverage
+    public static let extendedRelays: [String] = [
+        damus,
+        nosLol,
+        primal,
+        nostrBand,
+        nostrWine
+    ]
+    
+    /// Test relays for E2E tests
+    public static let testRelays: [String] = [
+        damus,
+        nosLol,
+        primal
     ]
 
     /// Relays optimized for wallet operations

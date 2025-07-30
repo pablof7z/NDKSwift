@@ -5,6 +5,7 @@ extension NDK {
     // MARK: - Internal Outbox Components
 
     /// Outbox tracker for relay information
+    /// Deprecated: Use NDKOutboxManager directly via ndk.outbox
     public var outboxTracker: NDKOutboxTracker {
         lazyInit(&_outboxTracker) {
             NDKOutboxTracker(
@@ -17,7 +18,7 @@ extension NDK {
     /// Relay ranker for intelligent selection
     var relayRanker: NDKRelayRanker {
         lazyInit(&_relayRanker) {
-            NDKRelayRanker(ndk: self, tracker: outboxTracker)
+            NDKRelayRanker(ndk: self, tracker: outbox)
         }
     }
 

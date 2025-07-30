@@ -137,7 +137,6 @@ final class NIP05Tests: XCTestCase {
 // Simple testable cache implementation
 actor TestableCache: NDKCache {
     private var events: [String: NDKEvent] = [:]
-    private var profiles: [String: NDKUserProfile] = [:]
     private var nip05Entries: [String: NIP05CacheEntry] = [:]
     private var nip05ByPubkey: [String: String] = [:]
     private var domainChecks: [String: Date] = [:]
@@ -160,17 +159,10 @@ actor TestableCache: NDKCache {
         events.removeValue(forKey: id)
     }
     
-    func saveProfile(_ profile: NDKUserProfile, pubkey: String) async throws {
-        profiles[pubkey] = profile
-    }
-    
-    func getProfile(pubkey: String) async -> NDKUserProfile? {
-        return profiles[pubkey]
-    }
+    // Profile operations are now handled through event storage
     
     func clear() async throws {
         events.removeAll()
-        profiles.removeAll()
         nip05Entries.removeAll()
         nip05ByPubkey.removeAll()
         domainChecks.removeAll()

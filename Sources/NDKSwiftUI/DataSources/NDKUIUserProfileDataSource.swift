@@ -8,7 +8,7 @@ import Combine
 /// Data source for user profile metadata
 @MainActor
 public class NDKUIUserProfileDataSource: ObservableObject {
-    @Published public private(set) var profile: NDKUserProfile?
+    @Published public private(set) var metadata: NDKUserMetadata?
     @Published public private(set) var isLoading = false
     @Published public private(set) var error: Error?
     
@@ -32,9 +32,9 @@ public class NDKUIUserProfileDataSource: ObservableObject {
     
     private func observeProfile() async {
         // Use NDKProfileManager for best practices
-        for await profileUpdate in await ndk.profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
+        for await metadataUpdate in await ndk.profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
             await MainActor.run {
-                self.profile = profileUpdate
+                self.metadata = metadataUpdate
                 self.isLoading = false
             }
         }

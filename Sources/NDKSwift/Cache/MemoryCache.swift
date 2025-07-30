@@ -4,7 +4,6 @@ import CashuSwift
 /// Comprehensive in-memory cache implementation for testing and temporary use
 public actor MemoryCache: NDKCache {
     private var events: [String: NDKEvent] = [:]
-    private var profiles: [String: NDKUserProfile] = [:]
     private var eventConfirmations: [String: EventConfirmationState] = [:]
     private var unpublishedEventRelays: [String: Set<String>] = [:]
     private var eventCreationTimes: [String: Date] = [:]
@@ -16,6 +15,7 @@ public actor MemoryCache: NDKCache {
     // Tombstone cache for deletion events that arrive before the original event
     private var deletionTombstones: [String: Date] = [:]
     private let tombstoneTTL: TimeInterval = NetworkConstants.tombstoneTTL
+    
     
     // Cleanup task for tombstones
     private var cleanupTask: Task<Void, Never>?
@@ -97,24 +97,11 @@ public actor MemoryCache: NDKCache {
         NDKLogger.log(.debug, category: .cache, "Deleted event \(id)")
     }
 
-    // MARK: - Profile Operations
-
-    public func saveProfile(_ profile: NDKUserProfile, pubkey: String) async throws {
-        profiles[pubkey] = profile
-        NDKLogger.log(.trace, category: .cache, "Saved profile for \(pubkey)")
-    }
-
-    public func getProfile(pubkey: String) async -> NDKUserProfile? {
-        let profile = profiles[pubkey]
-        NDKLogger.log(.trace, category: .cache, "Retrieved profile for \(pubkey): \(profile != nil ? "found" : "not found")")
-        return profile
-    }
 
     // MARK: - Cache Management
 
     public func clear() async throws {
         events.removeAll()
-        profiles.removeAll()
         eventConfirmations.removeAll()
         mintInfos.removeAll()
         keysets.removeAll()
@@ -223,9 +210,6 @@ public actor MemoryCache: NDKCache {
         return events.count
     }
 
-    public func profileCount() async -> Int {
-        return profiles.count
-    }
 
     public func unconfirmedEventCount() async -> Int {
         return eventConfirmations.values.filter { !$0.isConfirmed }.count

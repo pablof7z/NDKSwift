@@ -37,6 +37,7 @@ public struct NDKUIEventView: View {
 
     // MARK: - Properties
 
+    private let ndk: NDK
     private let event: NDKEvent
     private let style: EventStyle
     private let showAuthor: Bool
@@ -44,8 +45,6 @@ public struct NDKUIEventView: View {
     private let showInteractions: Bool
     private var eventTapAction: ((NDKEvent) -> Void)?
     private var authorTapAction: ((String) -> Void)?
-
-    @Environment(\.ndk) private var ndk
 
     // MARK: - Supporting Types
 
@@ -61,18 +60,21 @@ public struct NDKUIEventView: View {
 
     /// Initialize with an event
     /// - Parameters:
+    ///   - ndk: The NDK instance to use
     ///   - event: The NDKEvent to display
     ///   - style: The presentation style
     ///   - showAuthor: Whether to show author information
     ///   - showTimestamp: Whether to show the timestamp
     ///   - showInteractions: Whether to show interaction buttons
     public init(
+        ndk: NDK,
         event: NDKEvent,
         style: EventStyle = .feed,
         showAuthor: Bool = true,
         showTimestamp: Bool = true,
         showInteractions: Bool = true
     ) {
+        self.ndk = ndk
         self.event = event
         self.style = style
         self.showAuthor = showAuthor
@@ -87,6 +89,7 @@ public struct NDKUIEventView: View {
             switch event.kind {
             case 1:
                 NDKTextNoteView(
+                    ndk: ndk,
                     event: event,
                     style: style,
                     showAuthor: showAuthor,
@@ -95,6 +98,7 @@ public struct NDKUIEventView: View {
                 )
             case 20:
                 NDKPictureEventView(
+                    ndk: ndk,
                     event: event,
                     style: style,
                     showAuthor: showAuthor,
@@ -102,6 +106,7 @@ public struct NDKUIEventView: View {
                 )
             case EventKind.longFormContent:
                 NDKLongFormArticleView(
+                    ndk: ndk,
                     event: event,
                     style: style,
                     showAuthor: showAuthor,
@@ -109,6 +114,7 @@ public struct NDKUIEventView: View {
                 )
             case 9321:
                 NDKCashuTokenView(
+                    ndk: ndk,
                     event: event,
                     style: style,
                     showAuthor: showAuthor,
@@ -116,6 +122,7 @@ public struct NDKUIEventView: View {
                 )
             default:
                 NDKGenericEventView(
+                    ndk: ndk,
                     event: event,
                     style: style,
                     showAuthor: showAuthor,
@@ -150,19 +157,19 @@ public struct NDKUIEventView: View {
 
 /// Specialized view for text note events (kind:1)
 public struct NDKTextNoteView: View {
+    let ndk: NDK
     let event: NDKEvent
     let style: NDKUIEventView.EventStyle
     let showAuthor: Bool
     let showTimestamp: Bool
     let showInteractions: Bool
 
-    @Environment(\.ndk) private var ndk
-
     public var body: some View {
         VStack(alignment: .leading, spacing: verticalSpacing) {
             // Author header
             if showAuthor {
                 NDKUIEventAuthorHeader(
+                    ndk: ndk,
                     pubkey: event.pubkey,
                     timestamp: showTimestamp ? event.createdAt : nil,
                     style: authorHeaderStyle
@@ -267,18 +274,18 @@ public struct NDKTextNoteView: View {
 
 /// Specialized view for long-form article events (kind:30023) - shows rich preview
 public struct NDKLongFormArticleView: View {
+    let ndk: NDK
     let event: NDKEvent
     let style: NDKUIEventView.EventStyle
     let showAuthor: Bool
     let showTimestamp: Bool
-
-    @Environment(\.ndk) private var ndk
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Author header
             if showAuthor {
                 NDKUIEventAuthorHeader(
+                    ndk: ndk,
                     pubkey: event.pubkey,
                     timestamp: showTimestamp ? event.createdAt : nil,
                     style: .standard
@@ -372,18 +379,18 @@ public struct NDKLongFormArticleView: View {
 
 /// Specialized view for Cashu token events (kind:9321)
 public struct NDKCashuTokenView: View {
+    let ndk: NDK
     let event: NDKEvent
     let style: NDKUIEventView.EventStyle
     let showAuthor: Bool
     let showTimestamp: Bool
-
-    @Environment(\.ndk) private var ndk
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Author header
             if showAuthor {
                 NDKUIEventAuthorHeader(
+                    ndk: ndk,
                     pubkey: event.pubkey,
                     timestamp: showTimestamp ? event.createdAt : nil,
                     style: .minimal
@@ -459,18 +466,18 @@ public struct NDKCashuTokenView: View {
 
 /// Specialized view for picture events (kind:20) - NIP-68 picture-first feeds
 public struct NDKPictureEventView: View {
+    let ndk: NDK
     let event: NDKEvent
     let style: NDKUIEventView.EventStyle
     let showAuthor: Bool
     let showTimestamp: Bool
-
-    @Environment(\.ndk) private var ndk
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Author header
             if showAuthor {
                 NDKUIEventAuthorHeader(
+                    ndk: ndk,
                     pubkey: event.pubkey,
                     timestamp: showTimestamp ? event.createdAt : nil,
                     style: .standard
@@ -682,6 +689,7 @@ private struct GridImageView: View {
 
 /// Fallback view for unknown or unsupported event kinds
 public struct NDKGenericEventView: View {
+    let ndk: NDK
     let event: NDKEvent
     let style: NDKUIEventView.EventStyle
     let showAuthor: Bool
@@ -692,6 +700,7 @@ public struct NDKGenericEventView: View {
             // Author header
             if showAuthor {
                 NDKUIEventAuthorHeader(
+                    ndk: ndk,
                     pubkey: event.pubkey,
                     timestamp: showTimestamp ? event.createdAt : nil,
                     style: .minimal
