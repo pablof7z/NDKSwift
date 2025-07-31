@@ -50,7 +50,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/pablof7z/CashuSwift.git",
       "state" : {
-        "branch" : "v0.1.1",
+        "branch" : "main",
         "revision" : "0e1b39ba4cafa41a83a415c79dda27ee1f38e4c7"
       }
     },
