@@ -138,11 +138,13 @@ actor NDKRelaySubscription {
         // Compile filters
         let compiledFilters = compileFilters()
         
-        // Generate subscription ID using relay-safe ID generation
-        subId = NDKSubscriptionIDGenerator.generateRelayID(
-            from: fingerprint,
-            suffix: String(UUID().uuidString.prefix(8))
-        )
+        // Generate subscription ID if we don't have one yet (reuse existing on reconnection)
+        if subId == nil {
+            subId = NDKSubscriptionIDGenerator.generateRelayID(
+                from: fingerprint,
+                suffix: String(UUID().uuidString.prefix(8))
+            )
+        }
         
         guard let subId = subId else { return }
         

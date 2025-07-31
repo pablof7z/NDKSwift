@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Fixed "No group found for subscription" warnings during relay reconnection
+  - Subscriptions now properly route through NDKRelaySubscriptionManager during replay
+  - Subscription IDs are reused across reconnections to maintain group consistency
+  - This eliminates the ID mismatch that occurred when bypassing the grouping system
+
 ## [0.12] - 2025-07-31
 
 ### Breaking Changes
