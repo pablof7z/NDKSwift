@@ -4,7 +4,7 @@
 This document tracks test improvement work for NDKSwift, focusing on unit tests and coverage for core library components.
 
 ## Current Status (2025-07-31)
-Completed unit tests for NDKEvent and MemoryCache. Found and documented a bug in MemoryCache.queryEvents.
+Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, and NostrMessage. Found and documented bugs in MemoryCache.queryEvents and NostrMessage.serialize.
 
 ## Work Completed
 - [x] Analyzed test coverage across the entire codebase
@@ -18,18 +18,30 @@ Completed unit tests for NDKEvent and MemoryCache. Found and documented a bug in
   - Decrypted content cache, mint/keyset cache, Negentropy support
   - Deletion event processing (NIP-09), reactive observation
 - [x] Discovered and documented bug in MemoryCache.queryEvents (limit applied before sort)
+- [x] Added comprehensive unit tests for NDKUser (25 tests)
+  - Initialization from pubkey/npub, equality/hashable conformance
+  - Npub generation, relay list, following, NIP-05, payments
+  - Thread safety, error handling, UserStateActor
+- [x] Added comprehensive unit tests for NDKFilter (37 tests)
+  - Initialization, tag filters, replaceable event detection
+  - Event matching, specificity, merging, Codable
+  - Fingerprint generation, description formatting
+- [x] Added comprehensive unit tests for NostrMessage (34 tests)
+  - Parsing and serialization of all message types
+  - Round-trip testing, error handling, NIP-77 messages
+  - Discovered bug in EVENT message serialization
 
 ## Priority Work Items (Top 3)
-1. **Add unit tests for NDKUser** - Core user model with profile management needs test coverage.
-2. **Add unit tests for NDKFilter** - Only fingerprint tests exist; needs comprehensive filter matching tests.
-3. **Add unit tests for NostrMessage** - No parsing/serialization tests for the protocol message layer.
+1. **Add unit tests for NDKRelay** - Core relay model has no tests.
+2. **Add unit tests for NDKPrivateKeySigner** - No local signing tests.
+3. **Add unit tests for NDKRelayConnection** - No WebSocket tests.
 
 ## Critical Gaps Identified
 
 ### Core Models (HIGH PRIORITY)
 - ~~**NDKEvent**: No unit tests for the base event model~~ ✅ COMPLETED
-- **NDKUser**: No tests for user model functionality  
-- **NDKFilter**: Only fingerprint tests exist
+- ~~**NDKUser**: No tests for user model functionality~~ ✅ COMPLETED  
+- ~~**NDKFilter**: Only fingerprint tests exist~~ ✅ COMPLETED
 - **NDKRelay**: No tests for the base relay model
 
 ### Cache Layer
@@ -41,7 +53,7 @@ Completed unit tests for NDKEvent and MemoryCache. Found and documented a bug in
 - **NDKRelayConnection**: No WebSocket tests
 - **NDKRelaySubscriptionGroup**: No grouping tests
 - **NDKRelaySubscriptionManager**: No management tests
-- **NostrMessage**: No parsing/serialization tests
+- ~~**NostrMessage**: No parsing/serialization tests~~ ✅ COMPLETED
 
 ### Security Components
 - **NDKPrivateKeySigner**: No local signing tests
@@ -59,6 +71,7 @@ Completed unit tests for NDKEvent and MemoryCache. Found and documented a bug in
 
 ## Bugs Discovered
 1. **MemoryCache.queryEvents** - Limit is applied before sorting, resulting in incorrect query results when using limit. See `BUG_REPORT_MemoryCache_QueryEvents.md` for details.
+2. **NostrMessage.serialize** - EVENT messages with subscription IDs don't include the subscription ID in serialized output. See `BUG_REPORT_NostrMessage_EventSerialization.md` for details.
 
 ## Guidelines
 - Focus on unit tests for core functionality
