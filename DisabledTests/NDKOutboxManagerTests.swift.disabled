@@ -35,7 +35,7 @@ final class NDKOutboxManagerTests: NDKUnitTestCase {
         // Test that relay discoveries stream is available
         var hasStream = false
         let task = Task {
-            for await _ in await outboxManager.relayDiscoveries {
+            for await _ in outboxManager.relayDiscoveries {
                 hasStream = true
                 break
             }
@@ -182,7 +182,7 @@ final class NDKOutboxManagerTests: NDKUnitTestCase {
         let expectation = XCTestExpectation(description: "Relay discovery event emitted")
         
         let task = Task {
-            for await discovery in await outboxManager.relayDiscoveries {
+            for await discovery in outboxManager.relayDiscoveries {
                 if discovery.authors.contains("test_pubkey") {
                     expectation.fulfill()
                     break
@@ -293,7 +293,7 @@ final class NDKOutboxManagerTests: NDKUnitTestCase {
         )
         
         // Connect some relays for unknown author fallback
-        await ndk.connect()
+        await ndk.pool.connect()
         
         let filter = NDKFilter(
             authors: ["known_author", "unknown_author1", "unknown_author2"],
@@ -349,11 +349,7 @@ final class NDKOutboxManagerTests: NDKUnitTestCase {
         )
         
         // Save the event to cache
-        do {
-            try await memoryCache.saveEvent(relayListEvent)
-        } catch {
-            XCTFail("Failed to save event to cache: \(error)")
-        }
+        try await memoryCache.saveEvent(relayListEvent)
         
         // Track user
         await outboxManager.trackUser("user_pubkey")
@@ -423,7 +419,7 @@ final class NDKOutboxManagerTests: NDKUnitTestCase {
             kinds: [1]
         )
         
-        let dataSource = ndk.subscribe(
+        let dataSource = await outboxManager.observe(
             filter: filter,
             maxAge: 3600,
             cachePolicy: .networkOnly

@@ -1,0 +1,228 @@
+import XCTest
+@testable import NDKSwift
+import CashuSwift
+
+final class NIP60WalletE2ETests: XCTestCase {
+    var ndk: NDK!
+    var wallet: NIP60Wallet!
+    
+    override func setUp() async throws {
+        try await super.setUp()
+        
+        // Create NDK instance with in-memory cache for testing
+        let cache = MemoryCache()
+        ndk = NDK(cache: cache)
+        
+        // Add test relays
+        _ = await ndk.pool.addRelay(RelayConstants.damus)
+        _ = await ndk.pool.addRelay(RelayConstants.primal)
+        _ = await ndk.pool.addRelay(RelayConstants.nostrBand)
+        
+        // Connect to relays using proper async monitoring
+        print("🔌 Connecting to relays...")
+        await ndk.connect()
+        
+        // Wait for at least 2 relays to connect with 5 second timeout
+        let connectedCount = await ndk.waitForRelayConnections(minimumRelays: 2, timeout: 5.0)
+        
+        // Check connection status
+        print("\n📡 Final relay connection status:")
+        let allRelays = await ndk.pool.relays
+        for relay in allRelays {
+            if await relay.isConnected {
+                print("   ✅ Connected: \(relay.url)")
+            } else {
+                print("   ❌ Not connected: \(relay.url)")
+            }
+        }
+        print("   Total connected: \(connectedCount) relay(s)")
+    }
+    
+    override func tearDown() async throws {
+        // NDKPool doesn't have a disconnect method
+        try await super.tearDown()
+    }
+    
+    func testCreateWalletDepositAndVerify7375Event() async throws {
+        // Skip test in CI environment
+        #if os(macOS) || os(iOS)
+        guard ProcessInfo.processInfo.environment["CI"] == nil else {
+            throw XCTSkip("Skipping e2e test in CI environment")
+        }
+        #endif
+        
+        // 1. Create a new pubkey
+        let signer = try NDKPrivateKeySigner.generate()
+        let pubkey = try await signer.pubkey
+        
+        print("\n✅ Created new pubkey: \(pubkey)")
+        
+        // Set signer on NDK
+        ndk.signer = signer
+        
+        // 2. Create a nutsack wallet
+        wallet = try NIP60Wallet(ndk: ndk)
+        
+        // Setup wallet with testnut mint
+        let testMint = "https://testnut.cashu.space"
+        let relays = [RelayConstants.damus, RelayConstants.primal]
+        
+        // Track wallet setup publishing
+        print("\n📤 Setting up wallet...")
+        try await wallet.setup(
+            mints: [testMint],
+            relays: relays,
+            publishMintList: false
+        )
+        
+        print("✅ Created nutsack wallet with testnut mint")
+        
+        // Wait for wallet setup to propagate
+        try await Task.sleep(nanoseconds: 2 * TimeConstants.nanosecondsPerSecond) // 2 seconds
+        
+        // 3. Create a deposit on testnut.cashu.space for a random amount
+        let randomAmount = Int64.random(in: 21...100) // Random sats between 21-100
+        print("\n🎲 Creating deposit for \(randomAmount) sats")
+        
+        let quote = try await wallet.requestMint(
+            amount: randomAmount,
+            mintURL: testMint,
+            persistQuote: true
+        )
+        
+        print("⚡ Lightning invoice created")
+        print("📋 Quote ID: \(quote.quoteId)")
+        
+        // Create expectation for 7375 event
+        let eventExpectation = expectation(description: "7375 event published")
+        var received7375Event: NDKEvent?
+        var publishedRelays: Set<String> = []
+        
+        // Subscribe to monitor for 7375 events
+        let filter = NDKFilter(
+            authors: [pubkey],
+            kinds: [EventKind.cashuToken]
+        )
+        
+        // Create data source to monitor for events
+        let dataSource = ndk.observe(
+            filter: filter,
+            maxAge: 0, // Real-time monitoring
+            cachePolicy: .networkOnly
+        )
+        
+        // Track which relays send us the event
+        Task {
+            do {
+                for await event in dataSource.events {
+                    if event.kind == EventKind.cashuToken {
+                        print("\n📨 Received 7375 event: \(event.id)")
+                        received7375Event = event
+                        
+                        // Give time for event to propagate to other relays
+                        try await Task.sleep(nanoseconds: 3 * TimeConstants.nanosecondsPerSecond) // 3 seconds
+                        eventExpectation.fulfill()
+                    }
+                }
+            } catch {
+                print("❌ Subscription error: \(error)")
+            }
+        }
+        
+        // 4. Monitor deposit status
+        print("\n⏳ Monitoring deposit (testnut auto-settles)...")
+        
+        let depositStream = await wallet.monitorDeposit(
+            quote: quote,
+            timeout: 60.0 // 1 minute timeout
+        )
+        
+        var depositCompleted = false
+        
+        do {
+            for try await status in depositStream {
+                switch status {
+                case .pending:
+                    print("⏳ Deposit pending...")
+                case .minted(let proofs):
+                    print("✅ Deposit completed! Received \(proofs.count) proofs")
+                    depositCompleted = true
+                case .expired:
+                    XCTFail("Deposit expired before payment")
+                case .cancelled:
+                    XCTFail("Deposit was cancelled")
+                }
+            }
+        } catch {
+            if !depositCompleted {
+                XCTFail("Deposit monitoring error: \(error)")
+            }
+        }
+        
+        // 5. Wait for and validate the 7375 event
+        await fulfillment(of: [eventExpectation], timeout: 30.0)
+        
+        XCTAssertNotNil(received7375Event, "Should have received a 7375 event")
+        
+        if let event = received7375Event {
+            // Verify event properties
+            XCTAssertEqual(event.kind, EventKind.cashuToken)
+            XCTAssertEqual(event.pubkey, pubkey)
+            
+            // Check that it's encrypted
+            XCTAssertFalse(event.content.isEmpty, "Event should have encrypted content")
+            print("\n✅ Event has encrypted content of length: \(event.content.count)")
+            
+            // Manual verification: Try to fetch the event directly from each relay
+            print("\n🔍 Verifying event publication by fetching from each relay...")
+            let verifyFilter = NDKFilter(ids: [event.id])
+            
+            // Check each relay individually
+            let allRelays = await ndk.pool.relays
+            print("Checking \(allRelays.count) relay(s):")
+            
+            for relay in allRelays {
+                guard await relay.isConnected else {
+                    print("   ⏭️ Skipping disconnected relay: \(relay.url)")
+                    continue
+                }
+                // Fetch from specific relay
+                let relaySet = Set([relay.url])
+                let dataSource = ndk.observe(
+                    filter: verifyFilter,
+                    maxAge: 0, // Always fresh for tests
+                    cachePolicy: .networkOnly,
+                    relays: relaySet
+                )
+                // Use first() to check if any event exists on this relay
+                if let _ = await dataSource.first() {
+                    publishedRelays.insert(relay.url)
+                    print("   ✅ Found event on \(relay.url)")
+                } else {
+                    print("   ❌ NOT found on \(relay.url)")
+                }
+            }
+            
+            print("\n📊 Event publication summary:")
+            print("   - Event ID: \(event.id)")
+            print("   - Published to \(publishedRelays.count) relay(s):")
+            for relay in publishedRelays {
+                print("     ✅ \(relay)")
+            }
+            
+            XCTAssertFalse(publishedRelays.isEmpty, "Event should be published to at least one relay")
+        }
+        
+        // Check final wallet balance
+        let balance = try await wallet.getBalance()
+        XCTAssertEqual(balance, randomAmount, "Wallet balance should match deposited amount")
+        print("\n💰 Final wallet balance: \(balance ?? 0) sats")
+        
+        print("\n🎉 E2E test completed successfully!")
+        print("   - Created new keypair")
+        print("   - Created nutsack wallet") 
+        print("   - Deposited \(randomAmount) sats via Lightning")
+        print("   - Verified 7375 event was created")
+        print("   - Event published to \(publishedRelays.count) relay(s)")
+    }
+}

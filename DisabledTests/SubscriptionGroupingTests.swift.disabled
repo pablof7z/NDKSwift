@@ -35,8 +35,8 @@ final class SubscriptionGroupingTests: XCTestCase {
         groupableDelay: TimeInterval? = nil,
         groupableDelayType: NDKSubscriptionDelayType? = nil,
         closeOnEose: Bool = false
-    ) -> NDKSubscriptionCoordinator {
-        return NDKSubscriptionCoordinator(
+    ) -> InternalSubscription {
+        return InternalSubscription(
             id: id,
             filters: filters,
             relays: nil,
@@ -60,14 +60,15 @@ final class SubscriptionGroupingTests: XCTestCase {
     // MARK: - Grouping Configuration Tests
     
     func testSubscriptionGroupingProperties() async {
-        // Test subscription creation (properties are actor-isolated so cannot be directly tested)
+        // Test default values
         let sub1 = createSubscription(
             id: "sub1",
             filters: [createFilter(kinds: [1])]
         )
         
-        // Verify subscription was created successfully
-        XCTAssertNotNil(sub1)
+        await XCTAssertTrue(sub1.isGroupable)
+        await XCTAssertEqual(sub1.groupableDelay, 0.1)
+        await XCTAssertEqual(sub1.groupableDelayType, .atMost)
         
         // Test custom values
         let sub2 = createSubscription(
@@ -76,8 +77,9 @@ final class SubscriptionGroupingTests: XCTestCase {
             isGroupable: false
         )
         
-        // Verify subscription was created successfully
-        XCTAssertNotNil(sub2)
+        await XCTAssertFalse(sub2.isGroupable)
+        await XCTAssertNil(sub2.groupableDelay)
+        await XCTAssertNil(sub2.groupableDelayType)
         
         // Test explicit delay configuration
         let sub3 = createSubscription(
@@ -88,11 +90,9 @@ final class SubscriptionGroupingTests: XCTestCase {
             groupableDelayType: .atLeast
         )
         
-        // Verify subscription was created successfully
-        XCTAssertNotNil(sub3)
-        
-        // Note: Properties like isGroupable, groupableDelay, and groupableDelayType
-        // are actor-isolated and cannot be accessed directly from main actor
+        await XCTAssertTrue(sub3.isGroupable)
+        await XCTAssertEqual(sub3.groupableDelay, 0.5)
+        await XCTAssertEqual(sub3.groupableDelayType, .atLeast)
     }
     
     // MARK: - Subscription Grouping Tests
@@ -181,9 +181,8 @@ final class SubscriptionGroupingTests: XCTestCase {
         await manager.addSubscription(sub, filters: [filter])
         
         // With atMost, the group should execute within the specified delay
-        // This is harder to test without mocking time, and the configuration
-        // cannot be directly verified due to actor isolation
-        XCTAssertNotNil(sub) // Verify the subscription was created
+        // This is harder to test without mocking time, but we verify the configuration
+        await XCTAssertEqual(sub.groupableDelayType, .atMost)
     }
     
     func testDelayTypeAtLeast() async {
@@ -199,8 +198,7 @@ final class SubscriptionGroupingTests: XCTestCase {
         await manager.addSubscription(sub, filters: [filter])
         
         // With atLeast, the group should wait at least the specified delay
-        // Configuration cannot be directly verified due to actor isolation
-        XCTAssertNotNil(sub) // Verify the subscription was created
+        await XCTAssertEqual(sub.groupableDelayType, .atLeast)
     }
     
     // MARK: - Filter Merging Tests
