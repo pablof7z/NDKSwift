@@ -4,7 +4,7 @@
 This document tracks test improvement work for NDKSwift, focusing on unit tests and coverage for core library components.
 
 ## Current Status (2025-07-31)
-Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage, NDKRelay, and NDKPrivateKeySigner. Found and documented bugs in MemoryCache.queryEvents and NostrMessage.serialize.
+Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage, NDKRelay, NDKPrivateKeySigner, and NDKRelayConnection. Found and documented bugs in MemoryCache.queryEvents and NostrMessage.serialize.
 
 ## Work Completed
 - [x] Analyzed test coverage across the entire codebase
@@ -43,11 +43,19 @@ Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage
   - NIP-04 and NIP-44 encryption/decryption
   - Serialization/deserialization
   - Error handling for invalid inputs
+- [x] Added comprehensive unit tests for NDKRelayConnection (16 tests)
+  - Initialization and delegate assignment
+  - Connection state management and statistics
+  - Message sending and event publishing when not connected
+  - Concurrent connection/send/publish operations
+  - Error mapping and delegate notifications
+  - Initial connection failure behavior (no auto-retry)
+  - Connection lifecycle management
 
 ## Priority Work Items (Top 3)
-1. **Add unit tests for NDKRelayConnection** - No WebSocket tests.
-2. **Add unit tests for NDKCache protocol** - No interface tests.
-3. **Add unit tests for NDKRelaySubscriptionGroup** - No grouping tests.
+1. **Add unit tests for NDKCache protocol** - No interface tests for the cache protocol.
+2. **Add unit tests for NDKRelaySubscriptionGroup** - No grouping/merging tests.
+3. **Add unit tests for encryption utilities** - NIP-04/NIP-44 encryption needs tests.
 
 ## Critical Gaps Identified
 
@@ -63,7 +71,7 @@ Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage
 - **Cache migrations**: No migration tests
 
 ### Relay Infrastructure
-- **NDKRelayConnection**: No WebSocket tests
+- ~~**NDKRelayConnection**: No WebSocket tests~~ ✅ COMPLETED
 - **NDKRelaySubscriptionGroup**: No grouping tests
 - **NDKRelaySubscriptionManager**: No management tests
 - ~~**NostrMessage**: No parsing/serialization tests~~ ✅ COMPLETED
