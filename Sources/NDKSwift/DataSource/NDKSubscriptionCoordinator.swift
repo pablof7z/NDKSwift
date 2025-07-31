@@ -292,36 +292,22 @@ actor InternalSubscriptionManager {
                 NDKLogger.log(.info, category: .subscription, "🚀 Starting inactive subscription \(subscription.id) for relay \(relay.url)")
                 await subscription.start()
             } else if !hasActiveRelays {
-                // If started but no relays active (all were disconnected), try sending to this relay
-                NDKLogger.log(.info, category: .subscription, "🔄 Subscription \(subscription.id) was started but has no active relays - sending REQ to \(relay.url)")
-                do {
-                    let message = await subscription.createREQMessage()
-                    NDKLogger.log(.debug, category: .subscription, "📤 [RelayActivation] REQ message: \(message)")
-                    try await relay.send(message)
-                    await relay.trackSubscription(id: subscription.id, filters: subscription.filters)
-                    await subscription.markRelayAsActive(relay.url)
-                    NDKLogger.log(.info, category: .subscription, "✅ Activated subscription \(subscription.id) on relay \(relay.url)")
-                } catch {
-                    NDKLogger.log(.error, category: .subscription, "❌ Failed to activate subscription \(subscription.id) on \(relay.url): \(error)")
-                }
+                // If started but no relays active (all were disconnected), add to relay via subscription manager
+                NDKLogger.log(.info, category: .subscription, "🔄 Subscription \(subscription.id) was started but has no active relays - adding to \(relay.url)")
+                
+                // Route through subscription manager for proper grouping
+                await relay.addSubscription(subscription, filters: subscription.filters)
+                await subscription.markRelayAsActive(relay.url)
+                NDKLogger.log(.info, category: .subscription, "✅ Activated subscription \(subscription.id) on relay \(relay.url)")
             } else {
-                // If already active on other relays, just send REQ to this relay
-                do {
-                    let message = await subscription.createREQMessage()
-                    NDKLogger.log(.debug, category: .subscription, "📨 [RelayReplay] Replaying subscription \(subscription.id) to \(relay.url)")
-                    NDKLogger.log(.debug, category: .subscription, "📤 [RelayReplay] REQ message: \(message)")
-                    try await relay.send(message)
-
-                    // Track subscription on the relay
-                    await relay.trackSubscription(id: subscription.id, filters: subscription.filters)
-                    
-                    // Update the subscription's active relays
-                    await subscription.markRelayAsActive(relay.url)
-
-                    NDKLogger.log(.info, category: .subscription, "✅ Replayed subscription \(subscription.id) to \(relay.url)")
-                } catch {
-                    NDKLogger.log(.error, category: .subscription, "❌ Failed to replay subscription \(subscription.id) to \(relay.url): \(error)")
-                }
+                // If already active on other relays, add to this relay via subscription manager
+                NDKLogger.log(.debug, category: .subscription, "📨 [RelayReplay] Replaying subscription \(subscription.id) to \(relay.url)")
+                
+                // Route through subscription manager for proper grouping
+                await relay.addSubscription(subscription, filters: subscription.filters)
+                await subscription.markRelayAsActive(relay.url)
+                
+                NDKLogger.log(.info, category: .subscription, "✅ Replayed subscription \(subscription.id) to \(relay.url)")
             }
         }
     }
