@@ -4,7 +4,7 @@
 This document tracks test improvement work for NDKSwift, focusing on unit tests and coverage for core library components.
 
 ## Current Status (2025-07-31)
-Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage, NDKRelay, NDKPrivateKeySigner, NDKRelayConnection, NDKCache protocol, NDKFilterGrouping, NIP-04 encryption, NIP-44 encryption, NDKRelaySubscriptionManager, NDKRelaySubscriptionGroup, SQLite cache migrations, NDKBunkerSigner, NDKOutboxManager, and NDKEventBuilder. Found and documented bugs in MemoryCache.queryEvents, NostrMessage.serialize, and NDKRelaySubscriptionManager (missing properties).
+Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage, NDKRelay, NDKPrivateKeySigner, NDKRelayConnection, NDKCache protocol, NDKFilterGrouping, NIP-04 encryption, NIP-44 encryption, NDKRelaySubscriptionManager, NDKRelaySubscriptionGroup, SQLite cache migrations, NDKBunkerSigner, NDKOutboxManager, NDKEventBuilder, and NDKDataSource. Found and documented bugs in MemoryCache.queryEvents, NostrMessage.serialize, and NDKRelaySubscriptionManager (missing properties).
 
 ## Work Completed
 - [x] Analyzed test coverage across the entire codebase
@@ -133,11 +133,21 @@ Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage
   - Build validation and error handling
   - Complex event building scenarios
   - Unsigned event building and edge cases
+- [x] Added comprehensive unit tests for NDKDataSource (50+ tests)
+  - Transform functionality including filtering and custom types
+  - Filter updates and data refresh operations
+  - Event deduplication and state management
+  - Cache policies (networkOnly, cacheOnly, cacheWithNetwork)
+  - Relay-specific updates and EOSE handling
+  - Edge cases (empty filters, large batches, limits)
+  - Memory management and proper cleanup
+  - Concurrent access and multiple observers
+  - AsyncSequence operations (first, collect, eventsUntilEOSE)
 
 ## Priority Work Items (Top 3)
-1. **Add unit tests for NDKDataSource** - Core subscription and data flow logic needs testing.
-2. **Add unit tests for NDKPool** - Connection management and relay pool operations need coverage.
-3. **Add unit tests for NDKSubscriptionManager** - Subscription lifecycle and deduplication logic needs testing.
+1. **Add unit tests for NDKPool** - Connection management and relay pool operations need coverage.
+2. **Add unit tests for NDKSubscriptionManager** - Subscription lifecycle and deduplication logic needs testing.
+3. **Fix remaining compilation errors in test suite** - Several test files have compilation errors that need fixing.
 
 ## Critical Gaps Identified
 
