@@ -151,16 +151,17 @@ actor NDKRelaySubscriptionGroup {
         NDKLogger.log(.debug, category: .subscription,
                      "🆔 [SubGroup] Generated subscription ID '\(subId)' for group '\(fingerprint)'")
         
-        // Send REQ to relay
+        // IMPORTANT: Track subscription ID mapping BEFORE sending REQ to avoid race condition
+        // where events arrive before the mapping is established
+        NDKLogger.log(.debug, category: .subscription,
+                     "📌 [SubGroup] Requesting manager to track subscription ID '\(subId)' for group '\(fingerprint)'")
+        await relay.subscriptionManager?.trackGroupSubscriptionId(self)
+        
+        // Send REQ to relay (after tracking is set up)
         await relay.sendSubscription(id: subId, filters: compiledFilters)
         
         // Track this subscription on the relay
         await relay.trackSubscription(self)
-        
-        // Track subscription ID mapping in manager
-        NDKLogger.log(.debug, category: .subscription,
-                     "📌 [SubGroup] Requesting manager to track subscription ID '\(subId)' for group '\(fingerprint)'")
-        await relay.subscriptionManager?.trackGroupSubscriptionId(self)
         
         // CRITICAL: Register the relay-specific subscription ID with InternalSubscriptionManager
         // This allows events arriving with the relay-generated ID to be routed to the correct subscriptions
