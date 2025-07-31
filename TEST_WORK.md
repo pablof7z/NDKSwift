@@ -4,7 +4,7 @@
 This document tracks test improvement work for NDKSwift, focusing on unit tests and coverage for core library components.
 
 ## Current Status (2025-07-31)
-Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage, NDKRelay, NDKPrivateKeySigner, NDKRelayConnection, NDKCache protocol, NDKFilterGrouping, NIP-04 encryption, NIP-44 encryption, NDKRelaySubscriptionManager, and NDKRelaySubscriptionGroup. Found and documented bugs in MemoryCache.queryEvents, NostrMessage.serialize, and NDKRelaySubscriptionManager (missing properties).
+Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage, NDKRelay, NDKPrivateKeySigner, NDKRelayConnection, NDKCache protocol, NDKFilterGrouping, NIP-04 encryption, NIP-44 encryption, NDKRelaySubscriptionManager, NDKRelaySubscriptionGroup, and SQLite cache migrations. Found and documented bugs in MemoryCache.queryEvents, NostrMessage.serialize, and NDKRelaySubscriptionManager (missing properties).
 
 ## Work Completed
 - [x] Analyzed test coverage across the entire codebase
@@ -97,11 +97,19 @@ Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage
   - Event distribution to subscriptions
   - EOSE and CLOSED message handling
   - Group lifecycle and cleanup
+- [x] Added comprehensive unit tests for SQLite cache migrations (16 tests)
+  - All 12 database migrations (V1 through V12)
+  - Table creation, column structure, indexes, triggers
+  - Foreign key constraints and cascade delete behavior
+  - Migration idempotency and data integrity preservation
+  - Default column values and composite primary keys
+  - Trigger functionality (fetch timestamp cleanup)
+  - Full migration chain and performance testing
 
 ## Priority Work Items (Top 3)
-1. **Add unit tests for cache migrations** - No migration tests exist for SQLite schema upgrades.
-2. **Add unit tests for NDKBunkerSigner** - Remote signing via NIP-46 needs tests.
-3. **Add unit tests for NDKOutboxManager** - Complex relay selection logic needs testing.
+1. **Add unit tests for NDKBunkerSigner** - Remote signing via NIP-46 needs tests.
+2. **Add unit tests for NDKOutboxManager** - Complex relay selection logic needs testing.
+3. **Add unit tests for URL normalization** - URLNormalizer is critical for relay connectivity.
 
 ## Critical Gaps Identified
 
@@ -114,7 +122,7 @@ Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage
 ### Cache Layer
 - ~~**MemoryCache**: No tests for in-memory cache~~ ✅ COMPLETED
 - ~~**NDKCache protocol**: No interface tests~~ ✅ COMPLETED
-- **Cache migrations**: No migration tests
+- ~~**Cache migrations**: No migration tests~~ ✅ COMPLETED
 
 ### Relay Infrastructure
 - ~~**NDKRelayConnection**: No WebSocket tests~~ ✅ COMPLETED
