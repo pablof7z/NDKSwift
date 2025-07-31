@@ -24,9 +24,9 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/anquii/CryptoSwiftWrapper.git", from: "1.4.3"),
-        .package(url: "https://github.com/zeugmaster/swift-secp256k1.git", revision: "73cf2403b7a69de8efc612d251a6e0d01211e1c4"),
+        .package(url: "https://github.com/zeugmaster/swift-secp256k1.git", branch: "main"),
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "6.29.3"),
-        .package(url: "https://github.com/pablof7z/CashuSwift.git", from: "0.1.1"),
+        .package(url: "https://github.com/pablof7z/CashuSwift.git", branch: "main"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
