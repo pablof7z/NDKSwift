@@ -4,7 +4,7 @@
 This document tracks test improvement work for NDKSwift, focusing on unit tests and coverage for core library components.
 
 ## Current Status (2025-07-31)
-Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage, NDKRelay, NDKPrivateKeySigner, NDKRelayConnection, NDKCache protocol, and NDKFilterGrouping. Found and documented bugs in MemoryCache.queryEvents and NostrMessage.serialize.
+Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage, NDKRelay, NDKPrivateKeySigner, NDKRelayConnection, NDKCache protocol, NDKFilterGrouping, NIP-04 encryption, and NIP-44 encryption. Found and documented bugs in MemoryCache.queryEvents, NostrMessage.serialize, and NDKRelaySubscriptionManager (missing properties).
 
 ## Work Completed
 - [x] Analyzed test coverage across the entire codebase
@@ -70,11 +70,30 @@ Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage
   - Tag merging and deduplication
   - Time constraint preservation
   - Complex filter handling with all field types
+- [x] Added comprehensive unit tests for NIP-04 encryption (16 tests)
+  - Shared secret computation with ECDH
+  - Encryption/decryption with various message types
+  - Error handling for invalid keys and formats
+  - PKCS7 padding validation
+  - Performance tests
+- [x] Added comprehensive unit tests for NIP-44 encryption (27 tests)
+  - Padding length calculations
+  - Conversation key derivation
+  - Encryption/decryption with various message sizes
+  - Error handling for invalid data, MAC, and version
+  - Performance tests
+  - Edge cases and boundaries
+- [x] Added basic tests for NDKRelaySubscriptionManager
+  - Initialization and basic functionality
+  - Event/EOSE/CLOSED routing
+  - Connection handling
+  - Group lifecycle
+  - Note: Full testing limited due to missing properties bug
 
 ## Priority Work Items (Top 3)
-1. **Add unit tests for encryption utilities** - NIP-04/NIP-44 encryption needs tests.
-2. **Add unit tests for NDKRelaySubscriptionManager** - No management tests.
-3. **Add unit tests for tag helpers and validation** - Tag parsing/building needs tests.
+1. **Add unit tests for NDKRelaySubscriptionGroup** - Complex grouping logic needs testing.
+2. **Add unit tests for cache migrations** - No migration tests exist.
+3. **Add unit tests for NDKBunkerSigner** - Remote signing via NIP-46 needs tests.
 
 ## Critical Gaps Identified
 
@@ -99,7 +118,7 @@ Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage
 ### Security Components
 - ~~**NDKPrivateKeySigner**: No local signing tests~~ ✅ COMPLETED
 - **NDKBunkerSigner**: No remote signing tests
-- **NIP04/NIP44 Encryption**: No encryption tests
+- ~~**NIP04/NIP44 Encryption**: No encryption tests~~ ✅ COMPLETED
 
 ## Well-Tested Areas
 - Authentication & Session Management
@@ -113,6 +132,7 @@ Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage
 ## Bugs Discovered
 1. **MemoryCache.queryEvents** - Limit is applied before sorting, resulting in incorrect query results when using limit. See `BUG_REPORT_MemoryCache_QueryEvents.md` for details.
 2. **NostrMessage.serialize** - EVENT messages with subscription IDs don't include the subscription ID in serialized output. See `BUG_REPORT_NostrMessage_EventSerialization.md` for details.
+3. **NDKRelaySubscriptionManager** - References non-existent properties (isGroupable, groupableDelay, groupableDelayType) on InternalSubscription. See `BUG_REPORT_NDKRelaySubscriptionManager_MissingProperties.md` for details.
 
 ## Guidelines
 - Focus on unit tests for core functionality
