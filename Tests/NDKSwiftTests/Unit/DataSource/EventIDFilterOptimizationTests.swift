@@ -2,7 +2,7 @@ import XCTest
 import CashuSwift
 @testable import NDKSwift
 
-/// Tests for event ID filter optimization in NDKDataRequirementManager
+/// Tests for event ID filter optimization in NDKSubscriptionManager
 /// 
 /// These tests verify that:
 /// 1. If all requested event IDs are in cache, no subscription is created

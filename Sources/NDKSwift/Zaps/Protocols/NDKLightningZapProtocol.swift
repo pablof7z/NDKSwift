@@ -166,8 +166,8 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
             filter.addTagFilter("e", values: [eventId])
         }
 
-        // Use NDKDataSource for real-time zap receipt monitoring
-        let dataSource = NDKDataSource(
+        // Use NDKSubscription for real-time zap receipt monitoring
+        let dataSource = NDKSubscription(
             ndk: ndk,
             filter: filter,
             maxAge: 0, // Always fresh for real-time monitoring
@@ -208,7 +208,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
     private func resolveLNURL(for user: NDKUser) async throws -> LNURLPayEndpoint {
         var userMetadata: NDKUserMetadata?
 
-        for await metadata in await ndk.profileManager.observe(for: user.pubkey, maxAge: TimeConstants.hour) {
+        for await metadata in await ndk.profileManager.subscribe(for: user.pubkey, maxAge: TimeConstants.hour) {
             userMetadata = metadata
             break // Only need first value
         }
@@ -350,8 +350,8 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         relayListFilter.authors = [recipient.pubkey]
         relayListFilter.kinds = [EventKind.relayList]
 
-        // Use NDKDataSource for fetching relay list
-        let dataSource = NDKDataSource(
+        // Use NDKSubscription for fetching relay list
+        let dataSource = NDKSubscription(
             ndk: ndk,
             filter: relayListFilter,
             maxAge: TimeConstants.hour // 1 hour - relay lists don't change frequently

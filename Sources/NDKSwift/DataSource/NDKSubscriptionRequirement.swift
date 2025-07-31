@@ -2,10 +2,10 @@ import Foundation
 
 /// Manages a single data requirement with proper filter splitting for outbox model
 /// Focuses on event deduplication and relay management
-actor DataRequirement {
+actor NDKSubscriptionRequirement {
     let filter: NDKFilter
     let subscriptionId: String
-    let internalSubscription: InternalSubscription
+    let internalSubscription: NDKSubscriptionCoordinator
     private let cache: any NDKCache
     private weak var ndk: NDK?
     private let closeOnEose: Bool
@@ -27,8 +27,8 @@ actor DataRequirement {
     // Track which authors each relay subscription covers
     private var relayAuthorCoverage: [RelayURL: Set<String>] = [:]
     
-    // Enhanced requirements created by NDKDataRequirementManager
-    private var enhancedRequirements: [DataRequirementHandle] = []
+    // Enhanced requirements created by NDKSubscriptionManager
+    private var enhancedRequirements: [NDKSubscriptionRequirementHandle] = []
     
     // EOSE tracking
     private let eoseTracker: EOSETracker
@@ -37,7 +37,7 @@ actor DataRequirement {
     init(
         filter: NDKFilter,
         subscriptionId: String,
-        internalSubscription: InternalSubscription,
+        internalSubscription: NDKSubscriptionCoordinator,
         cache: any NDKCache,
         ndk: NDK,
         relays: Set<RelayURL>?,
@@ -327,12 +327,12 @@ actor DataRequirement {
                      "📡 Discovered relays for \(relevantAuthors.count) authors in requirement")
         
         // According to Outbox.md, we should NOT modify this requirement
-        // Instead, the NDKDataRequirementManager will create new requirements
+        // Instead, the NDKSubscriptionManager will create new requirements
         // This method now just logs for debugging
     }
     
     /// Add an enhanced requirement handle
-    func addEnhancedRequirement(_ handle: DataRequirementHandle) {
+    func addEnhancedRequirement(_ handle: NDKSubscriptionRequirementHandle) {
         enhancedRequirements.append(handle)
     }
     

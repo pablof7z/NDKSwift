@@ -25,8 +25,8 @@ final class EOSECollectTests: NDKTestCase {
         
         let filter = NDKFilter(kinds: [EventKind.textNote], limit: 10)
         
-        // Use NDKDataSource with closeOnEose to fetch events
-        let dataSource = NDKDataSource(
+        // Use NDKSubscription with closeOnEose to fetch events
+        let dataSource = NDKSubscription(
             ndk: ndk,
             filter: filter,
             closeOnEose: true
@@ -47,8 +47,8 @@ final class EOSECollectTests: NDKTestCase {
         
         let startTime = Date()
         
-        // Use NDKDataSource with closeOnEose and collect for a short time
-        let dataSource = NDKDataSource(
+        // Use NDKSubscription with closeOnEose and collect for a short time
+        let dataSource = NDKSubscription(
             ndk: ndk,
             filter: filter,
             closeOnEose: true
@@ -82,7 +82,7 @@ final class EOSECollectTests: NDKTestCase {
     
     // Note: More comprehensive EOSE tests would require:
     // 1. Mock relay infrastructure to simulate EOSE messages
-    // 2. Access to internal NDKDataSource APIs
+    // 2. Access to internal NDKSubscription APIs
     // 3. Ability to control relay message timing
     
     // For now, these tests verify basic functionality without

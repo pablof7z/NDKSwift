@@ -57,25 +57,25 @@ The cache stores parsed `NDKUserProfile` objects to avoid repeated JSON decoding
    - New profile event arrives from relay
    - Update memory cache
    - Update database
-   - Notify all active observers
+   - Notify all active subscribers
 
 ### The `maxAge` Parameter
 
-The `observe` method accepts a `maxAge` parameter that controls relay subscription behavior (consistent with `ndk.observe`):
+The `subscribe` method accepts a `maxAge` parameter that controls relay subscription behavior (consistent with `ndk.subscribe`):
 
 ```swift
 // Use cached data, keep subscription open for updates
-for await profile in profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
+for await profile in profileManager.subscribe(for: pubkey, maxAge: TimeConstants.hour) {
     // Returns cached profile immediately, subscription closes after 1 hour
 }
 
 // Always get real-time updates
-for await profile in profileManager.observe(for: pubkey, maxAge: 0) {
+for await profile in profileManager.subscribe(for: pubkey, maxAge: 0) {
     // Returns cached profile immediately, keeps subscription open
 }
 ```
 
-The `maxAge` parameter is passed directly to the underlying `NDKDataSource`:
+The `maxAge` parameter is passed directly to the underlying `NDKSubscription`:
 - `maxAge: 0` - Keep subscription open for real-time updates
 - `maxAge: >0` - Use cache if available, close subscription after EOSE if data is fresh enough
 
@@ -137,7 +137,7 @@ private func updateCacheOrder(for pubkey: PublicKey) {
 
 ```swift
 // Use cached data, close subscription after 1 hour
-for await profile in profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
+for await profile in profileManager.subscribe(for: pubkey, maxAge: TimeConstants.hour) {
     // Display profile
     break // If you only need one value
 }
@@ -147,7 +147,7 @@ for await profile in profileManager.observe(for: pubkey, maxAge: TimeConstants.h
 
 ```swift
 // Keep subscription open for real-time updates
-for await profile in profileManager.observe(for: pubkey, maxAge: 0) {
+for await profile in profileManager.subscribe(for: pubkey, maxAge: 0) {
     // Display and react to updates
 }
 ```
@@ -158,7 +158,7 @@ for await profile in profileManager.observe(for: pubkey, maxAge: 0) {
 // Load multiple profiles efficiently
 for pubkey in pubkeys {
     Task {
-        for await profile in profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
+        for await profile in profileManager.subscribe(for: pubkey, maxAge: TimeConstants.hour) {
             // Cache prevents redundant fetches
             updateUI(pubkey: pubkey, profile: profile)
             break

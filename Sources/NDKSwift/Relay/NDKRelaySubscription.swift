@@ -20,12 +20,12 @@ enum NDKRelaySubscriptionStatus: Int, Comparable {
 }
 
 /// Groups together a number of subscriptions to be executed within a single specific relay
-actor NDKRelaySubscriptionGroup {
+actor NDKRelaySubscription {
     let fingerprint: String
     let relay: NDKRelay
     let isGroupable: Bool
     
-    private var items: [(subscription: InternalSubscription, filters: [NDKFilter])] = []
+    private var items: [(subscription: NDKSubscriptionCoordinator, filters: [NDKFilter])] = []
     private var status: NDKRelaySubscriptionStatus = .initial
     private var executionTask: Task<Void, Never>?
     private var fireTime: Date?
@@ -42,7 +42,7 @@ actor NDKRelaySubscriptionGroup {
     }
     
     /// Adds a subscription and its filters to this group
-    func addItem(_ subscription: InternalSubscription, filters: [NDKFilter]) {
+    func addItem(_ subscription: NDKSubscriptionCoordinator, filters: [NDKFilter]) {
         items.append((subscription, filters))
         
         NDKLogger.log(.debug, category: .subscription,
@@ -50,7 +50,7 @@ actor NDKRelaySubscriptionGroup {
     }
     
     /// Removes a subscription from this group
-    func removeItem(_ subscription: InternalSubscription) -> Bool {
+    func removeItem(_ subscription: NDKSubscriptionCoordinator) -> Bool {
         let initialCount = items.count
         items.removeAll { $0.subscription === subscription }
         return items.count < initialCount
@@ -163,11 +163,11 @@ actor NDKRelaySubscriptionGroup {
         // Track this subscription on the relay
         await relay.trackSubscription(self)
         
-        // CRITICAL: Register the relay-specific subscription ID with InternalSubscriptionManager
+        // CRITICAL: Register the relay-specific subscription ID with NDKSubscriptionCoordinatorManager
         // This allows events arriving with the relay-generated ID to be routed to the correct subscriptions
         if let ndk = relay.ndk {
             NDKLogger.log(.debug, category: .subscription,
-                         "🔗 [SubGroup] Registering relay ID '\(subId)' → fingerprint '\(fingerprint)' with InternalSubscriptionManager")
+                         "🔗 [SubGroup] Registering relay ID '\(subId)' → fingerprint '\(fingerprint)' with NDKSubscriptionCoordinatorManager")
             await ndk.internalSubscriptionManager.registerRelayIdMapping(relayId: subId, fingerprint: fingerprint)
         } else {
             NDKLogger.log(.warning, category: .subscription,
@@ -271,7 +271,7 @@ actor NDKRelaySubscriptionGroup {
         if let subId = subId {
             await relay.closeSubscription(id: subId)
             
-            // Clean up relay ID mapping from InternalSubscriptionManager
+            // Clean up relay ID mapping from NDKSubscriptionCoordinatorManager
             if relay.ndk != nil {
                 // Note: We would need to add a method to remove the mapping
                 // For now, the mapping will be cleaned up when the subscription is removed

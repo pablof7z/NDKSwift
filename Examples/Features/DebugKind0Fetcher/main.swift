@@ -55,7 +55,7 @@ struct DebugKind0Fetcher {
         print("🔍 Fetching profile using NDK Data Source...")
         
         // Use NDK's declarative API to fetch the profile
-        let profileDataSource = NDKDataSource<NDKUserProfile>(
+        let profileDataSource = NDKSubscription<NDKUserProfile>(
             ndk: ndk,
             filter: NDKFilter(
                 authors: [pubkeyHex],

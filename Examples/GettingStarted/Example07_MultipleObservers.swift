@@ -38,14 +38,14 @@ struct Example07_MultipleObservers {
         print("Filter: authors=[\(testPubkey.prefix(8))...], kinds=[1]")
         
         // Create first observer
-        let observer1 = ndk.observe(
+        let observer1 = ndk.subscribe(
             filter: filter,
             maxAge: 0  // Real-time updates
         )
         print("👁️ Observer 1 created")
         
         // Create second observer
-        let observer2 = ndk.observe(
+        let observer2 = ndk.subscribe(
             filter: filter,
             maxAge: 0  // Real-time updates
         )

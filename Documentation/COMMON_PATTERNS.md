@@ -150,7 +150,7 @@ func loadProfiles(pubkeys: [String]) async -> [String: NDKUserProfile] {
     
     // Create chunked requests for efficiency
     for chunk in pubkeys.chunked(into: 50) {
-        let profileSource = ndk.observe(
+        let profileSource = ndk.subscribe(
             filter: NDKFilter(
                 kinds: [EventKind.metadata],
                 authors: chunk
@@ -179,14 +179,14 @@ func loadProfiles(pubkeys: [String]) async -> [String: NDKUserProfile] {
 // Create a live-updating activity feed
 class ActivityFeed: ObservableObject {
     @Published var activities: [NDKEvent] = []
-    private var dataSource: NDKDataSource<NDKEvent>?
+    private var dataSource: NDKSubscription<NDKEvent>?
     
     func startWatching(for pubkey: String) {
         // Watch for mentions and reactions
         let filter = NDKFilter(kinds: [1, 7])
         filter.addTagFilter("p", values: [pubkey])
         
-        dataSource = ndk.observe(
+        dataSource = ndk.subscribe(
             filter: filter,
             maxAge: 0,  // Real-time only
             cachePolicy: .cacheWithNetwork
@@ -234,7 +234,7 @@ func loadEventsPaginated(
                     pageFilter.until = until
                 }
                 
-                let source = ndk.observe(
+                let source = ndk.subscribe(
                     filter: pageFilter,
                     maxAge: 300,  // 5 minute cache
                     cachePolicy: .cacheWithNetwork
@@ -287,12 +287,14 @@ func watchPrivateMessages() {
         let myPubkey = try await signer.pubkey
         
         // Watch for gift wraps addressed to me
-        let messageSource = ndk.observePrivateMessages(recipientPubkey: myPubkey)
+        // Note: This is a placeholder - implement based on your app's needs
+        let giftWrapFilter = NDKFilter(kinds: [1059], tags: ["p": Set([myPubkey])])
+        let messageSource = ndk.subscribe(filter: giftWrapFilter)
         
-        for await message in messageSource {
-            print("From: \(message.senderPubkey)")
-            print("Message: \(message.content)")
-            print("Sent at: \(message.createdAt.date)")
+        for await event in messageSource.events {
+            // Decrypt and process the gift wrap event
+            // Implementation depends on your encryption approach
+            print("Received gift wrap at: \(event.createdAt.date)")
         }
     }
 }
@@ -350,7 +352,7 @@ func sendZap(to event: NDKEvent, amount: Int64, comment: String? = nil) async th
 
 // Monitor zaps on your content
 func watchZaps(for pubkey: String) {
-    let zapSource = ndk.observe(
+    let zapSource = ndk.subscribe(
         filter: NDKFilter(
             kinds: [EventKind.zap],
             tags: ["p": Set([pubkey])]
@@ -553,7 +555,7 @@ func publishWithRetry(_ content: String, maxRetries: Int = 3) async throws -> ND
 ```swift
 // Process large event streams efficiently
 func processLargeEventStream() async {
-    let source = ndk.observe(
+    let source = ndk.subscribe(
         filter: NDKFilter(kinds: [1], limit: 1000),
         maxAge: 3600
     )
@@ -595,7 +597,7 @@ actor EventProcessor {
 ```swift
 // Stream events without holding all in memory
 func streamLargeDataset() {
-    let source = ndk.observe(
+    let source = ndk.subscribe(
         filter: NDKFilter(kinds: [1]),
         maxAge: 0  // No cache for streaming
     )
@@ -629,7 +631,7 @@ class EventStore: ObservableObject {
     @Published var error: Error?
     
     private let ndk: NDK
-    private var dataSource: NDKDataSource<NDKEvent>?
+    private var dataSource: NDKSubscription<NDKEvent>?
     
     init(ndk: NDK) {
         self.ndk = ndk
@@ -639,7 +641,7 @@ class EventStore: ObservableObject {
         isLoading = true
         error = nil
         
-        dataSource = ndk.observe(
+        dataSource = ndk.subscribe(
             filter: filter,
             maxAge: 300,
             cachePolicy: .cacheWithNetwork
@@ -710,7 +712,7 @@ struct EventListView: View {
 struct UserProfileView: View {
     let pubkey: String
     @State private var profile: NDKUserProfile?
-    @State private var dataSource: NDKDataSource<NDKUserProfile>?
+    @State private var dataSource: NDKSubscription<NDKUserProfile>?
     
     var body: some View {
         VStack {
@@ -730,7 +732,7 @@ struct UserProfileView: View {
         }
         .task {
             // Create reactive profile source
-            dataSource = ndk.observe(
+            dataSource = ndk.subscribe(
                 filter: NDKFilter(kinds: [0], authors: [pubkey]),
                 maxAge: 3600,
                 transform: { event in
@@ -817,7 +819,7 @@ let normalizedRelay = "RELAY.EXAMPLE.COM".normalizedRelayURL
 
 ### 1. Always Handle Offline Mode
 ```swift
-let events = await ndk.observe(filter: filter, cachePolicy: .cacheWithNetwork).collect()
+let events = await ndk.subscribe(filter: filter, cachePolicy: .cacheWithNetwork).collect()
 if events.isEmpty && !ndk.isConnected {
     // Show offline message
 }
@@ -831,7 +833,7 @@ if events.isEmpty && !ndk.isConnected {
 
 ### 3. Cancel Subscriptions
 ```swift
-let dataSource = ndk.observe(filter: filter)
+let dataSource = ndk.subscribe(filter: filter)
 // Use it...
 dataSource.cancel() // Clean up when done
 ```

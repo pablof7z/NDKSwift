@@ -1,18 +1,18 @@
 import Foundation
 
-/// Internal subscription manager for NDKDataRequirementManager only.
-/// Use `ndk.observe()` for the public API.
+/// Internal subscription manager for NDKSubscriptionManager only.
+/// Use `ndk.subscribe()` for the public API.
 actor InternalSubscriptionManager {
     private let ndk: NDK
-    private var activeSubscriptions: [String: InternalSubscription] = [:]
+    private var activeSubscriptions: [String: NDKSubscriptionCoordinator] = [:]
     private var relayMonitorTask: Task<Void, Never>?
     
     // NEW: Fingerprint-based routing
-    private var fingerprintSubscriptions: [NDKFilterFingerprint: Set<InternalSubscription>] = [:]
+    private var fingerprintSubscriptions: [NDKFilterFingerprint: Set<NDKSubscriptionCoordinator>] = [:]
     private var relayIdToFingerprint: [String: NDKFilterFingerprint] = [:]
     
     // NEW: Relay-to-subscription mapping for O(1) lookups
-    private var relayToSubscriptions: [RelayURL: Set<InternalSubscription>] = [:]
+    private var relayToSubscriptions: [RelayURL: Set<NDKSubscriptionCoordinator>] = [:]
 
     init(ndk: NDK) {
         self.ndk = ndk
@@ -39,7 +39,7 @@ actor InternalSubscriptionManager {
         isGroupable: Bool = true,
         groupableDelay: TimeInterval? = nil,
         groupableDelayType: NDKSubscriptionDelayType? = nil
-    ) async -> InternalSubscription {
+    ) async -> NDKSubscriptionCoordinator {
         // Ensure relay monitoring is started when first subscription is created
         await ensureRelayMonitoring()
 
@@ -51,7 +51,7 @@ actor InternalSubscriptionManager {
 
         let fp = fingerprint ?? filters.toFingerprint(closeOnEose: closeOnEose)
         
-        let subscription = InternalSubscription(
+        let subscription = NDKSubscriptionCoordinator(
             id: id,
             filters: filters,
             relays: relays,
@@ -66,7 +66,7 @@ actor InternalSubscriptionManager {
         activeSubscriptions[id] = subscription
         
         // Add to fingerprint mapping
-        var subs = fingerprintSubscriptions[fp] ?? Set<InternalSubscription>()
+        var subs = fingerprintSubscriptions[fp] ?? Set<NDKSubscriptionCoordinator>()
         subs.insert(subscription)
         fingerprintSubscriptions[fp] = subs
         
@@ -74,7 +74,7 @@ actor InternalSubscriptionManager {
         if let specificRelays = relays {
             // Subscription targets specific relays
             for relayUrl in specificRelays {
-                var relaySubs = relayToSubscriptions[relayUrl] ?? Set<InternalSubscription>()
+                var relaySubs = relayToSubscriptions[relayUrl] ?? Set<NDKSubscriptionCoordinator>()
                 relaySubs.insert(subscription)
                 relayToSubscriptions[relayUrl] = relaySubs
             }
@@ -105,8 +105,8 @@ actor InternalSubscriptionManager {
     }
     
     /// Update relay associations for a subscription (used by outbox model)
-    func updateRelayAssociation(subscription: InternalSubscription, relay: RelayURL) async {
-        var relaySubs = relayToSubscriptions[relay] ?? Set<InternalSubscription>()
+    func updateRelayAssociation(subscription: NDKSubscriptionCoordinator, relay: RelayURL) async {
+        var relaySubs = relayToSubscriptions[relay] ?? Set<NDKSubscriptionCoordinator>()
         relaySubs.insert(subscription)
         relayToSubscriptions[relay] = relaySubs
         
@@ -332,8 +332,8 @@ actor InternalSubscriptionManager {
 }
 
 /// Internal subscription handler for relay communication.
-/// Part of the internal implementation of NDKDataRequirementManager.
-actor InternalSubscription: Hashable {
+/// Part of the internal implementation of NDKSubscriptionManager.
+actor NDKSubscriptionCoordinator: Hashable {
     let id: String
     let filters: [NDKFilter]
     let relays: Set<RelayURL>?
@@ -352,7 +352,7 @@ actor InternalSubscription: Hashable {
     private var eoseHandlers: [(String) async -> Void] = []  // Changed to include relay URL
     var isActive = false
     
-    // Callbacks for DataRequirement
+    // Callbacks for NDKSubscriptionRequirement
     private var onEvent: ((NDKEvent, NDKRelay) async -> Void)?
     private var onEOSE: ((NDKRelay) async -> Void)?
     
@@ -378,7 +378,7 @@ actor InternalSubscription: Hashable {
         hasher.combine(id)
     }
     
-    nonisolated static func == (lhs: InternalSubscription, rhs: InternalSubscription) -> Bool {
+    nonisolated static func == (lhs: NDKSubscriptionCoordinator, rhs: NDKSubscriptionCoordinator) -> Bool {
         lhs.id == rhs.id
     }
 
@@ -437,10 +437,10 @@ actor InternalSubscription: Hashable {
 
         // NOTE: In the new architecture, the actual subscription sending is handled by
         // relay-level subscription managers. This method now just marks the subscription as active.
-        // The DataRequirement will handle adding subscriptions to specific relays based on
+        // The NDKSubscriptionRequirement will handle adding subscriptions to specific relays based on
         // the relay selection strategy (outbox, explicit, or default).
         
-        NDKLogger.log(.info, category: .subscription, "✅ InternalSubscription '\(id)' is now active")
+        NDKLogger.log(.info, category: .subscription, "✅ NDKSubscriptionCoordinator '\(id)' is now active")
     }
 
     /// Mark a relay as active (used when replay succeeds)
@@ -504,10 +504,10 @@ actor InternalSubscription: Hashable {
         }
         isActive = false
         
-        NDKLogger.log(.info, category: .subscription, "🛑 Closing InternalSubscription: \(id)")
+        NDKLogger.log(.info, category: .subscription, "🛑 Closing NDKSubscriptionCoordinator: \(id)")
         
         // In the new architecture, subscriptions are managed at the relay level
-        // The DataRequirement will handle removing subscriptions from relays
+        // The NDKSubscriptionRequirement will handle removing subscriptions from relays
         
         // Close event stream
         eventContinuation?.finish()

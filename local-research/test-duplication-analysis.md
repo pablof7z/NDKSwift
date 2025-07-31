@@ -14,7 +14,7 @@ Therefore, I cannot directly analyze the source code of the test files in `Tests
 Based on the nature of the modules and the descriptions of the tests, here are common areas where test code duplication is highly likely and could be consolidated:
 
 1.  **NDK Instance and Cache Setup:**
-    *   **Likely Duplication:** Many test suites (`NDKEventTests`, `MemoryCacheTests`, `NDKUserTests`, `NDKFilterTests`, `NostrMessageTests`, `NDKRelayTests`, `NDKPrivateKeySignerTests`, `NDKRelayConnectionTests`, `NDKCacheTests`, `NDKFilterGroupingTests`, `NIP-04 encryption tests`, `NIP-44 encryption tests`, `NDKRelaySubscriptionGroupTests`) would likely need to instantiate an `NDK` object and configure a `NDKCache` (e.g., `MemoryCache` or `NDKSQLiteCache`) for each test or test suite.
+    *   **Likely Duplication:** Many test suites (`NDKEventTests`, `MemoryCacheTests`, `NDKUserTests`, `NDKFilterTests`, `NostrMessageTests`, `NDKRelayTests`, `NDKPrivateKeySignerTests`, `NDKRelayConnectionTests`, `NDKCacheTests`, `NDKFilterGroupingTests`, `NIP-04 encryption tests`, `NIP-44 encryption tests`, `NDKRelaySubscriptionTests`) would likely need to instantiate an `NDK` object and configure a `NDKCache` (e.g., `MemoryCache` or `NDKSQLiteCache`) for each test or test suite.
     *   **Consolidation Opportunity:** A base `NDKTestCase` class (or similar) could be created with a `setUp()` method that initializes a clean `NDK` instance with a `MemoryCache` (for speed) and possibly a default `NDKPrivateKeySigner`. `NDKSQLiteCache` setup might be more specific to integration tests.
 
 2.  **Signer Creation:**
@@ -30,7 +30,7 @@ Based on the nature of the modules and the descriptions of the tests, here are c
     *   **Consolidation Opportunity:** Custom XCTest assertions or helper methods for async test flows (e.g., `XCTAssertEventuallyReceivedEvent()`, `XCTAssertSubscriptionStateTransition()`). `XCTestCase+Async.swift` is mentioned in `TEST_WORK.md` as existing, suggesting some of this is already addressed.
 
 5.  **Relay/Connection Setup for Integration Tests:**
-    *   **Likely Duplication:** Integration tests that interact with real relays (`NDKRelayTests`, `NDKRelayConnectionTests`, `NDKRelaySubscriptionManagerTests`, `NDKRelaySubscriptionGroupTests`, and the E2E scripts like `test-basic-e2e.swift`) would repeat adding relays, connecting, and waiting for connection.
+    *   **Likely Duplication:** Integration tests that interact with real relays (`NDKRelayTests`, `NDKRelayConnectionTests`, `NDKRelaySubscriptionManagerTests`, `NDKRelaySubscriptionTests`, and the E2E scripts like `test-basic-e2e.swift`) would repeat adding relays, connecting, and waiting for connection.
     *   **Consolidation Opportunity:** A `RelayTestHelper` or a base class for integration tests that manages a pool of test relays (e.g., `RelayConstants.testRelays`) and handles their connection/disconnection in `setUp()`/`tearDown()`.
 
 6.  **Error Handling and Expectation Management in Async Tests:**
@@ -150,7 +150,7 @@ These strategies will significantly reduce boilerplate, improve test readability
 *   `BUG_REPORT_MemoryCache_QueryEvents.md` (mentions `MemoryCacheTests.swift`)
 *   `BUG_REPORT_NostrMessage_EventSerialization.md` (mentions `NostrMessageTests.swift`)
 *   `BUG_REPORT_NDKRelaySubscriptionManager_MissingProperties.md` (mentions `NDKRelaySubscriptionManager` and implies its test file)
-*   `TEST_WORK.md` (lists numerous test files implicitly within `Tests/NDKSwiftTests/`, e.g., `NDKEventTests`, `NDKUserTests`, `NDKFilterTests`, `NIP-04 encryption tests`, `NIP-44 encryption tests`, `NDKRelaySubscriptionGroupTests`, `SQLite cache migrations tests`).
+*   `TEST_WORK.md` (lists numerous test files implicitly within `Tests/NDKSwiftTests/`, e.g., `NDKEventTests`, `NDKUserTests`, `NDKFilterTests`, `NIP-04 encryption tests`, `NIP-44 encryption tests`, `NDKRelaySubscriptionTests`, `SQLite cache migrations tests`).
 *   `Scripts/Testing/test-basic-e2e.swift` (shows E2E test patterns)
 *   `Scripts/Testing/test-deletion-e2e.swift` (shows E2E test patterns, includes custom XCTAssert extensions that could be centralized)
 *   `Scripts/Testing/test-zap-e2e.swift` (shows E2E test patterns)

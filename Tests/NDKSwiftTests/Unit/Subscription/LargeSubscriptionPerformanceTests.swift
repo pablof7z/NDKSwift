@@ -38,7 +38,7 @@ final class LargeSubscriptionPerformanceTests: XCTestCase {
         
         // Create data source
         let filter = NDKFilter(kinds: [EventKind.textNote])
-        let dataSource = ndk.observe(filter: filter, maxAge: 0)
+        let dataSource = ndk.subscribe(filter: filter, maxAge: 0)
         
         // Measure performance
         let startTime = Date()
@@ -97,13 +97,13 @@ final class LargeSubscriptionPerformanceTests: XCTestCase {
         // await mockRelay.queueEvents(allEvents.shuffled())
         
         // Create multiple data sources
-        var dataSources: [NDKDataSource<NDKEvent>] = []
+        var dataSources: [NDKSubscription<NDKEvent>] = []
         for i in 0..<subscriptionCount {
             let filter = NDKFilter(
                 authors: ["author\(i)"],
                 kinds: [EventKind.textNote]
             )
-            dataSources.append(ndk.observe(filter: filter, maxAge: 0))
+            dataSources.append(ndk.subscribe(filter: filter, maxAge: 0))
         }
         
         // Measure performance
@@ -151,7 +151,7 @@ final class LargeSubscriptionPerformanceTests: XCTestCase {
         
         // Create data source
         let filter = NDKFilter(kinds: [EventKind.textNote])
-        let dataSource = ndk.observe(filter: filter, maxAge: 0)
+        let dataSource = ndk.subscribe(filter: filter, maxAge: 0)
         
         // Track memory before
         let initialMemory = getCurrentMemoryUsage()

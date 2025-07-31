@@ -2,16 +2,16 @@ import Foundation
 
 /// Manages data requirements from multiple components
 /// Handles temporal grouping, deduplication, and lifecycle management
-actor NDKDataRequirementManager {
+actor NDKSubscriptionManager {
     private let ndk: NDK
     private let groupingWindow: TimeInterval = NetworkConstants.dataGroupingWindow
 
     // Active requirements tracked by ID
-    private var activeRequirements: [RequirementID: DataRequirement] = [:]
+    private var activeRequirements: [RequirementID: NDKSubscriptionRequirement] = [:]
 
     init(ndk: NDK) {
         self.ndk = ndk
-        NDKLogger.log(.trace, category: .subscription, "🏗️ NDKDataRequirementManager initialized")
+        NDKLogger.log(.trace, category: .subscription, "🏗️ NDKSubscriptionManager initialized")
 
         // Start periodic cleanup task
         Task {
@@ -51,16 +51,16 @@ actor NDKDataRequirementManager {
         exclusiveRelays: Bool = false,
         subscriptionId: String? = nil,
         closeOnEose: Bool? = nil
-    ) async -> (handle: DataRequirementHandle, events: AsyncStream<NDKEvent>, relayUpdates: AsyncStream<RelayUpdate>) {
+    ) async -> (handle: NDKSubscriptionRequirementHandle, events: AsyncStream<NDKEvent>, relayUpdates: AsyncStream<RelayUpdate>) {
         let requirementId = RequirementID()
         let correlationId = requirementId.uuidString.prefix(8)
 
         NDKLogger.log(.info, category: .subscription, "📥 [DataReqManager] registerRequirement - filter: \(filter), maxAge: \(maxAge), policy: \(cachePolicy), subscriptionId: \(subscriptionId ?? "auto")", correlationId: String(correlationId))
         
-        // Note: DataRequirement will set up its own cache observation
+        // Note: NDKSubscriptionRequirement will set up its own cache observation
         // This ensures proper lifecycle management
 
-        // For cache-only policy, we still create a DataRequirement
+        // For cache-only policy, we still create a NDKSubscriptionRequirement
         // This allows cache-only subscriptions to participate in the reactive system
         // and receive events from network subscriptions with the same fingerprint
 
@@ -114,7 +114,7 @@ actor NDKDataRequirementManager {
 
 
         return (
-            handle: DataRequirementHandle(
+            handle: NDKSubscriptionRequirementHandle(
                 id: requirementId,
                 manager: self,
                 requirement: requirement
@@ -135,7 +135,7 @@ actor NDKDataRequirementManager {
         closeOnEose: Bool,
         requirementId: RequirementID,
         shouldFetchFromNetwork: Bool
-    ) async -> (DataRequirement, AsyncStream<NDKEvent>, AsyncStream<RelayUpdate>) {
+    ) async -> (NDKSubscriptionRequirement, AsyncStream<NDKEvent>, AsyncStream<RelayUpdate>) {
         // Optimize filter for cache - remove event IDs we already have
         let optimizedFilter = await optimizeFilterForCache(filter) ?? filter
 
@@ -155,14 +155,14 @@ actor NDKDataRequirementManager {
         let internalSubscription = await ndk.internalSubscriptionManager.createSubscription(
             id: subId,
             filters: [optimizedFilter],
-            relays: nil, // Will be set by DataRequirement based on strategy
+            relays: nil, // Will be set by NDKSubscriptionRequirement based on strategy
             fingerprint: fingerprint,
             closeOnEose: closeOnEose,
             autoStart: false
         )
 
         // Create data requirement
-        let requirement = DataRequirement(
+        let requirement = NDKSubscriptionRequirement(
             filter: optimizedFilter,
             subscriptionId: internalSubscription.id,
             internalSubscription: internalSubscription,
@@ -297,7 +297,7 @@ actor NDKDataRequirementManager {
     private func handleRelayDiscovery(authors: Set<String>, relays: Set<RelayURL>) async {
         NDKLogger.log(.info, category: .subscription, "📡 Relay discovery: \(relays.count) relays for \(authors.count) authors")
         
-        // According to Outbox.md: Create NEW DataRequirements for discovered relays
+        // According to Outbox.md: Create NEW NDKSubscriptionRequirements for discovered relays
         // and attach them to the same observers as the original subscription
         
         // Create relay selection strategy
@@ -386,7 +386,7 @@ actor NDKDataRequirementManager {
                 )
                 
                 // Create handle for the enhanced requirement
-                let enhancedHandle = DataRequirementHandle(
+                let enhancedHandle = NDKSubscriptionRequirementHandle(
                     id: enhancedRequirementId,
                     manager: self,
                     requirement: enhancedRequirement
@@ -416,12 +416,12 @@ actor NDKDataRequirementManager {
 // MARK: - Requirement Handle
 
 /// Handle for managing a data requirement lifecycle
-public final class DataRequirementHandle: Sendable {
+public final class NDKSubscriptionRequirementHandle: Sendable {
     let id: RequirementID
-    nonisolated(unsafe) private weak var manager: NDKDataRequirementManager?
-    nonisolated(unsafe) private weak var requirement: DataRequirement?
+    nonisolated(unsafe) private weak var manager: NDKSubscriptionManager?
+    nonisolated(unsafe) private weak var requirement: NDKSubscriptionRequirement?
 
-    init(id: RequirementID, manager: NDKDataRequirementManager?, requirement: DataRequirement? = nil) {
+    init(id: RequirementID, manager: NDKSubscriptionManager?, requirement: NDKSubscriptionRequirement? = nil) {
         self.id = id
         self.manager = manager
         self.requirement = requirement

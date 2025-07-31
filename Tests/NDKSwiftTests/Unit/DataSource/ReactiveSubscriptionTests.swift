@@ -25,7 +25,7 @@ final class ReactiveSubscriptionTests: XCTestCase {
         
         // Create network subscription first
         let networkEvents = ActorQueue<NDKEvent>()
-        let networkDataSource = ndk.observe(
+        let networkDataSource = ndk.subscribe(
             filter: filter,
             cachePolicy: .networkOnly,
             subscriptionId: "network-sub"
@@ -42,7 +42,7 @@ final class ReactiveSubscriptionTests: XCTestCase {
         
         // Create cache-only subscription with same filter
         let cacheOnlyEvents = ActorQueue<NDKEvent>()
-        let cacheOnlyDataSource = ndk.observe(
+        let cacheOnlyDataSource = ndk.subscribe(
             filter: filter,
             cachePolicy: .cacheOnly,
             subscriptionId: "cache-only-sub"
@@ -107,7 +107,7 @@ final class ReactiveSubscriptionTests: XCTestCase {
         let allEvents = ActorQueue<(event: NDKEvent, source: String)>()
         
         // Create main network subscription
-        let networkDataSource = ndk.observe(
+        let networkDataSource = ndk.subscribe(
             filter: filter,
             cachePolicy: .networkOnly,
             subscriptionId: "main-network-sub"
@@ -120,7 +120,7 @@ final class ReactiveSubscriptionTests: XCTestCase {
         }
         
         // Create cache-only reactive subscription
-        let cacheDataSource = ndk.observe(
+        let cacheDataSource = ndk.subscribe(
             filter: filter,
             cachePolicy: .cacheOnly,
             subscriptionId: "reactive-cache-sub"
@@ -151,7 +151,7 @@ final class ReactiveSubscriptionTests: XCTestCase {
         // Simulate dynamic relay discovery creating enhanced subscription
         // In real scenario, this happens via handleRelayDiscovery
         let enhancedFilter = filter // Same filter, different relay
-        let enhancedDataSource = ndk.observe(
+        let enhancedDataSource = ndk.subscribe(
             filter: enhancedFilter,
             cachePolicy: .networkOnly,
             subscriptionId: "main-network-sub_enhanced_relay2"

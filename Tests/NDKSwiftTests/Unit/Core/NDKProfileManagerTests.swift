@@ -44,7 +44,7 @@ final class NDKProfileManagerTests: NDKTestCase {
         
         // When
         var loadedMetadata: NDKUserMetadata?
-        for await metadata in await sut.observe(for: pubkey) {
+        for await metadata in await sut.subscribe(for: pubkey) {
             loadedMetadata = metadata
             break
         }
@@ -64,7 +64,7 @@ final class NDKProfileManagerTests: NDKTestCase {
         
         // When
         var loadedMetadata: NDKUserMetadata?
-        for await metadata in await sut.observe(for: pubkey, maxAge: 0) {
+        for await metadata in await sut.subscribe(for: pubkey, maxAge: 0) {
             loadedMetadata = metadata
             break
         }
@@ -164,7 +164,7 @@ final class NDKProfileManagerTests: NDKTestCase {
         
         // Observe each pubkey
         for pubkey in pubkeys {
-            for await metadata in await sut.observe(for: pubkey, maxAge: 0) {
+            for await metadata in await sut.subscribe(for: pubkey, maxAge: 0) {
                 loadedProfiles[pubkey] = metadata
                 break
             }
@@ -196,7 +196,7 @@ final class NDKProfileManagerTests: NDKTestCase {
         
         // Then
         var loadedMetadata: NDKUserMetadata?
-        for await metadata in await sut.observe(for: pubkey, maxAge: 0) {
+        for await metadata in await sut.subscribe(for: pubkey, maxAge: 0) {
             loadedMetadata = metadata
             break
         }
@@ -217,7 +217,7 @@ final class NDKProfileManagerTests: NDKTestCase {
         
         // Then - metadata should have empty fields
         var loadedMetadata: NDKUserMetadata?
-        for await metadata in await sut.observe(for: pubkey, maxAge: 0) {
+        for await metadata in await sut.subscribe(for: pubkey, maxAge: 0) {
             loadedMetadata = metadata
             break
         }
@@ -241,7 +241,7 @@ final class NDKProfileManagerTests: NDKTestCase {
         
         // Then - Profile should exist immediately with maxAge 0
         var immediateMetadata: NDKUserMetadata?
-        for await metadata in await sut.observe(for: pubkey, maxAge: 0) {
+        for await metadata in await sut.subscribe(for: pubkey, maxAge: 0) {
             immediateMetadata = metadata
             break
         }
@@ -249,7 +249,7 @@ final class NDKProfileManagerTests: NDKTestCase {
         
         // When requesting with a very small maxAge, it should not return stale data
         var expiredMetadata: NDKUserMetadata?
-        for await metadata in await sut.observe(for: pubkey, maxAge: 0.0001) { // 0.1ms maxAge
+        for await metadata in await sut.subscribe(for: pubkey, maxAge: 0.0001) { // 0.1ms maxAge
             expiredMetadata = metadata
             break
         }
@@ -277,7 +277,7 @@ final class NDKProfileManagerTests: NDKTestCase {
         let startTime = CFAbsoluteTimeGetCurrent()
         
         for pubkey in pubkeys {
-            for await _ in await sut.observe(for: pubkey, maxAge: 0) {
+            for await _ in await sut.subscribe(for: pubkey, maxAge: 0) {
                 break // Just get the first result
             }
         }

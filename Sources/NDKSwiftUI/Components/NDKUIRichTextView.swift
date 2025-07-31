@@ -241,7 +241,7 @@ public struct NDKUIRichTextView: View {
         trackedPubkeys.insert(pubkey)
         
         let task = Task {
-            let profileStream = await ndk.profileManager.observe(for: pubkey, maxAge: TimeConstants.hour)
+            let profileStream = await ndk.profileManager.subscribe(for: pubkey, maxAge: TimeConstants.hour)
             
             for await profile in profileStream {
                 if let profile = profile {

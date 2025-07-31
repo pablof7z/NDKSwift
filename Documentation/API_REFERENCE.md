@@ -6,7 +6,7 @@ Complete API documentation for NDKSwift v0.7.6+
 
 - [Core Classes](#core-classes)
   - [NDK](#ndk)
-  - [NDKDataSource](#ndkdatasource)
+  - [NDKSubscription](#ndkdatasource)
   - [NDKEvent](#ndkevent)
   - [NDKFilter](#ndkfilter)
   - [NDKUser](#ndkuser)
@@ -92,17 +92,17 @@ public func retryUnpublishedEvents(maxAge: TimeInterval, limit: Int?) async thro
 
 ```swift
 // Create a data source with automatic caching and updates
-public func observe(
+public func subscribe(
     filter: NDKFilter,
     maxAge: TimeInterval = 0,
     cachePolicy: CachePolicy = .cacheWithNetwork,
     relays: Set<RelayURL>? = nil,
     exclusiveRelays: Bool = false,
     subscriptionId: String? = nil
-) -> NDKDataSource<NDKEvent>
+) -> NDKSubscription<NDKEvent>
 
 // Create a data source with transformation
-public func observe<T>(
+public func subscribe<T>(
     filter: NDKFilter,
     maxAge: TimeInterval = 0,
     cachePolicy: CachePolicy = .cacheWithNetwork,
@@ -110,7 +110,7 @@ public func observe<T>(
     exclusiveRelays: Bool = false,
     subscriptionId: String? = nil,
     transform: @escaping (NDKEvent) -> T?
-) -> NDKDataSource<T>
+) -> NDKSubscription<T>
 ```
 
 **Parameters:**
@@ -170,14 +170,14 @@ public func getSignatureVerificationStats() async -> (
 )
 ```
 
-### NDKDataSource
+### NDKSubscription
 
 A modern declarative API for accessing Nostr data with automatic caching and real-time updates.
 
 #### Properties
 
 ```swift
-public let filter: NDKFilter                     // Filter defining what events to observe
+public let filter: NDKFilter                     // Filter defining what events to subscribe to
 public let maxAge: TimeInterval                  // Maximum age of cached data to consider fresh
 public let cachePolicy: CachePolicy              // How to handle cache vs network
 public let relays: Set<RelayURL>?               // Specific relays to use (optional)
@@ -185,24 +185,24 @@ public let relays: Set<RelayURL>?               // Specific relays to use (optio
 
 #### Initialization
 
-NDKDataSource is created through `ndk.observe()` methods:
+NDKSubscription is created through `ndk.subscribe()` methods:
 
 ```swift
 // Basic observation
-let dataSource = ndk.observe(
+let dataSource = ndk.subscribe(
     filter: NDKFilter(kinds: [1], limit: 50),
     maxAge: 300,  // 5 minutes
     cachePolicy: .cacheWithNetwork
 )
 
 // With custom subscription ID for debugging
-let walletSource = ndk.observe(
+let walletSource = ndk.subscribe(
     filter: NDKFilter(kinds: [EventKind.cashuToken]),
     subscriptionId: "nip60-wallet-events"  // Shows in relay logs
 )
 
 // With transformation
-let profiles = ndk.observe(
+let profiles = ndk.subscribe(
     filter: NDKFilter(kinds: [0]),
     transform: { event -> NDKUserMetadata? in
         NDKUserMetadata(event: event)
@@ -248,25 +248,25 @@ public enum CachePolicy {
 
 ```swift
 // Real-time subscription (maxAge: 0)
-let liveNotes = ndk.observe(
+let liveNotes = ndk.subscribe(
     filter: NDKFilter(kinds: [1]),
     maxAge: 0  // Always fresh
 )
 
 // Periodic updates with cache
-let profiles = ndk.observe(
+let profiles = ndk.subscribe(
     filter: NDKFilter(kinds: [0], authors: following),
     maxAge: 3600  // 1 hour cache
 )
 
 // Offline-first with cache only
-let cachedEvents = ndk.observe(
+let cachedEvents = ndk.subscribe(
     filter: NDKFilter(kinds: [1]),
     cachePolicy: .cacheOnly
 )
 
 // Relay-specific filtering
-let relaySpecificEvents = ndk.observe(
+let relaySpecificEvents = ndk.subscribe(
     filter: NDKFilter(kinds: [1, 6, 7]),
     relays: Set(["wss://relay.damus.io"]),
     exclusiveRelays: true  // Only show events from specified relay
@@ -274,7 +274,7 @@ let relaySpecificEvents = ndk.observe(
 
 // SwiftUI Integration
 struct NotesView: View {
-    let dataSource: NDKDataSource<NDKEvent>
+    let dataSource: NDKSubscription<NDKEvent>
     @State private var notes: [NDKEvent] = []
     
     var body: some View {
@@ -293,21 +293,21 @@ struct NotesView: View {
 
 // One-shot fetch examples
 // Fetch from cache if fresh, otherwise network
-let dataSource = ndk.observe(
+let dataSource = ndk.subscribe(
     filter: NDKFilter(kinds: [0], authors: [pubkey]),
     maxAge: 300  // 5 minutes
 )
 let profiles = await dataSource.fetch()
 
 // Always fetch from network
-let freshDataSource = ndk.observe(
+let freshDataSource = ndk.subscribe(
     filter: NDKFilter(kinds: [1], limit: 10),
     cachePolicy: .networkOnly
 )
 let latestNotes = await freshDataSource.fetch()
 
 // Only use cached data
-let offlineDataSource = ndk.observe(
+let offlineDataSource = ndk.subscribe(
     filter: NDKFilter(kinds: [1]),
     cachePolicy: .cacheOnly
 )
@@ -516,7 +516,7 @@ static func multipleKinds(_ kinds: [EventKind], by pubkey: String, limit: Int? =
 ```swift
 // Fetch user profile
 // Fetch profile using ProfileManager
-for await metadata in await ndk.profileManager.observe(for: pubkey) {
+for await metadata in await ndk.profileManager.subscribe(for: pubkey) {
     if let metadata = metadata {
         print(metadata.displayName ?? metadata.name ?? "Unknown")
     }
@@ -525,23 +525,23 @@ for await metadata in await ndk.profileManager.observe(for: pubkey) {
 
 // Stream user's recent notes
 let notesFilter = NDKFilter.textNotes(by: pubkey, limit: 20)
-for await note in ndk.observe(filter: notesFilter).events {
+for await note in ndk.subscribe(filter: notesFilter).events {
     print(note.content)
 }
 
 // Stream reactions to an event
 let reactionsFilter = NDKFilter.reactions(to: eventId)
-for await reaction in ndk.observe(filter: reactionsFilter).events {
+for await reaction in ndk.subscribe(filter: reactionsFilter).events {
     print("Reaction: \(reaction.content)")
 }
 ```
 
-### NDKDataSourceOptions
+### NDKSubscriptionOptions
 
 Configuration for data sources and subscriptions.
 
 ```swift
-public struct NDKDataSourceOptions {
+public struct NDKSubscriptionOptions {
     public var closeOnEose: Bool = false         // Auto-close on EOSE
     public var useCache: Bool = true             // Check cache first
     public var limit: Int?                       // Max events to receive
@@ -669,7 +669,7 @@ public func disconnect() async
 public func send(_ message: String) async throws
 
 // Observe connection state changes
-public func observeConnectionState(
+public func subscribeToConnectionState(
     _ handler: @escaping (ConnectionState) -> Void
 ) -> AnyCancellable
 ```
@@ -946,7 +946,7 @@ Common event kinds defined in various NIPs.
 
 ### CachePolicy
 
-Controls how NDKDataSource balances cache vs network access:
+Controls how NDKSubscription balances cache vs network access:
 
 ```swift
 public enum CachePolicy {
@@ -1429,14 +1429,14 @@ These components are internal implementation details and should not be used dire
 
 ### NDKSubscription (Internal)
 
-**⚠️ Internal Implementation Detail**: `NDKSubscription` is an internal component that should not be used directly. Use the public `NDKDataSource` API instead:
+**⚠️ Internal Implementation Detail**: `NDKSubscription` is an internal component that should not be used directly. Use the public `NDKSubscription` API instead:
 
 ```swift
 // ❌ Don't use NDKSubscription directly
 // (This API is not exposed publicly)
 
-// ✅ Use NDKDataSource through ndk.observe()
-let dataSource = ndk.observe(filter: filter)
+// ✅ Use NDKSubscription through ndk.subscribe()
+let dataSource = ndk.subscribe(filter: filter)
 ```
 
 For more information on internal components, see the [Architecture Documentation](ARCHITECTURE.md#internal-components).
@@ -1447,4 +1447,4 @@ public var isClosed: Bool { get async }          // Is subscription closed?
 public var eoseReceived: Bool { get async }      // End of stored events received?
 ```
 
-For documentation on the recommended approach, see the [NDKDataSource](#ndkdatasource) section above.
+For documentation on the recommended approach, see the [NDKSubscription](#ndkdatasource) section above.

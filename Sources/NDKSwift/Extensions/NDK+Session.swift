@@ -97,7 +97,7 @@ extension NDK {
                 NDKLogger.log(.info, category: .subscription, "🔍 [ReactiveFilter] Built filter with \(filter.authors?.count ?? 0) authors, kinds: \(filter.kinds ?? [])")
 
                 // Create data source with meaningful subscription ID
-                NDKLogger.log(.info, category: .subscription, "🔍 [ReactiveFilter] Creating NDKDataSource...")
+                NDKLogger.log(.info, category: .subscription, "🔍 [ReactiveFilter] Creating NDKSubscription...")
                 // Create a description based on dependencies
                 let depDescription = reactiveFilter.dependencies.map { dep in
                     switch dep {
@@ -114,9 +114,9 @@ extension NDK {
                     }
                 }.sorted().joined(separator: "_")
                 let subscriptionId = "reactive_\(depDescription)_\(sessionData.pubkey.prefix(8))"
-                NDKLogger.log(.info, category: .subscription, "🔍 [ReactiveFilter] Creating NDKDataSource with subscriptionId: \(subscriptionId), filter: \(filter)")
-                let dataSource = NDKDataSource<NDKEvent>(ndk: self, filter: filter, subscriptionId: subscriptionId)
-                NDKLogger.log(.info, category: .subscription, "✅ [ReactiveFilter] NDKDataSource created successfully")
+                NDKLogger.log(.info, category: .subscription, "🔍 [ReactiveFilter] Creating NDKSubscription with subscriptionId: \(subscriptionId), filter: \(filter)")
+                let dataSource = NDKSubscription<NDKEvent>(ndk: self, filter: filter, subscriptionId: subscriptionId)
+                NDKLogger.log(.info, category: .subscription, "✅ [ReactiveFilter] NDKSubscription created successfully")
 
                 // Register with swap manager
                 NDKLogger.log(.debug, category: .subscription, "🔍 [ReactiveFilter] Registering with SubscriptionSwapManager...")

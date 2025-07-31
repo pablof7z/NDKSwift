@@ -157,7 +157,7 @@ actor EOSETracker {
         eoseUpdatesContinuation?.yield(true)
     }
     
-    /// Check if query is fully filled (simple version, full logic is in DataRequirement)
+    /// Check if query is fully filled (simple version, full logic is in NDKSubscriptionRequirement)
     private func isQueryFullyFilled(events: Set<EventID>, filter: NDKFilter) -> Bool {
         // For replaceable events, always wait for all relays
         // to ensure we get the most recent version

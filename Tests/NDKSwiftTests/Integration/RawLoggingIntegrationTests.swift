@@ -29,7 +29,7 @@ final class RawLoggingIntegrationTest: XCTestCase {
         print("Creating subscription with \(largeAuthors.count) authors...")
         
         // Observe to trigger the logging
-        let dataSource = ndk.observe(filter: filter)
+        let dataSource = ndk.subscribe(filter: filter)
         
         // Start observing to trigger the subscription
         let task = Task {

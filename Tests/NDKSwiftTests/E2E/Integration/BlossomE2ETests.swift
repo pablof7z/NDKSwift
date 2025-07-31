@@ -148,7 +148,7 @@ final class BlossomE2ETests: XCTestCase {
         )
         
         // Fetch using observe with maxAge for one-shot query
-        let dataSource = ndk.observe(filter: filter, maxAge: 3600)
+        let dataSource = ndk.subscribe(filter: filter, maxAge: 3600)
         let fetchedEvents = await dataSource.collect(timeout: 5.0)
         XCTAssertEqual(fetchedEvents.count, 1, "Should fetch our file metadata event")
         

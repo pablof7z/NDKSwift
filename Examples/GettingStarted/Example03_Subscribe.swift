@@ -24,7 +24,7 @@ struct Example03_Subscribe {
         
         // Step 3: Method 1 - Fetch events using observe with cache
         print("\n1️⃣ Fetching events (from cache and relays):")
-        let dataSource = ndk.observe(filter: filter, cachePolicy: .cacheWithNetwork)
+        let dataSource = ndk.subscribe(filter: filter, cachePolicy: .cacheWithNetwork)
         
         // Collect events for a short time
         var collectedEvents: [NDKEvent] = []
@@ -57,7 +57,7 @@ struct Example03_Subscribe {
             since: Timestamp(Date().timeIntervalSince1970), // From now
             limit: 10
         )
-        let realtimeSource = ndk.observe(filter: realtimeFilter, cachePolicy: .networkOnly)
+        let realtimeSource = ndk.subscribe(filter: realtimeFilter, cachePolicy: .networkOnly)
         
         // Use a task to handle timeout
         var observer2Count = 0
@@ -81,7 +81,7 @@ struct Example03_Subscribe {
         // Step 5: Subscribe with specific authors
         print("\n3️⃣ Subscribe to specific authors:")
         
-        // Using NDKDataSource for real-time event streaming (recommended approach)
+        // Using NDKSubscription for real-time event streaming (recommended approach)
         let authors = [
             "82341f882b6eabcd2ba7f1ef90aad961cf074af15b9ef44a09f9d2a8fbfbe6a2", // jack
             "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d"  // fiatjaf
@@ -93,7 +93,7 @@ struct Example03_Subscribe {
             limit: 5
         )
         
-        let authorSource = ndk.observe(filter: authorFilter, cachePolicy: .cacheWithNetwork)
+        let authorSource = ndk.subscribe(filter: authorFilter, cachePolicy: .cacheWithNetwork)
         var authorEvents: [NDKEvent] = []
         
         let authorTask = Task {

@@ -10,7 +10,7 @@ public actor SubscriptionSwapManager {
 
     private struct TrackedSubscription {
         let id: String
-        let dataSource: NDKDataSource<NDKEvent>
+        let dataSource: NDKSubscription<NDKEvent>
         let reactiveFilter: ReactiveFilter
         let sessionData: NDKSessionData
         var lastFilter: NDKFilter
@@ -26,7 +26,7 @@ public actor SubscriptionSwapManager {
     ///   - sessionData: Session data for dependencies
     func register(
         id: String,
-        dataSource: NDKDataSource<NDKEvent>,
+        dataSource: NDKSubscription<NDKEvent>,
         reactiveFilter: ReactiveFilter,
         sessionData: NDKSessionData
     ) {

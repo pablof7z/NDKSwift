@@ -38,7 +38,7 @@ final class SubscriptionReplayTests: XCTestCase {
         
         // Create a subscription without explicit relays (should use default relays)
         let filter = NDKFilter(kinds: [1], limit: 10)
-        let dataSource = ndk.observe(filter: filter, cachePolicy: .networkOnly)
+        let dataSource = ndk.subscribe(filter: filter, cachePolicy: .networkOnly)
         
         // Start collecting events
         let task = Task {
@@ -95,7 +95,7 @@ final class SubscriptionReplayTests: XCTestCase {
         
         // Create a subscription with explicit relays
         let filter = NDKFilter(kinds: [1], limit: 10)
-        let dataSource = ndk.observe(
+        let dataSource = ndk.subscribe(
             filter: filter,
             relays: Set([relay1URL, relay2URL]),
             cachePolicy: .networkOnly
@@ -171,7 +171,7 @@ final class SubscriptionReplayTests: XCTestCase {
         
         // Create a subscription that will use outbox model
         let filter = NDKFilter(kinds: [1], authors: [author], limit: 10)
-        let dataSource = outboxNDK.observe(filter: filter, cachePolicy: .networkOnly)
+        let dataSource = outboxNDK.subscribe(filter: filter, cachePolicy: .networkOnly)
         
         // Start collecting events
         let task = Task {
@@ -306,7 +306,7 @@ private final class TestRelay: MockRelayProtocol {
         activeSubscriptions.removeValue(forKey: id)
     }
     
-    func addSubscription(_ subscription: InternalSubscription, filters: [NDKFilter]) async {
+    func addSubscription(_ subscription: NDKSubscriptionCoordinator, filters: [NDKFilter]) async {
         activeSubscriptions[subscription.id] = filters
     }
 }

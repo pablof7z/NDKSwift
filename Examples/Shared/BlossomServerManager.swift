@@ -56,7 +56,7 @@ public class BlossomServerManager {
                 )
                 
                 // Use observe to get the event
-                let dataSource = ndk.observe(filter: filter, maxAge: 300, cachePolicy: .cacheWithNetwork)
+                let dataSource = ndk.subscribe(filter: filter, maxAge: 300, cachePolicy: .cacheWithNetwork)
                 
                 for await events in dataSource.values {
                     if let event = events.first {

@@ -130,7 +130,7 @@ final class EnhancedRequirementsTests: XCTestCase {
         
         // Create subscription
         let filter = NDKFilter(authors: [author], kinds: [1])
-        let dataSource = ndk.observe(filter: filter, cachePolicy: .networkOnly)
+        let dataSource = ndk.subscribe(filter: filter, cachePolicy: .networkOnly)
         
         var receivedEvents: [NDKEvent] = []
         let eventExpectation = expectation(description: "Receive forwarded events")
@@ -215,8 +215,8 @@ final class EnhancedRequirementsTests: XCTestCase {
     
     func testEnhancedRequirements_NoMemoryLeak() async throws {
         // Test that enhanced requirements don't cause memory leaks
-        weak var weakHandle: DataRequirementHandle?
-        weak var weakDataSource: NDKDataSource<NDKEvent>?
+        weak var weakHandle: NDKSubscriptionRequirementHandle?
+        weak var weakDataSource: NDKSubscription<NDKEvent>?
         
         // Create scope for autoreleasepool
         await autoreleasepool {
@@ -228,7 +228,7 @@ final class EnhancedRequirementsTests: XCTestCase {
                 cachePolicy: .networkOnly
             )
             
-            let dataSource = NDKDataSource(
+            let dataSource = NDKSubscription(
                 filter: filter,
                 requirementHandle: handle,
                 eventStream: eventStream
@@ -263,7 +263,7 @@ final class EnhancedRequirementsTests: XCTestCase {
         let filter = NDKFilter(kinds: [1]) // Broad filter
         
         // Create cache-only observer
-        let cacheDataSource = ndk.observe(filter: filter, cachePolicy: .cacheOnly)
+        let cacheDataSource = ndk.subscribe(filter: filter, cachePolicy: .cacheOnly)
         
         var cacheEvents: [NDKEvent] = []
         let cacheExpectation = expectation(description: "Cache observer receives events")
@@ -277,7 +277,7 @@ final class EnhancedRequirementsTests: XCTestCase {
         
         // Create network subscription with specific filter
         let specificFilter = NDKFilter(authors: [author], kinds: [1])
-        _ = ndk.observe(filter: specificFilter, cachePolicy: .networkOnly)
+        _ = ndk.subscribe(filter: specificFilter, cachePolicy: .networkOnly)
         
         // Save event to cache (simulating network arrival)
         let event = createEvent(id: "reactive-event", author: author, content: "Test")
@@ -296,15 +296,15 @@ final class EnhancedRequirementsTests: XCTestCase {
         let author2 = "observer2-author"
         
         // Create multiple cache observers
-        let observer1 = ndk.observe(
+        let observer1 = ndk.subscribe(
             filter: NDKFilter(authors: [author1], kinds: [1]),
             cachePolicy: .cacheOnly
         )
-        let observer2 = ndk.observe(
+        let observer2 = ndk.subscribe(
             filter: NDKFilter(authors: [author2], kinds: [1]),
             cachePolicy: .cacheOnly
         )
-        let observerAll = ndk.observe(
+        let observerAll = ndk.subscribe(
             filter: NDKFilter(kinds: [1]),
             cachePolicy: .cacheOnly
         )
@@ -475,7 +475,7 @@ actor MockEnhancedRelayPool: NDKPool {
         
         // Notify subscribers
         Task {
-            // In real implementation, this would trigger InternalSubscription callbacks
+            // In real implementation, this would trigger NDKSubscriptionCoordinator callbacks
             // For testing, we'd need to hook into the actual subscription system
         }
     }
@@ -492,15 +492,15 @@ class MockEnhancedRelay: NDKRelay {
 }
 */
 
-// MARK: - NDKDataRequirementManager Test Extensions
+// MARK: - NDKSubscriptionManager Test Extensions
 
-extension NDKDataRequirementManager {
-    func getActiveRequirements() async -> [DataRequirement] {
+extension NDKSubscriptionManager {
+    func getActiveRequirements() async -> [NDKSubscriptionRequirement] {
         // This would need to be implemented to expose active requirements for testing
         return []
     }
     
-    func getEnhancedRequirements(for handleId: UUID) async -> [DataRequirement] {
+    func getEnhancedRequirements(for handleId: UUID) async -> [NDKSubscriptionRequirement] {
         // This would need to be implemented to track enhanced requirements
         return []
     }

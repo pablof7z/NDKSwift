@@ -21,7 +21,7 @@ final class SubscriptionSwapManagerTests: XCTestCase {
     // MARK: - Registration Tests
     
     func testRegisterSubscription() async {
-        let dataSource = NDKDataSource<NDKEvent>(
+        let dataSource = NDKSubscription<NDKEvent>(
             ndk: ndk,
             filter: NDKFilter(kinds: [1])
         )
@@ -43,7 +43,7 @@ final class SubscriptionSwapManagerTests: XCTestCase {
     }
     
     func testUnregisterSubscription() async {
-        let dataSource = NDKDataSource<NDKEvent>(
+        let dataSource = NDKSubscription<NDKEvent>(
             ndk: ndk,
             filter: NDKFilter(kinds: [1])
         )
@@ -83,7 +83,7 @@ final class SubscriptionSwapManagerTests: XCTestCase {
             }
         )
         
-        let dataSource = NDKDataSource<NDKEvent>(
+        let dataSource = NDKSubscription<NDKEvent>(
             ndk: ndk,
             filter: reactiveFilter.builder(sessionData)
         )
@@ -106,7 +106,7 @@ final class SubscriptionSwapManagerTests: XCTestCase {
     
     func testMultipleSubscriptionsWithDifferentDependencies() async {
         // Subscription 1: Depends on follow list
-        let dataSource1 = NDKDataSource<NDKEvent>(
+        let dataSource1 = NDKSubscription<NDKEvent>(
             ndk: ndk,
             filter: NDKFilter(kinds: [1])
         )
@@ -116,7 +116,7 @@ final class SubscriptionSwapManagerTests: XCTestCase {
         )
         
         // Subscription 2: No dependencies
-        let dataSource2 = NDKDataSource<NDKEvent>(
+        let dataSource2 = NDKSubscription<NDKEvent>(
             ndk: ndk,
             filter: NDKFilter(kinds: [0])
         )

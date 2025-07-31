@@ -23,14 +23,14 @@ final class MultipleObserversTests: XCTestCase {
         
         // Create first observer with maxAge: 0
         print("Creating observer1 with filter: \(filter)")
-        let observer1 = ndk.observe(
+        let observer1 = ndk.subscribe(
             filter: filter,
             maxAge: 0  // Real-time updates only
         )
         
         // Create second observer with maxAge: 0
         print("Creating observer2 with filter: \(filter)")
-        let observer2 = ndk.observe(
+        let observer2 = ndk.subscribe(
             filter: filter,
             maxAge: 0  // Real-time updates only
         )
@@ -150,13 +150,13 @@ final class MultipleObserversTests: XCTestCase {
         )
         
         // Create observer with maxAge: 0
-        let realtimeObserver = ndk.observe(
+        let realtimeObserver = ndk.subscribe(
             filter: filter,
             maxAge: 0  // Real-time updates only
         )
         
         // Create observer with maxAge > 0
-        let cachedObserver = ndk.observe(
+        let cachedObserver = ndk.subscribe(
             filter: filter,
             maxAge: 3600  // 1 hour cache
         )

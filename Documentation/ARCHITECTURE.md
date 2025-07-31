@@ -139,9 +139,9 @@ Each relay manages its own subscriptions to optimize network usage:
 ```swift
 actor NDKRelaySubscriptionManager {
     // Groups subscriptions with same fingerprint
-    private var subscriptionGroups: [String: NDKRelaySubscriptionGroup] = [:]
+    private var subscriptionGroups: [String: NDKRelaySubscription] = [:]
     
-    func addSubscription(_ subscription: InternalSubscription, filters: [NDKFilter]) {
+    func addSubscription(_ subscription: NDKSubscriptionCoordinator, filters: [NDKFilter]) {
         let fingerprint = NDKFilterGrouping.filterFingerprint(filters, closeOnEose: subscription.closeOnEose)
         
         // Find or create group for this fingerprint
@@ -149,7 +149,7 @@ actor NDKRelaySubscriptionManager {
             group.addItem(subscription, filters: filters)
         } else {
             // Create new group with delay for batching
-            let group = NDKRelaySubscriptionGroup(relay: relay, fingerprint: fingerprint)
+            let group = NDKRelaySubscription(relay: relay, fingerprint: fingerprint)
             group.scheduleExecution(delay: 0.1)  // 100ms default
         }
     }

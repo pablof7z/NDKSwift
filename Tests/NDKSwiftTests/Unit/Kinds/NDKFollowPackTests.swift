@@ -269,7 +269,7 @@ final class NDKFollowPackTests: XCTestCase {
     func testObserveFollowPacks() async throws {
         // Use observe to get follow packs
         let filter = NDKFilter(kinds: NDKFollowPack.supportedKinds)
-        let observer = ndk.observe(filter: filter)
+        let observer = ndk.subscribe(filter: filter)
         
         // Verify the observer pattern works
         XCTAssertNotNil(observer)

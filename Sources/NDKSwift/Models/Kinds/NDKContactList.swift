@@ -303,8 +303,8 @@ public extension NDK {
     func fetchContactList(for user: NDKUser) async throws -> NDKContactList? {
         let filter = NDKFilter(authors: [user.pubkey], kinds: [EventKind.contacts])
 
-        // Use NDKDataSource with reasonable maxAge for contact lists
-        let dataSource = NDKDataSource(
+        // Use NDKSubscription with reasonable maxAge for contact lists
+        let dataSource = NDKSubscription(
             ndk: self,
             filter: filter,
             maxAge: 10 * TimeConstants.minute // 10 minutes - contact lists don't change frequently

@@ -8,7 +8,7 @@ final class SimpleSubscriptionGroupingTest: XCTestCase {
         let ndk = NDK()
         
         // Test default grouping configuration
-        let sub1 = InternalSubscription(
+        let sub1 = NDKSubscriptionCoordinator(
             id: "sub1",
             filters: [NDKFilter()],
             relays: nil,
@@ -20,7 +20,7 @@ final class SimpleSubscriptionGroupingTest: XCTestCase {
         // But we can verify they work through the relay subscription manager
         
         // Test non-groupable subscription
-        let sub2 = InternalSubscription(
+        let sub2 = NDKSubscriptionCoordinator(
             id: "sub2",
             filters: [NDKFilter()],
             relays: nil,
@@ -33,7 +33,7 @@ final class SimpleSubscriptionGroupingTest: XCTestCase {
         // Properties configured but not directly accessible due to actor isolation
         
         // Test custom grouping configuration
-        let sub3 = InternalSubscription(
+        let sub3 = NDKSubscriptionCoordinator(
             id: "sub3",
             filters: [NDKFilter()],
             relays: nil,
@@ -60,7 +60,7 @@ final class SimpleSubscriptionGroupingTest: XCTestCase {
         filter.authors = ["test_author"]
         
         // Create a groupable subscription
-        let groupableSub = InternalSubscription(
+        let groupableSub = NDKSubscriptionCoordinator(
             id: "groupable",
             filters: [filter],
             relays: nil,
@@ -76,7 +76,7 @@ final class SimpleSubscriptionGroupingTest: XCTestCase {
         await manager.addSubscription(groupableSub, filters: [filter])
         
         // Create a non-groupable subscription with same filter
-        let nonGroupableSub = InternalSubscription(
+        let nonGroupableSub = NDKSubscriptionCoordinator(
             id: "non-groupable",
             filters: [filter],
             relays: nil,

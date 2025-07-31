@@ -29,7 +29,7 @@ public func runOutboxExample() async throws {
     print("and route the REQ to appropriate relays per NIP-65\n")
     
     // Create observer using the observe API
-    let observer = ndk.observe(filter: filter)
+    let observer = ndk.subscribe(filter: filter)
     
     print("Observer created. Waiting for events...\n")
     
@@ -52,7 +52,7 @@ public func runOutboxExample() async throws {
     )
     
     // Use observe to fetch a single event
-    let relayListObserver = ndk.observe(filter: relayListFilter)
+    let relayListObserver = ndk.subscribe(filter: relayListFilter)
     var relayListEvent: NDKEvent?
     
     for await event in relayListObserver.events {

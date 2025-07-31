@@ -42,8 +42,8 @@ struct Example03_2_GroupedSubscriptions {
         let filter2 = NDKFilter(authors: [fiatjafPubkey], kinds: [0])
         
         // Create observers
-        let observer1 = ndk.observe(filter: filter1, cachePolicy: .networkOnly)
-        let observer2 = ndk.observe(filter: filter2, cachePolicy: .networkOnly)
+        let observer1 = ndk.subscribe(filter: filter1, cachePolicy: .networkOnly)
+        let observer2 = ndk.subscribe(filter: filter2, cachePolicy: .networkOnly)
         
         // Track events received by each observer
         // Note: In a production test, consider using an actor for thread-safe access

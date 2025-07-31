@@ -2,7 +2,7 @@ import XCTest
 @testable import NDKSwift
 
 /// Basic tests for NDKRelaySubscriptionManager focusing on core functionality
-/// Note: Full testing is limited due to missing properties in InternalSubscription
+/// Note: Full testing is limited due to missing properties in NDKSubscriptionCoordinator
 /// See BUG_REPORT_NDKRelaySubscriptionManager_MissingProperties.md
 final class NDKRelaySubscriptionManagerBasicTests: XCTestCase {
     var relay: NDKRelay!
@@ -81,7 +81,7 @@ final class NDKRelaySubscriptionManagerBasicTests: XCTestCase {
     
     func testTrackGroupSubscriptionId_addsMapping() async {
         // Create a mock group
-        let group = NDKRelaySubscriptionGroup(
+        let group = NDKRelaySubscription(
             relay: relay,
             fingerprint: "test_fingerprint",
             isGroupable: true
@@ -99,7 +99,7 @@ final class NDKRelaySubscriptionManagerBasicTests: XCTestCase {
     
     func testOnGroupClosed_removesGroup() async {
         // Create a mock group
-        let group = NDKRelaySubscriptionGroup(
+        let group = NDKRelaySubscription(
             relay: relay,
             fingerprint: "test_fingerprint",
             isGroupable: true
@@ -122,12 +122,12 @@ final class NDKRelaySubscriptionManagerBasicTests: XCTestCase {
     
     func testMultipleGroups_tracking() async {
         // Create multiple groups
-        let group1 = NDKRelaySubscriptionGroup(
+        let group1 = NDKRelaySubscription(
             relay: relay,
             fingerprint: "fingerprint1",
             isGroupable: true
         )
-        let group2 = NDKRelaySubscriptionGroup(
+        let group2 = NDKRelaySubscription(
             relay: relay,
             fingerprint: "fingerprint2",
             isGroupable: true
@@ -154,7 +154,7 @@ final class NDKRelaySubscriptionManagerBasicTests: XCTestCase {
 
 // MARK: - Helper Extension
 
-extension NDKRelaySubscriptionGroup {
+extension NDKRelaySubscription {
     /// Helper to set subscription ID for testing
     func setSubId(_ id: String) async {
         self.subId = id

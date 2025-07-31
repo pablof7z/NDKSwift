@@ -2,7 +2,7 @@ import XCTest
 @testable import NDKSwift
 
 @MainActor
-final class NDKRelaySubscriptionGroupTests: XCTestCase {
+final class NDKRelaySubscriptionTests: XCTestCase {
     
     // MARK: - Test Helpers
     
@@ -18,9 +18,9 @@ final class NDKRelaySubscriptionGroupTests: XCTestCase {
         isGroupable: Bool = true,
         groupableDelay: TimeInterval? = nil,
         groupableDelayType: NDKSubscriptionDelayType? = nil
-    ) -> InternalSubscription {
+    ) -> NDKSubscriptionCoordinator {
         let ndk = NDK()
-        return InternalSubscription(
+        return NDKSubscriptionCoordinator(
             id: id,
             filters: filters,
             relays: nil,
@@ -51,7 +51,7 @@ final class NDKRelaySubscriptionGroupTests: XCTestCase {
     func testInitialization() async {
         let relay = createMockRelay()
         let fingerprint = "test-fingerprint"
-        let group = NDKRelaySubscriptionGroup(relay: relay, fingerprint: fingerprint, isGroupable: true)
+        let group = NDKRelaySubscription(relay: relay, fingerprint: fingerprint, isGroupable: true)
         
         let actualFingerprint = await group.fingerprint
         let actualRelay = await group.relay
@@ -68,7 +68,7 @@ final class NDKRelaySubscriptionGroupTests: XCTestCase {
     
     func testAddItem() async {
         let relay = createMockRelay()
-        let group = NDKRelaySubscriptionGroup(relay: relay, fingerprint: "test", isGroupable: true)
+        let group = NDKRelaySubscription(relay: relay, fingerprint: "test", isGroupable: true)
         
         let subscription = createMockSubscription(id: "sub1", filters: [createFilter(kinds: [1])])
         let filters = [createFilter(kinds: [1])]
@@ -81,7 +81,7 @@ final class NDKRelaySubscriptionGroupTests: XCTestCase {
     
     func testRemoveItem() async {
         let relay = createMockRelay()
-        let group = NDKRelaySubscriptionGroup(relay: relay, fingerprint: "test", isGroupable: true)
+        let group = NDKRelaySubscription(relay: relay, fingerprint: "test", isGroupable: true)
         
         let subscription1 = createMockSubscription(id: "sub1", filters: [createFilter(kinds: [1])])
         let subscription2 = createMockSubscription(id: "sub2", filters: [createFilter(kinds: [1])])
@@ -102,7 +102,7 @@ final class NDKRelaySubscriptionGroupTests: XCTestCase {
     
     func testRemoveAllItems() async {
         let relay = createMockRelay()
-        let group = NDKRelaySubscriptionGroup(relay: relay, fingerprint: "test", isGroupable: true)
+        let group = NDKRelaySubscription(relay: relay, fingerprint: "test", isGroupable: true)
         
         let subscription = createMockSubscription(id: "sub1", filters: [createFilter(kinds: [1])])
         let filters = [createFilter(kinds: [1])]
@@ -118,7 +118,7 @@ final class NDKRelaySubscriptionGroupTests: XCTestCase {
     
     func testCanAcceptNewItems() async {
         let relay = createMockRelay()
-        let group = NDKRelaySubscriptionGroup(relay: relay, fingerprint: "test", isGroupable: true)
+        let group = NDKRelaySubscription(relay: relay, fingerprint: "test", isGroupable: true)
         
         // Initial state should accept items
         let canAcceptInitial = await group.canAcceptNewItems()
@@ -132,7 +132,7 @@ final class NDKRelaySubscriptionGroupTests: XCTestCase {
     
     func testIsActive() async {
         let relay = createMockRelay()
-        let group = NDKRelaySubscriptionGroup(relay: relay, fingerprint: "test", isGroupable: true)
+        let group = NDKRelaySubscription(relay: relay, fingerprint: "test", isGroupable: true)
         
         let isActiveInitial = await group.isActive()
         XCTAssertFalse(isActiveInitial)
@@ -142,7 +142,7 @@ final class NDKRelaySubscriptionGroupTests: XCTestCase {
     
     func testCompileFiltersSimple() async {
         let relay = createMockRelay()
-        let group = NDKRelaySubscriptionGroup(relay: relay, fingerprint: "test", isGroupable: true)
+        let group = NDKRelaySubscription(relay: relay, fingerprint: "test", isGroupable: true)
         
         let sub1 = createMockSubscription(id: "sub1", filters: [createFilter(kinds: [1])])
         let sub2 = createMockSubscription(id: "sub2", filters: [createFilter(kinds: [1])])
@@ -157,7 +157,7 @@ final class NDKRelaySubscriptionGroupTests: XCTestCase {
     
     func testCompileFiltersWithLimits() async {
         let relay = createMockRelay()
-        let group = NDKRelaySubscriptionGroup(relay: relay, fingerprint: "test", isGroupable: true)
+        let group = NDKRelaySubscription(relay: relay, fingerprint: "test", isGroupable: true)
         
         // Filters with limits should be concatenated, not merged
         let filter1 = createFilter(kinds: [1], limit: 10)
@@ -188,7 +188,7 @@ final class NDKRelaySubscriptionGroupTests: XCTestCase {
     
     func testCompileFiltersMultipleFiltersPerSubscription() async {
         let relay = createMockRelay()
-        let group = NDKRelaySubscriptionGroup(relay: relay, fingerprint: "test", isGroupable: true)
+        let group = NDKRelaySubscription(relay: relay, fingerprint: "test", isGroupable: true)
         
         let filters1 = [
             createFilter(kinds: [1]),
@@ -215,7 +215,7 @@ final class NDKRelaySubscriptionGroupTests: XCTestCase {
     
     func testCompileFiltersComplexMerging() async {
         let relay = createMockRelay()
-        let group = NDKRelaySubscriptionGroup(relay: relay, fingerprint: "test", isGroupable: true)
+        let group = NDKRelaySubscription(relay: relay, fingerprint: "test", isGroupable: true)
         
         // Test tag merging
         let filter1 = createFilter(kinds: [1], tags: ["p": ["author1", "author2"]])
@@ -239,7 +239,7 @@ final class NDKRelaySubscriptionGroupTests: XCTestCase {
     
     func testScheduleExecutionFirstTime() async {
         let relay = createMockRelay()
-        let group = NDKRelaySubscriptionGroup(relay: relay, fingerprint: "test", isGroupable: true)
+        let group = NDKRelaySubscription(relay: relay, fingerprint: "test", isGroupable: true)
         
         await group.scheduleExecution(delay: 0.1, delayType: .atLeast)
         
@@ -250,7 +250,7 @@ final class NDKRelaySubscriptionGroupTests: XCTestCase {
     
     func testScheduleExecutionRescheduling() async {
         let relay = createMockRelay()
-        let group = NDKRelaySubscriptionGroup(relay: relay, fingerprint: "test", isGroupable: true)
+        let group = NDKRelaySubscription(relay: relay, fingerprint: "test", isGroupable: true)
         
         // Schedule with atLeast
         await group.scheduleExecution(delay: 0.2, delayType: .atLeast)
@@ -267,7 +267,7 @@ final class NDKRelaySubscriptionGroupTests: XCTestCase {
     
     func testCancelPendingExecution() async {
         let relay = createMockRelay()
-        let group = NDKRelaySubscriptionGroup(relay: relay, fingerprint: "test", isGroupable: true)
+        let group = NDKRelaySubscription(relay: relay, fingerprint: "test", isGroupable: true)
         
         await group.scheduleExecution(delay: 0.5, delayType: .atLeast)
         await group.cancelPendingExecution()
@@ -281,7 +281,7 @@ final class NDKRelaySubscriptionGroupTests: XCTestCase {
     
     func testHandleEvent() async {
         let relay = createMockRelay()
-        let group = NDKRelaySubscriptionGroup(relay: relay, fingerprint: "test", isGroupable: true)
+        let group = NDKRelaySubscription(relay: relay, fingerprint: "test", isGroupable: true)
         
         var receivedEvents: [String: NDKEvent] = [:]
         
@@ -312,7 +312,7 @@ final class NDKRelaySubscriptionGroupTests: XCTestCase {
     
     func testHandleEOSE() async {
         let relay = createMockRelay()
-        let group = NDKRelaySubscriptionGroup(relay: relay, fingerprint: "test", isGroupable: true)
+        let group = NDKRelaySubscription(relay: relay, fingerprint: "test", isGroupable: true)
         
         var eoseReceived: [String: Bool] = [:]
         
@@ -340,7 +340,7 @@ final class NDKRelaySubscriptionGroupTests: XCTestCase {
     
     func testHandleEOSEWithCloseOnEose() async {
         let relay = createMockRelay()
-        let group = NDKRelaySubscriptionGroup(relay: relay, fingerprint: "test", isGroupable: true)
+        let group = NDKRelaySubscription(relay: relay, fingerprint: "test", isGroupable: true)
         
         // Create relay with mock send capability
         relay.ndk = NDK()
@@ -359,7 +359,7 @@ final class NDKRelaySubscriptionGroupTests: XCTestCase {
     
     func testHandleEOSEForAbandonedSubscription() async {
         let relay = createMockRelay()
-        let group = NDKRelaySubscriptionGroup(relay: relay, fingerprint: "test", isGroupable: true)
+        let group = NDKRelaySubscription(relay: relay, fingerprint: "test", isGroupable: true)
         
         // Set up the relay to track close calls
         relay.ndk = NDK()
@@ -374,7 +374,7 @@ final class NDKRelaySubscriptionGroupTests: XCTestCase {
     
     func testHandleClosed() async {
         let relay = createMockRelay()
-        let group = NDKRelaySubscriptionGroup(relay: relay, fingerprint: "test", isGroupable: true)
+        let group = NDKRelaySubscription(relay: relay, fingerprint: "test", isGroupable: true)
         
         let sub = createMockSubscription(id: "sub1", filters: [createFilter(kinds: [1])])
         
@@ -395,7 +395,7 @@ final class NDKRelaySubscriptionGroupTests: XCTestCase {
     
     func testClose() async {
         let relay = createMockRelay()
-        let group = NDKRelaySubscriptionGroup(relay: relay, fingerprint: "test", isGroupable: true)
+        let group = NDKRelaySubscription(relay: relay, fingerprint: "test", isGroupable: true)
         
         relay.ndk = NDK()
         

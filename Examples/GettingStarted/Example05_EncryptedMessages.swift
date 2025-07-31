@@ -37,7 +37,7 @@ struct Example05_EncryptedMessages {
             tags: ["p": [bobPubkey]] // Messages where Bob is tagged
         )
         
-        let bobSubscription = bobNDK.observe(filter: bobDMFilter)
+        let bobSubscription = bobNDK.subscribe(filter: bobDMFilter)
         
         // Start Bob's listener in background
         let bobListenerTask = Task {
@@ -112,7 +112,7 @@ struct Example05_EncryptedMessages {
             tags: ["p": [alicePubkey, bobPubkey]]
         )
         
-        let conversationSource = aliceNDK.observe(filter: conversationFilter)
+        let conversationSource = aliceNDK.subscribe(filter: conversationFilter)
         var conversationEvents: [NDKEvent] = []
         
         let conversationTask = Task {

@@ -89,7 +89,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
         )
 
         // Fetch the relay list event
-        let dataSource = NDKDataSource(
+        let dataSource = NDKSubscription(
             ndk: ndk,
             filter: filter,
             maxAge: TimeConstants.day // 24 hours - relay lists rarely change
@@ -136,7 +136,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
         )
 
         // Fetch the contact list event
-        let dataSource = NDKDataSource(
+        let dataSource = NDKSubscription(
             ndk: ndk,
             filter: filter,
             maxAge: 10 * TimeConstants.minute // 10 minutes - contact lists don't change frequently

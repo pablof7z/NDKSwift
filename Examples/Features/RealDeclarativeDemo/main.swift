@@ -43,7 +43,7 @@ struct RealDeclarativeDemo {
         print("\n6. Observing kind:1 events...")
         let filter = NDKFilter(kinds: [1], limit: 5)
         print("   Filter: \(filter)")
-        let dataSource = ndk.observe(filter: filter)
+        let dataSource = ndk.subscribe(filter: filter)
         print("   DataSource created: \(dataSource)")
         
         // Count events received

@@ -1,7 +1,7 @@
 import XCTest
 @testable import NDKSwift
 
-/// Tests for cache-first behavior in NDKDataRequirementManager
+/// Tests for cache-first behavior in NDKSubscriptionManager
 class CacheFirstTests: XCTestCase {
     var ndk: NDK!
     var cache: MemoryCache!
@@ -44,7 +44,7 @@ class CacheFirstTests: XCTestCase {
         let startTime = Date()
         
         // Act: Create data source (should immediately hit cache)
-        let dataSource = NDKDataSource(
+        let dataSource = NDKSubscription(
             ndk: ndk,
             filter: filter,
             maxAge: 60, // 1 minute - cache should be fresh
@@ -91,7 +91,7 @@ class CacheFirstTests: XCTestCase {
         await ndk.addRelay("wss://test.relay")
         
         // Act: Create data source with maxAge that makes cache fresh
-        let dataSource = NDKDataSource(
+        let dataSource = NDKSubscription(
             ndk: ndk,
             filter: filter,
             maxAge: 300, // 5 minutes - cache should be fresh
@@ -133,7 +133,7 @@ class CacheFirstTests: XCTestCase {
         }
         
         // Act: Create data source with maxAge that makes cache stale
-        let dataSource = NDKDataSource(
+        let dataSource = NDKSubscription(
             ndk: ndk,
             filter: filter,
             maxAge: 300, // 5 minutes - cache is stale (1 hour old)
@@ -173,7 +173,7 @@ class CacheFirstTests: XCTestCase {
         let filter = NDKFilter(kinds: [1])
         
         // Act: Create data source with networkOnly policy
-        let dataSource = NDKDataSource(
+        let dataSource = NDKSubscription(
             ndk: ndk,
             filter: filter,
             cachePolicy: .networkOnly
@@ -210,7 +210,7 @@ class CacheFirstTests: XCTestCase {
         let filter = NDKFilter(kinds: [1])
         
         // Act: Create data source with cacheOnly policy
-        let dataSource = NDKDataSource(
+        let dataSource = NDKSubscription(
             ndk: ndk,
             filter: filter,
             cachePolicy: .cacheOnly

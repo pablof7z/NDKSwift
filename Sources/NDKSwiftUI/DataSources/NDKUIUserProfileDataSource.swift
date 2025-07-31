@@ -32,7 +32,7 @@ public class NDKUIUserProfileDataSource: ObservableObject {
     
     private func observeProfile() async {
         // Use NDKProfileManager for best practices
-        for await metadataUpdate in await ndk.profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
+        for await metadataUpdate in await ndk.profileManager.subscribe(for: pubkey, maxAge: TimeConstants.hour) {
             await MainActor.run {
                 self.metadata = metadataUpdate
                 self.isLoading = false

@@ -4,7 +4,7 @@
 This document tracks test improvement work for NDKSwift, focusing on unit tests and coverage for core library components.
 
 ## Current Status (2025-07-31)
-Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage, NDKRelay, NDKPrivateKeySigner, NDKRelayConnection, NDKCache protocol, NDKFilterGrouping, NIP-04 encryption, NIP-44 encryption, NDKRelaySubscriptionManager, NDKRelaySubscriptionGroup, SQLite cache migrations, NDKBunkerSigner, NDKOutboxManager, NDKEventBuilder, and NDKDataSource. Found and documented bugs in MemoryCache.queryEvents, NostrMessage.serialize, and NDKRelaySubscriptionManager (missing properties).
+Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage, NDKRelay, NDKPrivateKeySigner, NDKRelayConnection, NDKCache protocol, NDKFilterGrouping, NIP-04 encryption, NIP-44 encryption, NDKRelaySubscriptionManager, NDKRelaySubscription, SQLite cache migrations, NDKBunkerSigner, NDKOutboxManager, NDKEventBuilder, and NDKSubscription. Found and documented bugs in MemoryCache.queryEvents, NostrMessage.serialize, and NDKRelaySubscriptionManager (missing properties).
 
 ## Work Completed
 - [x] Analyzed test coverage across the entire codebase
@@ -89,7 +89,7 @@ Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage
   - Connection handling
   - Group lifecycle
   - Note: Full testing limited due to missing properties bug
-- [x] Added comprehensive unit tests for NDKRelaySubscriptionGroup (20 tests)
+- [x] Added comprehensive unit tests for NDKRelaySubscription (20 tests)
   - Initialization and item management
   - Status tracking (initial, pending, waiting, running, closed)
   - Filter compilation with limit handling and tag merging
@@ -133,7 +133,7 @@ Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage
   - Build validation and error handling
   - Complex event building scenarios
   - Unsigned event building and edge cases
-- [x] Added comprehensive unit tests for NDKDataSource (50+ tests)
+- [x] Added comprehensive unit tests for NDKSubscription (50+ tests)
   - Transform functionality including filtering and custom types
   - Filter updates and data refresh operations
   - Event deduplication and state management
@@ -164,7 +164,7 @@ Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage
 
 ### Relay Infrastructure
 - ~~**NDKRelayConnection**: No WebSocket tests~~ ✅ COMPLETED
-- ~~**NDKRelaySubscriptionGroup**: Complex to test due to InternalSubscription coupling~~ ✅ COMPLETED
+- ~~**NDKRelaySubscription**: Complex to test due to NDKSubscriptionCoordinator coupling~~ ✅ COMPLETED
 - ~~**NDKRelaySubscriptionManager**: No management tests~~ ✅ COMPLETED (basic tests)
 - ~~**NostrMessage**: No parsing/serialization tests~~ ✅ COMPLETED
 - ~~**NDKFilterGrouping**: No fingerprint/merge tests~~ ✅ COMPLETED
@@ -186,7 +186,7 @@ Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage
 ## Bugs Discovered
 1. **MemoryCache.queryEvents** - Limit is applied before sorting, resulting in incorrect query results when using limit. See `BUG_REPORT_MemoryCache_QueryEvents.md` for details.
 2. **NostrMessage.serialize** - EVENT messages with subscription IDs don't include the subscription ID in serialized output. See `BUG_REPORT_NostrMessage_EventSerialization.md` for details.
-3. **NDKRelaySubscriptionManager** - References non-existent properties (isGroupable, groupableDelay, groupableDelayType) on InternalSubscription. See `BUG_REPORT_NDKRelaySubscriptionManager_MissingProperties.md` for details.
+3. **NDKRelaySubscriptionManager** - References non-existent properties (isGroupable, groupableDelay, groupableDelayType) on NDKSubscriptionCoordinator. See `BUG_REPORT_NDKRelaySubscriptionManager_MissingProperties.md` for details.
 
 ## Guidelines
 - Focus on unit tests for core functionality

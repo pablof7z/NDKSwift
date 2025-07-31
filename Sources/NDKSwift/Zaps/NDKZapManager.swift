@@ -89,7 +89,7 @@ public actor NDKZapManager {
             ]
 
             // Create data source and collect until EOSE
-            let dataSource = NDKDataSource(
+            let dataSource = NDKSubscription(
                 ndk: ndk,
                 filter: filter,
                 maxAge: maxAge
@@ -425,8 +425,8 @@ public actor NDKZapManager {
                         return
                     }
 
-                    // Use NDKDataSource for real-time zap monitoring
-                    let dataSource = NDKDataSource(
+                    // Use NDKSubscription for real-time zap monitoring
+                    let dataSource = NDKSubscription(
                         ndk: ndk,
                         filter: filter,
                         maxAge: 0, // Always fresh for real-time zap monitoring
@@ -532,7 +532,7 @@ public actor NDKZapManager {
 
         // Try to get provider pubkey from recipient's profile
         var providerPubkey: String?
-        for await profile in await ndk.profileManager.observe(for: recipientPubkey, maxAge: TimeConstants.hour) {
+        for await profile in await ndk.profileManager.subscribe(for: recipientPubkey, maxAge: TimeConstants.hour) {
             if let profile = profile {
                 // Try to resolve LNURL to get provider pubkey
                 if let lnurlAddress = profile.lud16 ?? profile.lud06 {

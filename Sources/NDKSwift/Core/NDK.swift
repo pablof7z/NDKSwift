@@ -89,7 +89,7 @@ public final class NDK {
     /// Event tracker for managing event metadata
     public let eventTracker: NDKEventTracker = NDKEventTracker()
 
-    /// Internal subscription manager for DataRequirementManager
+    /// Internal subscription manager for NDKSubscriptionManager
     internal var internalSubscriptionManager: InternalSubscriptionManager!
 
     /// Signature verification sampler
@@ -97,7 +97,7 @@ public final class NDK {
 
 
     /// Data requirement manager for declarative data access
-    internal var dataRequirementManager: NDKDataRequirementManager?
+    internal var dataRequirementManager: NDKSubscriptionManager?
 
     /// Initial relay URLs to add after construction
     private var initialRelayUrls: [RelayURL] = []
@@ -180,7 +180,7 @@ public final class NDK {
         )
 
         // Initialize data requirement manager for declarative API
-        self.dataRequirementManager = NDKDataRequirementManager(ndk: self)
+        self.dataRequirementManager = NDKSubscriptionManager(ndk: self)
 
         // Set shared NDK instance for NDKEventBuilder
         NDKEventBuilder.setSharedNDK(self)
@@ -413,7 +413,7 @@ public final class NDK {
     ///
     /// ## Usage
     /// ```swift
-    /// let profileData = NDKDataSource<NDKUserMetadata>(
+    /// let profileData = NDKSubscription<NDKUserMetadata>(
     ///     ndk: ndk,
     ///     filter: NDKFilter(authors: [pubkey], kinds: [0])
     /// ) { event in
@@ -429,16 +429,16 @@ public final class NDK {
     @MainActor
     public func dataSource(
         filter: NDKFilter
-    ) -> NDKDataSource<NDKEvent> {
-        NDKDataSource(ndk: self, filter: filter) { $0 }
+    ) -> NDKSubscription<NDKEvent> {
+        NDKSubscription(ndk: self, filter: filter) { $0 }
     }
 
     @MainActor
     public func dataSource<T>(
         filter: NDKFilter,
         transform: @escaping (NDKEvent) -> T?
-    ) -> NDKDataSource<T> {
-        NDKDataSource(ndk: self, filter: filter, transform: transform)
+    ) -> NDKSubscription<T> {
+        NDKSubscription(ndk: self, filter: filter, transform: transform)
     }
 
     /// Observe events matching a filter with automatic subscription management
@@ -449,18 +449,18 @@ public final class NDK {
     ///
     /// ## Usage
     /// ```swift
-    /// // Simple event observation
-    /// let notes = ndk.observe(filter: NDKFilter(kinds: [1], limit: 20))
+    /// // Simple event subscription
+    /// let notes = ndk.subscribe(filter: NDKFilter(kinds: [1], limit: 20))
     ///
     /// // With transform
-    /// let profiles = ndk.observe(
+    /// let profiles = ndk.subscribe(
     ///     filter: NDKFilter(authors: [pubkey], kinds: [0])
     /// ) { event in
     ///     NDKUserMetadata(event: event)
     /// }
     ///
     /// // With options
-    /// let cachedEvents = ndk.observe(
+    /// let cachedEvents = ndk.subscribe(
     ///     filter: myFilter,
     ///     maxAge: 300,  // Use cache if less than 5 minutes old
     ///     cachePolicy: .cacheWithNetwork
@@ -479,8 +479,8 @@ public final class NDK {
     ///   - subscriptionId: Optional custom subscription ID for debugging/tracing.
     ///                     This ID will be used in REQ messages sent to relays.
     ///   - transform: Optional transform function to convert NDKEvent to custom type
-    /// - Returns: A data source that can be observed for changes
-    public func observe(
+    /// - Returns: A subscription that can be observed for changes
+    public func subscribe(
         filter: NDKFilter,
         maxAge: TimeInterval = 0,
         cachePolicy: CachePolicy = .cacheWithNetwork,
@@ -488,11 +488,11 @@ public final class NDK {
         exclusiveRelays: Bool = false,
         subscriptionId: String? = nil,
         closeOnEose: Bool? = nil
-    ) -> NDKDataSource<NDKEvent> {
+    ) -> NDKSubscription<NDKEvent> {
         // Smart default: close on EOSE if maxAge > 0, otherwise stay open
         let shouldCloseOnEose = closeOnEose ?? (maxAge > 0)
         
-        return NDKDataSource(
+        return NDKSubscription(
             ndk: self,
             filter: filter,
             maxAge: maxAge,
@@ -504,7 +504,7 @@ public final class NDK {
         )
     }
 
-    public func observe<T>(
+    public func subscribe<T>(
         filter: NDKFilter,
         maxAge: TimeInterval = 0,
         cachePolicy: CachePolicy = .cacheWithNetwork,
@@ -513,11 +513,11 @@ public final class NDK {
         subscriptionId: String? = nil,
         closeOnEose: Bool? = nil,
         transform: @escaping (NDKEvent) -> T?
-    ) -> NDKDataSource<T> {
+    ) -> NDKSubscription<T> {
         // Smart default: close on EOSE if maxAge > 0, otherwise stay open
         let shouldCloseOnEose = closeOnEose ?? (maxAge > 0)
         
-        return NDKDataSource(
+        return NDKSubscription(
             ndk: self,
             filter: filter,
             maxAge: maxAge,
@@ -832,7 +832,7 @@ public final class NDK {
     /// - Returns: True if the NIP-05 is verified and belongs to this user
     public func verifyNIP05(for user: NDKUser, maxAge: TimeInterval = TimeConstants.day) async throws -> Bool {
         var metadata: NDKUserMetadata?
-        for await m in await profileManager.observe(for: user.pubkey, maxAge: maxAge) {
+        for await m in await profileManager.subscribe(for: user.pubkey, maxAge: maxAge) {
             metadata = m
             break
         }

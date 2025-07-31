@@ -139,7 +139,7 @@ public actor WalletEventManager {
         // First get the event to delete
         let filter = NDKFilter(ids: [eventId])
 
-        let dataSource = NDKDataSource(
+        let dataSource = NDKSubscription(
             ndk: ndk,
             filter: filter,
             maxAge: 0, // Always fresh for deletion
@@ -179,7 +179,7 @@ public actor WalletEventManager {
         // First get the event to delete
         let filter = NDKFilter(ids: [eventId])
 
-        let dataSource = NDKDataSource(
+        let dataSource = NDKSubscription(
             ndk: ndk,
             filter: filter,
             maxAge: 0, // Always fresh for deletion

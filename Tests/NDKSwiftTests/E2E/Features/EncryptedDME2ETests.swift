@@ -70,7 +70,7 @@ final class EncryptedDME2ETests: XCTestCase {
         var bobReceivedEvents: [NDKEvent] = []
         let bobReceivedExpectation = XCTestExpectation(description: "Bob receives encrypted DM")
         
-        let bobSubscription = bobNDK.observe(filter: bobFilter)
+        let bobSubscription = bobNDK.subscribe(filter: bobFilter)
         
         Task {
             for await event in bobSubscription.events {
@@ -165,7 +165,7 @@ final class EncryptedDME2ETests: XCTestCase {
         )
         
         let aliceReceivedExpectation = XCTestExpectation(description: "Alice receives Bob's reply")
-        let aliceSubscription = aliceNDK.observe(filter: aliceFilter)
+        let aliceSubscription = aliceNDK.subscribe(filter: aliceFilter)
         
         Task {
             for await event in aliceSubscription.events {
@@ -392,7 +392,7 @@ final class EncryptedDME2ETests: XCTestCase {
             )
             
             let expectation = XCTestExpectation(description: "Recipient \(index + 1) receives DM")
-            let subscription = recipientNDK.observe(filter: filter)
+            let subscription = recipientNDK.subscribe(filter: filter)
             
             Task {
                 for await event in subscription.events {

@@ -4,7 +4,7 @@ Here's an analysis of the `Sources/NDKSwift` directory, identifying dead code, d
 
 ## Analysis of NDKSwift Codebase
 
-The codebase is generally well-structured and follows modern Swift patterns. The use of actors for concurrency and a declarative API for data access (`NDKDataSource`) is notable. However, a detailed review reveals some areas for potential cleanup and consolidation.
+The codebase is generally well-structured and follows modern Swift patterns. The use of actors for concurrency and a declarative API for data access (`NDKSubscription`) is notable. However, a detailed review reveals some areas for potential cleanup and consolidation.
 
 ### 1. Dead Code / Unused Definitions
 
@@ -78,9 +78,9 @@ Several areas show overlapping responsibilities or redundant mechanisms, indicat
     *   **Overlap**: There appear to be two separate mechanisms tracking which relays an event has been seen on. While `NDKEventTracker` might serve as an immediate-access, session-level aggregator, the ultimate source of truth for persistent "seen on" data is in `NDKSQLiteCache`. This setup could lead to inconsistencies or redundant operations if not carefully managed.
 
 *   **Subscription Grouping Logic (Incomplete Implementation)**:
-    *   **Files**: `Sources/NDKSwift/Relay/NDKRelaySubscriptionManager.swift` (Lines 24, 56-57) and `Sources/NDKSwift/DataSource/InternalSubscription.swift` (Lines 94-96)
-    *   **Details**: `NDKRelaySubscriptionManager` attempts to access `isGroupable`, `groupableDelay`, and `groupableDelayType` from `InternalSubscription` for its subscription grouping logic. However, these properties are *not defined* in `InternalSubscription.swift`. `InternalSubscription.swift` itself has a `var isGroupable: Bool` (Line 95) but its implementation is a static `true`, and it lacks the other related properties.
-    *   **Overlap/Incompleteness**: This is a critical bug/incomplete feature that prevents the subscription grouping from working as intended (or from compiling without modifications). It suggests that the sophisticated filter grouping logic, touted as a key feature, is either misimplemented or unfinished. The presence of `isGroupable` (Line 95) in `InternalSubscription.swift` without `groupableDelay` and `groupableDelayType` implies a partial migration or implementation.
+    *   **Files**: `Sources/NDKSwift/Relay/NDKRelaySubscriptionManager.swift` (Lines 24, 56-57) and `Sources/NDKSwift/DataSource/NDKSubscriptionCoordinator.swift` (Lines 94-96)
+    *   **Details**: `NDKRelaySubscriptionManager` attempts to access `isGroupable`, `groupableDelay`, and `groupableDelayType` from `NDKSubscriptionCoordinator` for its subscription grouping logic. However, these properties are *not defined* in `NDKSubscriptionCoordinator.swift`. `NDKSubscriptionCoordinator.swift` itself has a `var isGroupable: Bool` (Line 95) but its implementation is a static `true`, and it lacks the other related properties.
+    *   **Overlap/Incompleteness**: This is a critical bug/incomplete feature that prevents the subscription grouping from working as intended (or from compiling without modifications). It suggests that the sophisticated filter grouping logic, touted as a key feature, is either misimplemented or unfinished. The presence of `isGroupable` (Line 95) in `NDKSubscriptionCoordinator.swift` without `groupableDelay` and `groupableDelayType` implies a partial migration or implementation.
 
 ### 5. Methods or Types Defined but Never Called/Used (Beyond `MemoryCache`)
 
@@ -93,7 +93,7 @@ After a thorough review, aside from the large block of dead code in `MemoryCache
 1.  **Remove Dead Code**: Delete the commented-out `proofState` property, its associated methods, and the `ProofEntry`/`ProofState`/`ProofStateError` types from `Sources/NDKSwift/Cache/MemoryCache.swift`.
 2.  **Consolidate Hex Conversion**: Centralize hex-to-Data conversion in `Sources/NDKSwift/Utils/DataHexExtensions.swift` and remove the redundant `hexData` extension from `Sources/NDKSwift/Wallets/Common/WalletImports.swift`.
 3.  **Correct `@_exported` Usage**: Change `@_exported import CashuSwift` to `import CashuSwift` in `Sources/NDKSwift/Wallets/Common/WalletImports.swift` for semantic correctness.
-4.  **Address Subscription Grouping Bug**: Implement the missing `groupableDelay` and `groupableDelayType` properties in `Sources/NDKSwift/DataSource/InternalSubscription.swift` and properly integrate them into the grouping logic in `Sources/NDKSwift/Relay/NDKRelaySubscriptionManager.swift`, or decide to remove the incomplete grouping feature.
+4.  **Address Subscription Grouping Bug**: Implement the missing `groupableDelay` and `groupableDelayType` properties in `Sources/NDKSwift/DataSource/NDKSubscriptionCoordinator.swift` and properly integrate them into the grouping logic in `Sources/NDKSwift/Relay/NDKRelaySubscriptionManager.swift`, or decide to remove the incomplete grouping feature.
 5.  **Consolidate WOT Caching**: Migrate WOT caching functionality into the `NDKCache` protocol and its `NDKSQLiteCache` implementation, removing the stubbed methods from `Sources/NDKSwift/Core/Session/NDKSessionData.swift`.
 6.  **Review Relay Source Tracking Overlap**: Clarify the single source of truth for `seenOnRelays` and `sourceRelays` data (either `NDKEventTracker` or `NDKSQLiteCache`) to avoid redundancy.
 
@@ -105,7 +105,7 @@ By addressing these points, the codebase can achieve greater clarity, reduce mai
 1.  `Sources/NDKSwift/Cache/MemoryCache.swift`
 2.  `Sources/NDKSwift/Wallets/Common/WalletImports.swift`
 3.  `Sources/NDKSwift/Relay/NDKRelaySubscriptionManager.swift`
-4.  `Sources/NDKSwift/DataSource/InternalSubscription.swift`
+4.  `Sources/NDKSwift/DataSource/NDKSubscriptionCoordinator.swift`
 5.  `Sources/NDKSwift/Core/Session/NDKSessionData.swift`
 6.  `Sources/NDKSwift/Models/NDKEventTracker.swift`
 7.  `Sources/NDKSwift/Cache/NDKSQLiteCache.swift`

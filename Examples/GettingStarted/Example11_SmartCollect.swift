@@ -53,7 +53,7 @@ struct SmartCollectExample {
         ]
         
         let filter = NDKFilter(ids: eventIds)
-        let dataSource = ndk.observe(filter: filter, closeOnEose: true)
+        let dataSource = ndk.subscribe(filter: filter, closeOnEose: true)
         
         let startTime = Date()
         let events = await dataSource.collect()
@@ -72,7 +72,7 @@ struct SmartCollectExample {
             limit: 10
         )
         
-        let dataSource = ndk.observe(filter: filter, closeOnEose: true)
+        let dataSource = ndk.subscribe(filter: filter, closeOnEose: true)
         
         let startTime = Date()
         let events = await dataSource.collect()
@@ -97,7 +97,7 @@ struct SmartCollectExample {
             kinds: [EventKind.profile]
         )
         
-        let dataSource = ndk.observe(filter: filter, closeOnEose: true)
+        let dataSource = ndk.subscribe(filter: filter, closeOnEose: true)
         
         let startTime = Date()
         let events = await dataSource.collect()
@@ -136,7 +136,7 @@ struct SmartCollectExample {
             kinds: [EventKind.relayList]
         )
         
-        let dataSource = ndk.observe(filter: filter, closeOnEose: true)
+        let dataSource = ndk.subscribe(filter: filter, closeOnEose: true)
         
         print("  Fetching relay list with progressive timeout...")
         let startTime = Date()

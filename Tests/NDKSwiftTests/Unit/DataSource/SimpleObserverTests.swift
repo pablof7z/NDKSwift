@@ -26,7 +26,7 @@ final class SimpleObserverTest: XCTestCase {
         
         // Create observer
         print("Creating observer...")
-        let observer = ndk.observe(
+        let observer = ndk.subscribe(
             filter: filter,
             maxAge: 0  // Real-time updates only
         )

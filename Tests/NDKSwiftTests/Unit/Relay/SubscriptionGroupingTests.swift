@@ -35,8 +35,8 @@ final class SubscriptionGroupingTests: XCTestCase {
         groupableDelay: TimeInterval? = nil,
         groupableDelayType: NDKSubscriptionDelayType? = nil,
         closeOnEose: Bool = false
-    ) -> InternalSubscription {
-        return InternalSubscription(
+    ) -> NDKSubscriptionCoordinator {
+        return NDKSubscriptionCoordinator(
             id: id,
             filters: filters,
             relays: nil,

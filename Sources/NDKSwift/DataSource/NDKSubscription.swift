@@ -25,7 +25,7 @@ public enum RelayUpdate {
 
 /// Primary API for declarative data access in NDKSwift
 /// Automatically manages subscriptions, caching, and lifecycle
-public final class NDKDataSource<T>: ObservableObject {
+public final class NDKSubscription<T>: ObservableObject {
     @Published public private(set) var data: [T] = []
     @Published public private(set) var isLoading: Bool = false
     @Published public private(set) var error: Error?
@@ -46,7 +46,7 @@ public final class NDKDataSource<T>: ObservableObject {
     private let relays: Set<RelayURL>?
     private let exclusiveRelays: Bool
     private let closeOnEose: Bool
-    private var requirementHandle: DataRequirementHandle?
+    private var requirementHandle: NDKSubscriptionRequirementHandle?
     private var task: Task<Void, Never>?
     private let correlationId: String
     private let subscriptionId: String?
@@ -127,7 +127,7 @@ public final class NDKDataSource<T>: ObservableObject {
         self.correlationId = IDGenerator.randomId(length: 8)
         self.subscriptionId = subscriptionId
 
-        NDKLogger.log(.trace, category: .subscription, "🏗️ NDKDataSource init - filter: \(filter), maxAge: \(maxAge), cachePolicy: \(cachePolicy)", correlationId: correlationId)
+        NDKLogger.log(.trace, category: .subscription, "🏗️ NDKSubscription init - filter: \(filter), maxAge: \(maxAge), cachePolicy: \(cachePolicy)", correlationId: correlationId)
 
         // Set up the AsyncStream for events
         var continuation: AsyncStream<T>.Continuation!
@@ -151,7 +151,7 @@ public final class NDKDataSource<T>: ObservableObject {
     }
 
     deinit {
-        NDKLogger.log(.trace, category: .subscription, "🔚 NDKDataSource deinit - Cleaning up resources", correlationId: correlationId)
+        NDKLogger.log(.trace, category: .subscription, "🔚 NDKSubscription deinit - Cleaning up resources", correlationId: correlationId)
         task?.cancel()
         eventsContinuation.finish()
         relayUpdatesContinuation.finish()
@@ -162,7 +162,7 @@ public final class NDKDataSource<T>: ObservableObject {
     }
 
     private func startObserving() async {
-        NDKLogger.log(.info, category: .subscription, "🔍 NDKDataSource.startObserving() called - filter: \(filter), subscriptionId: \(subscriptionId ?? "auto")", correlationId: correlationId)
+        NDKLogger.log(.info, category: .subscription, "🔍 NDKSubscription.startObserving() called - filter: \(filter), subscriptionId: \(subscriptionId ?? "auto")", correlationId: correlationId)
         
         isLoading = true
         error = nil
@@ -203,7 +203,7 @@ public final class NDKDataSource<T>: ObservableObject {
             // No data requirement manager available
             NDKLogger.log(.error, category: .subscription, "❌ No data requirement manager available! Data source will not receive events", correlationId: correlationId)
             if ndk.debugMode {
-                NDKLogger.log(.warning, category: .general, "[NDKDataSource] No data requirement manager available")
+                NDKLogger.log(.warning, category: .general, "[NDKSubscription] No data requirement manager available")
             }
         }
 
@@ -229,7 +229,7 @@ public final class NDKDataSource<T>: ObservableObject {
                 data.append(transformed)
             }
         } else {
-            NDKLogger.log(.debug, category: .subscription, "❌ [NDKDataSource] Transform failed - event not added to data - id: \(event.id.prefix(10)), correlationId: \(correlationId)")
+            NDKLogger.log(.debug, category: .subscription, "❌ [NDKSubscription] Transform failed - event not added to data - id: \(event.id.prefix(10)), correlationId: \(correlationId)")
         }
     }
 
@@ -345,11 +345,11 @@ public final class NDKDataSource<T>: ObservableObject {
     /// ## Usage
     /// ```swift
     /// // Collect all text notes from the last hour
-    /// let dataSource = ndk.observe(filter: NDKFilter(kinds: [1]), maxAge: 3600)
-    /// let events = await dataSource.collect(timeout: 5.0)
+    /// let subscription = ndk.subscribe(filter: NDKFilter(kinds: [1]), maxAge: 3600)
+    /// let events = await subscription.collect(timeout: 5.0)
     /// 
     /// // Collect up to 100 events
-    /// let limitedEvents = await dataSource.collect(limit: 100)
+    /// let limitedEvents = await subscription.collect(limit: 100)
     /// ```
     /// 
     /// - Note: This method returns immediately when aggregated EOSE is received (using smart timeout logic from ndk-core)
@@ -486,10 +486,10 @@ public final class NDKDataSource<T>: ObservableObject {
     ///
     /// ## Usage
     /// ```swift
-    /// let dataSource = ndk.observe(filter: NDKFilter(kinds: [1]))
+    /// let subscription = ndk.subscribe(filter: NDKFilter(kinds: [1]))
     /// 
     /// // Later, update to show only events from specific authors
-    /// await dataSource.updateFilter(NDKFilter(kinds: [1], authors: ["pubkey1", "pubkey2"]))
+    /// await subscription.updateFilter(NDKFilter(kinds: [1], authors: ["pubkey1", "pubkey2"]))
     /// ```
     public func updateFilter(_ newFilter: NDKFilter) async {
         // Update the filter property
@@ -554,7 +554,7 @@ public final class NDKDataSource<T>: ObservableObject {
 
     /// Subscribe to events with the given filter
     private func subscribeToEvents(filter: NDKFilter) async {
-        let dataSource = NDKDataSource<NDKEvent>(
+        let subscription = NDKSubscription<NDKEvent>(
             ndk: ndk,
             filter: filter,
             maxAge: 0,
@@ -567,8 +567,8 @@ public final class NDKDataSource<T>: ObservableObject {
             self.isLoading = false
         }
 
-        // Process events from the nested data source
-        for await event in dataSource.events {
+        // Process events from the nested subscription
+        for await event in subscription.events {
             await self.handleEvent(event)
         }
     }

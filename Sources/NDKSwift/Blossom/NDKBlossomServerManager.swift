@@ -165,7 +165,7 @@ public class NDKBlossomServerManager: ObservableObject {
             )
             
             // Use observe to get the event
-            let dataSource = ndk.observe(filter: filter, maxAge: 300, cachePolicy: .cacheWithNetwork)
+            let dataSource = ndk.subscribe(filter: filter, maxAge: 300, cachePolicy: .cacheWithNetwork)
             
             var foundEvent = false
             for await event in dataSource.events {
@@ -269,7 +269,7 @@ public class NDKBlossomServerManager: ObservableObject {
             )
             
             // Use observe with cache-first approach
-            let dataSource = ndk.observe(filter: filter, maxAge: 3600, cachePolicy: .cacheWithNetwork)
+            let dataSource = ndk.subscribe(filter: filter, maxAge: 3600, cachePolicy: .cacheWithNetwork)
             
             var serverInfos: [NDKBlossomServerInfo] = []
             var seenUrls = Set<String>()

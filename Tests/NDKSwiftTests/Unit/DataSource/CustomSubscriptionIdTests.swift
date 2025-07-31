@@ -30,7 +30,7 @@ final class CustomSubscriptionIdTests: XCTestCase {
         let customId = "my-custom-subscription-id"
         let filter = NDKFilter(kinds: [1111])
         
-        let dataSource = NDKDataSource<NDKEvent>(
+        let dataSource = NDKSubscription<NDKEvent>(
             ndk: ndk,
             filter: filter,
             subscriptionId: customId
@@ -65,13 +65,13 @@ final class CustomSubscriptionIdTests: XCTestCase {
         let customId1 = "wallet-events"
         let customId2 = "profile-updates"
         
-        let dataSource1 = NDKDataSource<NDKEvent>(
+        let dataSource1 = NDKSubscription<NDKEvent>(
             ndk: ndk,
             filter: NDKFilter(kinds: [EventKind.cashuToken]),
             subscriptionId: customId1
         )
         
-        let dataSource2 = NDKDataSource<NDKEvent>(
+        let dataSource2 = NDKSubscription<NDKEvent>(
             ndk: ndk,
             filter: NDKFilter(kinds: [EventKind.metadata]),
             subscriptionId: customId2
@@ -107,7 +107,7 @@ final class CustomSubscriptionIdTests: XCTestCase {
         // Test NIP-60 wallet specific subscription IDs
         let walletId = "nip60-wallet-events"
         
-        let dataSource = NDKDataSource<NDKEvent>(
+        let dataSource = NDKSubscription<NDKEvent>(
             ndk: ndk,
             filter: NDKFilter(kinds: [EventKind.cashuToken, EventKind.nutzap]),
             subscriptionId: walletId

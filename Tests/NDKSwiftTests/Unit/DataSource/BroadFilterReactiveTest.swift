@@ -30,7 +30,7 @@ final class BroadFilterReactiveTest: XCTestCase {
         
         // Create broad cache-only subscription (all kind:1 events)
         let broadFilter = NDKFilter(kinds: [1])
-        let broadDataSource = ndk.observe(
+        let broadDataSource = ndk.subscribe(
             filter: broadFilter,
             cachePolicy: .cacheOnly,
             subscriptionId: "broad-cache-sub"
@@ -51,7 +51,7 @@ final class BroadFilterReactiveTest: XCTestCase {
         
         // Create specific network subscription (only author1's kind:1 events)
         let specificFilter = NDKFilter(authors: [author1], kinds: [1])
-        let specificDataSource = ndk.observe(
+        let specificDataSource = ndk.subscribe(
             filter: specificFilter,
             cachePolicy: .networkOnly,
             subscriptionId: "specific-network-sub"
@@ -129,19 +129,19 @@ final class BroadFilterReactiveTest: XCTestCase {
         let authorFilter = NDKFilter(authors: [testAuthor])
         
         // Create cache-only subscriptions
-        let kind1DataSource = ndk.observe(
+        let kind1DataSource = ndk.subscribe(
             filter: kind1Filter,
             cachePolicy: .cacheOnly,
             subscriptionId: "kind1-cache"
         )
         
-        let kind4DataSource = ndk.observe(
+        let kind4DataSource = ndk.subscribe(
             filter: kind4Filter,
             cachePolicy: .cacheOnly,
             subscriptionId: "kind4-cache"
         )
         
-        let authorDataSource = ndk.observe(
+        let authorDataSource = ndk.subscribe(
             filter: authorFilter,
             cachePolicy: .cacheOnly,
             subscriptionId: "author-cache"

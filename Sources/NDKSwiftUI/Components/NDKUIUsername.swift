@@ -100,7 +100,7 @@ private class ProfileState: ObservableObject {
         
         loadTask = Task {
             // Use profile manager to observe profile updates
-            for await profile in await profileManager.observe(for: pubkey) {
+            for await profile in await profileManager.subscribe(for: pubkey) {
                 if !Task.isCancelled {
                     self.name = profile?.displayName ?? profile?.name
                     self.nip05 = profile?.nip05

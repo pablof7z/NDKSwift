@@ -963,17 +963,17 @@ public extension NDKRelay {
     // MARK: - Relay-Level Subscription Management
     
     /// Add a subscription to this relay's subscription manager
-    internal func addSubscription(_ subscription: InternalSubscription, filters: [NDKFilter]) async {
+    internal func addSubscription(_ subscription: NDKSubscriptionCoordinator, filters: [NDKFilter]) async {
         await subscriptionManager?.addSubscription(subscription, filters: filters)
     }
     
     /// Remove a subscription from this relay's subscription manager
-    internal func removeSubscription(_ subscription: InternalSubscription) async {
+    internal func removeSubscription(_ subscription: NDKSubscriptionCoordinator) async {
         await subscriptionManager?.removeSubscription(subscription)
     }
     
-    /// Track a subscription group (called by NDKRelaySubscriptionGroup)
-    internal func trackSubscription(_ group: NDKRelaySubscriptionGroup) async {
+    /// Track a subscription group (called by NDKRelaySubscription)
+    internal func trackSubscription(_ group: NDKRelaySubscription) async {
         // Track the actual subscription ID that will be sent to relay
         if let subId = await group.subId {
             await trackSubscription(id: subId, filters: await group.compileFilters())

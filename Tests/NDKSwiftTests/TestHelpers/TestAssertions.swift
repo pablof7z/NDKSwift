@@ -149,7 +149,7 @@ func XCTAssertCacheEventCount(
 
 /// Asserts a data source receives events
 func XCTAssertDataSourceReceivesEvents<T>(
-    _ dataSource: NDKDataSource<T>,
+    _ dataSource: NDKSubscription<T>,
     minimumCount: Int = 1,
     timeout: TimeInterval = 5.0,
     file: StaticString = #filePath,

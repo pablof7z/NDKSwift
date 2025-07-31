@@ -27,12 +27,12 @@ final class EventIDOptimizationIntegrationTest: XCTestCase {
         // 3. Create a filter requesting both cached and non-cached IDs
         _ = NDKFilter(ids: [event1.id, "missing_event_1", "missing_event_2"])
         
-        // 4. When calling ndk.observe(filter:), the optimization will:
+        // 4. When calling ndk.subscribe(filter:), the optimization will:
         //    - Check cache for existing IDs
         //    - Remove cached IDs from the filter sent to relays
         //    - Only request missing IDs from the network
         
-        // This behavior is now implemented in NDKDataRequirementManager.optimizeFilterForCache()
+        // This behavior is now implemented in NDKNDKSubscriptionRequirementManager.optimizeFilterForCache()
         
         print("✅ Event ID filter optimization is implemented!")
         print("   - Cached IDs are excluded from relay requests")

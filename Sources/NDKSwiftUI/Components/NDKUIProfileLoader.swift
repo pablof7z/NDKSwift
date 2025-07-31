@@ -70,7 +70,7 @@ public struct NDKUIProfileLoader<Content: View>: View {
         guard let ndk = ndk else { return }
         
         profileTask = Task {
-            for await metadata in await ndk.profileManager.observe(for: pubkey, maxAge: maxAge) {
+            for await metadata in await ndk.profileManager.subscribe(for: pubkey, maxAge: maxAge) {
                 await MainActor.run {
                     self.metadata = metadata
                 }
@@ -120,7 +120,7 @@ public struct NDKUIMultipleProfileLoader<Content: View>: View {
         
         for pubkey in pubkeys {
             let task = Task {
-                for await metadata in await ndk.profileManager.observe(for: pubkey, maxAge: maxAge) {
+                for await metadata in await ndk.profileManager.subscribe(for: pubkey, maxAge: maxAge) {
                     await MainActor.run {
                         self.profiles[pubkey] = metadata
                     }
@@ -169,7 +169,7 @@ public struct NDKUICurrentUserProfile<Content: View>: View {
         profileTask = Task {
             do {
                 let currentUser = try await signer.user()
-                for await metadata in await ndk.profileManager.observe(for: currentUser.pubkey) {
+                for await metadata in await ndk.profileManager.subscribe(for: currentUser.pubkey) {
                     await MainActor.run {
                         self.metadata = metadata
                     }
@@ -259,7 +259,7 @@ public struct NDKUINip05Badge: View {
         guard let ndk = ndk else { return }
         
         profileTask = Task {
-            for await metadata in await ndk.profileManager.observe(for: pubkey) {
+            for await metadata in await ndk.profileManager.subscribe(for: pubkey) {
                 await MainActor.run {
                     self.metadata = metadata
                 }

@@ -31,7 +31,7 @@ let feedFilter = ReactiveFilter(
 )
 
 // Observe events with automatic updates
-for await event in ndk.observe(feedFilter) {
+for await event in ndk.subscribe(feedFilter) {
     // Handle events - subscription automatically updates when follows change
 }
 ```
@@ -198,7 +198,7 @@ struct FeedView: View {
 
 ### Continuous Observation
 
-Use `observe()` for real-time event streams:
+Use `subscribe()` for real-time event streams:
 
 ```swift
 // Create reactive filter
@@ -213,18 +213,18 @@ let filter = ReactiveFilter(
 )
 
 // Observe events
-for await event in ndk.observe(filter) {
+for await event in ndk.subscribe(filter) {
     print("New event from \(event.pubkey)")
 }
 ```
 
 ### One-Time Fetch
 
-To collect events once, use `observe()` with a collection pattern:
+To collect events once, use `subscribe()` with a collection pattern:
 
 ```swift
 var events: [NDKEvent] = []
-for await event in ndk.observe(filter: filter).events {
+for await event in ndk.subscribe(filter: filter).events {
     events.append(event)
     // Break after collecting enough events or a timeout
 }
@@ -247,7 +247,7 @@ When follow lists change, subscriptions are automatically updated using efficien
 For advanced use cases, you can manually update filters:
 
 ```swift
-let dataSource = NDKDataSource<NDKEvent>(ndk: ndk, filter: initialFilter)
+let dataSource = NDKSubscription<NDKEvent>(ndk: ndk, filter: initialFilter)
 
 // Later, update the filter
 await dataSource.updateFilter(newFilter)
@@ -269,7 +269,7 @@ let sessionData = try await ndk.startSession(
 )
 
 // Events from muted pubkeys are automatically filtered
-for await event in ndk.observe(feedFilter) {
+for await event in ndk.subscribe(feedFilter) {
     // This event is guaranteed not to be from a muted pubkey
 }
 ```
@@ -334,7 +334,7 @@ let protectedFeed = ReactiveFilter(
 )
 
 // Events are automatically filtered
-for await event in ndk.observe(protectedFeed) {
+for await event in ndk.subscribe(protectedFeed) {
     // This event:
     // - Is from someone you follow
     // - Is NOT from a muted pubkey
@@ -399,13 +399,13 @@ class FeedViewModel: ObservableObject {
             )
             
             // Start observing feed
-            await observeFeed()
+            await subscribeToFeed()
         } catch {
             self.error = error
         }
     }
     
-    private func observeFeed() async {
+    private func subscribeToFeed() async {
         // Cancel previous observation
         observationTask?.cancel()
         
@@ -425,7 +425,7 @@ class FeedViewModel: ObservableObject {
         observationTask = Task {
             isLoading = true
             
-            for await event in ndk.observe(filter) {
+            for await event in ndk.subscribe(filter) {
                 await MainActor.run {
                     events.append(event)
                     isLoading = false
@@ -463,7 +463,7 @@ let sub = ndk.subscribe(
 
 ### After (Reactive)
 ```swift
-// Declare requirements and observe
+// Declare requirements and subscribe
 let sessionData = try await ndk.startSession(
     signer: signer,
     config: NDKSessionConfiguration(
@@ -483,7 +483,7 @@ let filter = ReactiveFilter(
 )
 
 // Automatic updates!
-for await event in ndk.observe(filter) {
+for await event in ndk.subscribe(filter) {
     // Handle events
 }
 ```

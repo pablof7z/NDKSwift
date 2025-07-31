@@ -139,7 +139,7 @@ struct Example09_NutzapsAndHistory_Simple {
                 limit: 1
             )
             
-            let mintListDataSource = NDKDataSource(
+            let mintListDataSource = NDKSubscription(
                 ndk: senderNDK,
                 filter: mintListFilter,
                 maxAge: 0,
