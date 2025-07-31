@@ -22,6 +22,9 @@ class MockRelayProtocol: RelayProtocol, @unchecked Sendable {
     var shouldFailPublish = false
     var publishDelay: TimeInterval = 0
     
+    // Callback for intercepting sent messages
+    var onSend: ((String) -> Void)?
+    
     // State stream support
     private let stateSubject = PassthroughSubject<NDKRelayConnectionState, Never>()
     var stateStream: AsyncStream<NDKRelayConnectionState> {
@@ -55,6 +58,7 @@ class MockRelayProtocol: RelayProtocol, @unchecked Sendable {
     
     func send(_ message: String) async throws {
         sentMessages.append(message)
+        onSend?(message)
     }
     
     func addSubscriptionId(_ subscriptionId: String) async {

@@ -503,6 +503,19 @@ public final class NDK {
             closeOnEose: shouldCloseOnEose
         )
     }
+    
+    /// Subscribe to events with custom options
+    public func subscribe(
+        filter: NDKFilter,
+        options: NDKSubscriptionOptions? = nil
+    ) -> NDKSubscription<NDKEvent> {
+        let opts = options ?? .default
+        return NDKSubscription(
+            ndk: self,
+            filter: filter,
+            options: opts
+        )
+    }
 
     public func subscribe<T>(
         filter: NDKFilter,
@@ -529,6 +542,7 @@ public final class NDK {
             transform: transform
         )
     }
+    
 
 
     // MARK: - User Management

@@ -327,12 +327,12 @@ actor NDKSubscriptionCoordinator: Hashable {
     
     // NEW: Fingerprint for internal routing
     var fingerprint: NDKFilterFingerprint = ""
-    let closeOnEose: Bool
+    nonisolated let closeOnEose: Bool
     
     // Grouping configuration
-    let isGroupable: Bool
-    let groupableDelay: TimeInterval?
-    let groupableDelayType: NDKSubscriptionDelayType?
+    nonisolated let isGroupable: Bool
+    nonisolated let groupableDelay: TimeInterval?
+    nonisolated let groupableDelayType: NDKSubscriptionDelayType?
 
     private var eventHandlers: [(NDKEvent) async -> Void] = []
     private var eoseHandlers: [(String) async -> Void] = []  // Changed to include relay URL
@@ -571,5 +571,37 @@ actor NDKSubscriptionCoordinator: Hashable {
             NDKLogger.log(.error, category: .subscription, ErrorMessageConstants.failedTo("create CLOSE message") + ": \(error)")
             return ""
         }
+    }
+}
+
+// MARK: - Testing Support
+
+extension NDKSubscriptionCoordinator {
+    /// Testing interface for inspecting subscription state
+    struct InspectionData {
+        public let id: String
+        public let isGroupable: Bool
+        public let groupableDelay: TimeInterval?
+        public let groupableDelayType: NDKSubscriptionDelayType?
+        public let isActive: Bool
+        public let activeRelays: Set<String>
+        public let fingerprint: String
+        public let closeOnEose: Bool
+        public let filterCount: Int
+    }
+    
+    /// Get inspection data for testing
+    func inspect() async -> InspectionData {
+        InspectionData(
+            id: id,
+            isGroupable: isGroupable,
+            groupableDelay: groupableDelay,
+            groupableDelayType: groupableDelayType,
+            isActive: isActive,
+            activeRelays: activeRelays,
+            fingerprint: fingerprint,
+            closeOnEose: closeOnEose,
+            filterCount: filters.count
+        )
     }
 }

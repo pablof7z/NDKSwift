@@ -46,6 +46,9 @@ public final class NDKSubscription<T>: ObservableObject {
     private let relays: Set<RelayURL>?
     private let exclusiveRelays: Bool
     private let closeOnEose: Bool
+    private let groupable: Bool
+    private let groupableDelay: TimeInterval?
+    private let groupableDelayType: NDKSubscriptionDelayType?
     private var requirementHandle: NDKSubscriptionRequirementHandle?
     private var task: Task<Void, Never>?
     private let correlationId: String
@@ -124,10 +127,62 @@ public final class NDKSubscription<T>: ObservableObject {
         self.relays = relays
         self.exclusiveRelays = exclusiveRelays
         self.closeOnEose = closeOnEose
+        self.groupable = true
+        self.groupableDelay = nil
+        self.groupableDelayType = nil
         self.correlationId = IDGenerator.randomId(length: 8)
         self.subscriptionId = subscriptionId
 
         NDKLogger.log(.trace, category: .subscription, "🏗️ NDKSubscription init - filter: \(filter), maxAge: \(maxAge), cachePolicy: \(cachePolicy)", correlationId: correlationId)
+
+        // Set up the AsyncStream for events
+        var continuation: AsyncStream<T>.Continuation!
+        self.events = AsyncStream { cont in
+            continuation = cont
+        }
+        self.eventsContinuation = continuation
+
+        // Set up the AsyncStream for relay updates
+        var relayUpdatesCont: AsyncStream<RelayUpdate>.Continuation!
+        self.relayUpdates = AsyncStream { cont in
+            relayUpdatesCont = cont
+        }
+        self.relayUpdatesContinuation = relayUpdatesCont
+
+        // Start observing immediately
+        task = Task { [weak self] in
+            guard let self = self else { return }
+            await self.startObserving()
+        }
+    }
+
+    /// Initialize a data source with custom options
+    /// - Parameters:
+    ///   - ndk: The NDK instance
+    ///   - filter: The NDKFilter describing the data requirement
+    ///   - options: Subscription configuration options
+    ///   - transform: Optional transform to convert NDKEvent to custom type
+    public init(
+        ndk: NDK,
+        filter: NDKFilter,
+        options: NDKSubscriptionOptions,
+        transform: @escaping (NDKEvent) -> T? = { $0 as? T }
+    ) {
+        self.ndk = ndk
+        self.filter = filter
+        self.transform = transform
+        self.maxAge = options.maxAge
+        self.cachePolicy = options.cachePolicy
+        self.relays = options.relays
+        self.exclusiveRelays = options.exclusiveRelays
+        self.closeOnEose = options.closeOnEose ?? false
+        self.groupable = options.groupable
+        self.groupableDelay = options.groupableDelay
+        self.groupableDelayType = options.groupableDelayType
+        self.correlationId = IDGenerator.randomId(length: 8)
+        self.subscriptionId = options.subscriptionId
+
+        NDKLogger.log(.trace, category: .subscription, "🏗️ NDKSubscription init with options - filter: \(filter), maxAge: \(maxAge), cachePolicy: \(cachePolicy)", correlationId: correlationId)
 
         // Set up the AsyncStream for events
         var continuation: AsyncStream<T>.Continuation!
@@ -178,7 +233,10 @@ public final class NDKSubscription<T>: ObservableObject {
                 relays: relays,
                 exclusiveRelays: exclusiveRelays,
                 subscriptionId: subscriptionId,
-                closeOnEose: closeOnEose
+                closeOnEose: closeOnEose,
+                isGroupable: groupable,
+                groupableDelay: groupableDelay,
+                groupableDelayType: groupableDelayType
             )
             requirementHandle = handle
             

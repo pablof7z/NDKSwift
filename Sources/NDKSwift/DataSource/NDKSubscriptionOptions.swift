@@ -20,6 +20,15 @@ public struct NDKSubscriptionOptions {
     /// Whether to close subscription on EOSE (nil = auto-determine based on filter)
     public var closeOnEose: Bool?
     
+    /// Whether this subscription can be grouped with others
+    public var groupable: Bool
+    
+    /// Delay before executing grouped subscriptions (nil uses default)
+    public var groupableDelay: TimeInterval?
+    
+    /// Type of delay constraint
+    public var groupableDelayType: NDKSubscriptionDelayType?
+    
     /// Creates default data source options
     public init(
         maxAge: TimeInterval = 0,
@@ -27,7 +36,10 @@ public struct NDKSubscriptionOptions {
         relays: Set<RelayURL>? = nil,
         exclusiveRelays: Bool = false,
         subscriptionId: String? = nil,
-        closeOnEose: Bool? = nil
+        closeOnEose: Bool? = nil,
+        groupable: Bool = true,
+        groupableDelay: TimeInterval? = nil,
+        groupableDelayType: NDKSubscriptionDelayType? = nil
     ) {
         self.maxAge = maxAge
         self.cachePolicy = cachePolicy
@@ -35,6 +47,9 @@ public struct NDKSubscriptionOptions {
         self.exclusiveRelays = exclusiveRelays
         self.subscriptionId = subscriptionId
         self.closeOnEose = closeOnEose
+        self.groupable = groupable
+        self.groupableDelay = groupableDelay
+        self.groupableDelayType = groupableDelayType
     }
     
     /// Default options
