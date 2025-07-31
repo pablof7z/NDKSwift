@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.1] - 2025-01-31
+
 ### Fixed
 - Removed ~360 lines of dead proof state management code from MemoryCache.swift that had been migrated to ProofStateManager
 - Removed duplicate String.hexData extension from WalletImports.swift (use String.hexDecoded() from DataHexExtensions instead)
