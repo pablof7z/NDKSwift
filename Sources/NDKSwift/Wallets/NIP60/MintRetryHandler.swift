@@ -24,6 +24,8 @@ public actor MintRetryHandler {
 
     /// Persistent storage for pending mint operations
     private var pendingMints: [String: PendingMintOperation] = [:]
+    
+    public init() {}
 
     /// Retry minting tokens with linear backoff
     /// - Returns: Tuple of (proofs, wasUserNotified) - wasUserNotified indicates if user was shown the failure dialog

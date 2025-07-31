@@ -250,7 +250,8 @@ public actor WalletHealthMonitor {
                     _ = try await eventManager.updateTokenEvents(
                         tokenChange: tokenChange,
                         proofStateManager: proofStateManager,
-                        signer: signer
+                        signer: signer,
+                        relays: []
                     )
                 }
             }

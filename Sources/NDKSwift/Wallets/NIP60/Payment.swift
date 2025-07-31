@@ -182,7 +182,8 @@ public enum Payment {
                 destroyedEventIds: nil,
                 createdEventIds: newEventIds,
                 redeemedEventId: nil,
-                signer: signer
+                signer: signer,
+                relays: await wallet.resolvedWalletRelays
             )
 
             let actualFeePaid = lightningFee + Int64(inputFee)

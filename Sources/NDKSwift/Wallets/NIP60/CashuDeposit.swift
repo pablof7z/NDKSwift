@@ -59,7 +59,8 @@ public enum CashuDeposit {
         mints: MintManager,
         eventManager: WalletEventManager,
         persistQuote: Bool = false,
-        signer: NDKSigner? = nil
+        signer: NDKSigner? = nil,
+        relays: [String] = []
     ) async throws -> (quote: CashuMintQuote, eventId: String?) {
         // Get mint quote from mint manager
         let quoteResponse = try await mints.requestMintQuote(amount: amount, mintURL: mintURL)
@@ -77,7 +78,7 @@ public enum CashuDeposit {
         // If persistQuote is true and signer is provided, save it as a NIP-60 quote event
         var eventId: String? = nil
         if persistQuote, let signer = signer {
-            eventId = try await eventManager.saveQuoteEvent(quote: quote, signer: signer)
+            eventId = try await eventManager.saveQuoteEvent(quote: quote, signer: signer, relays: relays)
         }
 
         return (quote: quote, eventId: eventId)
@@ -120,7 +121,8 @@ public enum CashuDeposit {
         timeout: TimeInterval = 10 * TimeConstants.minute,
         quoteAge: TimeInterval = 0,
         onProofsReceived: @escaping ([CashuSwift.Proof]) async throws -> [String],
-        manualCheckTrigger: AsyncStream<Void>? = nil
+        manualCheckTrigger: AsyncStream<Void>? = nil,
+        relays: [String] = []
     ) -> AsyncThrowingStream<DepositStatus, Error> {
         return AsyncThrowingStream { continuation in
             let task = Task {
@@ -159,7 +161,8 @@ public enum CashuDeposit {
                                             amount: Int64(quote.amount),
                                             memo: StringConstants.Transactions.lightningDeposit,
                                             createdEventIds: createdEventIds,
-                                            signer: signer
+                                            signer: signer,
+                                            relays: relays
                                         )
                                         NDKLogger.log(.info, category: .wallet, "✅ Created NIP-60 history event for lightning deposit of \(quote.amount) sats")
                                     } catch {
@@ -225,7 +228,7 @@ public enum CashuDeposit {
                     // Timeout reached - persist quote and mark as expired
                     // Only save if we don't already have an event ID (to avoid duplicates)
                     if quoteEventId == nil {
-                        try await eventManager.saveQuoteEvent(quote: quote, signer: signer)
+                        try await eventManager.saveQuoteEvent(quote: quote, signer: signer, relays: relays)
                     }
                     continuation.yield(.expired)
                     continuation.finish()

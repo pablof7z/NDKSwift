@@ -17,6 +17,9 @@ public actor NIP60Wallet: NDKPaymentProvider {
 
     // Wallet configuration relays (from kind 17375 event)
     public internal(set) var walletConfigRelays: [String] = []
+    
+    // Resolved relays for wallet operations (publishing/fetching 7375 events)
+    public internal(set) var resolvedWalletRelays: [String] = []
 
     // Wallet subscriptions
     private var configSubscriptionTask: Task<Void, Never>?
@@ -80,6 +83,33 @@ public actor NIP60Wallet: NDKPaymentProvider {
             eventManager: eventManager,
             eventStream: events
         )
+    }
+
+    // MARK: - Relay Resolution
+    
+    /// Resolve which relays to use for wallet operations based on priority:
+    /// 1. 17375 event relay tags if present
+    /// 2. User's 10002 relay list if no relay tags
+    /// 3. Currently connected relays as fallback
+    private func resolveWalletRelays() async throws {
+        // 1. Check if 17375 event has relay tags
+        if !walletConfigRelays.isEmpty {
+            resolvedWalletRelays = walletConfigRelays
+            NDKLogger.log(.info, category: .wallet, "📡 Using \(resolvedWalletRelays.count) relays from wallet config (17375)")
+            return
+        }
+        
+        // 2. Fetch user's 10002 relay list
+        if let relayList = try await ndk.fetchRelayList() {
+            resolvedWalletRelays = relayList.writeRelays.map { $0.url }
+            NDKLogger.log(.info, category: .wallet, "📡 Using \(resolvedWalletRelays.count) write relays from user's relay list (10002)")
+            return
+        }
+        
+        // 3. Use currently connected relays
+        let connectedRelays = await ndk.pool.connectedRelays()
+        resolvedWalletRelays = connectedRelays.map { $0.url }
+        NDKLogger.log(.info, category: .wallet, "📡 Using \(resolvedWalletRelays.count) currently connected relays as fallback")
     }
 
     // MARK: - Configuration Subscription
@@ -162,10 +192,10 @@ public actor NIP60Wallet: NDKPaymentProvider {
                     )
                 ]
 
-                // Use wallet-specific relays if configured from 17375 event
-                let relayUrls: Set<String>? = walletConfigRelays.setOrNil
+                // Use resolved wallet relays
+                let relayUrls: Set<String>? = resolvedWalletRelays.setOrNil
 
-                NDKLogger.log(.debug, category: .wallet, "📡 Starting wallet event subscription with \(walletConfigRelays.isEmpty ? "default" : "\(walletConfigRelays.count) configured") relays")
+                NDKLogger.log(.debug, category: .wallet, "📡 Starting wallet event subscription with \(resolvedWalletRelays.isEmpty ? "default" : "\(resolvedWalletRelays.count) resolved") relays")
 
                 // Create NDKDataSource for each filter
                 var dataSources: [NDKDataSource<NDKEvent>] = []
@@ -737,7 +767,8 @@ public actor NIP60Wallet: NDKPaymentProvider {
             mints: mints,
             eventManager: eventManager,
             persistQuote: persistQuote,
-            signer: signer
+            signer: signer,
+            relays: resolvedWalletRelays
         )
         return quote
     }
@@ -806,7 +837,8 @@ public actor NIP60Wallet: NDKPaymentProvider {
                             )
                             return try await self.update(stateChange: stateChange)
                         },
-                        manualCheckTrigger: manualCheckTrigger
+                        manualCheckTrigger: manualCheckTrigger,
+                        relays: self.resolvedWalletRelays
                     )
 
                     for try await status in stream {
@@ -881,6 +913,12 @@ public actor NIP60Wallet: NDKPaymentProvider {
                         // Emit balance change event if we have a non-zero balance
                         await self.notifyBalanceChangeIfNeeded()
 
+                        // Resolve relays for wallet operations
+                        try? await self.resolveWalletRelays()
+                        
+                        // Update transaction history with resolved relays
+                        await self.transactionHistory.updateRelays(self.resolvedWalletRelays)
+
                         // Start transaction history observation
                         try? await self.transactionHistory.startObserving()
 
@@ -954,7 +992,8 @@ public actor NIP60Wallet: NDKPaymentProvider {
                             memo: StringConstants.Transactions.lightningDeposit
                         )
                         return try await self.update(stateChange: stateChange)
-                    }
+                    },
+                    relays: self.resolvedWalletRelays
                 ) {
                     switch status {
                     case .minted:
@@ -1109,7 +1148,8 @@ public actor NIP60Wallet: NDKPaymentProvider {
         let eventIds = try await eventManager.updateTokenEvents(
             tokenChange: tokenChange,
             proofStateManager: proofStateManager,
-            signer: signer
+            signer: signer,
+            relays: resolvedWalletRelays
         )
 
         // Update tracking
@@ -1174,7 +1214,8 @@ public actor NIP60Wallet: NDKPaymentProvider {
             amount: proofs.reduce(0) { $0 + Int64($1.amount) },
             memo: memo ?? "Offline token",
             token: tokenString,
-            signer: signer
+            signer: signer,
+            relays: resolvedWalletRelays
         )
 
         return tokenString
@@ -1184,8 +1225,18 @@ public actor NIP60Wallet: NDKPaymentProvider {
 
     /// Get relay health status for wallet synchronization
     public func getRelayHealth() async -> [WalletHealthMonitor.RelayHealth] {
-        // Use wallet-configured relays from kind 17375 event
-        let status = await healthMonitor.getWalletHealthStatus(walletRelays: walletRelays)
+        // Ensure relays are resolved first
+        if resolvedWalletRelays.isEmpty {
+            do {
+                try await resolveWalletRelays()
+            } catch {
+                NDKLogger.log(.warning, category: .wallet, "Failed to resolve wallet relays: \(error)")
+            }
+        }
+        
+        // Use the actual resolved relays that events are published to
+        let relaysToCheck = resolvedWalletRelays.compactMap { NDKRelay(url: $0) }
+        let status = await healthMonitor.getWalletHealthStatus(walletRelays: relaysToCheck)
         return status.relayHealth
     }
 

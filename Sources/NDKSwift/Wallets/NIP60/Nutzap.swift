@@ -142,7 +142,8 @@ public enum Nutzap {
                     destroyedEventIds: nil,
                     createdEventIds: nil,
                     redeemedEventId: nil,
-                    signer: signer
+                    signer: signer,
+                    relays: await wallet.resolvedWalletRelays
                 )
 
                 // Add to transaction history
@@ -384,7 +385,8 @@ public enum Nutzap {
             destroyedEventIds: nil,
             createdEventIds: nil,
             redeemedEventId: event.id,
-            signer: signer
+            signer: signer,
+            relays: wallet.resolvedWalletRelays
         )
 
         // Mark the nutzap as redeemed
