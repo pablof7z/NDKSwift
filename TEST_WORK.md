@@ -4,7 +4,7 @@
 This document tracks test improvement work for NDKSwift, focusing on unit tests and coverage for core library components.
 
 ## Current Status (2025-07-31)
-Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage, NDKRelay, NDKPrivateKeySigner, NDKRelayConnection, and NDKCache protocol. Found and documented bugs in MemoryCache.queryEvents and NostrMessage.serialize.
+Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage, NDKRelay, NDKPrivateKeySigner, NDKRelayConnection, NDKCache protocol, and NDKFilterGrouping. Found and documented bugs in MemoryCache.queryEvents and NostrMessage.serialize.
 
 ## Work Completed
 - [x] Analyzed test coverage across the entire codebase
@@ -62,11 +62,19 @@ Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage
   - Reactive observation
   - Cache freshness tracking
   - Default implementations verification
+- [x] Added comprehensive unit tests for NDKFilterGrouping (19 tests)
+  - Filter fingerprint generation with various combinations
+  - Fingerprint determinism and sorting
+  - closeOnEose prefix handling
+  - Filter merging with and without limits
+  - Tag merging and deduplication
+  - Time constraint preservation
+  - Complex filter handling with all field types
 
 ## Priority Work Items (Top 3)
-1. **Add unit tests for NDKRelaySubscriptionGroup** - No grouping/merging tests.
-2. **Add unit tests for encryption utilities** - NIP-04/NIP-44 encryption needs tests.
-3. **Add unit tests for NDKRelaySubscriptionManager** - No management tests.
+1. **Add unit tests for encryption utilities** - NIP-04/NIP-44 encryption needs tests.
+2. **Add unit tests for NDKRelaySubscriptionManager** - No management tests.
+3. **Add unit tests for tag helpers and validation** - Tag parsing/building needs tests.
 
 ## Critical Gaps Identified
 
@@ -83,9 +91,10 @@ Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage
 
 ### Relay Infrastructure
 - ~~**NDKRelayConnection**: No WebSocket tests~~ ✅ COMPLETED
-- **NDKRelaySubscriptionGroup**: No grouping tests
+- **NDKRelaySubscriptionGroup**: Complex to test due to InternalSubscription coupling
 - **NDKRelaySubscriptionManager**: No management tests
 - ~~**NostrMessage**: No parsing/serialization tests~~ ✅ COMPLETED
+- ~~**NDKFilterGrouping**: No fingerprint/merge tests~~ ✅ COMPLETED
 
 ### Security Components
 - ~~**NDKPrivateKeySigner**: No local signing tests~~ ✅ COMPLETED
