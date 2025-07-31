@@ -55,12 +55,16 @@ public actor NDKSubscriptionGroupingMetrics {
         }
         
         // Update relay-specific metrics
-        if relayMetrics[relay] == nil {
-            relayMetrics[relay] = RelayMetrics()
-        }
-        relayMetrics[relay]?.totalReqMessages += 1
-        relayMetrics[relay]?.averageGroupSize = 
-            ((relayMetrics[relay]?.averageGroupSize ?? 0) * Double(relayMetrics[relay]?.totalReqMessages ?? 1 - 1) + Double(groupSize)) / Double(relayMetrics[relay]?.totalReqMessages ?? 1)
+        var metrics = relayMetrics[relay] ?? RelayMetrics()
+        metrics.totalReqMessages += 1
+        
+        // Calculate new average
+        let previousTotal = metrics.totalReqMessages - 1
+        let previousAverage = metrics.averageGroupSize
+        metrics.averageGroupSize = (previousAverage * Double(previousTotal) + Double(groupSize)) / Double(metrics.totalReqMessages)
+        
+        // Store back in dictionary
+        relayMetrics[relay] = metrics
     }
     
     /// Records delay information
