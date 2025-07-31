@@ -4,7 +4,7 @@
 This document tracks test improvement work for NDKSwift, focusing on unit tests and coverage for core library components.
 
 ## Current Status (2025-07-31)
-Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage, NDKRelay, NDKPrivateKeySigner, and NDKRelayConnection. Found and documented bugs in MemoryCache.queryEvents and NostrMessage.serialize.
+Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage, NDKRelay, NDKPrivateKeySigner, NDKRelayConnection, and NDKCache protocol. Found and documented bugs in MemoryCache.queryEvents and NostrMessage.serialize.
 
 ## Work Completed
 - [x] Analyzed test coverage across the entire codebase
@@ -51,11 +51,22 @@ Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage
   - Error mapping and delegate notifications
   - Initial connection failure behavior (no auto-retry)
   - Connection lifecycle management
+- [x] Added comprehensive unit tests for NDKCache protocol (25 tests)
+  - Event operations (save, retrieve, query, delete)
+  - Optimistic publishing support
+  - Decrypted content caching
+  - Profile metadata operations
+  - NIP-05 caching and verification
+  - Relay preferences caching
+  - Negentropy support functions
+  - Reactive observation
+  - Cache freshness tracking
+  - Default implementations verification
 
 ## Priority Work Items (Top 3)
-1. **Add unit tests for NDKCache protocol** - No interface tests for the cache protocol.
-2. **Add unit tests for NDKRelaySubscriptionGroup** - No grouping/merging tests.
-3. **Add unit tests for encryption utilities** - NIP-04/NIP-44 encryption needs tests.
+1. **Add unit tests for NDKRelaySubscriptionGroup** - No grouping/merging tests.
+2. **Add unit tests for encryption utilities** - NIP-04/NIP-44 encryption needs tests.
+3. **Add unit tests for NDKRelaySubscriptionManager** - No management tests.
 
 ## Critical Gaps Identified
 
@@ -67,7 +78,7 @@ Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage
 
 ### Cache Layer
 - ~~**MemoryCache**: No tests for in-memory cache~~ ✅ COMPLETED
-- **NDKCache protocol**: No interface tests
+- ~~**NDKCache protocol**: No interface tests~~ ✅ COMPLETED
 - **Cache migrations**: No migration tests
 
 ### Relay Infrastructure
