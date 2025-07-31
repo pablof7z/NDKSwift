@@ -65,7 +65,7 @@ public struct RelayDiscovery: Sendable {
 /// let publishedRelays = try await ndk.outbox.publish(event)
 ///
 /// // Observe events with intelligent relay selection
-/// let dataSource = await ndk.outbox.observe(filter: filter)
+/// let dataSource = await ndk.outbox.subscribe(filter: filter)
 /// for await event in dataSource {
 ///     print("Received event: \(event)")
 /// }
@@ -185,12 +185,12 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
     ///   - maxAge: Maximum age of cached events in seconds. Use 0 to disable cache.
     ///   - cachePolicy: Policy for cache usage. Defaults to `.networkOnly`.
     ///   - strategy: Optional custom relay selection strategy. If nil, uses outbox model.
-    /// - Returns: `NDKDataSource` that emits matching events as they arrive.
+    /// - Returns: `NDKSubscription` that emits matching events as they arrive.
     ///
     /// ## Example
     /// ```swift
     /// let filter = NDKFilter(authors: [alicePubkey], kinds: [1])
-    /// let dataSource = await outbox.observe(filter: filter, maxAge: 3600)
+    /// let dataSource = await outbox.subscribe(filter: filter, maxAge: 3600)
     /// 
     /// for await event in dataSource {
     ///     print("New event from Alice: \(event.content)")
@@ -204,7 +204,7 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         maxAge: TimeInterval = 0,
         cachePolicy: CachePolicy = .networkOnly,
         strategy: RelaySelectionStrategy? = nil
-    ) async -> NDKDataSource<NDKEvent> {
+    ) async -> NDKSubscription<NDKEvent> {
         // Get optimal relays for this filter
         let relays: Set<String>
         if let strategy = strategy {
@@ -220,7 +220,7 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         let relayUrls = Set(relays)
 
         // Create and return data source
-        return NDKDataSource(
+        return NDKSubscription(
             ndk: ndk,
             filter: filter,
             maxAge: maxAge,
@@ -520,7 +520,7 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
             let shortAuthorsId = authors.first.map { String($0.prefix(8)) } ?? "unknown"
             let subscriptionId = "relay_disc_\(shortAuthorsId)_\(authors.count)"
             
-            let dataSource = NDKDataSource(
+            let dataSource = NDKSubscription(
                 ndk: ndk,
                 filter: relayListFilter,
                 relays: relaysToUse,
@@ -902,7 +902,7 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         }
 
         // Use determined relays
-        let dataSource = ndk.observe(
+        let dataSource = ndk.subscribe(
             filter: filter,
             maxAge: 0,
             cachePolicy: .networkOnly,

@@ -117,7 +117,7 @@ public class NDKRelayListManager: ObservableObject {
                 limit: 1
             )
             
-            let dataSource = ndk.observe(filter: filter, maxAge: 300, cachePolicy: .cacheWithNetwork)
+            let dataSource = ndk.subscribe(filter: filter, maxAge: 300, cachePolicy: .cacheWithNetwork)
             
             for await event in dataSource.events {
                 self.relayList = NDKRelayList.fromEvent(event, ndk: ndk)

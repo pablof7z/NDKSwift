@@ -45,7 +45,7 @@ final class OutboxModelTests: XCTestCase {
         let filter = NDKFilter(authors: ["author1"], kinds: [1])
         
         // Start subscription with explicit relays
-        let dataSource = ndk.observe(
+        let dataSource = ndk.subscribe(
             filter: filter,
             relays: explicitRelays,
             cachePolicy: .networkOnly
@@ -76,7 +76,7 @@ final class OutboxModelTests: XCTestCase {
         }
         
         // Start subscription without explicit relays (triggers outbox)
-        _ = ndk.observe(filter: filter, cachePolicy: .networkOnly)
+        _ = ndk.subscribe(filter: filter, cachePolicy: .networkOnly)
         
         await fulfillment(of: [mockPool.relaysSelectedExpectation], timeout: 1.0)
         
@@ -105,7 +105,7 @@ final class OutboxModelTests: XCTestCase {
         await mockCache.saveEvent(relayList)
         
         let filter = NDKFilter(authors: [author], kinds: [1])
-        _ = ndk.observe(filter: filter, cachePolicy: .networkOnly)
+        _ = ndk.subscribe(filter: filter, cachePolicy: .networkOnly)
         
         await fulfillment(of: [mockPool.relaysSelectedExpectation], timeout: 1.0)
         
@@ -129,7 +129,7 @@ final class OutboxModelTests: XCTestCase {
         await mockCache.saveEvent(relayList)
         
         let filter = NDKFilter(authors: [knownAuthor, unknownAuthor], kinds: [1])
-        let dataSource = ndk.observe(filter: filter, cachePolicy: .networkOnly)
+        let dataSource = ndk.subscribe(filter: filter, cachePolicy: .networkOnly)
         
         // Track subscription creation
         var subscriptionCount = 0
@@ -154,7 +154,7 @@ final class OutboxModelTests: XCTestCase {
         let unknownAuthor = "unknown-author"
         let filter = NDKFilter(authors: [unknownAuthor], kinds: [1])
         
-        let dataSource = ndk.observe(filter: filter, cachePolicy: .networkOnly)
+        let dataSource = ndk.subscribe(filter: filter, cachePolicy: .networkOnly)
         
         var receivedEvents: [NDKEvent] = []
         let eventExpectation = expectation(description: "Receive events during discovery")
@@ -199,7 +199,7 @@ final class OutboxModelTests: XCTestCase {
         let filter = NDKFilter(authors: [author], kinds: [1])
         
         // Start with unknown author
-        let handle = ndk.observe(filter: filter, cachePolicy: .networkOnly)
+        let handle = ndk.subscribe(filter: filter, cachePolicy: .networkOnly)
         
         // Wait for initial setup
         await Task.sleep(nanoseconds: 100_000_000) // 0.1s
@@ -351,7 +351,7 @@ final class OutboxModelTests: XCTestCase {
         await mockCache.saveEvent(relayList3)
         
         let filter = NDKFilter(authors: ["author1", "author2", "author3"], kinds: [1])
-        _ = ndk.observe(filter: filter, cachePolicy: .networkOnly)
+        _ = ndk.subscribe(filter: filter, cachePolicy: .networkOnly)
         
         await fulfillment(of: [mockPool.subscriptionGroupingExpectation], timeout: 1.0)
         
@@ -382,7 +382,7 @@ final class OutboxModelTests: XCTestCase {
         await mockCache.saveEvent(initialRelayList)
         
         let filter = NDKFilter(authors: [author], kinds: [1])
-        let dataSource = ndk.observe(filter: filter, cachePolicy: .networkOnly)
+        let dataSource = ndk.subscribe(filter: filter, cachePolicy: .networkOnly)
         
         var receivedEvents: [NDKEvent] = []
         let enhancedEventExpectation = expectation(description: "Receive enhanced events")
@@ -428,7 +428,7 @@ final class OutboxModelTests: XCTestCase {
         let author = "cleanup-test-author"
         let filter = NDKFilter(authors: [author], kinds: [1])
         
-        let handle = ndk.observe(filter: filter, cachePolicy: .networkOnly).handle
+        let handle = ndk.subscribe(filter: filter, cachePolicy: .networkOnly).handle
         
         // Trigger relay discovery to create enhanced requirements
         await ndk.dataRequirementManager.handleRelayDiscovery(
@@ -461,14 +461,14 @@ final class OutboxModelTests: XCTestCase {
         
         // Create cache-only subscription with broad filter
         let broadFilter = NDKFilter(kinds: [1])
-        let cacheDataSource = ndk.observe(
+        let cacheDataSource = ndk.subscribe(
             filter: broadFilter,
             cachePolicy: .cacheOnly
         )
         
         // Create network subscription with specific filter
         let specificFilter = NDKFilter(authors: [author], kinds: [1], limit: 10)
-        let networkDataSource = ndk.observe(
+        let networkDataSource = ndk.subscribe(
             filter: specificFilter,
             cachePolicy: .networkOnly
         )
@@ -518,7 +518,7 @@ final class OutboxModelTests: XCTestCase {
         await mockCache.saveEvent(olderList)
         
         let filter = NDKFilter(authors: [author], kinds: [1])
-        _ = ndk.observe(filter: filter, cachePolicy: .networkOnly)
+        _ = ndk.subscribe(filter: filter, cachePolicy: .networkOnly)
         
         await fulfillment(of: [mockPool.relaysSelectedExpectation], timeout: 1.0)
         
@@ -552,7 +552,7 @@ final class OutboxModelTests: XCTestCase {
         ]
         
         let filter = NDKFilter(authors: [authorA, authorB], kinds: [1])
-        let dataSource = ndk.observe(filter: filter, cachePolicy: .networkOnly)
+        let dataSource = ndk.subscribe(filter: filter, cachePolicy: .networkOnly)
         
         // Should not hang or crash
         let timeoutExpectation = expectation(description: "Operation completes")
@@ -572,7 +572,7 @@ final class OutboxModelTests: XCTestCase {
         let userWithoutList = "no-relay-list-user"
         let filter = NDKFilter(authors: [userWithoutList], kinds: [1])
         
-        _ = ndk.observe(filter: filter, cachePolicy: .networkOnly)
+        _ = ndk.subscribe(filter: filter, cachePolicy: .networkOnly)
         
         await fulfillment(of: [mockPool.relaysUsedExpectation], timeout: 1.0)
         
@@ -604,7 +604,7 @@ final class OutboxModelTests: XCTestCase {
         
         let startTime = Date()
         let filter = NDKFilter(authors: authors, kinds: [1])
-        _ = ndk.observe(filter: filter, cachePolicy: .networkOnly)
+        _ = ndk.subscribe(filter: filter, cachePolicy: .networkOnly)
         
         await fulfillment(of: [mockPool.relaysSelectedExpectation], timeout: 2.0)
         let endTime = Date()
@@ -628,7 +628,7 @@ final class OutboxModelTests: XCTestCase {
             let relay = "wss://relay\(i).relay"
             for j in 0..<subscriptionsPerRelay {
                 let filter = NDKFilter(ids: ["event\(i)-\(j)"])
-                _ = ndk.observe(filter: filter, relays: [relay])
+                _ = ndk.subscribe(filter: filter, relays: [relay])
             }
         }
         

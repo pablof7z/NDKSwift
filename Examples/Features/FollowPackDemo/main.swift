@@ -75,7 +75,7 @@ let userFilter = NDKFilter(
     authors: [signer.publicKey],
     kinds: NDKFollowPack.supportedKinds
 )
-let userPacksObserver = ndk.observe(filter: userFilter)
+let userPacksObserver = ndk.subscribe(filter: userFilter)
 
 print("📦 Follow packs by current user:")
 var userPacks: [NDKFollowPack] = []
@@ -96,7 +96,7 @@ let specificFilter = NDKFilter(
     kinds: NDKFollowPack.supportedKinds,
     tags: ["d": Set(["bitcoin-devs"])]
 )
-let specificObserver = ndk.observe(filter: specificFilter)
+let specificObserver = ndk.subscribe(filter: specificFilter)
 
 for await event in specificObserver.events {
     let fetchedPack = NDKFollowPack(event: event, ndk: ndk)
@@ -108,7 +108,7 @@ for await event in specificObserver.events {
 
 // Observe all follow packs (with limit)
 let allFilter = NDKFilter(kinds: NDKFollowPack.supportedKinds, limit: 10)
-let allPacksObserver = ndk.observe(filter: allFilter)
+let allPacksObserver = ndk.subscribe(filter: allFilter)
 
 print("\n📦 Recent follow packs:")
 var allPacks: [NDKFollowPack] = []

@@ -146,8 +146,8 @@ When creating a subscription without explicit relays:
 3. **Dynamic Updates**:
    - When relay information is discovered:
      - System connects to the newly discovered write relays
-     - Creates new DataRequirements for these relays
-     - Attaches them to the same observers as the original subscription
+     - Creates new NDKSubscriptionRequirements for these relays
+     - Attaches them to the same subscribers as the original subscription
    - Both the fallback and specific relay subscriptions remain active
    - Events flow from all sources - no events are missed during discovery
 
@@ -224,7 +224,7 @@ Unlike subscriptions which can be long-lived, publishing is a one-time operation
 ### Separation of Concerns
 
 - **NDKOutboxManager**: Manages relay information cache and emits discovery events
-- **NDKDataRequirementManager**: Handles subscription updates when relays are discovered
+- **NDKSubscriptionManager**: Handles subscription updates when relays are discovered
 - **NDKPublishingStrategy**: Manages publishing with background relay discovery
 - **NDKRelaySelector**: Implements relay selection logic based on NIP-65 rules
 

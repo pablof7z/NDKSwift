@@ -69,7 +69,7 @@ Not just a performance optimization - it's your personal Nostr archive:
 ### 3. Resilient Subscriptions
 ```swift
 // Subscriptions blend local and remote seamlessly
-let dataSource = ndk.observe(filter: filter)
+let dataSource = ndk.subscribe(filter: filter)
 for await event in dataSource.events {
     // Mix of cached, optimistic, and relay events
     // User sees continuous stream of content

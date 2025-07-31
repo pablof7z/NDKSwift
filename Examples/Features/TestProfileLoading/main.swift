@@ -19,13 +19,13 @@ Task {
     // Wait a moment for connection
     try? await Task.sleep(nanoseconds: 2_000_000_000)
     
-    print("\n=== Testing NDKDataSource directly ===")
+    print("\n=== Testing NDKSubscription directly ===")
     let filter = NDKFilter(
         authors: [testPubkey],
         kinds: [0]
     )
     
-    let dataSource = ndk.observe(filter: filter, maxAge: 0, cachePolicy: .networkOnly)
+    let dataSource = ndk.subscribe(filter: filter, maxAge: 0, cachePolicy: .networkOnly)
     
     print("Created data source, waiting for events...")
     

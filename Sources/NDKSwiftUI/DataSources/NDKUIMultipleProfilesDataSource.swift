@@ -12,12 +12,12 @@ public class NDKUIMultipleProfilesDataSource: ObservableObject {
     @Published public private(set) var isLoading = false
     @Published public private(set) var error: Error?
     
-    private let dataSource: NDKDataSource<NDKEvent>
+    private let dataSource: NDKSubscription<NDKEvent>
     private let pubkeys: Set<String>
     
     public init(ndk: NDK, pubkeys: Set<String>) {
         self.pubkeys = pubkeys
-        self.dataSource = ndk.observe(
+        self.dataSource = ndk.subscribe(
             filter: NDKFilter(
                 authors: Array(pubkeys),
                 kinds: [EventKind.metadata]

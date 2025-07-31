@@ -107,18 +107,18 @@ This ensures code signing persists across project regenerations.
 **NDK Core Flow**:
 - `NDK` → `NDKPool` → `NDKRelayConnection` → WebSocket
 - Events flow bidirectionally through this chain
-- Subscriptions filter incoming events through NDKDataSource
+- Subscriptions filter incoming events through NDKSubscription
 - Cache interceptors store events in NDKSQLiteCache
 
 **Relay-Level Subscription Grouping** (matches ndk-core):
 - Each relay has its own `NDKRelaySubscriptionManager`
-- Subscriptions with the same fingerprint are grouped into `NDKRelaySubscriptionGroup`
+- Subscriptions with the same fingerprint are grouped into `NDKRelaySubscription`
 - Groups execute with configurable delays (default 100ms) to batch subscriptions
 - Filter merging happens at execution time on each relay
 - Filters with limits are concatenated, filters without limits have their values merged
 
 **Event Processing Flow**:
-- Events → `NDKSubscriptionManager.processEvent()` → `NDKDataSource.handleEvent()` → Cache
+- Events → `NDKSubscriptionManager.processEvent()` → `NDKSubscription.handleEvent()` → Cache
 - Kind 5 deletion events are automatically processed by `NDKSubscriptionManager`
 - Referenced events are removed from cache with proper NIP-09 author validation
 - Only the original author can delete their own events
@@ -149,8 +149,8 @@ This ensures code signing persists across project regenerations.
 
 2. **Subscription Flow (AsyncSequence)**:
    - Create NDKFilter → Subscribe through NDK → Returns AsyncSequence
-   - DataRequirement manages deduplication and relay selection
-   - NDKDataSource added to relay's subscription manager
+   - NDKSubscriptionRequirement manages deduplication and relay selection
+   - NDKSubscription added to relay's subscription manager
    - Multiple subscriptions with same fingerprint grouped together
    - Groups execute after delay, merging filters into single REQ
    - Events arrive → Routed to all subscriptions in group → Cache stores → Yield to iterator

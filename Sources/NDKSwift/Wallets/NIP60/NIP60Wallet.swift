@@ -197,10 +197,10 @@ public actor NIP60Wallet: NDKPaymentProvider {
 
                 NDKLogger.log(.debug, category: .wallet, "📡 Starting wallet event subscription with \(resolvedWalletRelays.isEmpty ? "default" : "\(resolvedWalletRelays.count) resolved") relays")
 
-                // Create NDKDataSource for each filter
-                var dataSources: [NDKDataSource<NDKEvent>] = []
-                var nutzapDataSource: NDKDataSource<NDKEvent>?
-                var spendingHistoryDataSource: NDKDataSource<NDKEvent>?
+                // Create NDKSubscription for each filter
+                var dataSources: [NDKSubscription<NDKEvent>] = []
+                var nutzapDataSource: NDKSubscription<NDKEvent>?
+                var spendingHistoryDataSource: NDKSubscription<NDKEvent>?
 
                 for (index, filter) in filters.enumerated() {
                     let subscriptionId: String
@@ -213,7 +213,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
                     default: subscriptionId = "nip60-wallet-\(index)"
                     }
 
-                    let dataSource = NDKDataSource(
+                    let dataSource = NDKSubscription(
                         ndk: self.ndk,
                         filter: filter,
                         maxAge: 0,
@@ -886,8 +886,8 @@ public actor NIP60Wallet: NDKPaymentProvider {
 
             NDKLogger.log(.info, category: .wallet, "Starting wallet configuration subscription for kinds [17375, \(EventKind.blockedMints)]")
 
-            // Create NDKDataSource for configuration events
-            let dataSource = NDKDataSource(
+            // Create NDKSubscription for configuration events
+            let dataSource = NDKSubscription(
                 ndk: self.ndk,
                 filter: configFilter,
                 maxAge: 0,
@@ -1388,7 +1388,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
             kinds: [EventKind.cashuWalletBackup]
         )
 
-        let dataSource = NDKDataSource(
+        let dataSource = NDKSubscription(
             ndk: ndk,
             filter: backupFilter,
             maxAge: 0,

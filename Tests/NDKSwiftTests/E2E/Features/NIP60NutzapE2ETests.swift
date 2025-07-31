@@ -188,7 +188,7 @@ final class NIP60NutzapE2ETests: XCTestCase {
             kinds: [EventKind.cashuToken]
         )
         
-        let dataSource7375_1 = ndk1.observe(
+        let dataSource7375_1 = ndk1.subscribe(
             filter: filter7375_1,
             maxAge: 0, // Real-time monitoring
             cachePolicy: .networkOnly
@@ -212,7 +212,7 @@ final class NIP60NutzapE2ETests: XCTestCase {
             tags: ["p": Set([pubkey2])]
         )
         
-        let dataSource9321 = ndk1.observe(
+        let dataSource9321 = ndk1.subscribe(
             filter: filter9321,
             maxAge: 0, // Real-time monitoring
             cachePolicy: .networkOnly
@@ -234,7 +234,7 @@ final class NIP60NutzapE2ETests: XCTestCase {
             kinds: [EventKind.cashuToken]
         )
         
-        let dataSource7375_2 = ndk2.observe(
+        let dataSource7375_2 = ndk2.subscribe(
             filter: filter7375_2,
             maxAge: 0, // Real-time monitoring
             cachePolicy: .networkOnly
@@ -328,7 +328,7 @@ final class NIP60NutzapE2ETests: XCTestCase {
             kinds: [EventKind.nutzapPreferences]
         )
         
-        let dataSource = ndk1.observe(
+        let dataSource = ndk1.subscribe(
             filter: preferencesFilter,
             maxAge: 0, // Always fresh for tests
             cachePolicy: .networkOnly

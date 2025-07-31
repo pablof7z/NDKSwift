@@ -41,8 +41,8 @@ public struct NWCResponseHandler {
         // 2. Create subscription for the response BEFORE publishing
         let relayUrls = Set(connectedRelays.map { $0.url })
 
-        // Use NDKDataSource for NWC response monitoring
-        let dataSource = NDKDataSource(
+        // Use NDKSubscription for NWC response monitoring
+        let dataSource = NDKSubscription(
             ndk: ndk,
             filter: filter,
             maxAge: 0, // Always fresh for real-time response monitoring
@@ -161,8 +161,8 @@ public struct NWCResponseHandler {
         // Create subscription
         let relayUrls = Set(connectedRelays.map { $0.url })
 
-        // Use NDKDataSource for batch NWC response monitoring
-        let dataSource = NDKDataSource(
+        // Use NDKSubscription for batch NWC response monitoring
+        let dataSource = NDKSubscription(
             ndk: ndk,
             filter: filter,
             maxAge: 0, // Always fresh for real-time response monitoring
@@ -260,8 +260,8 @@ public struct NWCResponseHandler {
                 // Create subscription
                 let relayUrls = Set(connectedRelays.map { $0.url })
 
-                // Use NDKDataSource for NWC notification monitoring
-                let dataSource = NDKDataSource(
+                // Use NDKSubscription for NWC notification monitoring
+                let dataSource = NDKSubscription(
                     ndk: ndk,
                     filter: filter,
                     maxAge: 0, // Always fresh for real-time notification monitoring

@@ -44,7 +44,7 @@ final class NIP60SimpleWalletE2ETest: XCTestCase {
         // Set up subscription for 7375 events
         var received7375 = false
         let filter = NDKFilter(authors: [pubkey], kinds: [EventKind.cashuToken])
-        let dataSource = ndk.observe(
+        let dataSource = ndk.subscribe(
             filter: filter,
             maxAge: 0, // Real-time monitoring
             cachePolicy: .networkOnly

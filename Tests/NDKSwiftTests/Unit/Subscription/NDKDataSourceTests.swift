@@ -1,8 +1,8 @@
 import XCTest
 @testable import NDKSwift
 
-/// Tests for NDKDataSource (modern subscription API)
-final class NDKDataSourceTests: NDKTestCase {
+/// Tests for NDKSubscription (modern subscription API)
+final class NDKSubscriptionTests: NDKTestCase {
     
     // MARK: - Basic DataSource Tests
     
@@ -10,7 +10,7 @@ final class NDKDataSourceTests: NDKTestCase {
         let ndk = createTestNDK()
         let filter = NDKFilter(kinds: [1], limit: 10)
         
-        let dataSource = ndk.observe(filter: filter)
+        let dataSource = ndk.subscribe(filter: filter)
         
         XCTAssertNotNil(dataSource)
         XCTAssertEqual(dataSource.data.count, 0) // Initially empty
@@ -22,7 +22,7 @@ final class NDKDataSourceTests: NDKTestCase {
         let filter = NDKFilter(kinds: [1])
         let customId = "my-custom-subscription-id"
         
-        let dataSource = ndk.observe(
+        let dataSource = ndk.subscribe(
             filter: filter,
             subscriptionId: customId
         )
@@ -37,7 +37,7 @@ final class NDKDataSourceTests: NDKTestCase {
         let ndk = createTestNDK(cache: cache)
         
         let filter = NDKFilter(kinds: [1])
-        let dataSource = ndk.observe(filter: filter)
+        let dataSource = ndk.subscribe(filter: filter)
         
         // Create test event
         let event = EventTestFactory.createTextNote()
@@ -69,7 +69,7 @@ final class NDKDataSourceTests: NDKTestCase {
         let ndk = createTestNDK(cache: cache)
         
         let filter = NDKFilter(kinds: [1])
-        let dataSource = ndk.observe(filter: filter)
+        let dataSource = ndk.subscribe(filter: filter)
         
         // Create test events
         let events = (0..<5).map { i in
@@ -106,7 +106,7 @@ final class NDKDataSourceTests: NDKTestCase {
         
         let targetAuthor = TestFixtures.Keys.alice.publicKey
         let filter = NDKFilter(authors: [targetAuthor], kinds: [1])
-        let dataSource = ndk.observe(filter: filter)
+        let dataSource = ndk.subscribe(filter: filter)
         
         // Create mixed events
         let matchingEvent = EventTestFactory.createTextNote(pubkey: targetAuthor)
@@ -144,7 +144,7 @@ final class NDKDataSourceTests: NDKTestCase {
         let cache = createMemoryCache()
         let ndk = createTestNDK(cache: cache)
         
-        let dataSource = ndk.observe(filter: NDKFilter(kinds: [1]))
+        let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
         
         var eoseReceived = false
         let eoseTask = Task {
@@ -175,7 +175,7 @@ final class NDKDataSourceTests: NDKTestCase {
         let ndk = createTestNDK(cache: cache)
         
         // Create with closeOnEose = true
-        let dataSource = ndk.observe(
+        let dataSource = ndk.subscribe(
             filter: NDKFilter(kinds: [1]),
             closeOnEose: true
         )
@@ -197,7 +197,7 @@ final class NDKDataSourceTests: NDKTestCase {
         let cache = createMemoryCache()
         let ndk = createTestNDK(cache: cache)
         
-        let dataSource = ndk.observe(filter: NDKFilter(kinds: [1]))
+        let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
         
         // Create events
         let events = (0..<3).map { i in
@@ -225,7 +225,7 @@ final class NDKDataSourceTests: NDKTestCase {
         let cache = createMemoryCache()
         let ndk = createTestNDK(cache: cache)
         
-        let dataSource = ndk.observe(filter: NDKFilter(kinds: [1]))
+        let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
         
         let event = EventTestFactory.createTextNote()
         
@@ -252,8 +252,8 @@ final class NDKDataSourceTests: NDKTestCase {
         let ndk = createTestNDK(cache: cache)
         
         // Create two data sources with different filters
-        let dataSource1 = ndk.observe(filter: NDKFilter(kinds: [1]))
-        let dataSource2 = ndk.observe(filter: NDKFilter(kinds: [2]))
+        let dataSource1 = ndk.subscribe(filter: NDKFilter(kinds: [1]))
+        let dataSource2 = ndk.subscribe(filter: NDKFilter(kinds: [2]))
         
         let kind1Event = EventTestFactory.createEvent(kind: 1, content: "Kind 1")
         let kind2Event = EventTestFactory.createEvent(kind: 2, content: "Kind 2")
@@ -308,7 +308,7 @@ final class NDKDataSourceTests: NDKTestCase {
         try await cache.saveEvent(event)
         
         // Create data source with cache-only policy
-        let dataSource = ndk.observe(
+        let dataSource = ndk.subscribe(
             filter: NDKFilter(kinds: [1]),
             cachePolicy: .cacheOnly
         )
@@ -326,7 +326,7 @@ final class NDKDataSourceTests: NDKTestCase {
         let ndk = createTestNDK(cache: cache)
         
         // Create data source that transforms events to just their content
-        let dataSource = ndk.observe(
+        let dataSource = ndk.subscribe(
             filter: NDKFilter(kinds: [1]),
             transform: { event in event.content }
         )
@@ -356,7 +356,7 @@ final class NDKDataSourceTests: NDKTestCase {
         let cache = createMemoryCache()
         let ndk = createTestNDK(cache: cache)
         
-        let dataSource = ndk.observe(filter: NDKFilter(kinds: [1]))
+        let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
         
         // Error should be nil initially
         XCTAssertNil(dataSource.error)
@@ -374,7 +374,7 @@ final class NDKDataSourceTests: NDKTestCase {
         let ndk = createTestNDK(cache: cache)
         
         // Transform that filters out certain events
-        let dataSource = ndk.observe(
+        let dataSource = ndk.subscribe(
             filter: NDKFilter(kinds: [1]),
             transform: { event in
                 // Only return events with "important" in content
@@ -418,7 +418,7 @@ final class NDKDataSourceTests: NDKTestCase {
         }
         
         // Transform events to summaries
-        let dataSource = ndk.observe(
+        let dataSource = ndk.subscribe(
             filter: NDKFilter(kinds: [1]),
             transform: { event in
                 EventSummary(
@@ -454,7 +454,7 @@ final class NDKDataSourceTests: NDKTestCase {
         let ndk = createTestNDK(cache: cache)
         
         // Start with kind 1 filter
-        let dataSource = ndk.observe(filter: NDKFilter(kinds: [1]))
+        let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
         
         let kind1Event = EventTestFactory.createEvent(kind: 1, content: "Kind 1")
         let kind2Event = EventTestFactory.createEvent(kind: 2, content: "Kind 2")
@@ -497,7 +497,7 @@ final class NDKDataSourceTests: NDKTestCase {
         let cache = createMemoryCache()
         let ndk = createTestNDK(cache: cache)
         
-        let dataSource = ndk.observe(filter: NDKFilter(kinds: [1]))
+        let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
         
         // Add some events
         let events = (0..<3).map { i in
@@ -526,7 +526,7 @@ final class NDKDataSourceTests: NDKTestCase {
         let cache = createMemoryCache()
         let ndk = createTestNDK(cache: cache)
         
-        let dataSource = ndk.observe(filter: NDKFilter(kinds: [1]))
+        let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
         
         // Add initial events
         let initialEvents = (0..<3).map { i in
@@ -559,7 +559,7 @@ final class NDKDataSourceTests: NDKTestCase {
         let cache = createMemoryCache()
         let ndk = createTestNDK(cache: cache)
         
-        let dataSource = ndk.observe(filter: NDKFilter(kinds: [1]))
+        let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
         
         // Create same event
         let event = EventTestFactory.createTextNote(content: "Duplicate test")
@@ -598,7 +598,7 @@ final class NDKDataSourceTests: NDKTestCase {
         try await cache.saveEvent(cachedEvent)
         
         // Create data source with network-only policy
-        let dataSource = ndk.observe(
+        let dataSource = ndk.subscribe(
             filter: NDKFilter(kinds: [1]),
             cachePolicy: .networkOnly
         )
@@ -630,7 +630,7 @@ final class NDKDataSourceTests: NDKTestCase {
         let cache = createMemoryCache()
         let ndk = createTestNDK(cache: cache)
         
-        let dataSource = ndk.observe(filter: NDKFilter(kinds: [1]))
+        let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
         
         var aggregatedEoseReceived = false
         let eoseTask = Task {
@@ -657,7 +657,7 @@ final class NDKDataSourceTests: NDKTestCase {
         let cache = createMemoryCache()
         let ndk = createTestNDK(cache: cache)
         
-        let dataSource = ndk.observe(filter: NDKFilter(kinds: [1]))
+        let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
         
         let event = EventTestFactory.createTextNote()
         let relayURL = "wss://specific.relay"
@@ -704,7 +704,7 @@ final class NDKDataSourceTests: NDKTestCase {
         let ndk = createTestNDK(cache: cache)
         
         // Empty filter should match all events
-        let dataSource = ndk.observe(filter: NDKFilter())
+        let dataSource = ndk.subscribe(filter: NDKFilter())
         
         let events = [
             EventTestFactory.createEvent(kind: 1),
@@ -737,7 +737,7 @@ final class NDKDataSourceTests: NDKTestCase {
         let cache = createMemoryCache()
         let ndk = createTestNDK(cache: cache)
         
-        let dataSource = ndk.observe(filter: NDKFilter(kinds: [1]))
+        let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
         
         // Create many events
         let eventCount = 100
@@ -766,7 +766,7 @@ final class NDKDataSourceTests: NDKTestCase {
         let cache = createMemoryCache()
         let ndk = createTestNDK(cache: cache)
         
-        var dataSource: NDKDataSource<NDKEvent>? = ndk.observe(filter: NDKFilter(kinds: [1]))
+        var dataSource: NDKSubscription<NDKEvent>? = ndk.subscribe(filter: NDKFilter(kinds: [1]))
         
         let event = EventTestFactory.createTextNote()
         
@@ -804,7 +804,7 @@ final class NDKDataSourceTests: NDKTestCase {
         let cache = createMemoryCache()
         let ndk = createTestNDK(cache: cache)
         
-        let dataSource = ndk.observe(filter: NDKFilter(kinds: [1]))
+        let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
         
         let eventCount = 50
         let events = (0..<eventCount).map { i in

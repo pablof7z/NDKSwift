@@ -264,7 +264,7 @@ final class CacheObservationIntegrationTests: XCTestCase {
         
         // Create broad cache-only subscription
         let broadFilter = NDKFilter(kinds: [1])
-        let broadDataSource = ndk.observe(
+        let broadDataSource = ndk.subscribe(
             filter: broadFilter,
             cachePolicy: .cacheOnly
         )
@@ -275,7 +275,7 @@ final class CacheObservationIntegrationTests: XCTestCase {
             kinds: [1],
             limit: 10
         )
-        _ = ndk.observe(
+        _ = ndk.subscribe(
             filter: specificFilter,
             cachePolicy: .networkOnly
         )
@@ -328,7 +328,7 @@ final class CacheObservationIntegrationTests: XCTestCase {
         
         // Start observers
         for (index, filter) in filters.enumerated() {
-            let dataSource = ndk.observe(filter: filter, cachePolicy: .cacheOnly)
+            let dataSource = ndk.subscribe(filter: filter, cachePolicy: .cacheOnly)
             
             Task {
                 for await event in dataSource.events {

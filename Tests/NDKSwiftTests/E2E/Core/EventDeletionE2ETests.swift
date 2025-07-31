@@ -55,7 +55,7 @@ final class EventDeletionE2ETests: XCTestCase {
         // Verify event exists on subscriber
         let fetchTime = Date()
         let filter = NDKFilter(ids: [textEvent.id])
-        let dataSource = subscriber.observe(filter: filter, maxAge: 3600)
+        let dataSource = subscriber.subscribe(filter: filter, maxAge: 3600)
         
         var fetchedEvents: [NDKEvent] = []
         for await event in dataSource.events {
@@ -86,7 +86,7 @@ final class EventDeletionE2ETests: XCTestCase {
         
         // Verify event is deleted
         let verifyTime = Date()
-        let verifyDataSource = subscriber.observe(filter: filter, maxAge: 3600)
+        let verifyDataSource = subscriber.subscribe(filter: filter, maxAge: 3600)
         
         var fetchedAfterDeletion: [NDKEvent] = []
         for await event in verifyDataSource.events {
@@ -168,7 +168,7 @@ final class EventDeletionE2ETests: XCTestCase {
         // Verify event still exists (deletion should be rejected)
         let verifyTime = Date()
         let filter = NDKFilter(ids: [textEvent.id])
-        let dataSource = observer.observe(filter: filter, maxAge: 3600)
+        let dataSource = observer.subscribe(filter: filter, maxAge: 3600)
         
         var fetchedEvents: [NDKEvent] = []
         for await event in dataSource.events {
@@ -198,7 +198,7 @@ final class EventDeletionE2ETests: XCTestCase {
         
         // Verify event is now deleted
         let finalVerifyTime = Date()
-        let finalDataSource = observer.observe(filter: filter, maxAge: 3600)
+        let finalDataSource = observer.subscribe(filter: filter, maxAge: 3600)
         
         var finalFetch: [NDKEvent] = []
         for await event in finalDataSource.events {
@@ -277,7 +277,7 @@ final class EventDeletionE2ETests: XCTestCase {
         let verifyTime = Date()
         let eventIds = events.map { $0.id }
         let filter = NDKFilter(ids: eventIds)
-        let dataSource = ndk.observe(filter: filter, maxAge: 3600)
+        let dataSource = ndk.subscribe(filter: filter, maxAge: 3600)
         
         var remainingEvents: [NDKEvent] = []
         let collectStart = Date()
@@ -346,7 +346,7 @@ final class EventDeletionE2ETests: XCTestCase {
         // Subscribe on instance 2
         Task {
             let subscription2Time = Date()
-            let dataSource2 = instance2.observe(filter: filter)
+            let dataSource2 = instance2.subscribe(filter: filter)
             for await receivedEvent in dataSource2.events {
                 if receivedEvent.id == event.id {
                     NDKLogger.log(.debug, category: .event, "📨 Instance 2 received event after \(Date().timeIntervalSince(subscription2Time))s")
@@ -357,7 +357,7 @@ final class EventDeletionE2ETests: XCTestCase {
         // Subscribe on instance 3
         Task {
             let subscription3Time = Date()
-            let dataSource3 = instance3.observe(filter: filter)
+            let dataSource3 = instance3.subscribe(filter: filter)
             for await receivedEvent in dataSource3.events {
                 if receivedEvent.id == event.id {
                     NDKLogger.log(.debug, category: .event, "📨 Instance 3 received event after \(Date().timeIntervalSince(subscription3Time))s")
@@ -389,7 +389,7 @@ final class EventDeletionE2ETests: XCTestCase {
             let eventFilter = NDKFilter(ids: [event.id])
             
             // Check instance 2
-            let dataSource2 = instance2.observe(filter: eventFilter, maxAge: 3600)
+            let dataSource2 = instance2.subscribe(filter: eventFilter, maxAge: 3600)
             var fetch2: [NDKEvent] = []
             for await e in dataSource2.events {
                 fetch2.append(e)
@@ -398,7 +398,7 @@ final class EventDeletionE2ETests: XCTestCase {
             }
             
             // Check instance 3
-            let dataSource3 = instance3.observe(filter: eventFilter, maxAge: 3600)
+            let dataSource3 = instance3.subscribe(filter: eventFilter, maxAge: 3600)
             var fetch3: [NDKEvent] = []
             for await e in dataSource3.events {
                 fetch3.append(e)
@@ -480,7 +480,7 @@ final class EventDeletionE2ETests: XCTestCase {
         // Verify event is not retrievable (tombstone should prevent it)
         let verifyTime = Date()
         let filter = NDKFilter(ids: [localEvent.id])
-        let dataSource = ndk.observe(filter: filter, maxAge: 3600)
+        let dataSource = ndk.subscribe(filter: filter, maxAge: 3600)
         
         var fetchedEvents: [NDKEvent] = []
         let collectStart = Date()

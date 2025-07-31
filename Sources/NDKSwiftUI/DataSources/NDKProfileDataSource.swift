@@ -32,7 +32,7 @@ import Combine
 /// }
 /// ```
 @MainActor
-public final class NDKProfileDataSource: ObservableObject, @preconcurrency NDKDataSourceProtocol {
+public final class NDKProfileDataSource: ObservableObject, @preconcurrency NDKSubscriptionProtocol {
 
     // MARK: - Published Properties
 
@@ -49,7 +49,7 @@ public final class NDKProfileDataSource: ObservableObject, @preconcurrency NDKDa
 
     private let ndk: NDK
     private let pubkey: String
-    private let dataSource: NDKDataSource<NDKEvent>
+    private let dataSource: NDKSubscription<NDKEvent>
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Initialization
@@ -64,7 +64,7 @@ public final class NDKProfileDataSource: ObservableObject, @preconcurrency NDKDa
         self.pubkey = pubkey
 
         // Create data source for profile events (kind:0)
-        self.dataSource = ndk.observe(
+        self.dataSource = ndk.subscribe(
             filter: NDKFilter(
                 authors: [pubkey],
                 kinds: [EventKind.metadata]

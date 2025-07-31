@@ -108,16 +108,16 @@ public actor NDKPool {
         do {
             let userPubkey = try await signer.pubkey
 
-            // Subscribe for blocked relay list using NDKDataSource
+            // Subscribe for blocked relay list using NDKSubscription
             blockedRelaySubscriptionTask = Task {
                 let filter = NDKFilter(
                     authors: [userPubkey],
                     kinds: [EventKind.blockedRelays]
                 )
 
-                // Use NDKDataSource with 24 hour maxAge for blocked relay lists
+                // Use NDKSubscription with 24 hour maxAge for blocked relay lists
                 // This will return cached data immediately if available, then fetch updates
-                let dataSource = ndk.observe(
+                let dataSource = ndk.subscribe(
                     filter: filter,
                     maxAge: TimeConstants.day // 24 hours
                 )

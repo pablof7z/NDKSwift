@@ -2,7 +2,7 @@ import Foundation
 import CashuSwift
 
 /// Manages wallet transaction history by merging multiple event types
-/// Uses NDKDataSource for fully reactive event processing
+/// Uses NDKSubscription for fully reactive event processing
 public actor WalletTransactionHistory {
     // MARK: - Properties
 
@@ -22,8 +22,8 @@ public actor WalletTransactionHistory {
     private var recipientIndex: [String: [String]] = [:]         // recipientPubkey -> [txIds]
 
     // Data sources for reactive event processing
-    private var historyDataSource: NDKDataSource<NDKEvent>?
-    private var nutzapDataSource: NDKDataSource<NDKEvent>?
+    private var historyDataSource: NDKSubscription<NDKEvent>?
+    private var nutzapDataSource: NDKSubscription<NDKEvent>?
     private var observationTask: Task<Void, Never>?
 
     // Track user pubkey for filtering
@@ -80,7 +80,7 @@ public actor WalletTransactionHistory {
         // Create data sources
         let relayUrls = relays.isEmpty ? nil : Set(relays)
         
-        historyDataSource = NDKDataSource(
+        historyDataSource = NDKSubscription(
             ndk: ndk,
             filter: historyFilter,
             maxAge: 0,  // Always fresh
@@ -89,7 +89,7 @@ public actor WalletTransactionHistory {
             subscriptionId: "wallet-history"
         )
 
-        nutzapDataSource = NDKDataSource(
+        nutzapDataSource = NDKSubscription(
             ndk: ndk,
             filter: nutzapFilter,
             maxAge: 0,
@@ -651,7 +651,7 @@ public actor WalletTransactionHistory {
                 // Try to get nutzap details
                 let filter = NDKFilter(ids: [redeemedId])
                 let relayUrls = relays.isEmpty ? nil : Set(relays)
-                let dataSource = NDKDataSource(
+                let dataSource = NDKSubscription(
                     ndk: ndk,
                     filter: filter,
                     maxAge: 0,

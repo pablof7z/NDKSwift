@@ -115,7 +115,7 @@ public class NDKSessionData {
     // MARK: - List Management
 
     /// Active data source for all lists
-    private var listsDataSource: NDKDataSource<NDKEvent>?
+    private var listsDataSource: NDKSubscription<NDKEvent>?
 
     private func loadLists(kinds: Set<Int>, needsFollowList: Bool, needsMuteList: Bool, needsBlockedRelays: Bool) async {
         guard let ndk = ndk else { return }
@@ -176,7 +176,7 @@ public class NDKSessionData {
 
         // Create data source for continuous updates with meaningful subscription ID
         let subscriptionId = "session_lists_\(pubkey.prefix(8))"
-        let dataSource = NDKDataSource<NDKEvent>(ndk: ndk, filter: filter, subscriptionId: subscriptionId)
+        let dataSource = NDKSubscription<NDKEvent>(ndk: ndk, filter: filter, subscriptionId: subscriptionId)
         self.listsDataSource = dataSource
 
         // Start processing events in background - don't block
@@ -355,7 +355,7 @@ public class NDKSessionData {
 
         // Use data source to fetch events from outbox relays only
         let subscriptionId = "session_wot_\(pubkey.prefix(8))"
-        let dataSource = NDKDataSource<NDKEvent>(
+        let dataSource = NDKSubscription<NDKEvent>(
             ndk: ndk,
             filter: filter,
             maxAge: 5 * TimeConstants.minute, // 5 minute cache

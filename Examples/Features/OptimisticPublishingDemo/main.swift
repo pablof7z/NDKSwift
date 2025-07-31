@@ -34,7 +34,7 @@ print("📱 User pubkey: \(pubkey)")
 // Start observing BEFORE connecting
 // This will receive optimistic events immediately
 print("\n📡 Starting observer (before connecting)...")
-let dataSource = ndk.observe(
+let dataSource = ndk.subscribe(
     filter: NDKFilter(
         authors: [pubkey],
         kinds: [1],
@@ -139,7 +139,7 @@ print("\n✅ Final unpublished count: \(finalUnpublished.count)")
 print("\n🎯 Testing observer with network-only cache policy...")
 
 // Create observer that only shows network events
-let strictDataSource = ndk.observe(
+let strictDataSource = ndk.subscribe(
     filter: NDKFilter(authors: [pubkey], kinds: [1]),
     cachePolicy: .networkOnly
 )

@@ -311,7 +311,7 @@ private class FollowState: ObservableObject {
             kinds: [EventKind.contacts]
         )
 
-        let dataSource = ndk.observe(
+        let dataSource = ndk.subscribe(
             filter: filter,
             maxAge: 0, // Real-time
             cachePolicy: .cacheWithNetwork

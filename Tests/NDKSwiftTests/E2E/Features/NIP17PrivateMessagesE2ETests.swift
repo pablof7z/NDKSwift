@@ -64,7 +64,7 @@ final class NIP17PrivateMessagesE2ETests: XCTestCase {
             tags: ["p": Set([bobPubkey])]
         )
         
-        let dataSource = ndk.observe(filter: filter, maxAge: 0, closeOnEose: true)
+        let dataSource = ndk.subscribe(filter: filter, maxAge: 0, closeOnEose: true)
         var receivedEvents: [NDKEvent] = []
         for await event in dataSource.events {
             receivedEvents.append(event)
@@ -126,7 +126,7 @@ final class NIP17PrivateMessagesE2ETests: XCTestCase {
             tags: ["p": Set([bobPubkey])]
         )
         
-        let bobDataSource = ndk.observe(filter: bobFilter, maxAge: 0, closeOnEose: true)
+        let bobDataSource = ndk.subscribe(filter: bobFilter, maxAge: 0, closeOnEose: true)
         var bobEvents: [NDKEvent] = []
         for await event in bobDataSource.events {
             bobEvents.append(event)

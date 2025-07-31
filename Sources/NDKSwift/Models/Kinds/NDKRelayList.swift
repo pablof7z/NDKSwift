@@ -275,8 +275,8 @@ public extension NDK {
     func fetchRelayList(for user: NDKUser) async throws -> NDKRelayList? {
         let filter = NDKFilter(authors: [user.pubkey], kinds: [EventKind.relayList])
 
-        // Use NDKDataSource with long maxAge for relay lists
-        let dataSource = NDKDataSource(
+        // Use NDKSubscription with long maxAge for relay lists
+        let dataSource = NDKSubscription(
             ndk: self,
             filter: filter,
             maxAge: TimeConstants.day // 24 hours - relay lists rarely change

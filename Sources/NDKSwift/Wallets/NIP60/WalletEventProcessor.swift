@@ -149,7 +149,7 @@ actor WalletEventProcessor {
         // Track the nutzap in the event manager
         await context.eventManager.trackNutzap(event)
 
-        // Transaction history will automatically pick up this event through NDKDataSource
+        // Transaction history will automatically pick up this event through NDKSubscription
         // No need to manually process it here
 
         try await context.wallet.processIncomingNutzap(event)
@@ -170,7 +170,7 @@ actor WalletEventProcessor {
             }
         }
 
-        // Transaction history will automatically pick up this event through NDKDataSource
+        // Transaction history will automatically pick up this event through NDKSubscription
         // No need to manually process it here
     }
 

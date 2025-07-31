@@ -30,11 +30,11 @@ struct Example03_1_SimpleObserver {
         let filter = NDKFilter(kinds: [1], limit: 3)
         
         print("\nObserving text notes (kind 1, limit 3)...")
-        print("Note: This example demonstrates NDKDataSource, which provides real-time event streaming.")
-        print("      NDKDataSource addresses limitations of older observer patterns.")
+        print("Note: This example demonstrates NDKSubscription, which provides real-time event streaming.")
+        print("      NDKSubscription addresses limitations of older observer patterns.")
         
         // Create data source
-        let dataSource = ndk.observe(filter: filter, cachePolicy: .networkOnly)
+        let dataSource = ndk.subscribe(filter: filter, cachePolicy: .networkOnly)
         
         // Track received events
         var receivedEvents = 0

@@ -32,13 +32,13 @@ private struct ProfileCacheEntry {
 /// Example usage:
 /// ```swift
 /// // Feed view - many profiles, use cache
-/// for await profile in profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
+/// for await profile in profileManager.subscribe(for: pubkey, maxAge: TimeConstants.hour) {
 ///     // Use profile (may be nil if not found)
 ///     break // If you only need one value
 /// }
 ///
 /// // Profile page - want real-time updates
-/// for await profile in profileManager.observe(for: pubkey, maxAge: 0) {
+/// for await profile in profileManager.subscribe(for: pubkey, maxAge: 0) {
 ///     // Handle profile updates
 /// }
 /// ```
@@ -77,7 +77,7 @@ public actor NDKProfileManager {
     /// - Parameters:
     ///   - pubkey: The public key to observe
     ///   - maxAge: Maximum age of cached data in seconds (0 = always get real-time updates)
-    public func observe(for pubkey: PublicKey, maxAge: TimeInterval = TimeConstants.hour) -> AsyncStream<NDKUserMetadata?> {
+    public func subscribe(for pubkey: PublicKey, maxAge: TimeInterval = TimeConstants.hour) -> AsyncStream<NDKUserMetadata?> {
         AsyncStream { continuation in
             Task {
                 // Add continuation to active observations
@@ -103,9 +103,9 @@ public actor NDKProfileManager {
                     kinds: [EventKind.metadata]
                 )
 
-                // Use NDKDataSource for profile updates
+                // Use NDKSubscription for profile updates
                 // Pass maxAge through to control subscription behavior
-                let dataSource = ndk.observe(filter: filter, maxAge: maxAge)
+                let dataSource = ndk.subscribe(filter: filter, maxAge: maxAge)
 
                 // Process events from data source
                 for await event in dataSource.events {

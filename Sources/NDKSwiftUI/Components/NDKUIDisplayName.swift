@@ -134,7 +134,7 @@ public struct NDKUIDisplayName: View {
             os_log(.debug, "NDKUIDisplayName: Starting profile observation for %{public}@", pubkey)
             var receivedProfile = false
             
-            for await metadata in await ndk.profileManager.observe(for: pubkey) {
+            for await metadata in await ndk.profileManager.subscribe(for: pubkey) {
                 receivedProfile = true
                 os_log(.debug, "NDKUIDisplayName: Received metadata for %{public}@: %{public}@", pubkey, metadata?.displayName ?? metadata?.name ?? "<nil>")
                 

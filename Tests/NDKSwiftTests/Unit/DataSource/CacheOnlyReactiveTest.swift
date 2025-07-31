@@ -31,7 +31,7 @@ final class CacheOnlyReactiveTest: XCTestCase {
         var cacheOnlyEvents: [NDKEvent] = []
         
         // Create network subscription
-        let networkDataSource = ndk.observe(
+        let networkDataSource = ndk.subscribe(
             filter: filter,
             cachePolicy: .networkOnly,
             subscriptionId: "network-sub"
@@ -47,7 +47,7 @@ final class CacheOnlyReactiveTest: XCTestCase {
         try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         
         // Create cache-only subscription with same filter
-        let cacheDataSource = ndk.observe(
+        let cacheDataSource = ndk.subscribe(
             filter: filter,
             cachePolicy: .cacheOnly,
             subscriptionId: "cache-sub"
@@ -107,7 +107,7 @@ final class CacheOnlyReactiveTest: XCTestCase {
         var networkEvents: [NDKEvent] = []
         
         // Create first cache-only subscription
-        let cache1DataSource = ndk.observe(
+        let cache1DataSource = ndk.subscribe(
             filter: filter,
             cachePolicy: .cacheOnly,
             subscriptionId: "cache-1"
@@ -120,7 +120,7 @@ final class CacheOnlyReactiveTest: XCTestCase {
         }
         
         // Create second cache-only subscription
-        let cache2DataSource = ndk.observe(
+        let cache2DataSource = ndk.subscribe(
             filter: filter,
             cachePolicy: .cacheOnly,
             subscriptionId: "cache-2"
@@ -136,7 +136,7 @@ final class CacheOnlyReactiveTest: XCTestCase {
         try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         
         // Create network subscription
-        let networkDataSource = ndk.observe(
+        let networkDataSource = ndk.subscribe(
             filter: filter,
             cachePolicy: .networkOnly,
             subscriptionId: "network-sub"
@@ -209,7 +209,7 @@ final class CacheOnlyReactiveTest: XCTestCase {
         }
         
         // Create cache-only subscription
-        let cacheDataSource = ndk.observe(
+        let cacheDataSource = ndk.subscribe(
             filter: filter,
             cachePolicy: .cacheOnly,
             subscriptionId: "cache-only-no-network"

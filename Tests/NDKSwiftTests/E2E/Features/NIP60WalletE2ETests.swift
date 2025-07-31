@@ -105,7 +105,7 @@ final class NIP60WalletE2ETests: XCTestCase {
         )
         
         // Create data source to monitor for events
-        let dataSource = ndk.observe(
+        let dataSource = ndk.subscribe(
             filter: filter,
             maxAge: 0, // Real-time monitoring
             cachePolicy: .networkOnly
@@ -188,7 +188,7 @@ final class NIP60WalletE2ETests: XCTestCase {
                 }
                 // Fetch from specific relay
                 let relaySet = Set([relay.url])
-                let dataSource = ndk.observe(
+                let dataSource = ndk.subscribe(
                     filter: verifyFilter,
                     maxAge: 0, // Always fresh for tests
                     cachePolicy: .networkOnly,

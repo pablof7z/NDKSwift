@@ -296,7 +296,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
 
         // Create subscription with specific relays if available
         // Create data source for bunker communication
-        let dataSource = NDKDataSource(
+        let dataSource = NDKSubscription(
             ndk: ndk,
             filter: filter,
             maxAge: 0, // Always fresh for real-time bunker communication

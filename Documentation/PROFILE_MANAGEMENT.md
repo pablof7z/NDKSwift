@@ -32,7 +32,7 @@ For displaying profiles in a list or feed where you don't need real-time updates
 
 ```swift
 // Returns cached data immediately if available, then fetches fresh data
-for await profile in await profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
+for await profile in await profileManager.subscribe(for: pubkey, maxAge: TimeConstants.hour) {
     if let profile = profile {
         // Use profile data
         displayName = profile.displayName ?? profile.name ?? "Anonymous"
@@ -48,7 +48,7 @@ For profile pages where you want to show changes as they happen:
 
 ```swift
 // maxAge: 0 keeps the subscription open for real-time updates
-for await profile in await profileManager.observe(for: pubkey, maxAge: 0) {
+for await profile in await profileManager.subscribe(for: pubkey, maxAge: 0) {
     if let profile = profile {
         // Update UI with latest profile data
         updateProfileView(with: profile)
@@ -83,19 +83,19 @@ struct ProfileView: View {
             }
         }
         .task {
-            await observeProfile()
+            await subscribeToProfile()
         }
         .onDisappear {
             profileTask?.cancel()
         }
     }
     
-    private func observeProfile() async {
+    private func subscribeToProfile() async {
         profileTask = Task {
             // Use hour cache for feed views, 0 for profile pages
             let maxAge = isProfilePage ? 0 : TimeConstants.hour
             
-            for await profile in await profileManager.observe(for: pubkey, maxAge: maxAge) {
+            for await profile in await profileManager.subscribe(for: pubkey, maxAge: maxAge) {
                 await MainActor.run {
                     if let profile = profile {
                         self.profile = profile
@@ -130,7 +130,7 @@ for (pubkey, profile) in cachedProfiles {
 await withTaskGroup(of: Void.self) { group in
     for pubkey in pubkeys {
         group.addTask {
-            for await profile in await profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
+            for await profile in await profileManager.subscribe(for: pubkey, maxAge: TimeConstants.hour) {
                 await updateUI(pubkey: pubkey, profile: profile)
                 break  // Only need first value
             }
@@ -174,7 +174,7 @@ class ProfileViewModel: ObservableObject {
         profileTask?.cancel()
         
         profileTask = Task {
-            for await profile in await profileManager.observe(for: pubkey) {
+            for await profile in await profileManager.subscribe(for: pubkey) {
                 // Update UI
             }
         }
@@ -217,7 +217,7 @@ struct ProfilePicture: View {
             }
         }
         .task {
-            for await profile in await ndk.profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
+            for await profile in await ndk.profileManager.subscribe(for: pubkey, maxAge: TimeConstants.hour) {
                 if let profile = profile {
                     self.profile = profile
                 }
@@ -239,7 +239,7 @@ struct DisplayName: View {
     var body: some View {
         Text(displayName)
             .task {
-                for await profile in await profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
+                for await profile in await profileManager.subscribe(for: pubkey, maxAge: TimeConstants.hour) {
                     displayName = profile?.displayName 
                         ?? profile?.name 
                         ?? String(pubkey.prefix(8))
@@ -257,7 +257,7 @@ If you're currently fetching profiles manually:
 ### Before (Manual Approach)
 ```swift
 // Don't do this
-let profileSource = ndk.observe(
+let profileSource = ndk.subscribe(
     filter: NDKFilter(
         authors: [pubkey],
         kinds: [0]
@@ -276,7 +276,7 @@ for await event in profileSource.events {
 ### After (Using ProfileManager)
 ```swift
 // Do this instead
-for await profile in await profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
+for await profile in await profileManager.subscribe(for: pubkey, maxAge: TimeConstants.hour) {
     if let profile = profile {
         // Use profile directly - no manual JSON decoding needed
     }
@@ -296,7 +296,7 @@ for await profile in await profileManager.observe(for: pubkey, maxAge: TimeConst
 
 ```swift
 do {
-    for await profile in await profileManager.observe(for: pubkey) {
+    for await profile in await profileManager.subscribe(for: pubkey) {
         // Handle profile
     }
 } catch {

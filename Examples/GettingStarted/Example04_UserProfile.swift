@@ -25,7 +25,7 @@ struct Example04_UserProfile {
         
         // Fetch profile using profileManager
         var fetchedMetadata: NDKUserMetadata?
-        for await metadata in await ndk.profileManager.observe(for: jackPubkey) {
+        for await metadata in await ndk.profileManager.subscribe(for: jackPubkey) {
             fetchedMetadata = metadata
             break // Get first result
         }
@@ -88,7 +88,7 @@ struct Example04_UserProfile {
         // Fetch profiles for multiple users
         var foundProfiles = 0
         for pubkey in pubkeys {
-            for await metadata in await ndk.profileManager.observe(for: pubkey, maxAge: 0) {
+            for await metadata in await ndk.profileManager.subscribe(for: pubkey, maxAge: 0) {
                 if let metadata = metadata {
                     foundProfiles += 1
                     print("\n👤 Profile: \(metadata.name ?? "Unknown")")
@@ -108,7 +108,7 @@ struct Example04_UserProfile {
             since: Timestamp(Date().timeIntervalSince1970)
         )
         
-        let updateSource = ndk.observe(filter: updateFilter, cachePolicy: .networkOnly)
+        let updateSource = ndk.subscribe(filter: updateFilter, cachePolicy: .networkOnly)
         
         let subscriptionTask = Task {
             var updateCount = 0

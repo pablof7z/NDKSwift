@@ -56,7 +56,7 @@ await ndk.connect()
 
 // Stream real-time notes
 // Multiple subscriptions with similar filters are automatically merged!
-let dataSource = ndk.observe(filter: NDKFilter(kinds: [1], limit: 50))
+let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1], limit: 50))
 for await event in dataSource.events {
     print("\(event.content)")
 }

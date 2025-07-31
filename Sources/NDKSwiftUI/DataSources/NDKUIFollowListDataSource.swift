@@ -13,10 +13,10 @@ public class NDKUIFollowListDataSource: ObservableObject {
     @Published public private(set) var error: Error?
     @Published public private(set) var lastUpdate: Date?
     
-    private let dataSource: NDKDataSource<NDKEvent>
+    private let dataSource: NDKSubscription<NDKEvent>
     
     public init(ndk: NDK, pubkey: String) {
-        self.dataSource = ndk.observe(
+        self.dataSource = ndk.subscribe(
             filter: NDKFilter(
                 authors: [pubkey],
                 kinds: [EventKind.contacts]

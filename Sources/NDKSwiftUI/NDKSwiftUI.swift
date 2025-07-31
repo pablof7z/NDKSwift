@@ -41,7 +41,7 @@ import NDKSwift
 /// ```
 public struct NDKSwiftUI {
     /// The version of NDKSwiftUI
-    public static let version = "0.2.1"
+    public static let version = "0.12"
 }
 
 // MARK: - Environment Values

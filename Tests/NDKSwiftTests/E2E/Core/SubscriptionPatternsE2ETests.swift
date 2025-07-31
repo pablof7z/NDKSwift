@@ -39,7 +39,7 @@ final class SubscriptionPatternsE2ETests: XCTestCase {
             limit: 10
         )
         
-        let realtimeDataSource = ndk.observe(filter: realtimeFilter, maxAge: 0)
+        let realtimeDataSource = ndk.subscribe(filter: realtimeFilter, maxAge: 0)
         var realtimeEvents: [NDKEvent] = []
         
         // Start observing in background
@@ -89,7 +89,7 @@ final class SubscriptionPatternsE2ETests: XCTestCase {
             tags: ["test": ["realtime"]]
         )
         
-        let cacheDataSource = ndk.observe(
+        let cacheDataSource = ndk.subscribe(
             filter: cacheFetchFilter,
             maxAge: 3600, // 1 hour
             cachePolicy: .cacheWithNetwork
@@ -120,9 +120,9 @@ final class SubscriptionPatternsE2ETests: XCTestCase {
         let filter2 = NDKFilter(kinds: [EventKind.textNote], limit: 5)
         let filter3 = NDKFilter(kinds: [EventKind.contacts], limit: 5)
         
-        let dataSource1 = ndk.observe(filter: filter1, maxAge: 3600)
-        let dataSource2 = ndk.observe(filter: filter2, maxAge: 3600)
-        let dataSource3 = ndk.observe(filter: filter3, maxAge: 3600)
+        let dataSource1 = ndk.subscribe(filter: filter1, maxAge: 3600)
+        let dataSource2 = ndk.subscribe(filter: filter2, maxAge: 3600)
+        let dataSource3 = ndk.subscribe(filter: filter3, maxAge: 3600)
         
         var results = (metadata: 0, textNotes: 0, contacts: 0)
         
@@ -200,7 +200,7 @@ final class SubscriptionPatternsE2ETests: XCTestCase {
             tags: ["t": [testTag]]
         )
         
-        let tagDataSource = ndk.observe(filter: tagFilter, maxAge: 3600)
+        let tagDataSource = ndk.subscribe(filter: tagFilter, maxAge: 3600)
         var taggedEvents: [NDKEvent] = []
         
         print("[\(timestamp())] Fetching events with tag '\(testTag)'...")
@@ -230,7 +230,7 @@ final class SubscriptionPatternsE2ETests: XCTestCase {
         print("\n[\(timestamp())] Test 5: Cache-only query")
         print("=====================================")
         
-        let cacheOnlyDataSource = ndk.observe(
+        let cacheOnlyDataSource = ndk.subscribe(
             filter: tagFilter,
             maxAge: 3600,
             cachePolicy: .cacheOnly
@@ -281,7 +281,7 @@ final class SubscriptionPatternsE2ETests: XCTestCase {
         )
         
         // Create data source with transform
-        let profileDataSource = ndk.observe(
+        let profileDataSource = ndk.subscribe(
             filter: profileFilter,
             maxAge: 3600,
             transform: { (event: NDKEvent) -> ProfileSummary? in

@@ -54,7 +54,7 @@ NDKSwift uses a modern declarative data access pattern with automatic caching:
 
 ```swift
 // Subscribe to text notes (kind 1) with real-time updates
-let textNotesSource = ndk.observe(
+let textNotesSource = ndk.subscribe(
     filter: NDKFilter(kinds: [1], limit: 20),
     maxAge: 0,  // Always fetch fresh data
     cachePolicy: .cacheWithNetwork  // Show cached first, then update
@@ -72,7 +72,7 @@ let currentNotes = await textNotesSource.collect(timeout: 10.0)
 
 // Use in SwiftUI views
 struct NotesView: View {
-    let dataSource: NDKDataSource<NDKEvent>
+    let dataSource: NDKSubscription<NDKEvent>
     @State private var notes: [NDKEvent] = []
     
     var body: some View {
@@ -98,7 +98,7 @@ Use the fetch and subscribe APIs with different strategies:
 ```swift
 // Get user profile using ProfileManager (recommended)
 let user = ndk.getUser(npub: "npub1...")!
-for await metadata in await ndk.profileManager.observe(for: user.pubkey, maxAge: TimeConstants.hour) {
+for await metadata in await ndk.profileManager.subscribe(for: user.pubkey, maxAge: TimeConstants.hour) {
     if let metadata = metadata {
         print("Name: \(metadata.displayName ?? metadata.name ?? "Unknown")")
     }
@@ -106,12 +106,12 @@ for await metadata in await ndk.profileManager.observe(for: user.pubkey, maxAge:
 }
 
 // Stream recent notes
-for await event in ndk.observe(filter: NDKFilter(kinds: [1], limit: 10)).events {
+for await event in ndk.subscribe(filter: NDKFilter(kinds: [1], limit: 10)).events {
     print("Note: \(event.content)")
 }
 
-// Subscribe to real-time updates using observe API
-let dataSource = ndk.observe(
+// Subscribe to real-time updates using subscribe API
+let dataSource = ndk.subscribe(
     filter: NDKFilter(kinds: [1], limit: 10),
     maxAge: 0  // Real-time updates
 )
@@ -120,7 +120,7 @@ for await event in dataSource.events {
 }
 
 // Get specific event by ID
-let eventSource = ndk.observe(
+let eventSource = ndk.subscribe(
     filter: NDKFilter(ids: ["eventId..."]),
     cachePolicy: .networkOnly  // Skip cache entirely
 )
@@ -128,7 +128,7 @@ let events = await eventSource.collect(timeout: 5.0)
 let event = events.first
 
 // Cache-only access for offline support
-let cachedNotes = ndk.observe(
+let cachedNotes = ndk.subscribe(
     filter: NDKFilter(kinds: [1]),
     cachePolicy: .cacheOnly  // Never hit network
 )
@@ -223,7 +223,7 @@ let user = ndk.getUser(npub: "npub1...")
 // The profile manager is built into NDK - no need to create one
 if let user = user {
     // This returns cached data immediately if available, then fetches fresh data
-    for await profile in await ndk.profileManager.observe(for: user.pubkey, maxAge: TimeConstants.hour) {
+    for await profile in await ndk.profileManager.subscribe(for: user.pubkey, maxAge: TimeConstants.hour) {
         if let profile = profile {
             print("Name: \(profile.displayName ?? profile.name ?? "Unknown")")
             print("About: \(profile.about ?? "")")
@@ -232,13 +232,13 @@ if let user = user {
     }
     
     // For continuous profile updates (e.g., on a profile page)
-    for await profile in await ndk.profileManager.observe(for: user.pubkey, maxAge: 0) {
+    for await profile in await ndk.profileManager.subscribe(for: user.pubkey, maxAge: 0) {
         // This will keep the subscription open and yield updates
         updateUI(with: profile)
     }
     
     // Get who they follow
-    let contactsSource = ndk.observe(
+    let contactsSource = ndk.subscribe(
         filter: NDKFilter(kinds: [3], authors: [user.pubkey])
     )
     
@@ -304,7 +304,7 @@ let bunkerSigner = NDKBunkerSigner(
 
 ```swift
 // Subscribe to a chat channel
-let chatSource = ndk.observe(
+let chatSource = ndk.subscribe(
     filter: NDKFilter(
         kinds: [42],  // Live chat message
         tags: ["e": Set(["chat-room-id"])]
@@ -346,7 +346,7 @@ try await ndk.publish(profileEvent)
 
 ```swift
 // Fetch the original event
-let eventSource = ndk.observe(
+let eventSource = ndk.subscribe(
     filter: NDKFilter(ids: ["eventId..."])
 )
 
@@ -390,7 +390,7 @@ Always handle errors appropriately:
 
 ```swift
 do {
-    let dataSource = ndk.observe(filter: filter)
+    let dataSource = ndk.subscribe(filter: filter)
     
     // For streaming
     for await event in dataSource.events {
@@ -411,7 +411,7 @@ Data sources automatically manage their lifecycle:
 
 ```swift
 // Create a data source
-let dataSource = ndk.observe(
+let dataSource = ndk.subscribe(
     filter: filter,
     maxAge: 0  // Real-time
 )
@@ -429,7 +429,7 @@ Task {
 // The subscription is managed internally and closes when:
 // - The AsyncSequence iteration ends
 // - The DataSource is deallocated
-// - No more observers are active
+// - No more subscribers are active
 ```
 
 ### 3. Enable Caching
@@ -444,7 +444,7 @@ let ndk = NDK(
 )
 
 // Queries will check cache first (cache is used by default)
-for await event in ndk.observe(filter: filter).events {
+for await event in ndk.subscribe(filter: filter).events {
     // Process events from cache and network
 }
 ```
@@ -565,7 +565,7 @@ For large-scale applications:
 ```swift
 // Use specific relays for queries
 let fastRelays = Set(["wss://relay1.com", "wss://relay2.com"])
-for await event in ndk.observe(
+for await event in ndk.subscribe(
     filter: filter,
     relays: fastRelays,
     exclusiveRelays: true  // Only use specified relays

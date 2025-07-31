@@ -172,7 +172,7 @@ public struct NDKUIProfilePicture: View {
         profileTask?.cancel()
 
         profileTask = Task {
-            for await metadata in await ndk.profileManager.observe(for: pubkey) {
+            for await metadata in await ndk.profileManager.subscribe(for: pubkey) {
                 await MainActor.run {
                     self.metadata = metadata
                 }

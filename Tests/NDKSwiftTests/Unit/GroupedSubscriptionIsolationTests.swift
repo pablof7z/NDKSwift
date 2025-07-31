@@ -27,8 +27,8 @@ final class GroupedSubscriptionIsolationTests: XCTestCase {
         let filter2 = NDKFilter(authors: [author2], kinds: [0])
         
         // Create observers
-        let observer1 = ndk.observe(filter: filter1, cachePolicy: .networkOnly)
-        let observer2 = ndk.observe(filter: filter2, cachePolicy: .networkOnly)
+        let observer1 = ndk.subscribe(filter: filter1, cachePolicy: .networkOnly)
+        let observer2 = ndk.subscribe(filter: filter2, cachePolicy: .networkOnly)
         
         // Track received events
         var observer1Events: [NDKEvent] = []
@@ -143,9 +143,9 @@ final class GroupedSubscriptionIsolationTests: XCTestCase {
         let filter2 = NDKFilter(authors: [author2], kinds: [1])          // Only author2
         let filter3 = NDKFilter(authors: [author3], kinds: [1])          // Only author3
         
-        let observer1 = ndk.observe(filter: filter1, cachePolicy: .networkOnly)
-        let observer2 = ndk.observe(filter: filter2, cachePolicy: .networkOnly)
-        let observer3 = ndk.observe(filter: filter3, cachePolicy: .networkOnly)
+        let observer1 = ndk.subscribe(filter: filter1, cachePolicy: .networkOnly)
+        let observer2 = ndk.subscribe(filter: filter2, cachePolicy: .networkOnly)
+        let observer3 = ndk.subscribe(filter: filter3, cachePolicy: .networkOnly)
         
         var results1: [String] = [] // Track pubkeys
         var results2: [String] = []
@@ -221,8 +221,8 @@ final class GroupedSubscriptionIsolationTests: XCTestCase {
         let filter1 = NDKFilter(kinds: [1], tags: ["t": ["bitcoin"]])
         let filter2 = NDKFilter(kinds: [1], tags: ["t": ["nostr"]])
         
-        let observer1 = ndk.observe(filter: filter1, cachePolicy: .networkOnly)
-        let observer2 = ndk.observe(filter: filter2, cachePolicy: .networkOnly)
+        let observer1 = ndk.subscribe(filter: filter1, cachePolicy: .networkOnly)
+        let observer2 = ndk.subscribe(filter: filter2, cachePolicy: .networkOnly)
         
         var bitcoinEvents: [NDKEvent] = []
         var nostrEvents: [NDKEvent] = []
@@ -315,7 +315,7 @@ final class GroupedSubscriptionIsolationTests: XCTestCase {
         for i in 0..<10 {
             let author = authors[i % authors.count]
             let filter = NDKFilter(authors: [author], kinds: [1])
-            let observer = ndk.observe(filter: filter, cachePolicy: .networkOnly)
+            let observer = ndk.subscribe(filter: filter, cachePolicy: .networkOnly)
             
             // Start observing
             let task = Task {

@@ -50,7 +50,7 @@ final class ReactiveFilterTests: XCTestCase {
         )
         
         // Observe with reactive filter
-        let stream = ndk.observe(filter)
+        let stream = ndk.subscribe(filter)
         
         // Try to consume some events
         Task {
@@ -98,7 +98,7 @@ final class ReactiveFilterTests: XCTestCase {
         )
         
         // Observe with reactive filter
-        let stream = ndk.observe(filter)
+        let stream = ndk.subscribe(filter)
         
         // Try to consume events
         Task {

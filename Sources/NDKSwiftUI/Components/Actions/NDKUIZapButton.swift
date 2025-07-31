@@ -358,7 +358,7 @@ private class ZapState: ObservableObject {
             tags: ["e": Set([eventId])] // Events that reference our event
         )
 
-        let dataSource = ndk.observe(
+        let dataSource = ndk.subscribe(
             filter: filter,
             maxAge: 0, // Real-time
             cachePolicy: .cacheWithNetwork

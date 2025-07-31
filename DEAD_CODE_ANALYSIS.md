@@ -41,8 +41,8 @@ This analysis identified several areas of dead code, duplication, and opportunit
 ## 3. Incomplete/Broken Features
 
 ### Subscription Grouping
-**Files**: `NDKRelaySubscriptionManager.swift`, `InternalSubscription.swift`
-- `NDKRelaySubscriptionManager` tries to access properties that don't exist on InternalSubscription:
+**Files**: `NDKRelaySubscriptionManager.swift`, `NDKSubscriptionCoordinator.swift`
+- `NDKRelaySubscriptionManager` tries to access properties that don't exist on NDKSubscriptionCoordinator:
   - `groupableDelay` (Line 56)
   - `groupableDelayType` (Line 57)
   - `isGroupable` exists but is always `true`
@@ -102,9 +102,9 @@ While test files weren't directly analyzed, common patterns suggest:
 - ✅ Fixed incorrect @_exported usage in WalletImports.swift
 - ✅ Enhanced test infrastructure with base classes and utilities
 - ✅ Fixed subscription grouping by implementing missing properties:
-  - Added `isGroupable`, `groupableDelay`, and `groupableDelayType` to InternalSubscription
+  - Added `isGroupable`, `groupableDelay`, and `groupableDelayType` to NDKSubscriptionCoordinator
   - Fixed NDKRelaySubscriptionManager to properly use these properties
-  - Removed conflicting property extensions from NDKRelaySubscriptionGroup
+  - Removed conflicting property extensions from NDKRelaySubscription
   - Created comprehensive tests for subscription grouping functionality
 
 ## Estimated Impact

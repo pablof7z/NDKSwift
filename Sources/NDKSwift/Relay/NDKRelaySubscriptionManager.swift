@@ -9,21 +9,21 @@ import Foundation
 /// * Managing subscription lifecycle on the relay
 actor NDKRelaySubscriptionManager {
     private weak var relay: NDKRelay?
-    private var subscriptionGroups: [String: NDKRelaySubscriptionGroup] = [:]
+    private var subscriptionGroups: [String: NDKRelaySubscription] = [:]
     /// Maps subscription IDs to their groups for event routing
-    private var subscriptionIdToGroup: [String: NDKRelaySubscriptionGroup] = [:]
+    private var subscriptionIdToGroup: [String: NDKRelaySubscription] = [:]
     
     init(relay: NDKRelay) {
         self.relay = relay
     }
     
     /// Adds a subscription to the manager
-    func addSubscription(_ subscription: InternalSubscription, filters: [NDKFilter]) async {
+    func addSubscription(_ subscription: NDKSubscriptionCoordinator, filters: [NDKFilter]) async {
         guard let relay = relay else { return }
         
         if !subscription.isGroupable {
             // Non-groupable subscriptions execute immediately
-            let group = NDKRelaySubscriptionGroup(
+            let group = NDKRelaySubscription(
                 relay: relay,
                 fingerprint: UUID().uuidString,
                 isGroupable: false
@@ -43,7 +43,7 @@ actor NDKRelaySubscriptionManager {
                await existingGroup.canAcceptNewItems() {
                 await existingGroup.addItem(subscription, filters: filters)
             } else {
-                let newGroup = NDKRelaySubscriptionGroup(
+                let newGroup = NDKRelaySubscription(
                     relay: relay,
                     fingerprint: fingerprint,
                     isGroupable: true
@@ -63,7 +63,7 @@ actor NDKRelaySubscriptionManager {
     }
     
     /// Removes a subscription from the manager
-    func removeSubscription(_ subscription: InternalSubscription) async {
+    func removeSubscription(_ subscription: NDKSubscriptionCoordinator) async {
         for (fingerprint, group) in subscriptionGroups {
             let wasRemoved = await group.removeItem(subscription)
             if wasRemoved {
@@ -77,7 +77,7 @@ actor NDKRelaySubscriptionManager {
     }
     
     /// Called when a group closes
-    func onGroupClosed(_ group: NDKRelaySubscriptionGroup) async {
+    func onGroupClosed(_ group: NDKRelaySubscription) async {
         subscriptionGroups.removeValue(forKey: group.fingerprint)
         // Remove from subscription ID mapping
         if let subId = await group.subId {
@@ -88,7 +88,7 @@ actor NDKRelaySubscriptionManager {
     }
     
     /// Called when a group starts executing (to track subscription ID)
-    func trackGroupSubscriptionId(_ group: NDKRelaySubscriptionGroup) async {
+    func trackGroupSubscriptionId(_ group: NDKRelaySubscription) async {
         if let subId = await group.subId {
             subscriptionIdToGroup[subId] = group
             NDKLogger.log(.debug, category: .subscription,

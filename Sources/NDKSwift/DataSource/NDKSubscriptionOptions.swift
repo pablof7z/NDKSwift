@@ -1,7 +1,7 @@
 import Foundation
 
-/// Options for configuring NDKDataSource behavior
-public struct NDKDataSourceOptions {
+/// Options for configuring NDKSubscription behavior
+public struct NDKSubscriptionOptions {
     /// Maximum age of events to return from cache (0 = no limit)
     public var maxAge: TimeInterval
     
@@ -38,11 +38,11 @@ public struct NDKDataSourceOptions {
     }
     
     /// Default options
-    public static let `default` = NDKDataSourceOptions()
+    public static let `default` = NDKSubscriptionOptions()
     
     /// Cache-only options
-    public static let cacheOnly = NDKDataSourceOptions(cachePolicy: .cacheOnly)
+    public static let cacheOnly = NDKSubscriptionOptions(cachePolicy: .cacheOnly)
     
     /// Network-only options
-    public static let networkOnly = NDKDataSourceOptions(cachePolicy: .networkOnly)
+    public static let networkOnly = NDKSubscriptionOptions(cachePolicy: .networkOnly)
 }

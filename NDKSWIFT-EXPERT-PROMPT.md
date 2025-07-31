@@ -218,13 +218,13 @@ The `NutsackiOS` and `Socrates` example apps demonstrate these patterns in produ
 
 ---
 
-### 3. Data Access: Declarative API with NDKDataSource
+### 3. Data Access: Declarative API with NDKSubscription
 
 NDKSwift provides a modern declarative API for accessing Nostr data with automatic caching, real-time updates, and intelligent subscription management.
 
 **Key Concepts:**
 
-*   **`NDKDataSource`**: A declarative data source that provides streaming (`events`) and collection (`collect()`) access
+*   **`NDKSubscription`**: A declarative data source that provides streaming (`events`) and collection (`collect()`) access
 *   **`maxAge`**: Controls cache freshness - how old cached data can be before fetching fresh
 *   **`CachePolicy`**: Determines how to balance cache vs network (`.cacheWithNetwork`, `.cacheOnly`, `.networkOnly`)
 *   **Automatic Lifecycle**: Data sources manage their subscriptions automatically - no manual closing needed
@@ -232,18 +232,18 @@ NDKSwift provides a modern declarative API for accessing Nostr data with automat
 
 **Creating Data Sources:**
 
-Use `ndk.observe()` to create data sources with optional custom subscription IDs:
+Use `ndk.subscribe()` to create data sources with optional custom subscription IDs:
 
 ```swift
 // With custom subscription ID (persists across sessions)
-let customSource = ndk.observe(
+let customSource = ndk.subscribe(
     filter: NDKFilter(kinds: [1]),
     maxAge: 0,
     subscriptionId: "my-custom-feed"
 )
 
 // Without custom ID (auto-generated)
-let autoSource = ndk.observe(
+let autoSource = ndk.subscribe(
     filter: NDKFilter(kinds: [1]),
     maxAge: 0
 )
@@ -255,7 +255,7 @@ When you need to collect all events before proceeding (rather than streaming the
 
 ```swift
 // Collect all events until EOSE or timeout
-let dataSource = ndk.observe(
+let dataSource = ndk.subscribe(
     filter: NDKFilter(kinds: [1], limit: 100),
     maxAge: 0
 )
@@ -278,7 +278,7 @@ let limitedEvents = await dataSource.collect(timeout: 10.0, limit: 50)
 
     ```swift
     // Stream text notes in real-time
-    let notesSource = ndk.observe(
+    let notesSource = ndk.subscribe(
         filter: NDKFilter(kinds: [1], limit: 100),
         maxAge: 0,  // Always fresh
         cachePolicy: .cacheWithNetwork
@@ -294,7 +294,7 @@ let limitedEvents = await dataSource.collect(timeout: 10.0, limit: 50)
 
     ```swift
     // Fetch user profile with 1-hour cache
-    let profileSource = ndk.observe(
+    let profileSource = ndk.subscribe(
         filter: NDKFilter(authors: [pubkey], kinds: [0]),
         maxAge: 3600  // 1 hour cache tolerance
     )
@@ -310,7 +310,7 @@ let limitedEvents = await dataSource.collect(timeout: 10.0, limit: 50)
 
     ```swift
     // Only use cached data, no network calls
-    let cachedNotes = ndk.observe(
+    let cachedNotes = ndk.subscribe(
         filter: NDKFilter(kinds: [1]),
         cachePolicy: .cacheOnly
     )
@@ -323,7 +323,7 @@ let limitedEvents = await dataSource.collect(timeout: 10.0, limit: 50)
 
     ```swift
     struct NotesView: View {
-        let dataSource: NDKDataSource<NDKEvent>
+        let dataSource: NDKSubscription<NDKEvent>
         @State private var notes: [NDKEvent] = []
         
         var body: some View {
@@ -361,7 +361,7 @@ When you need to show events only from specific relays (e.g., for relay-specific
 
 ```swift
 // Show only events from selected relays
-let relaySpecificSource = ndk.observe(
+let relaySpecificSource = ndk.subscribe(
     filter: NDKFilter(kinds: [1, 6, 7]),
     maxAge: 0,
     relays: Set(["wss://relay.damus.io"]),
@@ -404,7 +404,7 @@ let event = try await NDKEventBuilder()
 ```
 
 **Optimistic Publishing:** This is a key feature for a responsive UI. When enabled (default), `ndk.publish(event)` does the following:
-1.  Immediately dispatches the event to active subscriptions (including NDKDataSource observers).
+1.  Immediately dispatches the event to active subscriptions (including NDKSubscription observers).
 2.  Your UI can update instantly, showing the event in a "sending..." state.
 3.  The event is sent to relays in the background.
 4.  When `OK` messages arrive from relays, the event's status transitions through confirmation states.
@@ -685,7 +685,7 @@ When you call `ndk.publish(event)`:
 // Use cache policy .networkOnly if you need to skip optimistic events
 
 // Per-data source control
-let confirmedOnlySource = ndk.observe(
+let confirmedOnlySource = ndk.subscribe(
     filter: filter,
     maxAge: 0,
     cachePolicy: .networkOnly  // Skip cache and optimistic events
@@ -948,7 +948,7 @@ The `NDKProfileManager` is an actor-based cache that provides intelligent profil
 
 ```swift
 // Reactive profile updates with caching
-for await profile in await ndk.profileManager.observe(for: pubkey, maxAge: TimeConstants.hour) {
+for await profile in await ndk.profileManager.subscribe(for: pubkey, maxAge: TimeConstants.hour) {
     // Handle profile updates (may be nil if not found)
     if let profile = profile {
         print("Name: \(profile.name ?? "Unknown")")
@@ -958,7 +958,7 @@ for await profile in await ndk.profileManager.observe(for: pubkey, maxAge: TimeC
 }
 
 // Force fresh data from network
-for await profile in await ndk.profileManager.observe(for: pubkey, maxAge: 0) {
+for await profile in await ndk.profileManager.subscribe(for: pubkey, maxAge: 0) {
     // Real-time profile updates, always from network
 }
 ```
@@ -1076,7 +1076,7 @@ For custom implementations, use direct event fetching:
 
 ```swift
 // Direct profile event fetching
-let profileSource = ndk.observe(
+let profileSource = ndk.subscribe(
     filter: NDKFilter(authors: [pubkey], kinds: [EventKind.metadata], limit: 1),
     maxAge: 3600  // 1 hour cache tolerance
 )
@@ -1127,7 +1127,7 @@ Following NDKSwift's core philosophy, never show loading states for profiles:
 func loadUserProfile() async {
     showLoadingSpinner()
     // fetchProfile doesn't exist - use profileManager instead
-    for await metadata in await ndk.profileManager.observe(for: pubkey) {
+    for await metadata in await ndk.profileManager.subscribe(for: pubkey) {
         updateUI(metadata)
         break
     }
@@ -1151,7 +1151,7 @@ struct UserProfileView: View {
             }
         }
         .task {
-            for await profile in await ndk.profileManager.observe(for: pubkey) {
+            for await profile in await ndk.profileManager.subscribe(for: pubkey) {
                 self.profile = profile
             }
         }
@@ -1233,14 +1233,14 @@ ForEach(Array(seenRelays), id: \.self) { relay in
 
 ### 9. Cache Observation and NIP-77 Integration
 
-NDKSwift's cache system integrates seamlessly with both NDKDataSource observers and NIP-77 sync operations, ensuring all data updates are propagated correctly.
+NDKSwift's cache system integrates seamlessly with both NDKSubscription observers and NIP-77 sync operations, ensuring all data updates are propagated correctly.
 
 **Cache Observer Pattern:**
 
 When events arrive through any channel (relay subscription, NIP-77 sync, optimistic publishing), they flow through the cache's `processEvent` method which:
 
 1. Saves the event to storage
-2. Notifies all matching NDKDataSource observers
+2. Notifies all matching NDKSubscription observers
 3. Updates relay tracking information
 4. Handles deletion tombstones (NIP-09)
 
@@ -1248,7 +1248,7 @@ When events arrive through any channel (relay subscription, NIP-77 sync, optimis
 
 ```swift
 // When NIP-77 syncs events, observers are automatically notified
-let profileSource = ndk.observe(
+let profileSource = ndk.subscribe(
     filter: NDKFilter(kinds: [0], authors: [pubkey]),
     maxAge: 300  // 5 minute cache
 )
@@ -1281,7 +1281,7 @@ NDKSwift includes a comprehensive implementation of Negentropy, a set reconcilia
 **When NOT to Use Negentropy:**
 
 *   **Small Event Sets (< 100 events)**: Traditional sync is simpler and faster
-*   **Real-time Subscriptions**: Use `ndk.observe()` with `maxAge: 0` for live feeds
+*   **Real-time Subscriptions**: Use `ndk.subscribe()` with `maxAge: 0` for live feeds
 *   **Unsupported Relays**: Always check relay NIP-77 support first
 
 **Core Implementation Pattern:**
@@ -1568,7 +1568,7 @@ func loadUserProfile() async {
     
     // Wait for profile to fully load
     // This method doesn't exist - use profileManager instead
-    for await metadata in await ndk.profileManager.observe(for: userPubkey) {
+    for await metadata in await ndk.profileManager.subscribe(for: userPubkey) {
         if let metadata = metadata {
             // Use profile data
         }
@@ -1584,7 +1584,7 @@ func showUserFeed() async {
     showLoadingSpinner()
     
     // Then wait to load all posts from followed users
-    let posts = await ndk.observe(authors: contactList.contactPubkeys).collect()
+    let posts = await ndk.subscribe(authors: contactList.contactPubkeys).collect()
     
     hideLoadingSpinner()
     displayPosts(posts)
@@ -1615,7 +1615,7 @@ struct UserProfileView: View {
 // RIGHT: Show UI immediately, update as data arrives
 func setupUserProfile(pubkey: String) {
     // Show UI immediately with pubkey - no loading state
-    let profileSource = ndk.observe(
+    let profileSource = ndk.subscribe(
         filter: NDKFilter(authors: [pubkey], kinds: [0]),  // metadata
         maxAge: 3600  // Use cached data immediately
     )
@@ -1634,7 +1634,7 @@ func showUserFeed() {
     displayFeedUI()
     
     // Stream contact list as it arrives
-    let followSource = ndk.observe(
+    let followSource = ndk.subscribe(
         filter: NDKFilter(kinds: [3], authors: [currentUser]),
         maxAge: 300
     )
@@ -1680,7 +1680,7 @@ struct UserProfileView: View {
         }
         .task {
             // Stream profile updates
-            let profileSource = ndk.observe(
+            let profileSource = ndk.subscribe(
                 filter: NDKFilter(authors: [pubkey], kinds: [0]),
                 maxAge: 3600
             )
@@ -1706,7 +1706,7 @@ The ONLY time you should wait is when a query depends on the results of another 
 // RIGHT: This is the ONLY acceptable waiting pattern
 func loadUserPostsFromFollows() async {
     // Must wait for follow list to know who to fetch posts from
-    let contactListSource = ndk.observe(
+    let contactListSource = ndk.subscribe(
         filter: NDKFilter(kinds: [3], authors: [currentUserPubkey]),
         maxAge: 300
     )
@@ -1717,7 +1717,7 @@ func loadUserPostsFromFollows() async {
         let contactList = NDKContactList.fromEvent(contactEvent)
         
         // Now stream posts from followed users
-        let postsSource = ndk.observe(
+        let postsSource = ndk.subscribe(
             filter: NDKFilter(kinds: [1], authors: contactList.contactPubkeys),
             maxAge: 0
         )

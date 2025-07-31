@@ -30,7 +30,7 @@ import Combine
 /// )
 /// ```
 @MainActor
-public final class NDKEventDataSource: ObservableObject, @preconcurrency NDKDataSourceProtocol {
+public final class NDKEventDataSource: ObservableObject, @preconcurrency NDKSubscriptionProtocol {
 
     // MARK: - Published Properties
 
@@ -48,7 +48,7 @@ public final class NDKEventDataSource: ObservableObject, @preconcurrency NDKData
     private let ndk: NDK
     private let filter: NDKFilter
     private let sortDescending: Bool
-    private let dataSource: NDKDataSource<NDKEvent>
+    private let dataSource: NDKSubscription<NDKEvent>
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Initialization
@@ -70,7 +70,7 @@ public final class NDKEventDataSource: ObservableObject, @preconcurrency NDKData
         self.sortDescending = sortDescending
 
         // Create data source with the provided filter
-        self.dataSource = ndk.observe(
+        self.dataSource = ndk.subscribe(
             filter: filter,
             maxAge: maxAge,
             cachePolicy: .cacheWithNetwork

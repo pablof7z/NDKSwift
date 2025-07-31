@@ -419,7 +419,7 @@ final class NDKOutboxManagerTests: NDKUnitTestCase {
             kinds: [1]
         )
         
-        let dataSource = await outboxManager.observe(
+        let dataSource = await outboxManager.subscribe(
             filter: filter,
             maxAge: 3600,
             cachePolicy: .networkOnly

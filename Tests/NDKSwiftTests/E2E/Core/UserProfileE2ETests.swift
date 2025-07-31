@@ -172,7 +172,7 @@ final class UserProfileE2ETests: XCTestCase {
         let cacheStart = Date()
         
         // Fetch again from cache using cacheOnly policy
-        let dataSource = fetcherNDK.observe(
+        let dataSource = fetcherNDK.subscribe(
             filter: profileFilter,
             maxAge: 3600, // 1 hour
             cachePolicy: .cacheOnly
@@ -317,7 +317,7 @@ final class UserProfileE2ETests: XCTestCase {
     // Helper function to fetch profile metadata
     private func fetchProfileMetadata(ndk: NDK, filter: NDKFilter, pubkey: PublicKey) async throws -> NDKUserMetadata? {
         // Create data source with network-only policy to ensure fresh data
-        let dataSource = ndk.observe(
+        let dataSource = ndk.subscribe(
             filter: filter,
             maxAge: 0, // Force fresh data
             cachePolicy: .networkOnly

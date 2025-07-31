@@ -251,8 +251,8 @@ public actor NIP77SyncHandler {
         var totalBytes = reqMessage.count
 
         // Fetch events using regular REQ/EVENT protocol
-        // Use NDKDataSource for fetching missing events
-        let dataSource = NDKDataSource(
+        // Use NDKSubscription for fetching missing events
+        let dataSource = NDKSubscription(
             ndk: ndk,
             filter: filter,
             maxAge: 0, // Always fetch fresh for sync

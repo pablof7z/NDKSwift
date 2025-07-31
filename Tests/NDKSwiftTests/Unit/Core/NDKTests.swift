@@ -198,7 +198,7 @@ final class NDKTests: NDKTestCase {
         let ndk = createTestNDK()
         let filter = NDKFilter(kinds: [1])
         
-        let dataSource = ndk.observe(filter: filter)
+        let dataSource = ndk.subscribe(filter: filter)
         
         XCTAssertNotNil(dataSource)
         // Test passes if data source was created successfully
@@ -208,7 +208,7 @@ final class NDKTests: NDKTestCase {
         let ndk = createTestNDK()
         let filter = NDKFilter(kinds: [0])
         
-        let dataSource = ndk.observe(
+        let dataSource = ndk.subscribe(
             filter: filter,
             transform: { event -> NDKUserProfile? in
                 guard event.kind == 0 else { return nil }
@@ -238,7 +238,7 @@ final class NDKTests: NDKTestCase {
         let filter = NDKFilter(kinds: [1])
         // Use observe with immediate EOSE to fetch from cache
         var fetchedEvents: [NDKEvent] = []
-        let dataSource = ndk.observe(filter: filter, maxAge: 0, cachePolicy: .cacheOnly, closeOnEose: true)
+        let dataSource = ndk.subscribe(filter: filter, maxAge: 0, cachePolicy: .cacheOnly, closeOnEose: true)
         
         // Collect events
         for await event in dataSource.events {
@@ -258,7 +258,7 @@ final class NDKTests: NDKTestCase {
         
         // Use observe to fetch single event by ID
         let idFilter = NDKFilter(ids: [event.id])
-        let dataSource = ndk.observe(filter: idFilter, maxAge: 0, cachePolicy: .cacheOnly, closeOnEose: true)
+        let dataSource = ndk.subscribe(filter: idFilter, maxAge: 0, cachePolicy: .cacheOnly, closeOnEose: true)
         
         var fetchedEvent: NDKEvent? = nil
         for await event in dataSource.events {
@@ -279,7 +279,7 @@ final class NDKTests: NDKTestCase {
         
         let filter = NDKFilter(kinds: [30023], limit: 1)
         // Use observe to fetch single event by filter
-        let dataSource = ndk.observe(filter: filter, maxAge: 0, cachePolicy: .cacheOnly, closeOnEose: true)
+        let dataSource = ndk.subscribe(filter: filter, maxAge: 0, cachePolicy: .cacheOnly, closeOnEose: true)
         
         var fetchedEvent: NDKEvent? = nil
         for await event in dataSource.events {
@@ -330,7 +330,7 @@ final class NDKTests: NDKTestCase {
         // Fetch profile
         // Use observe to fetch profile
         let profileFilter = NDKFilter(authors: [TestFixtures.Keys.alice.publicKey], kinds: [0], limit: 1)
-        let dataSource = ndk.observe(filter: profileFilter, maxAge: 0, cachePolicy: .cacheOnly, closeOnEose: true)
+        let dataSource = ndk.subscribe(filter: profileFilter, maxAge: 0, cachePolicy: .cacheOnly, closeOnEose: true)
         
         var profile: NDKUserProfile? = nil
         for await event in dataSource.events {
@@ -367,7 +367,7 @@ final class NDKTests: NDKTestCase {
         let pubkeys = users.map(\.pubkey)
         // Use observe to fetch multiple profiles
         let profilesFilter = NDKFilter(authors: pubkeys, kinds: [0])
-        let dataSource = ndk.observe(filter: profilesFilter, maxAge: 0, cachePolicy: .cacheOnly, closeOnEose: true)
+        let dataSource = ndk.subscribe(filter: profilesFilter, maxAge: 0, cachePolicy: .cacheOnly, closeOnEose: true)
         
         var profiles: [NDKUserProfile] = []
         for await event in dataSource.events {
@@ -415,7 +415,7 @@ final class NDKTests: NDKTestCase {
         let filter = NDKFilter(kinds: [1])
         
         // Create data source (modern subscription approach)
-        let dataSource = ndk.observe(filter: filter)
+        let dataSource = ndk.subscribe(filter: filter)
         
         // Verify data source is created
         XCTAssertNotNil(dataSource)

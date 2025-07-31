@@ -132,7 +132,7 @@ extension XCTestCase {
 extension XCTestCase {
     /// Waits for an NDK data source to receive a specific number of events
     func waitForEvents<T>(
-        from dataSource: NDKDataSource<T>,
+        from dataSource: NDKSubscription<T>,
         count: Int,
         timeout: TimeInterval = 10.0,
         file: StaticString = #filePath,
@@ -158,7 +158,7 @@ extension XCTestCase {
     
     /// Waits for EOSE from a data source
     func waitForEOSE(
-        from dataSource: NDKDataSource<NDKEvent>,
+        from dataSource: NDKSubscription<NDKEvent>,
         timeout: TimeInterval = 10.0,
         file: StaticString = #filePath,
         line: UInt = #line
@@ -208,7 +208,7 @@ extension XCTestCase {
         
         // Wait for the event to be retrievable using the new observe API
         await assertEventually(timeout: timeout, file: file, line: line) {
-            let dataSource = ndk.observe(filter: filter, maxAge: 0)
+            let dataSource = ndk.subscribe(filter: filter, maxAge: 0)
             let firstEvent = await dataSource.first(timeout: 1.0)
             return firstEvent != nil
         }

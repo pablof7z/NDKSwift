@@ -93,7 +93,7 @@ struct Example08_PublishWithNIP46 {
             print("👤 Your pubkey: \(user.pubkey)")
             
             // Fetch and display user profile if available  
-            let profileDataSource = ndk.observe(filter: NDKFilter(authors: [user.pubkey], kinds: [0]), maxAge: 3600)
+            let profileDataSource = ndk.subscribe(filter: NDKFilter(authors: [user.pubkey], kinds: [0]), maxAge: 3600)
             // Collect all profile events and use the most recent
             let profileEvents = await profileDataSource.collect(timeout: 3.0)
             if let profileEvent = profileEvents.sorted(by: { $0.createdAt > $1.createdAt }).first,
