@@ -32,7 +32,8 @@ public actor WalletEventManager {
     public func updateTokenEvents(
         tokenChange: WalletTokenChange,
         proofStateManager: ProofStateManager,
-        signer: NDKSigner
+        signer: NDKSigner,
+        relays: [String]
     ) async throws -> [String] {
         NDKLogger.log(.debug, category: .wallet, "=== WalletEventManager.updateTokenEvents START ===")
         NDKLogger.log(.debug, category: .wallet, "Tokens to delete: \(tokenChange.deletedTokenIds)")
@@ -57,8 +58,8 @@ public actor WalletEventManager {
                 ] + tokenChange.deletedTokenIds.map { ["e", $0] })
                 .build(signer: signer)
 
-            let relays = try await ndk.publish(deleteEvent)
-            NDKLogger.log(.debug, category: .wallet, "🗑️ Token deletion event published to \(relays.count) relays")
+            let publishedRelays = try await ndk.publish(deleteEvent, to: Set(relays))
+            NDKLogger.log(.debug, category: .wallet, "🗑️ Token deletion event published to \(publishedRelays.count) relays")
 
             // Create individual Kind 5 events for each deleted token
             for tokenId in tokenChange.deletedTokenIds {
@@ -91,7 +92,8 @@ public actor WalletEventManager {
                 let eventId = try await saveTokenEvent(
                     token: token,
                     signer: signer,
-                    deletedEventIds: Array(tokenChange.deletedTokenIds)
+                    deletedEventIds: Array(tokenChange.deletedTokenIds),
+                    relays: relays
                 )
 
                 newEventIds.insert(eventId)
@@ -116,14 +118,19 @@ public actor WalletEventManager {
     private func saveTokenEvent(
         token: CashuSwift.Token,
         signer: NDKSigner,
-        deletedEventIds: [String]?
+        deletedEventIds: [String]?,
+        relays: [String]
     ) async throws -> String {
-        let tokenEvent = try await NDKCashuTokenEvent.createAndPublish(
+        let tokenEvent = try await NDKCashuTokenEvent.create(
             ndk: ndk,
             token: token,
             signer: signer,
             deletedEventIds: deletedEventIds
         )
+        
+        // Publish to specific relays
+        _ = try await ndk.publish(tokenEvent.event, to: Set(relays))
+        
         return tokenEvent.event.id
     }
 
@@ -154,12 +161,16 @@ public actor WalletEventManager {
 
     /// Save a quote event and return its event ID
     @discardableResult
-    public func saveQuoteEvent(quote: CashuMintQuote, signer: NDKSigner) async throws -> String {
-        let quoteEvent = try await NDKCashuQuoteEvent.createAndPublish(
+    public func saveQuoteEvent(quote: CashuMintQuote, signer: NDKSigner, relays: [String]) async throws -> String {
+        let quoteEvent = try await NDKCashuQuoteEvent.create(
             ndk: ndk,
             quote: quote,
             signer: signer
         )
+        
+        // Publish to specific relays
+        _ = try await ndk.publish(quoteEvent.event, to: Set(relays))
+        
         return quoteEvent.event.id
     }
 
@@ -196,10 +207,11 @@ public actor WalletEventManager {
         createdEventIds: [String]? = nil,
         redeemedEventId: String? = nil,
         token: String? = nil,
-        signer: NDKSigner
+        signer: NDKSigner,
+        relays: [String]
     ) async throws {
         NDKLogger.log(.info, category: .wallet, "📝 Creating spending history event: \(direction) \(amount) sats - \(memo ?? "no memo")")
-        _ = try await NDKCashuSpendingHistory.createAndPublish(
+        let historyEvent = try await NDKCashuSpendingHistory.create(
             ndk: ndk,
             direction: direction,
             amount: amount,
@@ -210,6 +222,10 @@ public actor WalletEventManager {
             token: token,
             signer: signer
         )
+        
+        // Publish to specific relays
+        _ = try await ndk.publish(historyEvent.event, to: Set(relays))
+        
         NDKLogger.log(.info, category: .wallet, "✅ Spending history event created and published")
     }
 

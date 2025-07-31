@@ -28,6 +28,9 @@ public actor WalletTransactionHistory {
 
     // Track user pubkey for filtering
     private var userPubkey: String?
+    
+    // Relays for wallet operations
+    private var relays: [String] = []
 
     // MARK: - Initialization
 
@@ -48,6 +51,11 @@ public actor WalletTransactionHistory {
     }
 
     // MARK: - Lifecycle
+    
+    /// Update the relays to use for wallet operations
+    public func updateRelays(_ newRelays: [String]) {
+        relays = newRelays
+    }
 
     /// Start observing wallet events reactively
     public func startObserving() async throws {
@@ -70,11 +78,14 @@ public actor WalletTransactionHistory {
         )
 
         // Create data sources
+        let relayUrls = relays.isEmpty ? nil : Set(relays)
+        
         historyDataSource = NDKDataSource(
             ndk: ndk,
             filter: historyFilter,
             maxAge: 0,  // Always fresh
             cachePolicy: .cacheWithNetwork,
+            relays: relayUrls,
             subscriptionId: "wallet-history"
         )
 
@@ -83,6 +94,7 @@ public actor WalletTransactionHistory {
             filter: nutzapFilter,
             maxAge: 0,
             cachePolicy: .cacheWithNetwork,
+            relays: relayUrls,
             subscriptionId: "wallet-nutzaps"
         )
 
@@ -638,11 +650,13 @@ public actor WalletTransactionHistory {
             if let redeemedId = historyData.redeemedEventId {
                 // Try to get nutzap details
                 let filter = NDKFilter(ids: [redeemedId])
+                let relayUrls = relays.isEmpty ? nil : Set(relays)
                 let dataSource = NDKDataSource(
                     ndk: ndk,
                     filter: filter,
                     maxAge: 0,
                     cachePolicy: .cacheWithNetwork,
+                    relays: relayUrls,
                     subscriptionId: "nutzap-lookup-\(redeemedId)"
                 )
 

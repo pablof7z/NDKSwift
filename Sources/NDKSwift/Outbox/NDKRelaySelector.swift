@@ -27,20 +27,40 @@ actor NDKRelaySelector {
     ) async -> RelaySelectionResult {
         let correlationId = event.id.prefix(8)
         
-        // Collect all relevant pubkeys (author + p-tagged users)
-        var allPubkeys = [event.pubkey]
+        // Collect author and p-tagged users separately per NIP-65
+        let authorPubkey = event.pubkey
         let pTags = event.pTags
         
-        // For events with <10 p-tags, include their relays per NIP-65
+        // Start with author's write relays
+        var relayToPubkeys = await chooseRelayCombinationForPublishingAuthors(
+            [authorPubkey],
+            preferredRelays: await getPreferredRelaysForPublishing()
+        )
+        
+        // For events with <10 p-tags, include their READ relays per NIP-65
+        if pTags.count < ProtocolConstants.maxPTagsForOutboxModel {
+            let pTaggedRelays = await chooseRelayCombinationForPTaggedUsers(
+                pTags,
+                preferredRelays: await getPreferredRelaysForPublishing()
+            )
+            
+            // Merge p-tagged user relays into the main map
+            for (relayUrl, pubkeys) in pTaggedRelays {
+                var existingPubkeys = relayToPubkeys[relayUrl, default: []]
+                for pubkey in pubkeys {
+                    if !existingPubkeys.contains(pubkey) {
+                        existingPubkeys.append(pubkey)
+                    }
+                }
+                relayToPubkeys[relayUrl] = existingPubkeys
+            }
+        }
+        
+        // Collect all pubkeys for missing relay checks
+        var allPubkeys = [authorPubkey]
         if pTags.count < ProtocolConstants.maxPTagsForOutboxModel {
             allPubkeys.append(contentsOf: pTags)
         }
-        
-        // Use the improved relay combination selection
-        var relayToPubkeys = await chooseRelayCombinationForPublishingAuthors(
-            allPubkeys,
-            preferredRelays: await getPreferredRelaysForPublishing()
-        )
         
         // Extract missing pubkeys
         let missingRelayPubkeys = await getMissingRelayPubkeys(for: allPubkeys)
@@ -61,6 +81,16 @@ actor NDKRelaySelector {
         
         // Extract relay URLs from the map
         var selectedRelays = Set(relayToPubkeys.keys)
+        
+        // Add e-tag relay hints per NIP-10
+        for tag in event.tags {
+            if tag.count >= 3 && tag[0] == "e" {
+                let relayHint = tag[2]
+                if !relayHint.isEmpty {
+                    selectedRelays.insert(relayHint)
+                }
+            }
+        }
         
         // Ensure minimum relays
         if selectedRelays.count < OutboxConstants.minPublishRelays {
@@ -510,6 +540,44 @@ actor NDKRelaySelector {
             type: .write,
             relaysPerAuthor: OutboxConstants.relaysPerAuthor
         )
+    }
+    
+    /// Choose relay combination for p-tagged users (uses READ relays per NIP-65)
+    private func chooseRelayCombinationForPTaggedUsers(
+        _ pubkeys: [String],
+        preferredRelays: Set<String>
+    ) async -> RelayToPubkeysMap {
+        // For p-tagged users, we want read relays per NIP-65
+        var relayMap = await chooseRelayCombinationForPubkeys(
+            pubkeys,
+            type: .read,
+            relaysPerAuthor: OutboxConstants.relaysPerAuthor
+        )
+        
+        // Fallback: if a p-tagged user has no read relays, try their write relays
+        let assignedPubkeys = Set(relayMap.values.flatMap { $0 })
+        let unassignedPubkeys = pubkeys.filter { !assignedPubkeys.contains($0) }
+        
+        if !unassignedPubkeys.isEmpty {
+            let fallbackRelayMap = await chooseRelayCombinationForPubkeys(
+                unassignedPubkeys,
+                type: .write,
+                relaysPerAuthor: OutboxConstants.relaysPerAuthor
+            )
+            
+            // Merge fallback relays into main map
+            for (relayUrl, pubkeys) in fallbackRelayMap {
+                var existingPubkeys = relayMap[relayUrl, default: []]
+                for pubkey in pubkeys {
+                    if !existingPubkeys.contains(pubkey) {
+                        existingPubkeys.append(pubkey)
+                    }
+                }
+                relayMap[relayUrl] = existingPubkeys
+            }
+        }
+        
+        return relayMap
     }
     
     /// Choose relay combination optimized for fetching
