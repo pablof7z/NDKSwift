@@ -4,7 +4,7 @@
 This document tracks test improvement work for NDKSwift, focusing on unit tests and coverage for core library components.
 
 ## Current Status (2025-07-31)
-Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage, NDKRelay, NDKPrivateKeySigner, NDKRelayConnection, NDKCache protocol, NDKFilterGrouping, NIP-04 encryption, NIP-44 encryption, NDKRelaySubscriptionManager, NDKRelaySubscriptionGroup, SQLite cache migrations, and NDKBunkerSigner. Found and documented bugs in MemoryCache.queryEvents, NostrMessage.serialize, and NDKRelaySubscriptionManager (missing properties).
+Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage, NDKRelay, NDKPrivateKeySigner, NDKRelayConnection, NDKCache protocol, NDKFilterGrouping, NIP-04 encryption, NIP-44 encryption, NDKRelaySubscriptionManager, NDKRelaySubscriptionGroup, SQLite cache migrations, NDKBunkerSigner, NDKOutboxManager, and NDKEventBuilder. Found and documented bugs in MemoryCache.queryEvents, NostrMessage.serialize, and NDKRelaySubscriptionManager (missing properties).
 
 ## Work Completed
 - [x] Analyzed test coverage across the entire codebase
@@ -113,11 +113,31 @@ Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage
   - Auth URL publisher for authorization flow
   - Connection type initialization patterns
   - Async initialization timing handling
+- [x] Added comprehensive unit tests for NDKOutboxManager (28 tests)
+  - Cache operations (tracking, retrieval, clearing)
+  - Relay discovery and event emission
+  - Outbox strategy generation with known/unknown authors
+  - Public API methods (publish, observe, trackUser)
+  - Background relay discovery
+  - Relay updates stream and stats
+  - Error handling and concurrent operations
+- [x] Verified URLNormalizer already has comprehensive tests (22 tests)
+- [x] Added comprehensive unit tests for NDKEventBuilder (35 tests)
+  - Client tag configuration and auto-tagging
+  - Reply builder with different event types
+  - Tag builder methods with outbox integration
+  - Imeta tag creation and Blossom blob support
+  - Bech32 tag handling (npub, note, nevent, etc.)
+  - Content tag generation and normalization
+  - Encryption to recipient and self
+  - Build validation and error handling
+  - Complex event building scenarios
+  - Unsigned event building and edge cases
 
 ## Priority Work Items (Top 3)
-1. **Add unit tests for NDKOutboxManager** - Complex relay selection logic needs testing.
-2. **Add unit tests for URL normalization** - URLNormalizer is critical for relay connectivity.
-3. **Add unit tests for NDKEventBuilder** - Event creation helpers need test coverage.
+1. **Add unit tests for NDKDataSource** - Core subscription and data flow logic needs testing.
+2. **Add unit tests for NDKPool** - Connection management and relay pool operations need coverage.
+3. **Add unit tests for NDKSubscriptionManager** - Subscription lifecycle and deduplication logic needs testing.
 
 ## Critical Gaps Identified
 
