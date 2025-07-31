@@ -9,7 +9,7 @@
 /// ```
 
 @_exported import Foundation
-@_exported import CashuSwift
+import CashuSwift
 
 // MARK: - Type Aliases
 
@@ -43,30 +43,4 @@ public enum WalletConstants {
 // MARK: - Common Extensions
 
 // Data.hexString extension removed - already exists in DataHexExtensions.swift
-
-public extension String {
-    /// Convert hex string to data for wallet operations
-    var hexData: Data? {
-        var data = Data()
-        var hex = self
-        
-        // Remove "0x" prefix if present
-        if hex.hasPrefix("0x") {
-            hex = String(hex.dropFirst(2))
-        }
-        
-        guard hex.count % 2 == 0 else { return nil }
-        
-        while !hex.isEmpty {
-            let byte = String(hex.prefix(2))
-            hex = String(hex.dropFirst(2))
-            if let num = UInt8(byte, radix: 16) {
-                data.append(num)
-            } else {
-                return nil
-            }
-        }
-        
-        return data
-    }
-}
+// String.hexData extension removed - use String.hexDecoded() from DataHexExtensions.swift instead

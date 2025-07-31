@@ -34,7 +34,6 @@ import WalletImports
    - `CashuProof` - Alias for `CashuSwift.Proof`
    - `CashuKeyset` - Alias for `CashuSwift.Keyset`
    - `CashuMint` - Alias for `CashuSwift.Mint`
-   - `CashuError` - Alias for `CashuSwift.CashuError`
 
 3. **Common Constants**
    - `WalletConstants.defaultUnit` - Default unit for transactions ("sat")
@@ -44,8 +43,8 @@ import WalletImports
    - `WalletConstants.mintInfoCacheDuration` - Cache duration for mint info
 
 4. **Utility Extensions**
-   - `Data.hexString` - Convert data to hex string
-   - `String.hexData` - Convert hex string to data
+   - Use `Data.hexString` from DataHexExtensions.swift - Convert data to hex string
+   - Use `String.hexDecoded()` from DataHexExtensions.swift - Convert hex string to data
 
 ### Migration Guide
 
