@@ -16,7 +16,6 @@ public actor MemoryCache: NDKCache {
     private var deletionTombstones: [String: Date] = [:]
     private let tombstoneTTL: TimeInterval = NetworkConstants.tombstoneTTL
     
-    
     // Cleanup task for tombstones
     private var cleanupTask: Task<Void, Never>?
 

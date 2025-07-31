@@ -6,6 +6,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Removed ~360 lines of dead proof state management code from MemoryCache.swift that had been migrated to ProofStateManager
+- Removed duplicate String.hexData extension from WalletImports.swift (use String.hexDecoded() from DataHexExtensions instead)
+- Removed redundant HexValidator method aliases (isValidHexString, isValidHexPubkey, isValidEventId, isValidSignature)
+- Fixed incorrect @_exported usage in WalletImports.swift
+
+### Improved
+- Enhanced test infrastructure to reduce duplication:
+  - Added NDKUnitTestCase with pre-configured NDK, signer, and cache
+  - Added NDKMockTestCase for tests requiring mock relay behavior
+  - Added NDKCacheTestCase for cache-specific tests
+  - Created XCTestCase+AsyncEnhanced with comprehensive async test utilities
+  - Extended TestFixtures with encryption, wallet, subscription, and large dataset generators
+  - Added comprehensive test helper documentation
+
+### Removed
+- Removed CashuError type alias from WalletImports.swift (type doesn't exist in CashuSwift)
+
 ## [0.11] - 2025-01-30
 
 ### Fixed

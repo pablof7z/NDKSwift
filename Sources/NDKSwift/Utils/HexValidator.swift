@@ -87,36 +87,6 @@ public enum HexValidator {
         return isValidHex(hexString, expectedByteCount: 64)
     }
 
-    // MARK: - Convenience methods for backward compatibility
-    
-    /// Check if a string is a valid hex string (any length)
-    /// - Parameter hexString: The hex string to check
-    /// - Returns: True if the hex string is valid, false otherwise
-    public static func isValidHexString(_ hexString: String) -> Bool {
-        return isValidHex(hexString)
-    }
-
-    /// Check if a string is a valid hex public key (32 bytes)
-    /// - Parameter hexString: The hex string to check
-    /// - Returns: True if the hex string is valid 32-byte hex, false otherwise
-    public static func isValidHexPubkey(_ hexString: String) -> Bool {
-        return isValid32ByteHex(hexString)
-    }
-
-    /// Check if a string is a valid event ID (32 bytes)
-    /// - Parameter hexString: The hex string to check
-    /// - Returns: True if the hex string is valid 32-byte hex, false otherwise
-    public static func isValidEventId(_ hexString: String) -> Bool {
-        return isValid32ByteHex(hexString)
-    }
-
-    /// Check if a string is a valid signature (64 bytes)
-    /// - Parameter hexString: The hex string to check
-    /// - Returns: True if the hex string is valid 64-byte hex, false otherwise
-    public static func isValidSignature(_ hexString: String) -> Bool {
-        return isValid64ByteHex(hexString)
-    }
-    
     // MARK: - Safe Data Conversion
     
     /// Safely convert a hex string to Data
