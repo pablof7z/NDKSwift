@@ -81,6 +81,9 @@ public func removeRelay(_ url: RelayURL)
 // Publish event (uses outbox model if enabled, optimistic publishing by default)
 public func publish(_ event: NDKEvent) async throws -> Set<NDKRelay>
 
+// Builder-style publish (recommended)
+public func publish(builder: (NDKEventBuilder) -> Void) async throws -> (event: NDKEvent, publishedRelays: Set<NDKRelay>)
+
 // Publish to specific relays
 public func publish(event: NDKEvent, to relayUrls: Set<String>) async throws -> Set<NDKRelay>
 
@@ -94,32 +97,20 @@ public func retryUnpublishedEvents(maxAge: TimeInterval, limit: Int?) async thro
 // Create a data source with automatic caching and updates
 public func subscribe(
     filter: NDKFilter,
-    maxAge: TimeInterval = 0,
-    cachePolicy: CachePolicy = .cacheWithNetwork,
-    relays: Set<RelayURL>? = nil,
-    exclusiveRelays: Bool = false,
-    subscriptionId: String? = nil
+    cachePolicy: CachePolicy = .cacheWithNetwork
 ) -> NDKSubscription<NDKEvent>
 
 // Create a data source with transformation
 public func subscribe<T>(
     filter: NDKFilter,
-    maxAge: TimeInterval = 0,
     cachePolicy: CachePolicy = .cacheWithNetwork,
-    relays: Set<RelayURL>? = nil,
-    exclusiveRelays: Bool = false,
-    subscriptionId: String? = nil,
     transform: @escaping (NDKEvent) -> T?
 ) -> NDKSubscription<T>
 ```
 
 **Parameters:**
 - `filter`: The filter to apply for events
-- `maxAge`: Maximum age of cached data in seconds. 0 means always fetch fresh
 - `cachePolicy`: How to use cache (.cacheWithNetwork, .cacheOnly, .networkOnly)
-- `relays`: Optional specific relays to use
-- `exclusiveRelays`: If true, only process events from the specified relays (default: false)
-- `subscriptionId`: Optional custom subscription ID. If provided, this exact ID will be used in REQ messages to relays (useful for debugging and NIP-60 wallets)
 - `transform`: Optional transformation function for the data source
 
 #### User Management
@@ -178,9 +169,7 @@ A modern declarative API for accessing Nostr data with automatic caching and rea
 
 ```swift
 public let filter: NDKFilter                     // Filter defining what events to subscribe to
-public let maxAge: TimeInterval                  // Maximum age of cached data to consider fresh
 public let cachePolicy: CachePolicy              // How to handle cache vs network
-public let relays: Set<RelayURL>?               // Specific relays to use (optional)
 ```
 
 #### Initialization
@@ -191,14 +180,7 @@ NDKSubscription is created through `ndk.subscribe()` methods:
 // Basic observation
 let dataSource = ndk.subscribe(
     filter: NDKFilter(kinds: [1], limit: 50),
-    maxAge: 300,  // 5 minutes
     cachePolicy: .cacheWithNetwork
-)
-
-// With custom subscription ID for debugging
-let walletSource = ndk.subscribe(
-    filter: NDKFilter(kinds: [EventKind.cashuToken]),
-    subscriptionId: "nip60-wallet-events"  // Shows in relay logs
 )
 
 // With transformation
@@ -247,29 +229,22 @@ public enum CachePolicy {
 #### Usage Patterns
 
 ```swift
-// Real-time subscription (maxAge: 0)
+// Real-time subscription
 let liveNotes = ndk.subscribe(
     filter: NDKFilter(kinds: [1]),
-    maxAge: 0  // Always fresh
+    cachePolicy: .networkOnly  // Always fresh
 )
 
-// Periodic updates with cache
+// Updates with cache
 let profiles = ndk.subscribe(
     filter: NDKFilter(kinds: [0], authors: following),
-    maxAge: 3600  // 1 hour cache
+    cachePolicy: .cacheWithNetwork  // Use cache first, then update
 )
 
 // Offline-first with cache only
 let cachedEvents = ndk.subscribe(
     filter: NDKFilter(kinds: [1]),
     cachePolicy: .cacheOnly
-)
-
-// Relay-specific filtering
-let relaySpecificEvents = ndk.subscribe(
-    filter: NDKFilter(kinds: [1, 6, 7]),
-    relays: Set(["wss://relay.damus.io"]),
-    exclusiveRelays: true  // Only show events from specified relay
 )
 
 // SwiftUI Integration
@@ -292,26 +267,26 @@ struct NotesView: View {
 }
 
 // One-shot fetch examples
-// Fetch from cache if fresh, otherwise network
+// Fetch with cache policy
 let dataSource = ndk.subscribe(
     filter: NDKFilter(kinds: [0], authors: [pubkey]),
-    maxAge: 300  // 5 minutes
+    cachePolicy: .cacheWithNetwork
 )
-let profiles = await dataSource.fetch()
+let profiles = await dataSource.collect(timeout: 5.0)
 
 // Always fetch from network
 let freshDataSource = ndk.subscribe(
     filter: NDKFilter(kinds: [1], limit: 10),
     cachePolicy: .networkOnly
 )
-let latestNotes = await freshDataSource.fetch()
+let latestNotes = await freshDataSource.collect(timeout: 5.0)
 
 // Only use cached data
 let offlineDataSource = ndk.subscribe(
     filter: NDKFilter(kinds: [1]),
     cachePolicy: .cacheOnly
 )
-let cachedNotes = await offlineDataSource.fetch()
+let cachedNotes = await offlineDataSource.collect(timeout: 0.1)
 ```
 
 ### NDKEvent
@@ -541,14 +516,9 @@ for await reaction in ndk.subscribe(filter: reactionsFilter).events {
 Configuration for data sources and subscriptions.
 
 ```swift
-public struct NDKSubscriptionOptions {
-    public var closeOnEose: Bool = false         // Auto-close on EOSE
-    public var useCache: Bool = true             // Check cache first
-    public var limit: Int?                       // Max events to receive
-    public var timeout: TimeInterval?            // Subscription timeout
-    public var relays: Set<NDKRelay>?           // Specific relays to use
-    public var skipOptimisticEvents: Bool = false // Skip optimistic events (default: false)
-}
+// Note: NDKSubscriptionOptions is not part of the public API.
+// Subscription behavior is controlled through the cachePolicy parameter
+// in the ndk.subscribe() method.
 ```
 
 ### NDKUser
@@ -792,6 +762,10 @@ public protocol NDKCache: Actor {
     func getEventConfirmationState(eventId: String) async -> EventConfirmationState?
     func getUnpublishedEvents(maxAge: TimeInterval, limit: Int?) async -> [(event: NDKEvent, targetRelays: Set<String>)]
     
+    // Reactive observation
+    func observeEvents(matching filter: NDKFilter, includeExisting: Bool) async -> AsyncThrowingStream<[NDKEvent], Error>
+    func observeProfile(pubkey: String, includeExisting: Bool) async -> AsyncThrowingStream<NDKUserMetadata?, Error>
+    
     // Management
     func clear() async throws
 }
@@ -810,6 +784,47 @@ public actor NDKSQLiteCache: NDKCache {
     public init(databasePath: String? = nil) throws
 }
 ```
+
+#### Reactive Cache Observation
+
+Both cache implementations support reactive observation of events and profiles:
+
+**observeEvents** - Observe events matching a filter:
+```swift
+// Observe all text notes with real-time updates
+let eventStream = await cache.observeEvents(
+    matching: NDKFilter(kinds: [1]),
+    includeExisting: true  // Include existing events
+)
+
+for try await events in eventStream {
+    // Handle batch of events
+    print("Received \(events.count) events")
+}
+```
+
+**observeProfile** - Observe profile changes for a specific user:
+```swift
+// Observe profile updates for a user
+let profileStream = await cache.observeProfile(
+    pubkey: userPubkey,
+    includeExisting: true  // Emit current profile immediately
+)
+
+for try await profile in profileStream {
+    if let profile = profile {
+        // Profile exists/updated
+        print("Name: \(profile.name ?? "Unknown")")
+    } else {
+        // Profile doesn't exist yet
+    }
+}
+```
+
+Note: 
+- SQLiteCache provides real-time updates when data changes in the database
+- MemoryCache emits existing data and then completes (no real-time updates)
+- The stream yields `nil` initially for profiles to indicate observation has started
 
 ### NDKWallet
 
@@ -1441,10 +1456,6 @@ let dataSource = ndk.subscribe(filter: filter)
 
 For more information on internal components, see the [Architecture Documentation](ARCHITECTURE.md#internal-components).
 
-// State (async properties)
-public var isActive: Bool { get async }          // Is subscription active?
-public var isClosed: Bool { get async }          // Is subscription closed?
-public var eoseReceived: Bool { get async }      // End of stored events received?
 ```
 
 For documentation on the recommended approach, see the [NDKSubscription](#ndkdatasource) section above.

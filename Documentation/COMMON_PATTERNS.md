@@ -75,39 +75,40 @@ do {
 
 ```swift
 // Publish with confirmation from multiple relays
-let event = try await ndk.publishEvent { builder in
+let (event, publishedRelays) = try await ndk.publish { builder in
     builder
         .content("Hello Nostr!")
         .kind(EventKind.textNote)
         .tag(["t", "nostr"])
 }
 
-// Wait for confirmation from at least 2 relays
-let confirmations = try await event.waitForConfirmation(
-    minRelays: 2,
-    timeout: 5.0
-)
+print("Event published to \(publishedRelays.count) relays")
 
-print("Event confirmed by \(confirmations.count) relays")
+// Monitor confirmation state
+if let confirmationState = await ndk.cache?.getEventConfirmationState(eventId: event.id) {
+    switch confirmationState {
+    case .optimistic:
+        print("Event is being sent...")
+    case .partial(let confirmed, let pending):
+        print("Confirmed by \(confirmed.count) relays, \(pending.count) pending")
+    case .confirmed:
+        print("Event fully confirmed")
+    }
+}
 ```
 
 ### Batch Publishing
 
 ```swift
 // Publish multiple events efficiently
-let events = try await ndk.batchPublish { batch in
-    // Create multiple events
-    batch.add { builder in
-        builder.content("First post").kind(EventKind.textNote)
+let events: [(NDKEvent, Set<NDKRelay>)] = []
+
+// Create and publish events individually
+for content in ["First post", "Second post", "Third post"] {
+    let (event, relays) = try await ndk.publish { builder in
+        builder.content(content).kind(EventKind.textNote)
     }
-    
-    batch.add { builder in
-        builder.content("Second post").kind(EventKind.textNote)
-    }
-    
-    batch.add { builder in
-        builder.content("Third post").kind(EventKind.textNote)
-    }
+    events.append((event, relays))
 }
 
 print("Published \(events.count) events")
@@ -119,21 +120,12 @@ print("Published \(events.count) events")
 // Create a properly threaded reply
 func replyToEvent(_ originalEvent: NDKEvent, content: String) async throws -> NDKEvent {
     // Build reply with proper tags
-    let reply = try await ndk.publishEvent { builder in
-        builder
-            .content(content)
-            .kind(EventKind.textNote)
-            .tagEvent(originalEvent)  // Adds 'e' tag
-            .tagUser(originalEvent.pubkey)  // Adds 'p' tag
-            .addMarker("reply")  // NIP-10 marker
-        
-        // Thread root detection
-        if let rootTag = originalEvent.tags.first(where: { $0.isRootEvent }) {
-            builder.tag(rootTag)  // Preserve root
-        } else {
-            builder.tagRootEvent(originalEvent)  // This is the root
-        }
-    }
+    let reply = try await NDKEventBuilder.reply(to: originalEvent, ndk: ndk)
+        .content(content)
+        .build(signer: ndk.signer!)
+    
+    // Publish the reply
+    let (publishedReply, _) = try await ndk.publish(reply)
     
     return reply
 }
@@ -155,7 +147,6 @@ func loadProfiles(pubkeys: [String]) async -> [String: NDKUserProfile] {
                 kinds: [EventKind.metadata],
                 authors: chunk
             ),
-            maxAge: 3600,  // 1 hour cache
             cachePolicy: .cacheWithNetwork
         )
         
@@ -188,8 +179,7 @@ class ActivityFeed: ObservableObject {
         
         dataSource = ndk.subscribe(
             filter: filter,
-            maxAge: 0,  // Real-time only
-            cachePolicy: .cacheWithNetwork
+            cachePolicy: .networkOnly  // Real-time only
         )
         
         Task {
@@ -236,7 +226,6 @@ func loadEventsPaginated(
                 
                 let source = ndk.subscribe(
                     filter: pageFilter,
-                    maxAge: 300,  // 5 minute cache
                     cachePolicy: .cacheWithNetwork
                 )
                 
@@ -357,7 +346,7 @@ func watchZaps(for pubkey: String) {
             kinds: [EventKind.zap],
             tags: ["p": Set([pubkey])]
         ),
-        maxAge: 0  // Real-time
+        cachePolicy: .networkOnly  // Real-time
     )
     
     Task {
@@ -441,50 +430,46 @@ func createImagePost(imageData: Data, caption: String) async throws {
 ### Dynamic Relay Selection
 
 ```swift
-// Use outbox model for optimal relay selection
-let outboxNDK = NDK(
-    relayUrls: [], // Start with no relays
-    outboxModel: .enabled(
-        defaultRelays: [
-            "wss://relay.damus.io",
-            "wss://relay.primal.net"
-        ]
-    )
+// NDK uses outbox model by default for optimal relay selection
+let ndk = NDK(
+    relayUrls: [
+        "wss://relay.damus.io",
+        "wss://relay.primal.net"
+    ]
 )
 
 // NDK will automatically:
-// 1. Fetch relay lists from users you interact with
+// 1. Fetch relay lists from users you interact with (NIP-65)
 // 2. Connect to their preferred relays when fetching their events
 // 3. Publish to relays where your followers read from
+// 4. Respect p-tag limits (10+ p-tags skip outbox model)
 
-// Monitor relay changes
-Task {
-    for await update in outboxNDK.relayPoolUpdates {
-        print("Relay pool updated: \(update.addedRelays) added, \(update.removedRelays) removed")
-    }
+// Monitor relay connections
+let relays = await ndk.relays
+for relay in relays {
+    let state = await relay.connectionState
+    print("Relay \(relay.url): \(state)")
 }
 ```
 
 ### Relay Health Monitoring
 
 ```swift
-// Monitor relay performance
+// Monitor relay health
 class RelayHealthMonitor {
-    func startMonitoring(_ ndk: NDK) {
-        Task {
-            for await metrics in ndk.pool.relayMetrics {
-                for (relay, health) in metrics {
-                    print("\(relay):")
-                    print("  Latency: \(health.averageLatency)ms")
-                    print("  Success rate: \(health.successRate)%")
-                    print("  Events/sec: \(health.eventsPerSecond)")
-                    
-                    // Disconnect from unhealthy relays
-                    if health.successRate < 50 {
-                        await ndk.removeRelay(relay)
-                        print("  ❌ Removed unhealthy relay")
-                    }
-                }
+    func checkRelayHealth(_ ndk: NDK) async {
+        let relays = await ndk.relays
+        
+        for relay in relays {
+            let isConnected = await relay.isConnected
+            let isBlacklisted = await ndk.isRelayBlacklisted(relay.url)
+            
+            print("\(relay.url):")
+            print("  Connected: \(isConnected)")
+            print("  Blacklisted: \(isBlacklisted)")
+            
+            if isBlacklisted {
+                print("  ❌ Relay is blacklisted due to errors")
             }
         }
     }
@@ -502,18 +487,16 @@ func publishWithRetry(_ content: String, maxRetries: Int = 3) async throws -> ND
     
     for attempt in 1...maxRetries {
         do {
-            let event = try await ndk.publishEvent { builder in
+            let (event, publishedRelays) = try await ndk.publish { builder in
                 builder.content(content).kind(EventKind.textNote)
             }
             
-            // Wait for confirmation from majority of relays
-            let confirmations = try await event.waitForConfirmation(
-                minRelays: ndk.pool.connectedRelays().count / 2,
-                timeout: 5.0
-            )
+            // Check if published to enough relays
+            let connectedRelays = await ndk.relays.filter { await $0.isConnected }
+            let minRelays = connectedRelays.count / 2
             
-            if confirmations.isEmpty {
-                throw NDKError.publishFailed(relay: "majority", message: "No confirmations")
+            if publishedRelays.count < minRelays {
+                throw NDKError.publishingFailed("Published to only \(publishedRelays.count) relays")
             }
             
             return event
@@ -529,7 +512,7 @@ func publishWithRetry(_ content: String, maxRetries: Int = 3) async throws -> ND
             case .connectionLost, .connectionFailed:
                 // Try to reconnect
                 print("Connection issue, reconnecting...")
-                try await ndk.reconnect()
+                await ndk.connect()
                 continue
                 
             case .rateLimited(let message):
@@ -557,7 +540,7 @@ func publishWithRetry(_ content: String, maxRetries: Int = 3) async throws -> ND
 func processLargeEventStream() async {
     let source = ndk.subscribe(
         filter: NDKFilter(kinds: [1], limit: 1000),
-        maxAge: 3600
+        cachePolicy: .cacheWithNetwork
     )
     
     // Use actors for thread-safe processing
@@ -599,7 +582,7 @@ actor EventProcessor {
 func streamLargeDataset() {
     let source = ndk.subscribe(
         filter: NDKFilter(kinds: [1]),
-        maxAge: 0  // No cache for streaming
+        cachePolicy: .networkOnly  // No cache for streaming
     )
     
     Task {
@@ -643,25 +626,18 @@ class EventStore: ObservableObject {
         
         dataSource = ndk.subscribe(
             filter: filter,
-            maxAge: 300,
             cachePolicy: .cacheWithNetwork
         )
         
         Task {
             do {
-                // Show cached immediately
-                let cached = await dataSource!.getCached()
-                if !cached.isEmpty {
-                    self.events = cached
-                    self.isLoading = false
-                }
-                
-                // Then update with fresh data
+                // Stream events as they arrive
                 for await event in dataSource!.events {
                     if !events.contains(where: { $0.id == event.id }) {
                         events.append(event)
                         events.sort { $0.createdAt > $1.createdAt }
                     }
+                    self.isLoading = false
                 }
             } catch {
                 self.error = error
@@ -671,8 +647,10 @@ class EventStore: ObservableObject {
     }
     
     func refresh() {
-        dataSource?.invalidateCache()
-        loadEvents(filter: dataSource?.filter ?? NDKFilter())
+        if let filter = dataSource?.filter {
+            dataSource = nil  // Cancel current subscription
+            loadEvents(filter: filter)
+        }
     }
 }
 
@@ -731,23 +709,85 @@ struct UserProfileView: View {
             }
         }
         .task {
-            // Create reactive profile source
-            dataSource = ndk.subscribe(
-                filter: NDKFilter(kinds: [0], authors: [pubkey]),
-                maxAge: 3600,
-                transform: { event in
-                    try? event.decodeMetadata()
-                }
-            )
-            
-            // Update UI when profile changes
-            for await updatedProfile in dataSource!.values {
+            // Use ProfileManager for reactive profile updates
+            for await updatedProfile in await ndk.profileManager.subscribe(for: pubkey, maxAge: 3600) {
                 profile = updatedProfile
             }
         }
     }
 }
 ```
+
+### Reactive Profile Observation with Cache
+
+For direct cache observation of profile changes:
+
+```swift
+// Observe profile changes directly from cache
+func observeUserProfile(pubkey: String) async {
+    guard let cache = ndk.cache else { return }
+    
+    let profileStream = await cache.observeProfile(
+        pubkey: pubkey,
+        includeExisting: true
+    )
+    
+    do {
+        for try await profile in profileStream {
+            if let profile = profile {
+                // Profile exists or was updated
+                print("Profile updated: \(profile.name ?? "Unknown")")
+                print("About: \(profile.about ?? "No bio")")
+                
+                // Update UI with new profile data
+                await MainActor.run {
+                    self.currentProfile = profile
+                }
+            } else {
+                // Profile doesn't exist yet
+                print("No profile found for \(pubkey)")
+            }
+        }
+    } catch {
+        print("Error observing profile: \(error)")
+    }
+}
+
+// SwiftUI example with cache observation
+struct LiveProfileView: View {
+    let pubkey: String
+    @State private var profile: NDKUserMetadata?
+    
+    var body: some View {
+        VStack {
+            if let profile = profile {
+                Text(profile.displayName ?? profile.name ?? pubkey.prefix(8) + "...")
+                Text(profile.about ?? "")
+                    .font(.caption)
+            } else {
+                Text(pubkey.prefix(8) + "...")
+                    .foregroundColor(.secondary)
+            }
+        }
+        .task {
+            guard let cache = ndk.cache else { return }
+            
+            let stream = await cache.observeProfile(
+                pubkey: pubkey,
+                includeExisting: true
+            )
+            
+            for try await updatedProfile in stream {
+                await MainActor.run {
+                    self.profile = updatedProfile
+                }
+            }
+        }
+    }
+}
+```
+
+Note: Cache observation is useful when you want real-time updates as profiles are saved to the cache from any source (relay subscriptions, NIP-77 sync, etc).
 
 ## URL Handling
 
@@ -825,17 +865,21 @@ if events.isEmpty && !ndk.isConnected {
 }
 ```
 
-### 2. Use Appropriate Cache Ages
-- Profiles: 1 hour (`maxAge: 3600`)
-- Recent posts: 5 minutes (`maxAge: 300`)
-- Historical data: 1 day (`maxAge: 86400`)
-- Real-time: Always fresh (`maxAge: 0`)
+### 2. Use Appropriate Cache Policies
+- Profiles: `.cacheWithNetwork` - Shows cached first, then updates
+- Real-time feeds: `.networkOnly` - Always fresh from relays
+- Offline support: `.cacheOnly` - Only use cached data
 
-### 3. Cancel Subscriptions
+### 3. Subscriptions Auto-Close
 ```swift
-let dataSource = ndk.subscribe(filter: filter)
-// Use it...
-dataSource.cancel() // Clean up when done
+// Subscriptions automatically close when the Task is cancelled
+let task = Task {
+    for await event in ndk.subscribe(filter: filter).events {
+        // Process events
+    }
+}
+// Later:
+task.cancel() // Automatically closes subscription
 ```
 
 ### 4. Batch Operations

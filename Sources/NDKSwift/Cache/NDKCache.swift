@@ -221,6 +221,16 @@ public protocol NDKCache: Actor {
         matching filter: NDKFilter,
         includeExisting: Bool
     ) async -> AsyncThrowingStream<[NDKEvent], Error>
+    
+    /// Observe profile changes for a specific pubkey with reactive updates
+    /// - Parameters:
+    ///   - pubkey: The public key to observe profile changes for
+    ///   - includeExisting: Whether to include existing cached profile (default: true)
+    /// - Returns: An AsyncThrowingStream that emits the profile when it changes, or nil if deleted
+    func observeProfile(
+        pubkey: String,
+        includeExisting: Bool
+    ) async -> AsyncThrowingStream<NDKUserMetadata?, Error>
 
     /// Process incoming event from relay
     /// - Parameters:

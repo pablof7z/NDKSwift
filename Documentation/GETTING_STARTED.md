@@ -56,7 +56,6 @@ NDKSwift uses a modern declarative data access pattern with automatic caching:
 // Subscribe to text notes (kind 1) with real-time updates
 let textNotesSource = ndk.subscribe(
     filter: NDKFilter(kinds: [1], limit: 20),
-    maxAge: 0,  // Always fetch fresh data
     cachePolicy: .cacheWithNetwork  // Show cached first, then update
 )
 
@@ -98,7 +97,7 @@ Use the fetch and subscribe APIs with different strategies:
 ```swift
 // Get user profile using ProfileManager (recommended)
 let user = ndk.getUser(npub: "npub1...")!
-for await metadata in await ndk.profileManager.subscribe(for: user.pubkey, maxAge: TimeConstants.hour) {
+for await metadata in await ndk.profileManager.subscribe(for: user.pubkey) {
     if let metadata = metadata {
         print("Name: \(metadata.displayName ?? metadata.name ?? "Unknown")")
     }
@@ -113,7 +112,7 @@ for await event in ndk.subscribe(filter: NDKFilter(kinds: [1], limit: 10)).event
 // Subscribe to real-time updates using subscribe API
 let dataSource = ndk.subscribe(
     filter: NDKFilter(kinds: [1], limit: 10),
-    maxAge: 0  // Real-time updates
+    cachePolicy: .networkOnly  // Real-time updates
 )
 for await event in dataSource.events {
     print("New event: \(event.content)")
@@ -223,7 +222,7 @@ let user = ndk.getUser(npub: "npub1...")
 // The profile manager is built into NDK - no need to create one
 if let user = user {
     // This returns cached data immediately if available, then fetches fresh data
-    for await profile in await ndk.profileManager.subscribe(for: user.pubkey, maxAge: TimeConstants.hour) {
+    for await profile in await ndk.profileManager.subscribe(for: user.pubkey) {
         if let profile = profile {
             print("Name: \(profile.displayName ?? profile.name ?? "Unknown")")
             print("About: \(profile.about ?? "")")
@@ -232,7 +231,7 @@ if let user = user {
     }
     
     // For continuous profile updates (e.g., on a profile page)
-    for await profile in await ndk.profileManager.subscribe(for: user.pubkey, maxAge: 0) {
+    for await profile in await ndk.profileManager.subscribe(for: user.pubkey) {
         // This will keep the subscription open and yield updates
         updateUI(with: profile)
     }
@@ -304,12 +303,11 @@ let bunkerSigner = NDKBunkerSigner(
 
 ```swift
 // Subscribe to a chat channel
+let chatFilter = NDKFilter(kinds: [42])  // Live chat message
+chatFilter.addTagFilter("e", values: ["chat-room-id"])
 let chatSource = ndk.subscribe(
-    filter: NDKFilter(
-        kinds: [42],  // Live chat message
-        tags: ["e": Set(["chat-room-id"])]
-    ),
-    maxAge: 0  // Real-time messages
+    filter: chatFilter,
+    cachePolicy: .networkOnly  // Real-time messages
 )
 
 for await message in chatSource.events {
@@ -413,7 +411,7 @@ Data sources automatically manage their lifecycle:
 // Create a data source
 let dataSource = ndk.subscribe(
     filter: filter,
-    maxAge: 0  // Real-time
+    cachePolicy: .networkOnly  // Real-time
 )
 
 // Use in a task - automatically cleans up
@@ -564,12 +562,10 @@ For large-scale applications:
 
 ```swift
 // Use specific relays for queries
-let fastRelays = Set(["wss://relay1.com", "wss://relay2.com"])
-for await event in ndk.subscribe(
-    filter: filter,
-    relays: fastRelays,
-    exclusiveRelays: true  // Only use specified relays
-).events {
+// Note: NDK uses outbox model for relay selection
+// To use specific relays, configure them when creating NDK
+let ndkWithSpecificRelays = NDK(relayUrls: ["wss://relay1.com", "wss://relay2.com"])
+for await event in ndkWithSpecificRelays.subscribe(filter: filter).events {
     print("Event from fast relay: \(event.content)")
 }
 

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Reactive Profile Observation**: Added `observeProfile` method to NDKCache protocol and implementations
+  - `observeProfile(pubkey:includeExisting:)`: Observe real-time profile changes for a specific user
+  - Returns `AsyncThrowingStream<NDKUserMetadata?, Error>` for reactive updates
+  - Implemented in both NDKSQLiteCache (with real-time database observation) and MemoryCache
+  - Useful for building reactive UIs that update automatically when profiles change
+  - Integrates with all profile update sources: relay subscriptions, NIP-77 sync, and local saves
 - **Public API for Subscription Grouping Configuration**: Added NDKSubscriptionOptions with support for controlling subscription grouping behavior
   - `groupable`: Whether this subscription can be grouped with others (default: true)
   - `groupableDelay`: Custom delay before executing grouped subscriptions 
@@ -48,6 +54,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `NDKRelaySubscriptionManager.debugGroupCount()`: Returns number of active subscription groups
   - `NDKRelaySubscriptionManager.flushPendingGroups()`: Forces immediate execution of all pending groups
   - `NDKRelaySubscriptionManager.debugInspectGroup()`: Gets detailed information about a specific group
+
+### Added (Metrics)
+- **Subscription Grouping Metrics**: Added comprehensive metrics collection for monitoring grouping effectiveness
+  - `NDKSubscriptionGroupingMetrics`: Actor-based metrics collector tracking subscription and REQ message statistics
+  - `ndk.getSubscriptionMetrics()`: Get current metrics snapshot with all collected data
+  - `ndk.resetSubscriptionMetrics()`: Reset all metrics to zero for fresh measurements
+  - **Core Metrics Tracked**:
+    - Total subscriptions created (groupable and non-groupable)
+    - Number of subscriptions grouped together
+    - REQ messages sent and saved through grouping
+    - Average group size and grouping efficiency percentage
+    - Message reduction percentage
+  - **Delay Statistics**: Tracks actual vs configured delays with atLeast/atMost breakdowns
+  - **Per-Relay Metrics**: REQ message counts and average group sizes per relay
+  - **Human-Readable Summary**: `MetricsSnapshot.summary` provides formatted metrics overview
   - `NDKRelaySubscription` testing helpers: `getSubscriptionIds()`, `executeNow()`, `isActive()`
 - **Unit Tests**: Added SubscriptionGroupingTestabilityTests demonstrating the new testing capabilities
 

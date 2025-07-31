@@ -88,7 +88,7 @@ struct Example04_UserProfile {
         // Fetch profiles for multiple users
         var foundProfiles = 0
         for pubkey in pubkeys {
-            for await metadata in await ndk.profileManager.subscribe(for: pubkey, maxAge: 0) {
+            for await metadata in await ndk.profileManager.subscribe(for: pubkey) {
                 if let metadata = metadata {
                     foundProfiles += 1
                     print("\n👤 Profile: \(metadata.name ?? "Unknown")")

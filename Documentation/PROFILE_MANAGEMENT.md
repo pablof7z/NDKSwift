@@ -32,7 +32,7 @@ For displaying profiles in a list or feed where you don't need real-time updates
 
 ```swift
 // Returns cached data immediately if available, then fetches fresh data
-for await profile in await profileManager.subscribe(for: pubkey, maxAge: TimeConstants.hour) {
+for await profile in await profileManager.subscribe(for: pubkey) {
     if let profile = profile {
         // Use profile data
         displayName = profile.displayName ?? profile.name ?? "Anonymous"
@@ -47,8 +47,8 @@ for await profile in await profileManager.subscribe(for: pubkey, maxAge: TimeCon
 For profile pages where you want to show changes as they happen:
 
 ```swift
-// maxAge: 0 keeps the subscription open for real-time updates
-for await profile in await profileManager.subscribe(for: pubkey, maxAge: 0) {
+// Subscription stays open for real-time updates
+for await profile in await profileManager.subscribe(for: pubkey) {
     if let profile = profile {
         // Update UI with latest profile data
         updateProfileView(with: profile)
@@ -92,18 +92,15 @@ struct ProfileView: View {
     
     private func subscribeToProfile() async {
         profileTask = Task {
-            // Use hour cache for feed views, 0 for profile pages
-            let maxAge = isProfilePage ? 0 : TimeConstants.hour
-            
-            for await profile in await profileManager.subscribe(for: pubkey, maxAge: maxAge) {
+            for await profile in await profileManager.subscribe(for: pubkey) {
                 await MainActor.run {
                     if let profile = profile {
                         self.profile = profile
                     }
                 }
                 
-                // Only break if we don't need real-time updates
-                if maxAge > 0 {
+                // Break after first value if this is not a profile page
+                if !isProfilePage {
                     break
                 }
             }
@@ -130,7 +127,7 @@ for (pubkey, profile) in cachedProfiles {
 await withTaskGroup(of: Void.self) { group in
     for pubkey in pubkeys {
         group.addTask {
-            for await profile in await profileManager.subscribe(for: pubkey, maxAge: TimeConstants.hour) {
+            for await profile in await profileManager.subscribe(for: pubkey) {
                 await updateUI(pubkey: pubkey, profile: profile)
                 break  // Only need first value
             }
@@ -139,28 +136,31 @@ await withTaskGroup(of: Void.self) { group in
 }
 ```
 
-## Understanding maxAge
+## Understanding Profile Caching
 
-The `maxAge` parameter controls caching and subscription behavior:
+The ProfileManager automatically handles caching:
 
-- **`maxAge: 0`** - Always keep subscription open for real-time updates
-- **`maxAge: > 0`** - Use cache if data is newer than maxAge, close subscription after initial fetch
-- **`maxAge: TimeConstants.hour`** - Common for feed views (1 hour cache)
-- **`maxAge: TimeConstants.day`** - For less critical profile data
+- **Cached data** is returned immediately if available
+- **Fresh data** is fetched from the network after cache
+- **Real-time updates** - Continue iterating to receive profile changes
+- **One-time fetch** - Break after first value for static displays
 
 ## Performance Tips
 
-### 1. Use Appropriate maxAge Values
+### 1. Control Real-time Updates
 
 ```swift
-// Feed/List views - use cache, don't need real-time
-maxAge: TimeConstants.hour
+// Feed/List views - break after first value
+for await profile in await profileManager.subscribe(for: pubkey) {
+    // Use profile
+    break  // No real-time updates needed
+}
 
-// Profile pages - want real-time updates
-maxAge: 0
-
-// Background operations - use longer cache
-maxAge: TimeConstants.day
+// Profile pages - keep subscription open
+for await profile in await profileManager.subscribe(for: pubkey) {
+    // Update UI
+    // Don't break - continue receiving updates
+}
 ```
 
 ### 2. Cancel Tasks When Not Needed
@@ -217,7 +217,7 @@ struct ProfilePicture: View {
             }
         }
         .task {
-            for await profile in await ndk.profileManager.subscribe(for: pubkey, maxAge: TimeConstants.hour) {
+            for await profile in await ndk.profileManager.subscribe(for: pubkey) {
                 if let profile = profile {
                     self.profile = profile
                 }
@@ -239,7 +239,7 @@ struct DisplayName: View {
     var body: some View {
         Text(displayName)
             .task {
-                for await profile in await profileManager.subscribe(for: pubkey, maxAge: TimeConstants.hour) {
+                for await profile in await profileManager.subscribe(for: pubkey) {
                     displayName = profile?.displayName 
                         ?? profile?.name 
                         ?? String(pubkey.prefix(8))
@@ -262,7 +262,7 @@ let profileSource = ndk.subscribe(
         authors: [pubkey],
         kinds: [0]
     ),
-    maxAge: 3600
+    cachePolicy: .cacheWithNetwork
 )
 
 for await event in profileSource.events {
@@ -276,7 +276,7 @@ for await event in profileSource.events {
 ### After (Using ProfileManager)
 ```swift
 // Do this instead
-for await profile in await profileManager.subscribe(for: pubkey, maxAge: TimeConstants.hour) {
+for await profile in await profileManager.subscribe(for: pubkey) {
     if let profile = profile {
         // Use profile directly - no manual JSON decoding needed
     }
