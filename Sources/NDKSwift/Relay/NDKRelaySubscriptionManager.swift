@@ -21,6 +21,9 @@ actor NDKRelaySubscriptionManager {
     func addSubscription(_ subscription: NDKSubscriptionCoordinator, filters: [NDKFilter]) async {
         guard let relay = relay else { return }
         
+        // Record subscription in metrics
+        await NDKSubscriptionMetrics.recordSubscription(isGroupable: subscription.isGroupable)
+        
         if !subscription.isGroupable {
             // Non-groupable subscriptions execute immediately
             let group = NDKRelaySubscription(
@@ -42,6 +45,8 @@ actor NDKRelaySubscriptionManager {
             if let existingGroup = subscriptionGroups[fingerprint],
                await existingGroup.canAcceptNewItems() {
                 await existingGroup.addItem(subscription, filters: filters)
+                // Record that this subscription was grouped
+                await NDKSubscriptionMetrics.recordGroupedSubscription()
             } else {
                 let newGroup = NDKRelaySubscription(
                     relay: relay,
@@ -52,6 +57,7 @@ actor NDKRelaySubscriptionManager {
                 subscriptionGroups[fingerprint] = newGroup
                 
                 // Schedule execution with delay
+                // Note: These properties are nonisolated on NDKSubscriptionCoordinator
                 let delay = subscription.groupableDelay ?? 0.1
                 let delayType = subscription.groupableDelayType ?? .atMost
                 await newGroup.scheduleExecution(
@@ -144,3 +150,47 @@ actor NDKRelaySubscriptionManager {
         }
     }
 }
+
+// MARK: - Testing Support
+
+#if DEBUG
+extension NDKRelaySubscriptionManager {
+    /// Get current grouping state for testing
+    func debugGroupingState() async -> [String: [String]] {
+        var state: [String: [String]] = [:]
+        for (fingerprint, group) in subscriptionGroups {
+            // Get subscription IDs from the group
+            let subscriptionIds = await group.getSubscriptionIds()
+            state[fingerprint] = subscriptionIds
+        }
+        return state
+    }
+    
+    /// Get count of active subscription groups
+    func debugGroupCount() async -> Int {
+        subscriptionGroups.count
+    }
+    
+    /// Force immediate execution of all pending groups (for testing)
+    func flushPendingGroups() async {
+        for group in subscriptionGroups.values {
+            await group.executeNow()
+        }
+    }
+    
+    /// Get detailed information about a specific group
+    func debugInspectGroup(fingerprint: String) async -> GroupInspectionData? {
+        guard let group = subscriptionGroups[fingerprint] else { return nil }
+        return await group.inspectForTesting()
+    }
+    
+    /// Debug information about a subscription group
+    struct GroupInspectionData {
+        public let fingerprint: String
+        public let isGroupable: Bool
+        public let itemCount: Int
+        public let status: String
+        public let subId: String?
+    }
+}
+#endif

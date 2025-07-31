@@ -1,7 +1,7 @@
 import Foundation
 
 /// Represents the delay type for groupable subscriptions
-enum NDKSubscriptionDelayType {
+public enum NDKSubscriptionDelayType {
     case atLeast  // Wait at least this long before executing
     case atMost   // Execute within this time at most
 }
@@ -109,10 +109,18 @@ actor NDKRelaySubscription {
         fireTime = Date().addingTimeInterval(delay)
         self.delayType = delayType
         
+        let startTime = Date()
         executionTask = Task {
             try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             
             if !Task.isCancelled {
+                // Record delay metrics
+                let actualDelay = Date().timeIntervalSince(startTime)
+                await NDKSubscriptionMetrics.recordDelay(
+                    actualDelay: actualDelay,
+                    configuredDelay: delay,
+                    delayType: delayType
+                )
                 await execute()
             }
         }
@@ -158,6 +166,9 @@ actor NDKRelaySubscription {
         NDKLogger.log(.debug, category: .subscription,
                      "📌 [SubGroup] Requesting manager to track subscription ID '\(subId)' for group '\(fingerprint)'")
         await relay.subscriptionManager?.trackGroupSubscriptionId(self)
+        
+        // Record REQ message metrics
+        await NDKSubscriptionMetrics.recordReqMessage(groupSize: items.count, relay: relay.url)
         
         // Send REQ to relay (after tracking is set up)
         await relay.sendSubscription(id: subId, filters: compiledFilters)
@@ -285,5 +296,39 @@ actor NDKRelaySubscription {
         // Notify manager
         await relay.subscriptionManager?.onGroupClosed(self)
     }
+}
+
+// MARK: - Testing Support
+
+extension NDKRelaySubscription {
+    /// Get subscription IDs for testing
+    func getSubscriptionIds() async -> [String] {
+        items.map { $0.subscription.id }
+    }
+    
+    /// Force immediate execution for testing
+    func executeNow() async {
+        guard status < .running else { return }
+        executionTask?.cancel()
+        await execute()
+    }
+    
+    /// Check if this group is active
+    func isActive() async -> Bool {
+        status < .closed
+    }
+    
+    #if DEBUG
+    /// Get detailed inspection data for testing
+    func inspectForTesting() async -> NDKRelaySubscriptionManager.GroupInspectionData {
+        NDKRelaySubscriptionManager.GroupInspectionData(
+            fingerprint: fingerprint,
+            isGroupable: isGroupable,
+            itemCount: items.count,
+            status: String(describing: status),
+            subId: subId
+        )
+    }
+    #endif
 }
 

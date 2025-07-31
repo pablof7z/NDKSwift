@@ -50,7 +50,10 @@ actor NDKSubscriptionManager {
         relays: Set<RelayURL>? = nil,
         exclusiveRelays: Bool = false,
         subscriptionId: String? = nil,
-        closeOnEose: Bool? = nil
+        closeOnEose: Bool? = nil,
+        isGroupable: Bool = true,
+        groupableDelay: TimeInterval? = nil,
+        groupableDelayType: NDKSubscriptionDelayType? = nil
     ) async -> (handle: NDKSubscriptionRequirementHandle, events: AsyncStream<NDKEvent>, relayUpdates: AsyncStream<RelayUpdate>) {
         let requirementId = RequirementID()
         let correlationId = requirementId.uuidString.prefix(8)
@@ -99,7 +102,10 @@ actor NDKSubscriptionManager {
             subscriptionId: subscriptionId,
             closeOnEose: shouldCloseOnEose,
             requirementId: requirementId,
-            shouldFetchFromNetwork: shouldFetchFromNetwork
+            shouldFetchFromNetwork: shouldFetchFromNetwork,
+            isGroupable: isGroupable,
+            groupableDelay: groupableDelay,
+            groupableDelayType: groupableDelayType
         )
 
         // Store active requirement if it's not close-on-EOSE
@@ -134,7 +140,10 @@ actor NDKSubscriptionManager {
         subscriptionId: String?,
         closeOnEose: Bool,
         requirementId: RequirementID,
-        shouldFetchFromNetwork: Bool
+        shouldFetchFromNetwork: Bool,
+        isGroupable: Bool,
+        groupableDelay: TimeInterval?,
+        groupableDelayType: NDKSubscriptionDelayType?
     ) async -> (NDKSubscriptionRequirement, AsyncStream<NDKEvent>, AsyncStream<RelayUpdate>) {
         // Optimize filter for cache - remove event IDs we already have
         let optimizedFilter = await optimizeFilterForCache(filter) ?? filter
@@ -158,7 +167,10 @@ actor NDKSubscriptionManager {
             relays: nil, // Will be set by NDKSubscriptionRequirement based on strategy
             fingerprint: fingerprint,
             closeOnEose: closeOnEose,
-            autoStart: false
+            autoStart: false,
+            isGroupable: isGroupable,
+            groupableDelay: groupableDelay,
+            groupableDelayType: groupableDelayType
         )
 
         // Create data requirement
@@ -382,7 +394,10 @@ actor NDKSubscriptionManager {
                     subscriptionId: enhancedSubscriptionId,
                     closeOnEose: false, // Keep live subscription open
                     requirementId: enhancedRequirementId,
-                    shouldFetchFromNetwork: true // Always fetch from discovered relays
+                    shouldFetchFromNetwork: true, // Always fetch from discovered relays
+                    isGroupable: true,
+                    groupableDelay: nil,
+                    groupableDelayType: nil
                 )
                 
                 // Create handle for the enhanced requirement

@@ -6,11 +6,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Public API for Subscription Grouping Configuration**: Added NDKSubscriptionOptions with support for controlling subscription grouping behavior
+  - `groupable`: Whether this subscription can be grouped with others (default: true)
+  - `groupableDelay`: Custom delay before executing grouped subscriptions 
+  - `groupableDelayType`: Type of delay constraint (atLeast/atMost)
+- **New Subscribe Methods with Options**: Added overloads to `ndk.subscribe()` that accept NDKSubscriptionOptions
+  - `subscribe(filter:options:)` for events
+  - Updated NDKSubscription to accept options during initialization
+- **Integration Tests for REQ Message Batching**: Added SubscriptionGroupingIntegrationTests to verify:
+  - Multiple subscriptions with same filter create single REQ
+  - Non-groupable subscriptions execute immediately
+  - Custom grouping delays are respected
+  - Filter merging for grouped subscriptions
+  - Subscriptions with limits are concatenated correctly
+  - Relay-specific grouping behavior
+  - Event delivery to all grouped subscriptions
+- **Comprehensive Outbox System Test Suite**: Added extensive unit tests for the outbox system components:
+  - `NDKPublishingStrategyTests`: Tests for optimistic publishing, retry logic, auth handling, and relay discovery
+  - `NDKRelayRankerTests`: Tests for relay performance tracking, health scoring, and ranking algorithms
+  - `OutboxTestFixtures`: Centralized test data and mock factories for outbox-related tests
+  - `MockOutboxRelay`: Specialized mock relay with outbox-specific testing capabilities
+  - `MockRelayPreferenceProvider`: Mock implementation for testing relay preference lookups
+
+### Changed
+- Made NDKSubscriptionDelayType public to support the new API
+- Updated NDKSubscriptionOptions to include grouping configuration properties
+- Enhanced internal subscription creation to pass grouping parameters through the stack
+- Made grouping configuration properties (`isGroupable`, `groupableDelay`, `groupableDelayType`, `closeOnEose`) nonisolated on NDKSubscriptionCoordinator for better performance
+
 ### Fixed
 - Fixed "No group found for subscription" warnings during relay reconnection
   - Subscriptions now properly route through NDKRelaySubscriptionManager during replay
   - Subscription IDs are reused across reconnections to maintain group consistency
   - This eliminates the ID mismatch that occurred when bypassing the grouping system
+
+### Added (Testability)
+- **Inspection Methods for Testing**: Added comprehensive testing support for subscription grouping
+  - `NDKSubscriptionCoordinator.inspect()`: Returns inspection data with all subscription state
+  - `NDKRelaySubscriptionManager.debugGroupingState()`: Shows which subscriptions are grouped together
+  - `NDKRelaySubscriptionManager.debugGroupCount()`: Returns number of active subscription groups
+  - `NDKRelaySubscriptionManager.flushPendingGroups()`: Forces immediate execution of all pending groups
+  - `NDKRelaySubscriptionManager.debugInspectGroup()`: Gets detailed information about a specific group
+  - `NDKRelaySubscription` testing helpers: `getSubscriptionIds()`, `executeNow()`, `isActive()`
+- **Unit Tests**: Added SubscriptionGroupingTestabilityTests demonstrating the new testing capabilities
 
 ## [0.12] - 2025-07-31
 

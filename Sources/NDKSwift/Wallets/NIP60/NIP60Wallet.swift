@@ -457,6 +457,24 @@ public actor NIP60Wallet: NDKPaymentProvider {
 
         NDKLogger.log(.info, category: .wallet, "Successfully blacklisted mint: \(mintURL)")
     }
+    
+    /// Remove a mint from the blacklist and publish the updated blocked mints event
+    public func unblacklistMint(_ mintURL: String) async throws {
+        NDKLogger.log(.info, category: .wallet, "Removing mint from blacklist: \(mintURL)")
+        // Get current blocked mints
+        var updatedBlockedMints = cachedBlacklistedMints
+        updatedBlockedMints.remove(mintURL)
+        // Publish the updated blocked mints event
+        _ = try await NDKBlockedMintsEvent.createAndPublish(
+            ndk: ndk,
+            blockedMints: Array(updatedBlockedMints),
+            signer: signer
+        )
+        // Update local cache
+        cachedBlacklistedMints = updatedBlockedMints
+        blacklistLastFetched = Date()
+        NDKLogger.log(.info, category: .wallet, "Successfully removed mint from blacklist: \(mintURL)")
+    }
 
     /// Process blocked mints update event (kind 10020)
     private func processBlockedMintsUpdate(_ event: NDKEvent) async {
