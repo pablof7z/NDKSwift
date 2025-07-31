@@ -4,7 +4,7 @@
 This document tracks test improvement work for NDKSwift, focusing on unit tests and coverage for core library components.
 
 ## Current Status (2025-07-31)
-Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, and NostrMessage. Found and documented bugs in MemoryCache.queryEvents and NostrMessage.serialize.
+Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage, and NDKRelay. Found and documented bugs in MemoryCache.queryEvents and NostrMessage.serialize.
 
 ## Work Completed
 - [x] Analyzed test coverage across the entire codebase
@@ -30,11 +30,17 @@ Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, and NostrMes
   - Parsing and serialization of all message types
   - Round-trip testing, error handling, NIP-77 messages
   - Discovered bug in EVENT message serialization
+- [x] Added comprehensive unit tests for NDKRelay (28 tests)
+  - Initialization, normalized URLs, state management
+  - Connection states, authentication, NDK references
+  - Statistics, signature verification stats
+  - Subscription tracking, relay information types
+  - Codable conformance, equality, hashable
 
 ## Priority Work Items (Top 3)
-1. **Add unit tests for NDKRelay** - Core relay model has no tests.
-2. **Add unit tests for NDKPrivateKeySigner** - No local signing tests.
-3. **Add unit tests for NDKRelayConnection** - No WebSocket tests.
+1. **Add unit tests for NDKPrivateKeySigner** - No local signing tests.
+2. **Add unit tests for NDKRelayConnection** - No WebSocket tests.
+3. **Add unit tests for NDKCache protocol** - No interface tests.
 
 ## Critical Gaps Identified
 
@@ -42,7 +48,7 @@ Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, and NostrMes
 - ~~**NDKEvent**: No unit tests for the base event model~~ ✅ COMPLETED
 - ~~**NDKUser**: No tests for user model functionality~~ ✅ COMPLETED  
 - ~~**NDKFilter**: Only fingerprint tests exist~~ ✅ COMPLETED
-- **NDKRelay**: No tests for the base relay model
+- ~~**NDKRelay**: No tests for the base relay model~~ ✅ COMPLETED
 
 ### Cache Layer
 - ~~**MemoryCache**: No tests for in-memory cache~~ ✅ COMPLETED
