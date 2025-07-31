@@ -35,7 +35,10 @@ actor InternalSubscriptionManager {
         relays: Set<RelayURL>? = nil,
         fingerprint: NDKFilterFingerprint? = nil,
         closeOnEose: Bool = false,
-        autoStart: Bool = true
+        autoStart: Bool = true,
+        isGroupable: Bool = true,
+        groupableDelay: TimeInterval? = nil,
+        groupableDelayType: NDKSubscriptionDelayType? = nil
     ) async -> InternalSubscription {
         // Ensure relay monitoring is started when first subscription is created
         await ensureRelayMonitoring()
@@ -54,7 +57,10 @@ actor InternalSubscriptionManager {
             relays: relays,
             ndk: ndk,
             closeOnEose: closeOnEose,
-            fingerprint: fp
+            fingerprint: fp,
+            isGroupable: isGroupable,
+            groupableDelay: groupableDelay,
+            groupableDelayType: groupableDelayType
         )
 
         activeSubscriptions[id] = subscription
@@ -336,6 +342,11 @@ actor InternalSubscription: Hashable {
     // NEW: Fingerprint for internal routing
     var fingerprint: NDKFilterFingerprint = ""
     let closeOnEose: Bool
+    
+    // Grouping configuration
+    let isGroupable: Bool
+    let groupableDelay: TimeInterval?
+    let groupableDelayType: NDKSubscriptionDelayType?
 
     private var eventHandlers: [(NDKEvent) async -> Void] = []
     private var eoseHandlers: [(String) async -> Void] = []  // Changed to include relay URL
@@ -384,13 +395,27 @@ actor InternalSubscription: Hashable {
         return stream
     }
 
-    init(id: String, filters: [NDKFilter], relays: Set<RelayURL>?, ndk: NDK, closeOnEose: Bool = false, fingerprint: NDKFilterFingerprint? = nil) {
+    init(
+        id: String,
+        filters: [NDKFilter],
+        relays: Set<RelayURL>?,
+        ndk: NDK,
+        closeOnEose: Bool = false,
+        fingerprint: NDKFilterFingerprint? = nil,
+        isGroupable: Bool = true,
+        groupableDelay: TimeInterval? = nil,
+        groupableDelayType: NDKSubscriptionDelayType? = nil
+    ) {
         self.id = id
         self.filters = filters
         self.relays = relays
         self.ndk = ndk
         self.closeOnEose = closeOnEose
         self.fingerprint = fingerprint ?? filters.toFingerprint(closeOnEose: closeOnEose)
+        self.isGroupable = isGroupable
+        // Default delay values matching ndk-core
+        self.groupableDelay = groupableDelay ?? (isGroupable ? 0.1 : nil)
+        self.groupableDelayType = groupableDelayType ?? (isGroupable ? .atMost : nil)
     }
 
     /// Start the subscription

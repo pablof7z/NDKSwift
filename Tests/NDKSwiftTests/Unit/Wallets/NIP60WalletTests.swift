@@ -47,7 +47,7 @@ final class NIP60WalletTests: XCTestCase {
         XCTAssertEqual(publicKey.count, 66) // 33 bytes hex encoded (compressed public key)
         
         // Verify it's a valid hex string
-        XCTAssertTrue(HexValidator.isValidHexPubkey(publicKey))
+        XCTAssertTrue(HexValidator.isValid32ByteHex(publicKey))
     }
     
     func testP2PKManagerConsistency() async throws {

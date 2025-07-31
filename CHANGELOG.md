@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed duplicate String.hexData extension from WalletImports.swift (use String.hexDecoded() from DataHexExtensions instead)
 - Removed redundant HexValidator method aliases (isValidHexString, isValidHexPubkey, isValidEventId, isValidSignature)
 - Fixed incorrect @_exported usage in WalletImports.swift
+- Fixed broken subscription grouping feature by implementing missing properties:
+  - Added `isGroupable`, `groupableDelay`, and `groupableDelayType` properties to InternalSubscription
+  - Fixed NDKRelaySubscriptionManager to properly access subscription grouping properties without await
+  - Removed conflicting property extensions from NDKRelaySubscriptionGroup
+  - Subscription grouping now works as designed, reducing relay message overhead by batching similar subscriptions
 
 ### Improved
 - Enhanced test infrastructure to reduce duplication:
@@ -20,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Created XCTestCase+AsyncEnhanced with comprehensive async test utilities
   - Extended TestFixtures with encryption, wallet, subscription, and large dataset generators
   - Added comprehensive test helper documentation
+- Added comprehensive tests for subscription grouping functionality (SubscriptionGroupingTests.swift)
 
 ### Removed
 - Removed CashuError type alias from WalletImports.swift (type doesn't exist in CashuSwift)

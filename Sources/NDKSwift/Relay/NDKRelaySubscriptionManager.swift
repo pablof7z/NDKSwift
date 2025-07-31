@@ -21,8 +21,7 @@ actor NDKRelaySubscriptionManager {
     func addSubscription(_ subscription: InternalSubscription, filters: [NDKFilter]) async {
         guard let relay = relay else { return }
         
-        let isGroupable = await subscription.isGroupable
-        if !isGroupable {
+        if !subscription.isGroupable {
             // Non-groupable subscriptions execute immediately
             let group = NDKRelaySubscriptionGroup(
                 relay: relay,
@@ -53,8 +52,8 @@ actor NDKRelaySubscriptionManager {
                 subscriptionGroups[fingerprint] = newGroup
                 
                 // Schedule execution with delay
-                let delay = await subscription.groupableDelay ?? 0.1
-                let delayType = await subscription.groupableDelayType ?? .atLeast
+                let delay = subscription.groupableDelay ?? 0.1
+                let delayType = subscription.groupableDelayType ?? .atMost
                 await newGroup.scheduleExecution(
                     delay: delay,
                     delayType: delayType
