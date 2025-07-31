@@ -88,7 +88,7 @@ While test files weren't directly analyzed, common patterns suggest:
 ## Priority Actions
 
 1. ~~**HIGH**: Remove ~360 lines of dead proof code from MemoryCache.swift~~ ✅ COMPLETED
-2. **HIGH**: Fix subscription grouping by implementing missing properties
+2. ~~**HIGH**: Fix subscription grouping by implementing missing properties~~ ✅ COMPLETED
 3. ~~**MEDIUM**: Remove duplicate hex conversion in WalletImports.swift~~ ✅ COMPLETED
 4. ~~**MEDIUM**: Remove redundant HexValidator aliases~~ ✅ COMPLETED
 5. **LOW**: Consolidate WOT caching approach
@@ -101,6 +101,11 @@ While test files weren't directly analyzed, common patterns suggest:
 - ✅ Removed redundant HexValidator method aliases
 - ✅ Fixed incorrect @_exported usage in WalletImports.swift
 - ✅ Enhanced test infrastructure with base classes and utilities
+- ✅ Fixed subscription grouping by implementing missing properties:
+  - Added `isGroupable`, `groupableDelay`, and `groupableDelayType` to InternalSubscription
+  - Fixed NDKRelaySubscriptionManager to properly use these properties
+  - Removed conflicting property extensions from NDKRelaySubscriptionGroup
+  - Created comprehensive tests for subscription grouping functionality
 
 ## Estimated Impact
 

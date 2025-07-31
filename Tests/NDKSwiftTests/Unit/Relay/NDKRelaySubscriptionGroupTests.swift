@@ -14,7 +14,10 @@ final class NDKRelaySubscriptionGroupTests: XCTestCase {
     private func createMockSubscription(
         id: String,
         filters: [NDKFilter],
-        closeOnEose: Bool = false
+        closeOnEose: Bool = false,
+        isGroupable: Bool = true,
+        groupableDelay: TimeInterval? = nil,
+        groupableDelayType: NDKSubscriptionDelayType? = nil
     ) -> InternalSubscription {
         let ndk = NDK()
         return InternalSubscription(
@@ -22,7 +25,11 @@ final class NDKRelaySubscriptionGroupTests: XCTestCase {
             filters: filters,
             relays: nil,
             ndk: ndk,
-            closeOnEose: closeOnEose
+            closeOnEose: closeOnEose,
+            fingerprint: nil,
+            isGroupable: isGroupable,
+            groupableDelay: groupableDelay,
+            groupableDelayType: groupableDelayType
         )
     }
     
@@ -411,19 +418,4 @@ final class NDKRelaySubscriptionGroupTests: XCTestCase {
         XCTAssertFalse(canAccept)
     }
     
-    // MARK: - InternalSubscription Extension Tests
-    
-    func testInternalSubscriptionExtensions() async {
-        _ = createMockSubscription(id: "sub1", filters: [createFilter(kinds: [1])])
-        
-        // Test default values via the extension
-        // Note: These are computed properties on InternalSubscription actor
-        // We can't directly access them from outside the actor context
-        // but we've verified their usage in the group tests above
-        
-        // The extension provides:
-        // - isGroupable: true (always)
-        // - groupableDelay: 0.1 seconds
-        // - groupableDelayType: .atLeast
-    }
 }

@@ -104,7 +104,7 @@ extension XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) async throws -> S.Element? where S.Element: Sendable {
-        let task = Task {
+        let task = Task<S.Element?, Error> {
             for try await element in sequence {
                 return element
             }
@@ -130,45 +130,61 @@ extension XCTestCase {
 // MARK: - NDK-Specific Async Test Helpers
 
 extension XCTestCase {
-    /// Waits for an NDK subscription to receive a specific number of events
-    func waitForEvents(
-        from subscription: NDKSubscription,
+    /// Waits for an NDK data source to receive a specific number of events
+    func waitForEvents<T>(
+        from dataSource: NDKDataSource<T>,
         count: Int,
         timeout: TimeInterval = 10.0,
         file: StaticString = #filePath,
         line: UInt = #line
-    ) async -> [NDKEvent] {
-        var events: [NDKEvent] = []
+    ) async -> [T] {
+        var events: [T] = []
         let deadline = Date().addingTimeInterval(timeout)
         
-        do {
-            for try await event in subscription {
-                events.append(event)
-                if events.count >= count {
-                    return events
-                }
-                
-                if Date() > deadline {
-                    break
-                }
+        for await event in dataSource.events {
+            events.append(event)
+            if events.count >= count {
+                return events
             }
-        } catch {
-            XCTFail("Subscription error: \(error)", file: file, line: line)
+            
+            if Date() > deadline {
+                break
+            }
         }
         
         XCTFail("Expected \(count) events but received \(events.count) within \(timeout) seconds", file: file, line: line)
         return events
     }
     
-    /// Waits for EOSE from a subscription
+    /// Waits for EOSE from a data source
     func waitForEOSE(
-        from subscription: NDKSubscription,
+        from dataSource: NDKDataSource<NDKEvent>,
         timeout: TimeInterval = 10.0,
         file: StaticString = #filePath,
         line: UInt = #line
     ) async {
-        await assertEventually(timeout: timeout, message: "EOSE not received within \(timeout) seconds", file: file, line: line) {
-            await subscription.hasReceivedEose
+        var eoseReceived = false
+        
+        let deadline = Date().addingTimeInterval(timeout)
+        
+        for await update in dataSource.relayUpdates {
+            if case .eose = update {
+                eoseReceived = true
+                break
+            }
+            
+            if case .aggregatedEose = update {
+                eoseReceived = true
+                break
+            }
+            
+            if Date() > deadline {
+                break
+            }
+        }
+        
+        if !eoseReceived {
+            XCTFail("EOSE not received within \(timeout) seconds", file: file, line: line)
         }
     }
     
@@ -190,14 +206,11 @@ extension XCTestCase {
         // Create a filter for the published event
         let filter = NDKFilter(ids: [event.id])
         
-        // Wait for the event to be retrievable
+        // Wait for the event to be retrievable using the new observe API
         await assertEventually(timeout: timeout, file: file, line: line) {
-            do {
-                let events = try await ndk.fetchEvents(filter)
-                return !events.isEmpty
-            } catch {
-                return false
-            }
+            let dataSource = ndk.observe(filter: filter, maxAge: 0)
+            let firstEvent = await dataSource.first(timeout: 1.0)
+            return firstEvent != nil
         }
     }
     

@@ -284,24 +284,3 @@ actor NDKRelaySubscriptionGroup {
     }
 }
 
-// MARK: - InternalSubscription Extensions
-
-extension InternalSubscription {
-    /// Whether this subscription can be grouped with others
-    var isGroupable: Bool {
-        // For now, all subscriptions are groupable unless explicitly disabled
-        // This can be extended based on subscription options
-        true
-    }
-    
-    /// Delay before executing grouped subscriptions
-    var groupableDelay: TimeInterval? {
-        // Default 100ms delay for grouping
-        0.1
-    }
-    
-    /// Type of delay for grouped subscriptions
-    var groupableDelayType: NDKSubscriptionDelayType? {
-        .atLeast
-    }
-}

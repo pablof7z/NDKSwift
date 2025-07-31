@@ -284,7 +284,17 @@ extension TestFixtures {
     enum MockResponses {
         /// Generates a mock EVENT message
         static func eventMessage(event: NDKEvent, subscription: String) -> [Any] {
-            return ["EVENT", subscription, event.dictionary]
+            // Convert event to dictionary for the EVENT message
+            let eventDict: [String: Any] = [
+                "id": event.id,
+                "pubkey": event.pubkey,
+                "created_at": event.createdAt,
+                "kind": event.kind,
+                "tags": event.tags,
+                "content": event.content,
+                "sig": event.sig
+            ]
+            return ["EVENT", subscription, eventDict]
         }
         
         /// Generates a mock EOSE message
@@ -351,7 +361,8 @@ extension TestFixtures {
                 ["u", mint]
             ]
             
-            let content = try! JSONCoding.encodeToString(["proofs": proofs])
+            let proofsData = try! JSONSerialization.data(withJSONObject: ["proofs": proofs], options: [])
+            let content = String(data: proofsData, encoding: .utf8)!
             
             return EventTestFactory.createEvent(
                 kind: 9321,
