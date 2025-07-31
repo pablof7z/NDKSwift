@@ -483,4 +483,38 @@ public actor MemoryCache: NDKCache {
             }
         }
     }
+    
+    public func observeProfile(
+        pubkey: String,
+        includeExisting: Bool = true
+    ) async -> AsyncThrowingStream<NDKUserMetadata?, Error> {
+        // For MemoryCache, we don't have a built-in change notification system
+        // So we'll create a stream that emits existing profile and then completes
+        AsyncThrowingStream { continuation in
+            Task {
+                // If includeExisting, emit current profile
+                if includeExisting {
+                    // First yield nil to indicate we're starting
+                    continuation.yield(nil)
+                    
+                    // Then fetch the actual profile
+                    do {
+                        let filter = NDKFilter(authors: [pubkey], kinds: [EventKind.metadata], limit: 1)
+                        let profileEvents = try await self.queryEvents(filter)
+                        if let profileEvent = profileEvents.first {
+                            let metadata = NDKUserMetadata(event: profileEvent)
+                            continuation.yield(metadata)
+                        }
+                    } catch {
+                        continuation.finish(throwing: error)
+                        return
+                    }
+                }
+                
+                // Since MemoryCache doesn't have change notifications,
+                // we complete the stream after emitting existing profile
+                continuation.finish()
+            }
+        }
+    }
 }

@@ -1959,6 +1959,91 @@ public actor NDKSQLiteCache: NDKCache {
         }
     }
     
+    /// Observe profile changes for a specific pubkey with reactive updates
+    /// - Parameters:
+    ///   - pubkey: The public key to observe profile changes for
+    ///   - includeExisting: Whether to include existing cached profile (default: true)
+    /// - Returns: An AsyncThrowingStream that emits the profile when it changes, or nil if deleted
+    public func observeProfile(
+        pubkey: String,
+        includeExisting: Bool = true
+    ) async -> AsyncThrowingStream<NDKUserMetadata?, Error> {
+        let dbQueue = self.dbQueue
+        let debugMode = self.debugMode
+        
+        return AsyncThrowingStream { continuation in
+            let observationId = UUID()
+            
+            Task {
+                // Create observation for profile metadata
+                let observation = ValueObservation.tracking { [weak self] db -> NDKUserMetadata? in
+                    guard let self = self else { return nil }
+                    
+                    // Query for the latest kind 0 event for this pubkey
+                    let sql = """
+                        SELECT e.json 
+                        FROM events e
+                        WHERE e.kind = 0 
+                        AND e.pubkey = ?
+                        ORDER BY e.created_at DESC
+                        LIMIT 1
+                    """
+                    
+                    if let row = try Row.fetchOne(db, sql: sql, arguments: [pubkey]) {
+                        if let event = self.decodeEventFromRow(row) {
+                            return NDKUserMetadata(event: event)
+                        }
+                    }
+                    return nil
+                }
+                
+                // Start the observation
+                let cancellable = observation.start(
+                    in: dbQueue,
+                    onError: { error in
+                        continuation.finish(throwing: error)
+                    },
+                    onChange: { profile in
+                        if debugMode {
+                            NDKLogger.log(.info, category: .cache, "🔔 Profile observation triggered for pubkey \(pubkey)")
+                        }
+                        continuation.yield(profile)
+                    }
+                )
+                
+                // Store the cancellable
+                await self.storeObservation(id: observationId, cancellable: cancellable)
+                
+                // If includeExisting, immediately fetch and emit current profile
+                if includeExisting {
+                    // First yield nil to indicate we're starting
+                    continuation.yield(nil)
+                    
+                    // Then fetch the actual profile
+                    do {
+                        let filter = NDKFilter(authors: [pubkey], kinds: [EventKind.metadata], limit: 1)
+                        let profileEvents = try await self.queryEvents(filter)
+                        if let profileEvent = profileEvents.first {
+                            let metadata = NDKUserMetadata(event: profileEvent)
+                            continuation.yield(metadata)
+                        }
+                    } catch {
+                        if debugMode {
+                            NDKLogger.log(.error, category: .cache, "Failed to fetch existing profile: \(error)")
+                        }
+                    }
+                }
+                
+                // Set up cleanup
+                continuation.onTermination = { @Sendable _ in
+                    Task {
+                        await self.removeObservation(id: observationId)
+                    }
+                }
+            }
+        }
+    }
+    
 }
 
 // MARK: - Cache Statistics Models

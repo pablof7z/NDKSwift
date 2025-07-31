@@ -855,5 +855,17 @@ public final class NDK {
     }
 
     // MARK: - Internal Fetch Utilities
+    
+    // MARK: - Subscription Metrics
+    
+    /// Get current subscription grouping metrics
+    public func getSubscriptionMetrics() async -> MetricsSnapshot {
+        await NDKSubscriptionMetrics.getSnapshot()
+    }
+    
+    /// Reset subscription grouping metrics
+    public func resetSubscriptionMetrics() async {
+        await NDKSubscriptionMetrics.reset()
+    }
 
 }
