@@ -4,7 +4,7 @@
 This document tracks test improvement work for NDKSwift, focusing on unit tests and coverage for core library components.
 
 ## Current Status (2025-07-31)
-Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage, and NDKRelay. Found and documented bugs in MemoryCache.queryEvents and NostrMessage.serialize.
+Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage, NDKRelay, and NDKPrivateKeySigner. Found and documented bugs in MemoryCache.queryEvents and NostrMessage.serialize.
 
 ## Work Completed
 - [x] Analyzed test coverage across the entire codebase
@@ -36,11 +36,18 @@ Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage
   - Statistics, signature verification stats
   - Subscription tracking, relay information types
   - Codable conformance, equality, hashable
+- [x] Added comprehensive unit tests for NDKPrivateKeySigner (24 tests)
+  - Initialization with private key and nsec
+  - Key generation and validation
+  - Signing operations with valid/invalid events
+  - NIP-04 and NIP-44 encryption/decryption
+  - Serialization/deserialization
+  - Error handling for invalid inputs
 
 ## Priority Work Items (Top 3)
-1. **Add unit tests for NDKPrivateKeySigner** - No local signing tests.
-2. **Add unit tests for NDKRelayConnection** - No WebSocket tests.
-3. **Add unit tests for NDKCache protocol** - No interface tests.
+1. **Add unit tests for NDKRelayConnection** - No WebSocket tests.
+2. **Add unit tests for NDKCache protocol** - No interface tests.
+3. **Add unit tests for NDKRelaySubscriptionGroup** - No grouping tests.
 
 ## Critical Gaps Identified
 
@@ -62,7 +69,7 @@ Completed unit tests for NDKEvent, MemoryCache, NDKUser, NDKFilter, NostrMessage
 - ~~**NostrMessage**: No parsing/serialization tests~~ ✅ COMPLETED
 
 ### Security Components
-- **NDKPrivateKeySigner**: No local signing tests
+- ~~**NDKPrivateKeySigner**: No local signing tests~~ ✅ COMPLETED
 - **NDKBunkerSigner**: No remote signing tests
 - **NIP04/NIP44 Encryption**: No encryption tests
 
