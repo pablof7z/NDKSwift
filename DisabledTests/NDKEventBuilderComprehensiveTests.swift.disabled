@@ -23,8 +23,8 @@ final class NDKEventBuilderComprehensiveTests: NDKUnitTestCase {
         
         let customNDK = NDK(
             relayUrls: ["wss://relay.test"],
-            signer: signer
-            // Updated setup without clientTagConfig
+            signer: signer,
+            clientTagConfig: clientConfig
         )
         
         let customBuilder = NDKEventBuilder(ndk: customNDK)
@@ -80,7 +80,7 @@ final class NDKEventBuilderComprehensiveTests: NDKUnitTestCase {
             id: "article123",
             pubkey: "author123",
             createdAt: Timestamp.now,
-            kind: EventKind.genericReply,
+            kind: EventKind.longFormArticle,
             tags: [["d", "my-article"]],
             content: "Article content",
             sig: "sig123"
@@ -184,8 +184,7 @@ final class NDKEventBuilderComprehensiveTests: NDKUnitTestCase {
     
     func testQuoteEventWithRelayFromTracker() async throws {
         // Set up event tracker with relay info
-        // Mock tracking of event with relay
-        // Assuming this should mock relay tracking
+        await ndk.eventTracker.track(eventId: "quoted123", relay: "wss://origin.relay")
         
         let quotedEvent = NDKEvent(
             id: "quoted123",
@@ -240,7 +239,7 @@ final class NDKEventBuilderComprehensiveTests: NDKUnitTestCase {
             size: 1024,
             type: "image/jpeg",
             uploaded: Date(),
-            // blurhash not used in this context
+            blurhash: nil,
             dimensions: (width: 800, height: 600)
         )
         
@@ -281,7 +280,7 @@ final class NDKEventBuilderComprehensiveTests: NDKUnitTestCase {
     func testTagBech32Nevent() async throws {
         // This is a simplified test - real nevent would have valid TLV data
         let noteId = "test_event_id_32_bytes_long_____"
-        let note = try Bech32.note(from: Data(noteId.utf8).hexString) // Adjusted the argument label
+        let note = try Bech32.note(eventId: Data(noteId.utf8).hexString)
         
         let event = try await builder
             .tagBech32(note)
@@ -406,8 +405,7 @@ final class NDKEventBuilderComprehensiveTests: NDKUnitTestCase {
         // Should still build but with signer's pubkey (invalid one ignored)
         let event = try await builder.build(signer: signer)
         XCTAssertNotEqual(event.pubkey, "invalid_pubkey")
-        let signerPubkey = try await signer.pubkey
-        XCTAssertEqual(event.pubkey, signerPubkey)
+        XCTAssertEqual(event.pubkey, try await signer.pubkey)
     }
     
     func testBuildWithEmptyTag() async throws {
@@ -431,8 +429,7 @@ final class NDKEventBuilderComprehensiveTests: NDKUnitTestCase {
             source: .nip65
         )
         
-        // Mock tracking of event with relay (updated API would be needed)
-        // await ndk.eventTracker.track(eventId: "referenced123", relay: "wss://origin.relay")
+        await ndk.eventTracker.track(eventId: "referenced123", relay: "wss://origin.relay")
         
         let referencedEvent = NDKEvent(
             id: "referenced123",

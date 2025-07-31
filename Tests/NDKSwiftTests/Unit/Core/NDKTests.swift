@@ -5,79 +5,89 @@ final class NDKTests: NDKTestCase {
     
     // MARK: - Initialization Tests
     
-    func testInitializationWithDefaults() async {
-        let ndk = NDK()
-        
-        XCTAssertNil(ndk.signer)
-        XCTAssertNil(ndk.cache)
-        let activeUser = await ndk.activeUser
-        XCTAssertNil(activeUser)
-        XCTAssertTrue(ndk.outboxEnabled)
-        XCTAssertFalse(ndk.debugMode)
-        let relays = await ndk.relays
-        XCTAssertTrue(relays.isEmpty)
+    func testInitializationWithDefaults() async throws {
+        try await performAsyncTest(timeout: 30) { [self] in
+            let ndk = NDK()
+            
+            XCTAssertNil(ndk.signer)
+            XCTAssertNil(ndk.cache)
+            let activeUser = await ndk.activeUser
+            XCTAssertNil(activeUser)
+            XCTAssertTrue(ndk.outboxEnabled)
+            XCTAssertFalse(ndk.debugMode)
+            let relays = await ndk.relays
+            XCTAssertTrue(relays.isEmpty)
+        }
     }
     
     func testInitializationWithParameters() async throws {
-        let relayUrls = ["wss://relay1.test", "wss://relay2.test"]
-        let signer = try NDKPrivateKeySigner.generate()
-        let cache = createMemoryCache()
-        
-        let ndk = NDK(
-            relayUrls: relayUrls,
-            signer: signer,
-            cache: cache
-        )
-        
-        XCTAssertNotNil(ndk.signer)
-        XCTAssertNotNil(ndk.cache)
-        let activeUser = await ndk.activeUser
-        XCTAssertNotNil(activeUser)
-        let signerPubkey = try await signer.pubkey
-        XCTAssertEqual(activeUser?.pubkey, signerPubkey)
-        let relays = await ndk.relays
-        XCTAssertEqual(relays.count, 2)
-        XCTAssertEqual(Set(relays.map(\.url)), Set(relayUrls))
+        try await performAsyncTest(timeout: 30) { [self] in
+            let relayUrls = ["wss://relay1.test", "wss://relay2.test"]
+            let signer = try NDKPrivateKeySigner.generate()
+            let cache = self.createMemoryCache()
+            
+            let ndk = NDK(
+                relayUrls: relayUrls,
+                signer: signer,
+                cache: cache
+            )
+            
+            XCTAssertNotNil(ndk.signer)
+            XCTAssertNotNil(ndk.cache)
+            let activeUser = await ndk.activeUser
+            XCTAssertNotNil(activeUser)
+            let signerPubkey = try await signer.pubkey
+            XCTAssertEqual(activeUser?.pubkey, signerPubkey)
+            let relays = await ndk.relays
+            XCTAssertEqual(relays.count, 2)
+            XCTAssertEqual(Set(relays.map(\.url)), Set(relayUrls))
+        }
     }
     
     func testActiveUserUpdatesWithSigner() async throws {
-        let ndk = createTestNDK()
-        let activeUser1 = await ndk.activeUser
-        XCTAssertNil(activeUser1)
-        
-        let signer = try NDKPrivateKeySigner.generate()
-        ndk.signer = signer
-        
-        let activeUser2 = await ndk.activeUser
-        XCTAssertNotNil(activeUser2)
-        let signerPubkey = try await signer.pubkey
-        XCTAssertEqual(activeUser2?.pubkey, signerPubkey)
+        try await performAsyncTest(timeout: 30) { [self] in
+            let ndk = self.createTestNDK()
+            let activeUser1 = await ndk.activeUser
+            XCTAssertNil(activeUser1)
+            
+            let signer = try NDKPrivateKeySigner.generate()
+            ndk.signer = signer
+            
+            let activeUser2 = await ndk.activeUser
+            XCTAssertNotNil(activeUser2)
+            let signerPubkey = try await signer.pubkey
+            XCTAssertEqual(activeUser2?.pubkey, signerPubkey)
+        }
     }
     
     // MARK: - Relay Management Tests
     
-    func testAddRelay() async {
-        let ndk = createTestNDK()
-        let relayUrl = "wss://test.relay"
-        
-        let relay = await ndk.addRelay(relayUrl)
-        
-        XCTAssertEqual(relay.url, relayUrl)
-        let relays = await ndk.relays
-        XCTAssertTrue(relays.contains { $0.url == relayUrl })
-        XCTAssertEqual(relays.count, 1)
+    func testAddRelay() async throws {
+        try await performAsyncTest(timeout: 30) { [self] in
+            let ndk = self.createTestNDK()
+            let relayUrl = "wss://test.relay"
+            
+            let relay = await ndk.addRelay(relayUrl)
+            
+            XCTAssertEqual(relay.url, relayUrl)
+            let relays = await ndk.relays
+            XCTAssertTrue(relays.contains { $0.url == relayUrl })
+            XCTAssertEqual(relays.count, 1)
+        }
     }
     
-    func testAddDuplicateRelay() async {
-        let ndk = createTestNDK()
-        let relayUrl = "wss://test.relay"
-        
-        let relay1 = await ndk.addRelay(relayUrl)
-        let relay2 = await ndk.addRelay(relayUrl)
-        
-        XCTAssertEqual(relay1.url, relay2.url)
-        let relays = await ndk.relays
-        XCTAssertEqual(relays.count, 1) // Should not duplicate
+    func testAddDuplicateRelay() async throws {
+        try await performAsyncTest(timeout: 30) { [self] in
+            let ndk = self.createTestNDK()
+            let relayUrl = "wss://test.relay"
+            
+            let relay1 = await ndk.addRelay(relayUrl)
+            let relay2 = await ndk.addRelay(relayUrl)
+            
+            XCTAssertEqual(relay1.url, relay2.url)
+            let relays = await ndk.relays
+            XCTAssertEqual(relays.count, 1) // Should not duplicate
+        }
     }
     
     func testRemoveRelay() async {
