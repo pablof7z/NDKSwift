@@ -6,30 +6,34 @@ final class NDKSubscriptionTests: NDKTestCase {
     
     // MARK: - Basic DataSource Tests
     
-    func testDataSourceCreation() async {
-        let ndk = createTestNDK()
-        let filter = NDKFilter(kinds: [1], limit: 10)
-        
-        let dataSource = ndk.subscribe(filter: filter)
-        
-        XCTAssertNotNil(dataSource)
-        XCTAssertEqual(dataSource.data.count, 0) // Initially empty
-        XCTAssertFalse(dataSource.isLoading) // Not loading until iteration starts
+    func testDataSourceCreation() async throws {
+        try await performAsyncTest(timeout: 5) {
+            let ndk = self.createTestNDK()
+            let filter = NDKFilter(kinds: [1], limit: 10)
+            
+            let dataSource = ndk.subscribe(filter: filter)
+            
+            XCTAssertNotNil(dataSource)
+            XCTAssertEqual(dataSource.data.count, 0) // Initially empty
+            XCTAssertFalse(dataSource.isLoading) // Not loading until iteration starts
+        }
     }
     
-    func testDataSourceWithCustomId() async {
-        let ndk = createTestNDK()
-        let filter = NDKFilter(kinds: [1])
-        let customId = "my-custom-subscription-id"
-        
-        let dataSource = ndk.subscribe(
-            filter: filter,
-            subscriptionId: customId
-        )
-        
-        // The subscription ID is used internally but not exposed on DataSource
-        // We can verify it's used by checking logs if needed
-        XCTAssertNotNil(dataSource)
+    func testDataSourceWithCustomId() async throws {
+        try await performAsyncTest(timeout: 5) {
+            let ndk = self.createTestNDK()
+            let filter = NDKFilter(kinds: [1])
+            let customId = "my-custom-subscription-id"
+            
+            let dataSource = ndk.subscribe(
+                filter: filter,
+                subscriptionId: customId
+            )
+            
+            // The subscription ID is used internally but not exposed on DataSource
+            // We can verify it's used by checking logs if needed
+            XCTAssertNotNil(dataSource)
+        }
     }
     
     func testDataSourceReceivesEvents() async throws {
@@ -221,129 +225,137 @@ final class NDKSubscriptionTests: NDKTestCase {
     // MARK: - Data Collection Tests
     
     func testCollectWithTimeout() async throws {
-        let cache = createMemoryCache()
-        let ndk = createTestNDK(cache: cache)
-        
-        let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
-        
-        // Create events
-        let events = (0..<3).map { i in
-            EventTestFactory.createTextNote(content: "Event \(i)")
+        try await performAsyncTest(timeout: 5) {
+            let cache = self.createMemoryCache()
+            let ndk = self.createTestNDK(cache: cache)
+            
+            let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
+            
+            // Create events
+            let events = (0..<3).map { i in
+                EventTestFactory.createTextNote(content: "Event \(i)")
+            }
+            
+            // Start collection
+            let collectTask = Task {
+                await dataSource.collect(timeout: 1.0)
+            }
+            
+            // Give time to set up
+            try await Task.sleep(nanoseconds: 100_000_000)
+            
+            // Send events
+            for event in events {
+                try await cache.processEvent(event, from: "wss://test.relay", subscriptionId: "test")
+            }
+            
+            let collectedEvents = await collectTask.value
+            XCTAssertEqual(collectedEvents.count, 3)
         }
-        
-        // Start collection
-        let collectTask = Task {
-            await dataSource.collect(timeout: 1.0)
-        }
-        
-        // Give time to set up
-        try await Task.sleep(nanoseconds: 100_000_000)
-        
-        // Send events
-        for event in events {
-            try await cache.processEvent(event, from: "wss://test.relay", subscriptionId: "test")
-        }
-        
-        let collectedEvents = await collectTask.value
-        XCTAssertEqual(collectedEvents.count, 3)
     }
     
     func testFirstWithTimeout() async throws {
-        let cache = createMemoryCache()
-        let ndk = createTestNDK(cache: cache)
-        
-        let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
-        
-        let event = EventTestFactory.createTextNote()
-        
-        // Start waiting for first
-        let firstTask = Task {
-            await dataSource.first(timeout: 2.0)
+        try await performAsyncTest(timeout: 5) {
+            let cache = self.createMemoryCache()
+            let ndk = self.createTestNDK(cache: cache)
+            
+            let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
+            
+            let event = EventTestFactory.createTextNote()
+            
+            // Start waiting for first
+            let firstTask = Task {
+                await dataSource.first(timeout: 2.0)
+            }
+            
+            // Give time to set up
+            try await Task.sleep(nanoseconds: 100_000_000)
+            
+            // Send event
+            try await cache.processEvent(event, from: "wss://test.relay", subscriptionId: "test")
+            
+            let firstEvent = await firstTask.value
+            XCTAssertNotNil(firstEvent)
+            XCTAssertEqual(firstEvent?.id, event.id)
         }
-        
-        // Give time to set up
-        try await Task.sleep(nanoseconds: 100_000_000)
-        
-        // Send event
-        try await cache.processEvent(event, from: "wss://test.relay", subscriptionId: "test")
-        
-        let firstEvent = await firstTask.value
-        XCTAssertNotNil(firstEvent)
-        XCTAssertEqual(firstEvent?.id, event.id)
     }
     
     // MARK: - Multiple Observer Tests
     
     func testMultipleDataSources() async throws {
-        let cache = createMemoryCache()
-        let ndk = createTestNDK(cache: cache)
-        
-        // Create two data sources with different filters
-        let dataSource1 = ndk.subscribe(filter: NDKFilter(kinds: [1]))
-        let dataSource2 = ndk.subscribe(filter: NDKFilter(kinds: [2]))
-        
-        let kind1Event = EventTestFactory.createEvent(kind: 1, content: "Kind 1")
-        let kind2Event = EventTestFactory.createEvent(kind: 2, content: "Kind 2")
-        
-        var events1: [NDKEvent] = []
-        var events2: [NDKEvent] = []
-        
-        // Start consuming from both
-        let task1 = Task {
-            for await event in dataSource1.events {
-                events1.append(event)
-                if events1.count >= 1 { break }
+        try await performAsyncTest(timeout: 5) {
+            let cache = self.createMemoryCache()
+            let ndk = self.createTestNDK(cache: cache)
+            
+            // Create two data sources with different filters
+            let dataSource1 = ndk.subscribe(filter: NDKFilter(kinds: [1]))
+            let dataSource2 = ndk.subscribe(filter: NDKFilter(kinds: [2]))
+            
+            let kind1Event = EventTestFactory.createEvent(kind: 1, content: "Kind 1")
+            let kind2Event = EventTestFactory.createEvent(kind: 2, content: "Kind 2")
+            
+            var events1: [NDKEvent] = []
+            var events2: [NDKEvent] = []
+            
+            // Start consuming from both
+            let task1 = Task {
+                for await event in dataSource1.events {
+                    events1.append(event)
+                    if events1.count >= 1 { break }
+                }
             }
-        }
-        
-        let task2 = Task {
-            for await event in dataSource2.events {
-                events2.append(event)
-                if events2.count >= 1 { break }
+            
+            let task2 = Task {
+                for await event in dataSource2.events {
+                    events2.append(event)
+                    if events2.count >= 1 { break }
+                }
             }
+            
+            // Give time to set up
+            try await Task.sleep(nanoseconds: 100_000_000)
+            
+            // Send events
+            try await cache.processEvent(kind1Event, from: "wss://test.relay", subscriptionId: "test")
+            try await cache.processEvent(kind2Event, from: "wss://test.relay", subscriptionId: "test")
+            
+            // Wait for processing
+            try await Task.sleep(nanoseconds: 200_000_000)
+            
+            task1.cancel()
+            task2.cancel()
+            
+            // Each should only receive its filtered events
+            XCTAssertEqual(events1.count, 1)
+            XCTAssertEqual(events1.first?.kind, 1)
+            
+            XCTAssertEqual(events2.count, 1)
+            XCTAssertEqual(events2.first?.kind, 2)
         }
-        
-        // Give time to set up
-        try await Task.sleep(nanoseconds: 100_000_000)
-        
-        // Send events
-        try await cache.processEvent(kind1Event, from: "wss://test.relay", subscriptionId: "test")
-        try await cache.processEvent(kind2Event, from: "wss://test.relay", subscriptionId: "test")
-        
-        // Wait for processing
-        try await Task.sleep(nanoseconds: 200_000_000)
-        
-        task1.cancel()
-        task2.cancel()
-        
-        // Each should only receive its filtered events
-        XCTAssertEqual(events1.count, 1)
-        XCTAssertEqual(events1.first?.kind, 1)
-        
-        XCTAssertEqual(events2.count, 1)
-        XCTAssertEqual(events2.first?.kind, 2)
     }
     
     // MARK: - Cache Policy Tests
     
     func testCacheOnlyPolicy() async throws {
-        let cache = createMemoryCache()
-        let ndk = createTestNDK(cache: cache)
-        
-        // Pre-populate cache
-        let event = EventTestFactory.createTextNote()
-        try await cache.saveEvent(event)
-        
-        // Create data source with cache-only policy
-        let dataSource = ndk.subscribe(
-            filter: NDKFilter(kinds: [1]),
-            cachePolicy: .cacheOnly
-        )
-        
-        // Should get event from cache
-        let firstEvent = await dataSource.first(timeout: 1.0)
-        XCTAssertNotNil(firstEvent)
-        XCTAssertEqual(firstEvent?.id, event.id)
+        try await performAsyncTest(timeout: 5) {
+            let cache = self.createMemoryCache()
+            let ndk = self.createTestNDK(cache: cache)
+            
+            // Pre-populate cache
+            let event = EventTestFactory.createTextNote()
+            try await cache.saveEvent(event)
+            
+            // Create data source with cache-only policy
+            let dataSource = ndk.subscribe(
+                filter: NDKFilter(kinds: [1]),
+                cachePolicy: .cacheOnly
+            )
+            
+            // Should get event from cache
+            let firstEvent = await dataSource.first(timeout: 1.0)
+            XCTAssertNotNil(firstEvent)
+            XCTAssertEqual(firstEvent?.id, event.id)
+        }
     }
     
     // MARK: - Transform Tests
@@ -382,58 +394,62 @@ final class NDKSubscriptionTests: NDKTestCase {
     // MARK: - Error Handling Tests
     
     func testDataSourceErrorHandling() async throws {
-        let cache = createMemoryCache()
-        let ndk = createTestNDK(cache: cache)
-        
-        let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
-        
-        // Error should be nil initially
-        XCTAssertNil(dataSource.error)
-        
-        // DataSource should handle network errors gracefully
-        // In the current implementation, errors are logged but don't propagate to the error property
-        // This test documents the current behavior
-        XCTAssertNil(dataSource.error)
+        try await performAsyncTest(timeout: 5) {
+            let cache = self.createMemoryCache()
+            let ndk = self.createTestNDK(cache: cache)
+            
+            let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
+            
+            // Error should be nil initially
+            XCTAssertNil(dataSource.error)
+            
+            // DataSource should handle network errors gracefully
+            // In the current implementation, errors are logged but don't propagate to the error property
+            // This test documents the current behavior
+            XCTAssertNil(dataSource.error)
+        }
     }
     
     // MARK: - Transform Edge Cases
     
     func testTransformReturningNil() async throws {
-        let cache = createMemoryCache()
-        let ndk = createTestNDK(cache: cache)
-        
-        // Transform that filters out certain events
-        let dataSource = ndk.subscribe(
-            filter: NDKFilter(kinds: [1]),
-            transform: { event in
-                // Only return events with "important" in content
-                event.content.contains("important") ? event.content : nil
+        try await performAsyncTest(timeout: 5) {
+            let cache = self.createMemoryCache()
+            let ndk = self.createTestNDK(cache: cache)
+            
+            // Transform that filters out certain events
+            let dataSource = ndk.subscribe(
+                filter: NDKFilter(kinds: [1]),
+                transform: { event in
+                    // Only return events with "important" in content
+                    event.content.contains("important") ? event.content : nil
+                }
+            )
+            
+            let importantEvent = EventTestFactory.createTextNote(content: "This is important")
+            let normalEvent = EventTestFactory.createTextNote(content: "This is normal")
+            
+            var receivedContent: [String] = []
+            let consumeTask = Task {
+                for await content in dataSource.events {
+                    receivedContent.append(content)
+                    if receivedContent.count >= 1 { break }
+                }
             }
-        )
-        
-        let importantEvent = EventTestFactory.createTextNote(content: "This is important")
-        let normalEvent = EventTestFactory.createTextNote(content: "This is normal")
-        
-        var receivedContent: [String] = []
-        let consumeTask = Task {
-            for await content in dataSource.events {
-                receivedContent.append(content)
-                if receivedContent.count >= 1 { break }
-            }
+            
+            try await Task.sleep(nanoseconds: 100_000_000)
+            
+            // Send both events
+            try await cache.processEvent(normalEvent, from: "wss://test.relay", subscriptionId: "test")
+            try await cache.processEvent(importantEvent, from: "wss://test.relay", subscriptionId: "test")
+            
+            try await Task.sleep(nanoseconds: 200_000_000)
+            consumeTask.cancel()
+            
+            // Only important event should be transformed and received
+            XCTAssertEqual(receivedContent.count, 1)
+            XCTAssertEqual(receivedContent.first, "This is important")
         }
-        
-        try await Task.sleep(nanoseconds: 100_000_000)
-        
-        // Send both events
-        try await cache.processEvent(normalEvent, from: "wss://test.relay", subscriptionId: "test")
-        try await cache.processEvent(importantEvent, from: "wss://test.relay", subscriptionId: "test")
-        
-        try await Task.sleep(nanoseconds: 200_000_000)
-        consumeTask.cancel()
-        
-        // Only important event should be transformed and received
-        XCTAssertEqual(receivedContent.count, 1)
-        XCTAssertEqual(receivedContent.first, "This is important")
     }
     
     func testComplexTransform() async throws {
@@ -527,97 +543,103 @@ final class NDKSubscriptionTests: NDKTestCase {
     }
     
     func testUpdateFilterClearsData() async throws {
-        let cache = createMemoryCache()
-        let ndk = createTestNDK(cache: cache)
-        
-        let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
-        
-        // Add some events
-        let events = (0..<3).map { i in
-            EventTestFactory.createTextNote(content: "Event \(i)")
+        try await performAsyncTest(timeout: 5) {
+            let cache = self.createMemoryCache()
+            let ndk = self.createTestNDK(cache: cache)
+            
+            let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
+            
+            // Add some events
+            let events = (0..<3).map { i in
+                EventTestFactory.createTextNote(content: "Event \(i)")
+            }
+            
+            for event in events {
+                try await cache.processEvent(event, from: "wss://test.relay", subscriptionId: "test")
+            }
+            
+            try await Task.sleep(nanoseconds: 200_000_000)
+            
+            // Should have data
+            XCTAssertEqual(dataSource.data.count, 3)
+            
+            // Update filter
+            await dataSource.updateFilter(NDKFilter(kinds: [2]))
+            
+            // Data should be cleared
+            XCTAssertEqual(dataSource.data.count, 0)
         }
-        
-        for event in events {
-            try await cache.processEvent(event, from: "wss://test.relay", subscriptionId: "test")
-        }
-        
-        try await Task.sleep(nanoseconds: 200_000_000)
-        
-        // Should have data
-        XCTAssertEqual(dataSource.data.count, 3)
-        
-        // Update filter
-        await dataSource.updateFilter(NDKFilter(kinds: [2]))
-        
-        // Data should be cleared
-        XCTAssertEqual(dataSource.data.count, 0)
     }
     
     // MARK: - Refresh Tests
     
     func testRefresh() async throws {
-        let cache = createMemoryCache()
-        let ndk = createTestNDK(cache: cache)
-        
-        let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
-        
-        // Add initial events
-        let initialEvents = (0..<3).map { i in
-            EventTestFactory.createTextNote(content: "Initial \(i)")
+        try await performAsyncTest(timeout: 5) {
+            let cache = self.createMemoryCache()
+            let ndk = self.createTestNDK(cache: cache)
+            
+            let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
+            
+            // Add initial events
+            let initialEvents = (0..<3).map { i in
+                EventTestFactory.createTextNote(content: "Initial \(i)")
+            }
+            
+            for event in initialEvents {
+                try await cache.processEvent(event, from: "wss://test.relay", subscriptionId: "test")
+            }
+            
+            try await Task.sleep(nanoseconds: 200_000_000)
+            XCTAssertEqual(dataSource.data.count, 3)
+            
+            // Refresh should clear data
+            await dataSource.refresh()
+            XCTAssertEqual(dataSource.data.count, 0)
+            
+            // New events should be received after refresh
+            let newEvent = EventTestFactory.createTextNote(content: "New after refresh")
+            try await cache.processEvent(newEvent, from: "wss://test.relay", subscriptionId: "test")
+            
+            try await Task.sleep(nanoseconds: 200_000_000)
+            XCTAssertEqual(dataSource.data.count, 1)
+            XCTAssertEqual(dataSource.data.first?.content, "New after refresh")
         }
-        
-        for event in initialEvents {
-            try await cache.processEvent(event, from: "wss://test.relay", subscriptionId: "test")
-        }
-        
-        try await Task.sleep(nanoseconds: 200_000_000)
-        XCTAssertEqual(dataSource.data.count, 3)
-        
-        // Refresh should clear data
-        await dataSource.refresh()
-        XCTAssertEqual(dataSource.data.count, 0)
-        
-        // New events should be received after refresh
-        let newEvent = EventTestFactory.createTextNote(content: "New after refresh")
-        try await cache.processEvent(newEvent, from: "wss://test.relay", subscriptionId: "test")
-        
-        try await Task.sleep(nanoseconds: 200_000_000)
-        XCTAssertEqual(dataSource.data.count, 1)
-        XCTAssertEqual(dataSource.data.first?.content, "New after refresh")
     }
     
     // MARK: - Deduplication Tests
     
     func testEventDeduplication() async throws {
-        let cache = createMemoryCache()
-        let ndk = createTestNDK(cache: cache)
-        
-        let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
-        
-        // Create same event
-        let event = EventTestFactory.createTextNote(content: "Duplicate test")
-        
-        var receivedEvents: [NDKEvent] = []
-        let consumeTask = Task {
-            for await event in dataSource.events {
-                receivedEvents.append(event)
+        try await performAsyncTest(timeout: 5) {
+            let cache = self.createMemoryCache()
+            let ndk = self.createTestNDK(cache: cache)
+            
+            let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
+            
+            // Create same event
+            let event = EventTestFactory.createTextNote(content: "Duplicate test")
+            
+            var receivedEvents: [NDKEvent] = []
+            let consumeTask = Task {
+                for await event in dataSource.events {
+                    receivedEvents.append(event)
+                }
             }
+            
+            try await Task.sleep(nanoseconds: 100_000_000)
+            
+            // Send same event multiple times
+            for _ in 0..<5 {
+                try await cache.processEvent(event, from: "wss://test.relay", subscriptionId: "test")
+                try await Task.sleep(nanoseconds: 50_000_000)
+            }
+            
+            try await Task.sleep(nanoseconds: 100_000_000)
+            consumeTask.cancel()
+            
+            // Should only receive the event once
+            XCTAssertEqual(receivedEvents.count, 1)
+            XCTAssertEqual(dataSource.data.count, 1)
         }
-        
-        try await Task.sleep(nanoseconds: 100_000_000)
-        
-        // Send same event multiple times
-        for _ in 0..<5 {
-            try await cache.processEvent(event, from: "wss://test.relay", subscriptionId: "test")
-            try await Task.sleep(nanoseconds: 50_000_000)
-        }
-        
-        try await Task.sleep(nanoseconds: 100_000_000)
-        consumeTask.cancel()
-        
-        // Should only receive the event once
-        XCTAssertEqual(receivedEvents.count, 1)
-        XCTAssertEqual(dataSource.data.count, 1)
     }
     
     // MARK: - Network Only Policy Tests
