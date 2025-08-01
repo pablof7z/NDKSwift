@@ -195,7 +195,26 @@ actor MockNDKCacheProtocol: NDKCache {
         }
         return result
     }
+
+    // MARK: - Profile Observation
     
+    func observeProfile(pubkey: String, includeExisting: Bool) async -> AsyncThrowingStream<NDKUserMetadata?, Error> {
+        return AsyncThrowingStream { continuation in
+            Task {
+                // Send existing profile if requested
+                if includeExisting {
+                    if let (metadata, updatedAt, eventId) = await getProfileMetadata(pubkey: pubkey) {
+                        let userMetadata = NDKUserMetadata(pubkey: pubkey, parsedMetadata: metadata, updatedAt: updatedAt, eventId: eventId)
+                        continuation.yield(userMetadata)
+                    }
+                }
+                
+                // No new events stream for testing, so finish
+                continuation.finish()
+            }
+        }
+    }
+
     // MARK: - Profile Metadata
     
     func saveProfileMetadata(pubkey: String, metadata: [String: Any], updatedAt: Timestamp, eventId: String) async throws {

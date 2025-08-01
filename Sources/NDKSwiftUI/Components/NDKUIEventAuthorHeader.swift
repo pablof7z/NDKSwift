@@ -184,7 +184,7 @@ public struct NDKUIEventAuthorHeader: View {
 /// ## Usage
 ///
 /// ```swift
-/// NDKEventInteractionBar(event: event, style: .standard)
+/// NDKEventInteractionBar(ndk: ndk, event: event, style: .standard)
 ///     .onReplyTapped { event in
 ///         // Handle reply
 ///     }
@@ -196,6 +196,7 @@ public struct NDKEventInteractionBar: View {
 
     // MARK: - Properties
 
+    private let ndk: NDK
     private let event: NDKEvent
     private let style: Style
     private var replyAction: ((NDKEvent) -> Void)?
@@ -203,7 +204,6 @@ public struct NDKEventInteractionBar: View {
     private var repostAction: ((NDKEvent) -> Void)?
     private var zapAction: ((NDKEvent) -> Void)?
 
-    @Environment(\.ndk) private var ndk
     @State private var reactionCounts: ReactionCounts = ReactionCounts()
 
     // MARK: - Supporting Types
@@ -223,7 +223,8 @@ public struct NDKEventInteractionBar: View {
 
     // MARK: - Initialization
 
-    public init(event: NDKEvent, style: Style = .standard) {
+    public init(ndk: NDK, event: NDKEvent, style: Style = .standard) {
+        self.ndk = ndk
         self.event = event
         self.style = style
     }

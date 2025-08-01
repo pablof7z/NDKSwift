@@ -40,7 +40,7 @@ final class SubscriptionGroupingIntegrationTests: XCTestCase {
         let filter = NDKFilter(kinds: [1])
         
         // Create custom options
-        let options = NDKSubscriptionOptions()
+        var options = NDKSubscriptionOptions()
         options.groupable = false
         options.groupableDelay = 0.5
         options.groupableDelayType = .atLeast
@@ -54,7 +54,7 @@ final class SubscriptionGroupingIntegrationTests: XCTestCase {
     
     /// Test creating multiple subscriptions with same filter
     func testMultipleSubscriptionsWithSameFilter() async throws {
-        let filter = NDKFilter(kinds: [1], authors: ["alice"])
+        let filter = NDKFilter(authors: ["alice"], kinds: [1])
         
         // Create multiple subscriptions
         let sub1 = ndk.subscribe(filter: filter)
@@ -102,13 +102,13 @@ final class SubscriptionGroupingIntegrationTests: XCTestCase {
     /// Test subscription with options initializer
     func testSubscriptionWithOptionsInitializer() async throws {
         let filter = NDKFilter(kinds: [1])
-        let options = NDKSubscriptionOptions()
+        var options = NDKSubscriptionOptions()
         options.maxAge = 300
         options.cachePolicy = .cacheOnly
         options.groupable = false
         
         // Create subscription using the options initializer
-        let subscription = NDKSubscription(
+        let subscription = NDKSubscription<NDKEvent>(
             ndk: ndk,
             filter: filter,
             options: options

@@ -22,22 +22,19 @@ import UIKit
 ///
 /// ```swift
 /// // Basic zap button with default amounts
-/// NDKZapButton(event: event)
-///     .amounts([21, 100, 1000])
+/// NDKZapButton(ndk: ndk, event: event, amounts: [21, 100, 1000])
 ///     .onZapSent { amount in
 ///         print("Sent \(amount) sats!")
 ///     }
 ///
 /// // Custom styling
-/// NDKZapButton(event: event)
-///     .style(.compact)
-///     .showCount(true)
-///     .customAmountEnabled(true)
+/// NDKZapButton(ndk: ndk, event: event, style: .compact, showCount: true, customAmountEnabled: true)
 /// ```
 public struct NDKZapButton: View {
 
     // MARK: - Properties
 
+    private let ndk: NDK
     private let event: NDKEvent
     private let style: ButtonStyle
     private let amounts: [Int]
@@ -47,7 +44,6 @@ public struct NDKZapButton: View {
     private var onZapSent: ((Int) -> Void)?
     private var onZapFailed: ((Error) -> Void)?
 
-    @Environment(\.ndk) private var ndk
     @StateObject private var zapState: ZapState
     @State private var showAmountSelector = false
     @State private var showCustomAmount = false
@@ -65,6 +61,7 @@ public struct NDKZapButton: View {
 
     /// Initialize a zap button
     /// - Parameters:
+    ///   - ndk: The NDK instance to use for operations
     ///   - event: The event to zap
     ///   - style: Button presentation style
     ///   - amounts: Predefined zap amounts in sats
@@ -72,6 +69,7 @@ public struct NDKZapButton: View {
     ///   - showCount: Whether to show total zap count
     ///   - customAmountEnabled: Whether to allow custom amounts
     public init(
+        ndk: NDK,
         event: NDKEvent,
         style: ButtonStyle = .standard,
         amounts: [Int] = [21, 100, 1000],
@@ -79,6 +77,7 @@ public struct NDKZapButton: View {
         showCount: Bool = true,
         customAmountEnabled: Bool = true
     ) {
+        self.ndk = ndk
         self.event = event
         self.style = style
         self.amounts = amounts
@@ -611,23 +610,24 @@ private enum ZapError: LocalizedError {
 #if DEBUG
 struct NDKZapButton_Previews: PreviewProvider {
     static var previews: some View {
+        let mockNDK = NDK(relayUrls: [])
+        
         VStack(spacing: 20) {
             // Different styles
             HStack(spacing: 16) {
-                NDKZapButton(event: mockEvent, style: .standard)
-                NDKZapButton(event: mockEvent, style: .compact)
-                NDKZapButton(event: mockEvent, style: .minimal)
+                NDKZapButton(ndk: mockNDK, event: mockEvent, style: .standard)
+                NDKZapButton(ndk: mockNDK, event: mockEvent, style: .compact)
+                NDKZapButton(ndk: mockNDK, event: mockEvent, style: .minimal)
             }
 
             // Different configurations
             HStack(spacing: 16) {
-                NDKZapButton(event: mockEvent, amounts: [21])
-                NDKZapButton(event: mockEvent, amounts: UIConstants.ZapAmounts.standard)
-                NDKZapButton(event: mockEvent, showCount: false)
+                NDKZapButton(ndk: mockNDK, event: mockEvent, amounts: [21])
+                NDKZapButton(ndk: mockNDK, event: mockEvent, amounts: UIConstants.ZapAmounts.standard)
+                NDKZapButton(ndk: mockNDK, event: mockEvent, showCount: false)
             }
         }
         .padding()
-        .environment(\.ndk, nil) // Mock environment
     }
 
     // Mock event for preview

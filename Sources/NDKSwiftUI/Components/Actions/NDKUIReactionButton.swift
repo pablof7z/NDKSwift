@@ -21,20 +21,19 @@ import UIKit
 ///
 /// ```swift
 /// // Basic like button
-/// NDKUIReactionButton(event: event, reaction: "❤️")
+/// NDKUIReactionButton(ndk: ndk, event: event, reaction: "❤️")
 ///     .onReactionChanged { isReacted in
 ///         print("User \(isReacted ? "liked" : "unliked") the post")
 ///     }
 ///
 /// // Custom emoji with styling
-/// NDKUIReactionButton(event: event, reaction: "🤙")
-///     .style(.compact)
-///     .showCount(true)
+/// NDKUIReactionButton(ndk: ndk, event: event, reaction: "🤙", style: .compact, showCount: true)
 /// ```
 public struct NDKUIReactionButton: View {
 
     // MARK: - Properties
 
+    private let ndk: NDK
     private let event: NDKEvent
     private let reaction: String
     private let style: ButtonStyle
@@ -42,7 +41,6 @@ public struct NDKUIReactionButton: View {
     private let animateChanges: Bool
     private var onReactionChanged: ((Bool) -> Void)?
 
-    @Environment(\.ndk) private var ndk
     @StateObject private var reactionState: ReactionState
 
     // MARK: - Supporting Types
@@ -57,18 +55,21 @@ public struct NDKUIReactionButton: View {
 
     /// Initialize a reaction button
     /// - Parameters:
+    ///   - ndk: The NDK instance to use for operations
     ///   - event: The event to react to
     ///   - reaction: The emoji reaction (default: "❤️")
     ///   - style: Button presentation style
     ///   - showCount: Whether to show reaction count
     ///   - animateChanges: Whether to animate state changes
     public init(
+        ndk: NDK,
         event: NDKEvent,
         reaction: String = "❤️",
         style: ButtonStyle = .standard,
         showCount: Bool = true,
         animateChanges: Bool = true
     ) {
+        self.ndk = ndk
         self.event = event
         self.reaction = reaction
         self.style = style
@@ -346,23 +347,23 @@ private class ReactionState: ObservableObject {
 public extension NDKUIReactionButton {
 
     /// Create a like button (❤️)
-    static func like(event: NDKEvent, style: ButtonStyle = .standard) -> NDKUIReactionButton {
-        NDKUIReactionButton(event: event, reaction: "❤️", style: style)
+    static func like(ndk: NDK, event: NDKEvent, style: ButtonStyle = .standard) -> NDKUIReactionButton {
+        NDKUIReactionButton(ndk: ndk, event: event, reaction: "❤️", style: style)
     }
 
     /// Create a repost button (🔄)
-    static func repost(event: NDKEvent, style: ButtonStyle = .standard) -> NDKUIReactionButton {
-        NDKUIReactionButton(event: event, reaction: "🔄", style: style)
+    static func repost(ndk: NDK, event: NDKEvent, style: ButtonStyle = .standard) -> NDKUIReactionButton {
+        NDKUIReactionButton(ndk: ndk, event: event, reaction: "🔄", style: style)
     }
 
     /// Create a fire button (🔥)
-    static func fire(event: NDKEvent, style: ButtonStyle = .standard) -> NDKUIReactionButton {
-        NDKUIReactionButton(event: event, reaction: "🔥", style: style)
+    static func fire(ndk: NDK, event: NDKEvent, style: ButtonStyle = .standard) -> NDKUIReactionButton {
+        NDKUIReactionButton(ndk: ndk, event: event, reaction: "🔥", style: style)
     }
 
     /// Create a thumbs up button (👍)
-    static func thumbsUp(event: NDKEvent, style: ButtonStyle = .standard) -> NDKUIReactionButton {
-        NDKUIReactionButton(event: event, reaction: "👍", style: style)
+    static func thumbsUp(ndk: NDK, event: NDKEvent, style: ButtonStyle = .standard) -> NDKUIReactionButton {
+        NDKUIReactionButton(ndk: ndk, event: event, reaction: "👍", style: style)
     }
 }
 
@@ -371,24 +372,25 @@ public extension NDKUIReactionButton {
 #if DEBUG
 struct NDKUIReactionButton_Previews: PreviewProvider {
     static var previews: some View {
+        let mockNDK = NDK(relayUrls: [])
+        
         VStack(spacing: 20) {
             // Different styles
             HStack(spacing: 16) {
-                NDKUIReactionButton.like(event: mockEvent, style: .standard)
-                NDKUIReactionButton.like(event: mockEvent, style: .compact)
-                NDKUIReactionButton.like(event: mockEvent, style: .minimal)
+                NDKUIReactionButton.like(ndk: mockNDK, event: mockEvent, style: .standard)
+                NDKUIReactionButton.like(ndk: mockNDK, event: mockEvent, style: .compact)
+                NDKUIReactionButton.like(ndk: mockNDK, event: mockEvent, style: .minimal)
             }
 
             // Different reactions
             HStack(spacing: 16) {
-                NDKUIReactionButton.like(event: mockEvent)
-                NDKUIReactionButton.fire(event: mockEvent)
-                NDKUIReactionButton.thumbsUp(event: mockEvent)
-                NDKUIReactionButton(event: mockEvent, reaction: "🤙")
+                NDKUIReactionButton.like(ndk: mockNDK, event: mockEvent)
+                NDKUIReactionButton.fire(ndk: mockNDK, event: mockEvent)
+                NDKUIReactionButton.thumbsUp(ndk: mockNDK, event: mockEvent)
+                NDKUIReactionButton(ndk: mockNDK, event: mockEvent, reaction: "🤙")
             }
         }
         .padding()
-        .environment(\.ndk, nil) // Mock environment
     }
 
     // Mock event for preview

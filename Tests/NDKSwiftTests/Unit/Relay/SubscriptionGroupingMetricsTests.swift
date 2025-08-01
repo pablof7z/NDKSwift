@@ -30,9 +30,9 @@ final class SubscriptionGroupingMetricsTests: XCTestCase {
         let filter = NDKFilter(kinds: [1])
         
         // Create groupable subscriptions
-        let sub1 = ndk.subscribe(filter: filter)
-        let sub2 = ndk.subscribe(filter: filter)
-        let sub3 = ndk.subscribe(filter: filter)
+        _ = ndk.subscribe(filter: filter)
+        _ = ndk.subscribe(filter: filter)
+        _ = ndk.subscribe(filter: filter)
         
         // Wait a bit for subscriptions to be processed
         try await Task.sleep(nanoseconds: 100_000_000) // 0.1s
@@ -46,12 +46,12 @@ final class SubscriptionGroupingMetricsTests: XCTestCase {
     
     func testNonGroupableSubscriptions() async throws {
         let filter = NDKFilter(kinds: [1])
-        let options = NDKSubscriptionOptions()
+        var options = NDKSubscriptionOptions()
         options.groupable = false
         
         // Create non-groupable subscriptions
-        let sub1 = ndk.subscribe(filter: filter, options: options)
-        let sub2 = ndk.subscribe(filter: filter, options: options)
+        _ = ndk.subscribe(filter: filter, options: options)
+        _ = ndk.subscribe(filter: filter, options: options)
         
         // Wait a bit
         try await Task.sleep(nanoseconds: 100_000_000)
@@ -130,12 +130,12 @@ final class SubscriptionGroupingMetricsTests: XCTestCase {
         let relay1Metrics = metrics.relayMetrics["wss://relay1.com"]
         XCTAssertNotNil(relay1Metrics)
         XCTAssertEqual(relay1Metrics?.totalReqMessages, 2)
-        XCTAssertEqual(relay1Metrics?.averageGroupSize, 4.0, accuracy: 0.01)
+        XCTAssertEqual(relay1Metrics?.averageGroupSize ?? 0.0, 4.0, accuracy: 0.01)
         
         let relay2Metrics = metrics.relayMetrics["wss://relay2.com"]
         XCTAssertNotNil(relay2Metrics)
         XCTAssertEqual(relay2Metrics?.totalReqMessages, 1)
-        XCTAssertEqual(relay2Metrics?.averageGroupSize, 2.0, accuracy: 0.01)
+        XCTAssertEqual(relay2Metrics?.averageGroupSize ?? 0.0, 2.0, accuracy: 0.01)
     }
     
     func testMetricsReset() async throws {

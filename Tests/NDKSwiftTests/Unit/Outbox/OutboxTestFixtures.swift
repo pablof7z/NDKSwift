@@ -30,16 +30,18 @@ struct OutboxTestFixtures {
     // MARK: - NDKOutboxItem Factory
     
     static func makeOutboxItem(
+        pubkey: String = alicePubkey,
         readRelays: Set<RelayURL>,
         writeRelays: Set<RelayURL>,
-        timestamp: Timestamp? = nil,
-        source: RelayURL? = nil
+        fetchedAt: Date? = nil,
+        source: RelayListSource? = nil
     ) -> NDKOutboxItem {
         NDKOutboxItem(
-            readRelays: readRelays,
-            writeRelays: writeRelays,
-            timestamp: timestamp ?? Timestamp(Date().timeIntervalSince1970),
-            source: source ?? relay1
+            pubkey: pubkey,
+            readRelays: Set(readRelays.map { RelayInfo(url: $0) }),
+            writeRelays: Set(writeRelays.map { RelayInfo(url: $0) }),
+            fetchedAt: fetchedAt ?? Date(),
+            source: source ?? .unknown
         )
     }
     
@@ -73,21 +75,17 @@ struct OutboxTestFixtures {
     // MARK: - NDKEvent Factory
     
     static func makeEvent(
-        kind: EventKind = .textNote,
+        kind: Int = EventKind.textNote,
         content: String = "Test event",
         pubkey: PublicKey? = nil,
-        tags: Tags = [],
+        tags: [Tag] = [],
         createdAt: Timestamp? = nil
-    ) -> NDKEvent {
-        let event = NDKEvent(
-            pubkey: pubkey ?? alicePubkey,
-            createdAt: createdAt ?? Timestamp(Date().timeIntervalSince1970),
-            kind: kind,
-            tags: tags,
-            content: content
-        )
-        event.computeIdAndSerialize()
-        return event
+    ) async throws -> NDKEvent {
+        let builder = NDKEventBuilder(ndk: NDK())
+            .kind(Kind(kind))
+            .content(content)
+            .tags(tags)
+        return try await builder.build()
     }
     
     /// Make event with p-tags
@@ -95,12 +93,11 @@ struct OutboxTestFixtures {
         author: PublicKey,
         pTaggedUsers: [PublicKey],
         content: String = "Test event with mentions"
-    ) -> NDKEvent {
-        let tags = pTaggedUsers.map { Tag(id: "p", values: [$0]) }
-        return makeEvent(
-            kind: .textNote,
+    ) async throws -> NDKEvent {
+        let tags = pTaggedUsers.map { ["p", $0] }
+        return try await makeEvent(
+            kind: EventKind.textNote,
             content: content,
-            pubkey: author,
             tags: tags
         )
     }
@@ -110,14 +107,13 @@ struct OutboxTestFixtures {
         author: PublicKey,
         referencedEvents: [(String, RelayURL)],
         content: String = "Reply event"
-    ) -> NDKEvent {
+    ) async throws -> NDKEvent {
         let tags = referencedEvents.map { eventId, relay in
-            Tag(id: "e", values: [eventId, relay])
+            ["e", eventId, relay]
         }
-        return makeEvent(
-            kind: .textNote,
+        return try await makeEvent(
+            kind: EventKind.textNote,
             content: content,
-            pubkey: author,
             tags: tags
         )
     }
@@ -128,30 +124,28 @@ struct OutboxTestFixtures {
         readRelays: Set<RelayURL>,
         writeRelays: Set<RelayURL>,
         createdAt: Timestamp? = nil
-    ) -> NDKEvent {
-        var tags: Tags = []
+    ) async throws -> NDKEvent {
+        var tags: [Tag] = []
         
         // Add read-only relays
         for relay in readRelays.subtracting(writeRelays) {
-            tags.append(Tag(id: "r", values: [relay, "read"]))
+            tags.append(["r", relay, "read"])
         }
         
         // Add write-only relays
         for relay in writeRelays.subtracting(readRelays) {
-            tags.append(Tag(id: "r", values: [relay, "write"]))
+            tags.append(["r", relay, "write"])
         }
         
         // Add read+write relays
         for relay in readRelays.intersection(writeRelays) {
-            tags.append(Tag(id: "r", values: [relay]))
+            tags.append(["r", relay])
         }
         
-        return makeEvent(
-            kind: .relayList,
+        return try await makeEvent(
+            kind: EventKind.relayList,
             content: "",
-            pubkey: pubkey,
-            tags: tags,
-            createdAt: createdAt
+            tags: tags
         )
     }
     
@@ -159,19 +153,19 @@ struct OutboxTestFixtures {
     
     static func makeFilter(
         authors: Set<PublicKey>? = nil,
-        kinds: Set<EventKind>? = nil,
+        kinds: Set<Int>? = nil,
         tags: [String: Set<String>]? = nil,
         since: Timestamp? = nil,
         until: Timestamp? = nil,
         limit: Int? = nil
     ) -> NDKFilter {
         NDKFilter(
-            authors: authors,
-            kinds: kinds,
-            tags: tags,
+            authors: authors?.map { $0 },
+            kinds: kinds?.map { Kind($0) },
             since: since,
             until: until,
-            limit: limit
+            limit: limit,
+            tags: tags
         )
     }
     
@@ -179,7 +173,7 @@ struct OutboxTestFixtures {
     static func makeFilterWithPTags(
         authors: Set<PublicKey>? = nil,
         pTaggedUsers: Set<PublicKey>,
-        kinds: Set<EventKind>? = nil
+        kinds: Set<Int>? = nil
     ) -> NDKFilter {
         makeFilter(
             authors: authors,
@@ -188,27 +182,13 @@ struct OutboxTestFixtures {
         )
     }
     
-    // MARK: - Relay Performance Data
-    
-    static func makeRelayPerformance(
-        successCount: Int = 10,
-        failureCount: Int = 0,
-        totalResponseTime: TimeInterval = 5.0,
-        lastUpdated: Date = Date()
-    ) -> RelayPerformance {
-        RelayPerformance(
-            successCount: successCount,
-            failureCount: failureCount,
-            totalResponseTime: totalResponseTime,
-            lastUpdated: lastUpdated
-        )
-    }
+    // MARK: - Relay Performance Data (removed - type doesn't exist)
     
     // MARK: - Pre-configured Test Scenarios
     
     /// Scenario: Small group (< 10 p-tags)
-    static func makeSmallGroupEvent() -> NDKEvent {
-        makeEventWithPTags(
+    static func makeSmallGroupEvent() async throws -> NDKEvent {
+        try await makeEventWithPTags(
             author: alicePubkey,
             pTaggedUsers: [bobPubkey, charliePubkey, davePubkey],
             content: "Message to small group"
@@ -216,11 +196,11 @@ struct OutboxTestFixtures {
     }
     
     /// Scenario: Large group (>= 10 p-tags)
-    static func makeLargeGroupEvent() -> NDKEvent {
+    static func makeLargeGroupEvent() async throws -> NDKEvent {
         let manyPubkeys = (1...15).map { n in
             "user\(n)23456789012345678901234567890123456789012345678901234567890"
         }
-        return makeEventWithPTags(
+        return try await makeEventWithPTags(
             author: alicePubkey,
             pTaggedUsers: manyPubkeys,
             content: "Message to large group"
@@ -228,12 +208,12 @@ struct OutboxTestFixtures {
     }
     
     /// Scenario: Direct message
-    static func makeDirectMessage(from: PublicKey, to: PublicKey) -> NDKEvent {
-        makeEvent(
-            kind: .encryptedDirectMessage,
+    static func makeDirectMessage(from: PublicKey, to: PublicKey) async throws -> NDKEvent {
+        try await makeEvent(
+            kind: EventKind.encryptedDirectMessage,
             content: "Encrypted content here",
             pubkey: from,
-            tags: [Tag(id: "p", values: [to])]
+            tags: [["p", to]]
         )
     }
     
@@ -241,7 +221,7 @@ struct OutboxTestFixtures {
     static func makeMultiAuthorFilter() -> NDKFilter {
         makeFilter(
             authors: [alicePubkey, bobPubkey, charliePubkey],
-            kinds: [.textNote]
+            kinds: [EventKind.textNote]
         )
     }
     
@@ -249,7 +229,7 @@ struct OutboxTestFixtures {
     static func makePTagFilter() -> NDKFilter {
         makeFilterWithPTags(
             pTaggedUsers: [alicePubkey, bobPubkey],
-            kinds: [.textNote]
+            kinds: [EventKind.textNote]
         )
     }
     
@@ -257,7 +237,7 @@ struct OutboxTestFixtures {
     static func makeComplexFilter() -> NDKFilter {
         makeFilter(
             authors: [alicePubkey],
-            kinds: [.textNote],
+            kinds: [EventKind.textNote],
             tags: ["p": [bobPubkey, charliePubkey]]
         )
     }

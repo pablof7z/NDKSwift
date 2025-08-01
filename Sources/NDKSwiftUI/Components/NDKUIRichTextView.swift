@@ -3,13 +3,12 @@ import NDKSwift
 
 /// A comprehensive rich text view that renders parsed Nostr content with reactive profile loading and interactive elements
 public struct NDKUIRichTextView: View {
+    private let ndk: NDK
     let content: String
     let tags: [Tag]
     let currentUser: NDKUser?
     let showLinkPreviews: Bool
     let style: Style
-    
-    @Environment(\.ndk) private var ndk
     @State private var parsedContent: NDKParsedContent?
     @State private var profileCache: [String: NDKUserMetadata] = [:]
     @State private var profileTasks: [String: Task<Void, Never>] = [:]
@@ -28,12 +27,14 @@ public struct NDKUIRichTextView: View {
     }
     
     public init(
+        ndk: NDK,
         content: String,
         tags: [Tag] = [],
         currentUser: NDKUser? = nil,
         showLinkPreviews: Bool = true,
         style: Style = .full
     ) {
+        self.ndk = ndk
         self.content = content
         self.tags = tags
         self.currentUser = currentUser
@@ -53,7 +54,7 @@ public struct NDKUIRichTextView: View {
                     // Show URL previews below the text
                     if showLinkPreviews {
                         ForEach(extractURLs(from: parsed.components), id: \.absoluteString) { url in
-                            NDKUIURLPreview(url: url, style: previewStyle)
+                            NDKUIURLPreview(ndk: ndk, url: url, style: previewStyle)
                                 .padding(.top, 4)
                         }
                         
@@ -207,8 +208,6 @@ public struct NDKUIRichTextView: View {
     }
     
     private func parseContent() async {
-        guard let ndk = ndk else { return }
-        
         let parsed = await ndk.parseContent(content, tags: tags, currentUser: currentUser)
         
         await MainActor.run {
@@ -217,8 +216,6 @@ public struct NDKUIRichTextView: View {
     }
     
     private func loadProfilesForComponents(_ components: [NDKParsedContent.Component]) {
-        guard let ndk = ndk else { return }
-        
         for component in components {
             switch component {
             case .userMention(let pubkey, _):
@@ -235,8 +232,7 @@ public struct NDKUIRichTextView: View {
     
     private func loadProfile(for pubkey: String) {
         // Skip if already loading or loaded
-        guard !trackedPubkeys.contains(pubkey),
-              let ndk = ndk else { return }
+        guard !trackedPubkeys.contains(pubkey) else { return }
         
         trackedPubkeys.insert(pubkey)
         
@@ -366,17 +362,13 @@ public struct NDKUIEventPreview: View {
 
 /// A simpler text-only version for use in list views
 public struct NDKUIRichTextInline: View {
+    private let ndk: NDK
     let content: String
     let tags: [Tag]
     let currentUser: NDKUser?
     
-    @Environment(\.ndk) private var ndk
-    @State private var parsedContent: NDKParsedContent?
-    @State private var profileCache: [String: NDKUserMetadata] = [:]
-    @State private var profileTasks: [String: Task<Void, Never>] = [:]
-    @State private var trackedPubkeys: Set<String> = []
-    
-    public init(content: String, tags: [Tag] = [], currentUser: NDKUser? = nil) {
+    public init(ndk: NDK, content: String, tags: [Tag] = [], currentUser: NDKUser? = nil) {
+        self.ndk = ndk
         self.content = content
         self.tags = tags
         self.currentUser = currentUser
@@ -384,6 +376,7 @@ public struct NDKUIRichTextInline: View {
     
     public var body: some View {
         NDKUIRichTextView(
+            ndk: ndk,
             content: content,
             tags: tags,
             currentUser: currentUser,
@@ -398,13 +391,17 @@ public struct NDKUIRichTextInline: View {
 #if DEBUG
 struct NDKUIRichTextView_Previews: PreviewProvider {
     static var previews: some View {
+        let mockNDK = NDK(relayUrls: [])
+        
         VStack(spacing: 20) {
             NDKUIRichTextView(
+                ndk: mockNDK,
                 content: "Hello @npub1234... check out #bitcoin at https://example.com",
                 style: .full
             )
             
             NDKUIRichTextView(
+                ndk: mockNDK,
                 content: "Simple inline text with #nostr",
                 style: .minimal
             )

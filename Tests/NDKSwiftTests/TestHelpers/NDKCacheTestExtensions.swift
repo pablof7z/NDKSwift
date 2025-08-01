@@ -35,8 +35,8 @@ extension NDKCache {
         }
     }
     
-    /// Observe profile changes (test helper)
-    func observeProfile(pubkey: String, includeExisting: Bool = true) async -> AsyncStream<NDKUserProfile?> {
+    /// Observe profile changes test helper - just delegates to the protocol method
+    func observeProfileHelper(pubkey: String, includeExisting: Bool = true) async -> AsyncStream<NDKUserProfile?> {
         AsyncStream { continuation in
             Task {
                 // Send existing profile if requested

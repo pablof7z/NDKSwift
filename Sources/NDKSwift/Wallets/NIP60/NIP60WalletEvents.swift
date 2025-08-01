@@ -19,6 +19,8 @@ public struct NIP60WalletEvent {
         case transactionAdded(WalletTransaction)
         /// An existing transaction was updated
         case transactionUpdated(WalletTransaction)
+        /// Blacklisted mints were updated
+        case blacklistUpdated(Set<String>)
     }
 
     /// The type of event that occurred

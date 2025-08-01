@@ -1,8 +1,14 @@
 import Foundation
 @testable import NDKSwift
 
-/// Mock relay with outbox-specific testing capabilities
-final class MockOutboxRelay: NDKRelay {
+/// Mock relay with outbox-specific testing capabilities  
+/// Provides a testable relay implementation for outbox testing
+final class MockOutboxRelay {
+    
+    // MARK: - Relay Properties
+    
+    let url: RelayURL
+    private(set) var connectionState: NDKRelayConnectionState = .disconnected
     
     // MARK: - Mock Configuration
     
@@ -29,7 +35,7 @@ final class MockOutboxRelay: NDKRelay {
     // MARK: - Initialization
     
     init(url: RelayURL) {
-        super.init(url: url)
+        self.url = url
     }
     
     // MARK: - Mock Helpers
@@ -58,85 +64,71 @@ final class MockOutboxRelay: NDKRelay {
         publishedEvents.filter { $0.pubkey == pubkey }.count
     }
     
-    // MARK: - NDKRelay Overrides
+    // MARK: - Mock Relay Methods
     
-    override func connect() async {
+    func connect() async throws {
         if shouldFailConnection {
             connectionState = .disconnected
-            return
+            throw NDKError.connectionFailed(relay: url, message: "Mock connection failure")
         }
         
         if shouldAuthChallenge {
-            connectionState = .authRequired
+            connectionState = .authRequired(challenge: "mock-challenge")
         } else {
             connectionState = .connected
         }
     }
     
-    override func disconnect() async {
+    func disconnect() async {
         connectionState = .disconnected
         activeSubscriptions.removeAll()
     }
     
-    override func publish(_ event: NDKEvent) async throws -> RelayPublishResult {
+    func publish(_ event: NDKEvent) async throws -> MockPublishResult {
         // Simulate response delay
         if responseDelay > 0 {
             try await Task.sleep(nanoseconds: UInt64(responseDelay * 1_000_000_000))
         }
         
         // Check connection
-        guard connectionState == .connected || connectionState == .authenticated else {
-            return RelayPublishResult(
-                relay: self,
-                status: .failed(.connectionFailed("Not connected"))
-            )
+        guard await isConnected() else {
+            return MockPublishResult(success: false, message: "Not connected")
         }
         
         // Simulate auth challenge
-        if shouldAuthChallenge && connectionState != .authenticated {
-            return RelayPublishResult(
-                relay: self,
-                status: .failed(.authFailed("Authentication required"))
-            )
+        let isAuth = await isAuthenticated()
+        if shouldAuthChallenge && !isAuth {
+            return MockPublishResult(success: false, message: "Authentication required")
         }
         
         // Simulate rate limiting
         publishCount += 1
         if let limit = rateLimitAfterCount, publishCount > limit {
-            return RelayPublishResult(
-                relay: self,
-                status: .rateLimited(retryAfter: Date().addingTimeInterval(5))
-            )
+            return MockPublishResult(success: false, message: "Rate limited")
         }
         
         // Simulate rejection
         if shouldRejectEvents {
-            return RelayPublishResult(
-                relay: self,
-                status: .failed(.rejected(rejectReason))
-            )
+            return MockPublishResult(success: false, message: rejectReason)
         }
         
         // Success
         publishedEvents.append(event)
-        return RelayPublishResult(
-            relay: self,
-            status: .success
-        )
+        return MockPublishResult(success: true, message: "Published successfully")
     }
     
-    override func subscribe(
+    func subscribe(
         _ filter: NDKFilter,
         subscriptionId: String
-    ) async -> AsyncThrowingStream<RelayMessage, Error> {
+    ) async -> AsyncThrowingStream<MockRelayMessage, Error> {
         activeSubscriptions[subscriptionId] = filter
         
         return AsyncThrowingStream { continuation in
-            Task {
+            let task = Task {
                 // Emit matching events
-                for event in eventsToEmit {
-                    if matchesFilter(event: event, filter: filter) {
-                        continuation.yield(.event(subscriptionId, event))
+                for event in self.eventsToEmit {
+                    if self.matchesFilter(event: event, filter: filter) {
+                        continuation.yield(MockRelayMessage.event(subscriptionId, event))
                         
                         // Small delay between events
                         try? await Task.sleep(nanoseconds: 10_000_000) // 10ms
@@ -144,31 +136,30 @@ final class MockOutboxRelay: NDKRelay {
                 }
                 
                 // Send EOSE
-                continuation.yield(.eose(subscriptionId))
+                continuation.yield(MockRelayMessage.eose(subscriptionId))
                 
-                // Keep subscription open unless it should close on EOSE
-                if filter.closeOnEose ?? false {
-                    continuation.finish()
-                } else {
-                    // Keep alive for continuous subscriptions
-                    try? await Task.sleep(nanoseconds: 60_000_000_000) // 60s
-                    continuation.finish()
-                }
+                // Keep alive for continuous subscriptions
+                // (In real implementation, closeOnEose would be handled by subscription options)
+                try? await Task.sleep(nanoseconds: 60_000_000_000) // 60s
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in
+                task.cancel()
             }
         }
     }
     
-    override func unsubscribe(_ subscriptionId: String) async {
+    func unsubscribe(_ subscriptionId: String) async {
         activeSubscriptions.removeValue(forKey: subscriptionId)
     }
     
-    override func sendAuthResponse(_ authEvent: NDKEvent) async throws {
+    func sendAuthResponse(_ authEvent: NDKEvent) async throws {
         authAttempts += 1
         
         if authAttempts <= maxRetryAttempts {
             connectionState = .authenticated
         } else {
-            throw NDKError.relayError(message: "Auth failed after \(authAttempts) attempts")
+            throw NDKError.relayError(relay: url, message: "Auth failed after \(authAttempts) attempts")
         }
     }
     
@@ -189,8 +180,8 @@ final class MockOutboxRelay: NDKRelay {
         if let filterTags = filter.tags {
             for (tagName, tagValues) in filterTags {
                 let eventTagValues = Set(event.tags
-                    .filter { $0.id == tagName }
-                    .compactMap { $0.values.first })
+                    .filter { $0.count > 0 && $0[0] == tagName }
+                    .compactMap { $0.count > 1 ? $0[1] : nil })
                 
                 // Event must have at least one matching tag value
                 if !tagValues.isEmpty && eventTagValues.isDisjoint(with: tagValues) {
@@ -209,4 +200,27 @@ final class MockOutboxRelay: NDKRelay {
         
         return true
     }
+    
+    // MARK: - Connection State Helpers
+    
+    private func isConnected() async -> Bool {
+        return connectionState == .connected || connectionState == .authenticated
+    }
+    
+    private func isAuthenticated() async -> Bool {
+        return connectionState == .authenticated
+    }
+}
+
+// MARK: - Mock Types
+
+struct MockPublishResult {
+    let success: Bool
+    let message: String
+}
+
+enum MockRelayMessage {
+    case event(String, NDKEvent)
+    case eose(String)
+    case notice(String)
 }
