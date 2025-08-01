@@ -38,7 +38,7 @@ final class ReactiveSubscriptionTests: XCTestCase {
         }
         
         // Give network subscription time to set up
-        try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+        try await Task.sleep(nanoseconds: 10_000_000) // 0.01 seconds
         
         // Create cache-only subscription with same filter
         let cacheOnlyEvents = ActorQueue<NDKEvent>()
@@ -55,7 +55,7 @@ final class ReactiveSubscriptionTests: XCTestCase {
         }
         
         // Give cache subscription time to set up
-        try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+        try await Task.sleep(nanoseconds: 10_000_000) // 0.01 seconds
         
         // Create test event
         let event = NDKEvent(
@@ -68,20 +68,12 @@ final class ReactiveSubscriptionTests: XCTestCase {
             sig: "test_signature"
         )
         
-        // Process event through the internal subscription system
+        // Process event through the cache, which will notify observers
         // This simulates what happens when an event arrives from a relay
-        let mockRelay = MockRelay(url: "wss://test.relay/")
-        
-        // Use the network subscription ID to process the event
-        // The fingerprint-based routing will deliver it to both subscriptions
-        await ndk.internalSubscriptionManager.processEvent(
-            event,
-            subscriptionId: "network-sub",
-            from: mockRelay
-        )
+        try await cache.processEvent(event, from: "wss://test.relay/", subscriptionId: "network-sub")
         
         // Give events time to propagate
-        try await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
+        try await Task.sleep(nanoseconds: 50_000_000) // 0.05 seconds
         
         // Both subscriptions should have received the event
         let cacheOnlyReceived = await cacheOnlyEvents.dequeueAll()
@@ -133,7 +125,7 @@ final class ReactiveSubscriptionTests: XCTestCase {
         }
         
         // Give subscriptions time to set up
-        try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+        try await Task.sleep(nanoseconds: 10_000_000) // 0.01 seconds
         
         // Simulate event from initial relay
         let event1 = NDKEvent(
@@ -177,7 +169,7 @@ final class ReactiveSubscriptionTests: XCTestCase {
         try await cache.saveEvent(event2)
         
         // Give events time to propagate
-        try await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
+        try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         
         // Check all received events
         let receivedEvents = await allEvents.dequeueAll()
