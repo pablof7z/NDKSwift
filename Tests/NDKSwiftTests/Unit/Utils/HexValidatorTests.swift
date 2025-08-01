@@ -26,7 +26,7 @@ final class HexValidatorTests: XCTestCase {
     }
     
     func testIsValidHexPubkeyWithValidPubkey() {
-        let validPubkey = "a1b2c3d4e5f6789012345678901234567890123456789012345678901234567"
+        let validPubkey = "a1b2c3d4e5f67890123456789012345678901234567890123456789012345678"
         XCTAssertTrue(HexValidator.isValid32ByteHex(validPubkey))
     }
     
@@ -34,7 +34,7 @@ final class HexValidatorTests: XCTestCase {
         // Too short
         XCTAssertFalse(HexValidator.isValid32ByteHex("a1b2c3"))
         // Too long
-        XCTAssertFalse(HexValidator.isValid32ByteHex("a1b2c3d4e5f67890123456789012345678901234567890123456789012345678"))
+        XCTAssertFalse(HexValidator.isValid32ByteHex("a1b2c3d4e5f678901234567890123456789012345678901234567890123456789"))
         // Wrong length but valid hex
         XCTAssertFalse(HexValidator.isValid32ByteHex("a1b2c3d4e5f678901234567890123456789012345678901234567890123456"))
     }
