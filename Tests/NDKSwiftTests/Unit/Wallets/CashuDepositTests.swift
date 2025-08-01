@@ -12,7 +12,8 @@ final class CashuDepositTests: XCTestCase {
         ndk = NDK()
         eventManager = WalletEventManager(ndk: ndk)
         mints = MintManager()
-        signer = try NDKPrivateKeySigner(privateKey: "test_private_key")
+        // Use a valid 64 character hex string for testing
+        signer = try NDKPrivateKeySigner(privateKey: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef")
     }
     
     func testRequestMintQuoteReturnsEventId() async throws {
