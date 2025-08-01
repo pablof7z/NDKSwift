@@ -302,22 +302,36 @@ public actor NDKSQLiteCache: NDKCache {
                 // Reconstruct metadata dictionary
                 var metadata: [String: Any] = [:]
                 
-                // Add standard fields if present
-                if let name = row["name"] as? String { metadata["name"] = name }
-                if let displayName = row["display_name"] as? String { metadata["display_name"] = displayName }
-                if let about = row["about"] as? String { metadata["about"] = about }
-                if let picture = row["picture"] as? String { metadata["picture"] = picture }
-                if let banner = row["banner"] as? String { metadata["banner"] = banner }
-                if let website = row["website"] as? String { metadata["website"] = website }
-                if let nip05 = row["nip05"] as? String { metadata["nip05"] = nip05 }
-                if let lud06 = row["lud06"] as? String { metadata["lud06"] = lud06 }
-                if let lud16 = row["lud16"] as? String { metadata["lud16"] = lud16 }
+                // Check if we have semantic fields populated
+                let hasSemanticFields = row["name"] as? String != nil ||
+                                      row["display_name"] as? String != nil ||
+                                      row["about"] as? String != nil
                 
-                // Add additional fields if present
-                if let additionalFieldsData = row["additional_fields"] as? Data,
-                   let additionalFields = try? PropertyListSerialization.propertyList(from: additionalFieldsData, format: nil) as? [String: String] {
-                    for (key, value) in additionalFields {
-                        metadata[key] = value
+                if hasSemanticFields {
+                    // Add standard fields if present
+                    if let name = row["name"] as? String { metadata["name"] = name }
+                    if let displayName = row["display_name"] as? String { metadata["display_name"] = displayName }
+                    if let about = row["about"] as? String { metadata["about"] = about }
+                    if let picture = row["picture"] as? String { metadata["picture"] = picture }
+                    if let banner = row["banner"] as? String { metadata["banner"] = banner }
+                    if let website = row["website"] as? String { metadata["website"] = website }
+                    if let nip05 = row["nip05"] as? String { metadata["nip05"] = nip05 }
+                    if let lud06 = row["lud06"] as? String { metadata["lud06"] = lud06 }
+                    if let lud16 = row["lud16"] as? String { metadata["lud16"] = lud16 }
+                    
+                    // Add additional fields if present
+                    if let additionalFieldsData = row["additional_fields"] as? Data,
+                       let additionalFields = try? PropertyListSerialization.propertyList(from: additionalFieldsData, format: nil) as? [String: String] {
+                        for (key, value) in additionalFields {
+                            metadata[key] = value
+                        }
+                    }
+                } else {
+                    // Fallback to JSON parsing for backward compatibility
+                    if let jsonString = row["json"] as? String,
+                       let jsonData = jsonString.data(using: .utf8),
+                       let jsonDict = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] {
+                        metadata = jsonDict
                     }
                 }
                 
@@ -356,22 +370,36 @@ public actor NDKSQLiteCache: NDKCache {
                         // Reconstruct metadata dictionary
                         var metadata: [String: Any] = [:]
                         
-                        // Add standard fields if present
-                        if let name = row["name"] as? String { metadata["name"] = name }
-                        if let displayName = row["display_name"] as? String { metadata["display_name"] = displayName }
-                        if let about = row["about"] as? String { metadata["about"] = about }
-                        if let picture = row["picture"] as? String { metadata["picture"] = picture }
-                        if let banner = row["banner"] as? String { metadata["banner"] = banner }
-                        if let website = row["website"] as? String { metadata["website"] = website }
-                        if let nip05 = row["nip05"] as? String { metadata["nip05"] = nip05 }
-                        if let lud06 = row["lud06"] as? String { metadata["lud06"] = lud06 }
-                        if let lud16 = row["lud16"] as? String { metadata["lud16"] = lud16 }
+                        // Check if we have semantic fields populated
+                        let hasSemanticFields = row["name"] as? String != nil ||
+                                              row["display_name"] as? String != nil ||
+                                              row["about"] as? String != nil
                         
-                        // Add additional fields if present
-                        if let additionalFieldsData = row["additional_fields"] as? Data,
-                           let additionalFields = try? PropertyListSerialization.propertyList(from: additionalFieldsData, format: nil) as? [String: String] {
-                            for (key, value) in additionalFields {
-                                metadata[key] = value
+                        if hasSemanticFields {
+                            // Add standard fields if present
+                            if let name = row["name"] as? String { metadata["name"] = name }
+                            if let displayName = row["display_name"] as? String { metadata["display_name"] = displayName }
+                            if let about = row["about"] as? String { metadata["about"] = about }
+                            if let picture = row["picture"] as? String { metadata["picture"] = picture }
+                            if let banner = row["banner"] as? String { metadata["banner"] = banner }
+                            if let website = row["website"] as? String { metadata["website"] = website }
+                            if let nip05 = row["nip05"] as? String { metadata["nip05"] = nip05 }
+                            if let lud06 = row["lud06"] as? String { metadata["lud06"] = lud06 }
+                            if let lud16 = row["lud16"] as? String { metadata["lud16"] = lud16 }
+                            
+                            // Add additional fields if present
+                            if let additionalFieldsData = row["additional_fields"] as? Data,
+                               let additionalFields = try? PropertyListSerialization.propertyList(from: additionalFieldsData, format: nil) as? [String: String] {
+                                for (key, value) in additionalFields {
+                                    metadata[key] = value
+                                }
+                            }
+                        } else {
+                            // Fallback to JSON parsing for backward compatibility
+                            if let jsonString = row["json"] as? String,
+                               let jsonData = jsonString.data(using: .utf8),
+                               let jsonDict = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] {
+                                metadata = jsonDict
                             }
                         }
                         
@@ -818,8 +846,20 @@ public actor NDKSQLiteCache: NDKCache {
             }
 
             var result: [String: Any] = [:]
-            for (column, value) in row {
-                result[column] = value
+            for (column, dbValue) in row {
+                // Convert DatabaseValue to appropriate Swift type
+                if dbValue.isNull {
+                    result[column] = NSNull()
+                } else if let stringValue = String.fromDatabaseValue(dbValue) {
+                    result[column] = stringValue
+                } else if let intValue = Int64.fromDatabaseValue(dbValue) {
+                    result[column] = intValue
+                } else if let dataValue = Data.fromDatabaseValue(dbValue) {
+                    result[column] = dataValue
+                } else {
+                    // Store the database value directly if we can't convert it
+                    result[column] = dbValue
+                }
             }
             return result
         }

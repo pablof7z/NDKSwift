@@ -138,6 +138,8 @@ final class ProfileSemanticCachingTests: XCTestCase {
         if var updatedProfile = profile {
             updatedProfile.about = "Updated after migration"
             try await cache.saveProfile(updatedProfile, pubkey: pubkey)
+        } else {
+            XCTFail("Profile should not be nil")
         }
         
         // Verify the profile now has semantic fields populated
