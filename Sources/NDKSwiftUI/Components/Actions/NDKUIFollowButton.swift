@@ -108,7 +108,7 @@ public struct NDKUIFollowButton: View {
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
         }
         .buttonStyle(PlainButtonStyle())
-        .disabled(followState.isLoading || ndk?.signer == nil)
+        .disabled(followState.isLoading || ndk.signer == nil)
         .opacity(followState.isLoading ? OpacityConstants.overlay : 1.0)
         .confirmationDialog(
             "Unfollow User",
@@ -145,7 +145,6 @@ public struct NDKUIFollowButton: View {
 
     private func executeUnfollow() {
         Task {
-            guard let ndk = ndk else { return }
             await followState.unfollowUser(ndk: ndk)
             onFollowChanged?(followState.isFollowing)
 
@@ -159,7 +158,6 @@ public struct NDKUIFollowButton: View {
 
     private func executeToggleFollow() {
         Task {
-            guard let ndk = ndk else { return }
             await followState.toggleFollow(ndk: ndk)
             onFollowChanged?(followState.isFollowing)
 
@@ -172,8 +170,6 @@ public struct NDKUIFollowButton: View {
     }
 
     private func setupFollowObservation() {
-        guard let ndk = ndk else { return }
-
         Task {
             await followState.startObserving(ndk: ndk)
         }

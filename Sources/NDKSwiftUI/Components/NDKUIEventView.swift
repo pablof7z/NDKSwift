@@ -185,7 +185,7 @@ public struct NDKTextNoteView: View {
 
             // Interactions
             if showInteractions {
-                NDKEventInteractionBar(event: event, style: NDKEventViewStyles.interactionBarStyle(for: style))
+                NDKEventInteractionBar(ndk: ndk, event: event, style: NDKEventViewStyles.interactionBarStyle(for: style))
             }
         }
         .ndkEventViewStyle(style)

@@ -116,7 +116,7 @@ public struct NDKZapButton: View {
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
         }
         .buttonStyle(PlainButtonStyle())
-        .disabled(zapState.isLoading || ndk?.signer == nil)
+        .disabled(zapState.isLoading || ndk.signer == nil)
         .opacity(zapState.isLoading ? OpacityConstants.secondary : 1.0)
         .contextMenu {
             if !amounts.isEmpty {
@@ -188,7 +188,6 @@ public struct NDKZapButton: View {
 
     private func zapAmount(_ amount: Int) {
         Task {
-            guard let ndk = ndk else { return }
             await zapState.sendZap(ndk: ndk, event: event, amount: amount)
 
             if zapState.lastZapSucceeded {
@@ -213,8 +212,6 @@ public struct NDKZapButton: View {
     }
 
     private func setupZapObservation() {
-        guard let ndk = ndk else { return }
-
         Task {
             await zapState.startObserving(ndk: ndk)
         }
