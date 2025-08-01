@@ -109,7 +109,7 @@ final class SubscriptionGroupingTests: XCTestCase {
         await manager.addSubscription(sub2, filters: [filter])
         
         // Verify they're in the same group (by checking fingerprint)
-        let fingerprint = NDKFilterGrouping.filterFingerprint([filter], closeOnEose: false)
+        _ = NDKFilterGrouping.filterFingerprint([filter], closeOnEose: false)
         
         // Both subscriptions should be managed by the same group
         // This is internal implementation detail, but we can verify behavior
@@ -133,9 +133,10 @@ final class SubscriptionGroupingTests: XCTestCase {
         // without waiting for any delay
     }
     
-    func testSubscriptionsWithDifferentFiltersCreateDifferentGroups() async {
+    func testSubscriptionsWithDifferentFilterStructuresCreateDifferentGroups() async {
+        // These filters have different structures (one has authors, one doesn't)
         let filter1 = createFilter(kinds: [1], authors: ["alice"])
-        let filter2 = createFilter(kinds: [1], authors: ["bob"])
+        let filter2 = createFilter(kinds: [1])  // No authors field
         
         let sub1 = createSubscription(id: "sub1", filters: [filter1])
         let sub2 = createSubscription(id: "sub2", filters: [filter2])
@@ -143,11 +144,13 @@ final class SubscriptionGroupingTests: XCTestCase {
         await manager.addSubscription(sub1, filters: [filter1])
         await manager.addSubscription(sub2, filters: [filter2])
         
-        // Different filters should create different groups
+        // Different filter structures should create different fingerprints
         let fp1 = NDKFilterGrouping.filterFingerprint([filter1], closeOnEose: false)
         let fp2 = NDKFilterGrouping.filterFingerprint([filter2], closeOnEose: false)
         
-        XCTAssertNotEqual(fp1, fp2, "Different filters should have different fingerprints")
+        XCTAssertNotEqual(fp1, fp2, "Filters with different structures should have different fingerprints")
+        XCTAssertEqual(fp1, "authors-kinds")
+        XCTAssertEqual(fp2, "kinds")
     }
     
     func testCloseOnEoseCreatesSeperateGroup() async {
@@ -209,8 +212,8 @@ final class SubscriptionGroupingTests: XCTestCase {
         let filter1 = createFilter(kinds: [1], authors: ["alice"])
         let filter2 = createFilter(kinds: [1], authors: ["bob"])
         
-        let sub1 = createSubscription(id: "sub1", filters: [filter1])
-        let sub2 = createSubscription(id: "sub2", filters: [filter2])
+        _ = createSubscription(id: "sub1", filters: [filter1])
+        _ = createSubscription(id: "sub2", filters: [filter2])
         
         // When grouped, filters without limits should be merged
         // The resulting filter should have authors: ["alice", "bob"]
