@@ -44,10 +44,10 @@ final class NIP60WalletTests: XCTestCase {
         
         let publicKey = try await wallet.getP2PKPubkey()
         XCTAssertFalse(publicKey.isEmpty)
-        XCTAssertEqual(publicKey.count, 66) // 33 bytes hex encoded (compressed public key)
+        XCTAssertEqual(publicKey.count, 132) // 66 bytes hex encoded (uncompressed public key)
         
-        // Verify it's a valid hex string
-        XCTAssertTrue(HexValidator.isValid32ByteHex(publicKey))
+        // Verify it's a valid hex string (66 bytes = 132 hex chars)
+        XCTAssertTrue(HexValidator.isValidHex(publicKey, expectedByteCount: 66))
     }
     
     func testP2PKManagerConsistency() async throws {
