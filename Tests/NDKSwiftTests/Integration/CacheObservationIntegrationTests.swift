@@ -60,8 +60,9 @@ final class CacheObservationIntegrationTests: XCTestCase {
             }
         }
         
-        // Give the stream a moment to set up
-        try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+        // Give the stream sufficient time to set up GRDB observation
+        // GRDB needs time to register the observation before events are saved
+        try await Task.sleep(nanoseconds: 200_000_000) // 200ms
         
         // Save the event after the stream is set up
         try await sqliteCache.saveEvent(event)
@@ -141,8 +142,9 @@ final class CacheObservationIntegrationTests: XCTestCase {
             }
         }
         
-        // Give the stream a moment to set up
-        try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+        // Give the stream sufficient time to set up GRDB observation
+        // GRDB needs time to register the observation before events are saved
+        try await Task.sleep(nanoseconds: 200_000_000) // 200ms
         
         // Save the new event after the stream is set up
         try await sqliteCache.saveEvent(newEvent)
