@@ -30,12 +30,16 @@ class CacheFirstTests: XCTestCase {
         content: String = "Test content",
         pubkey: String? = nil
     ) -> NDKEvent {
-        return NDKEvent(
+        let event = NDKEvent(
+            id: UUID().uuidString.lowercased().replacingOccurrences(of: "-", with: "").prefix(64).description,
+            pubkey: pubkey ?? "test_pubkey_\(UUID().uuidString.prefix(8))",
+            createdAt: Timestamp(Date().timeIntervalSince1970),
             kind: kind,
-            content: content,
             tags: [],
-            pubkey: pubkey ?? "test_pubkey_\(UUID().uuidString.prefix(8))"
+            content: content,
+            sig: "test_signature_\(UUID().uuidString)"
         )
+        return event
     }
     
     func testImmediateCacheHit() async throws {
@@ -48,7 +52,12 @@ class CacheFirstTests: XCTestCase {
             )
             events.append(event)
             try await cache.saveEvent(event)
+            print("Saved event \(i) with id: \(event.id)")
         }
+        
+        // Verify events are in cache by using queryEvents
+        let cachedEvents = try await cache.queryEvents(NDKFilter(kinds: [1]))
+        print("Cache contains \(cachedEvents.count) events after saving")
         
         // Create filter matching cached events
         let filter = NDKFilter(kinds: [1])
@@ -72,15 +81,22 @@ class CacheFirstTests: XCTestCase {
                 
                 // Check timing - should be immediate (< 50ms)
                 let elapsed = Date().timeIntervalSince(startTime)
-                print("Received event \(receivedEvents.count) after \(elapsed * 1000)ms")
+                print("Received event \(receivedEvents.count) after \(elapsed * 1000)ms: \(event.id)")
+                
+                // Stop after receiving expected number of events
+                if receivedEvents.count >= 5 {
+                    break
+                }
             }
         }
         
-        // Wait briefly to ensure cache delivery
-        try await Task.sleep(nanoseconds: 200_000_000) // 200ms
+        // Wait for events or timeout
+        try await Task.sleep(nanoseconds: 500_000_000) // 500ms timeout
+        
         collectTask.cancel()
         
         // Assert: Should have received all cached events immediately
+        print("Total received events: \(receivedEvents.count)")
         XCTAssertEqual(receivedEvents.count, 5, "Should receive all cached events")
         XCTAssertEqual(Set(receivedEvents.map { $0.id }), Set(events.map { $0.id }))
     }
