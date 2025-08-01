@@ -55,8 +55,10 @@ let package = Package(
                 "NDKSwift",
                 .product(name: "CashuSwift", package: "CashuSwift"),
             ],
+            exclude: ["DisabledTests"],
             resources: [
-                .process("Integration/README_OutboxTests.md")
+                .process("Integration/README_OutboxTests.md"),
+                .process("TestHelpers/README.md")
             ]
         ),
     ]
