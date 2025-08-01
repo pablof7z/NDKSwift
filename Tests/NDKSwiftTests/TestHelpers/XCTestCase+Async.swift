@@ -1,6 +1,17 @@
 import XCTest
 @testable import NDKSwift
 
+// MARK: - Test Errors
+
+/// Error thrown when a test operation times out
+struct TestTimeoutError: Error, LocalizedError {
+    let timeout: TimeInterval
+    
+    var errorDescription: String? {
+        return "Test operation timed out after \(timeout) seconds"
+    }
+}
+
 // MARK: - Async Test Helpers
 
 extension XCTestCase {
@@ -57,6 +68,47 @@ extension XCTestCase {
             }
             throw error
         }
+    }
+    
+    /// Runs an async operation with a timeout, returning nil if it times out
+    func withTimeout<T>(
+        _ timeout: TimeInterval,
+        operation: @escaping () async throws -> T,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async throws -> T? {
+        return try await withThrowingTaskGroup(of: T?.self) { group in
+            // Add the main operation
+            group.addTask {
+                return try await operation()
+            }
+            
+            // Add the timeout task
+            group.addTask {
+                try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                return nil
+            }
+            
+            // Wait for the first to complete
+            let result = try await group.next()!
+            
+            // Cancel remaining tasks
+            group.cancelAll()
+            
+            return result
+        }
+    }
+    
+    /// Runs an async test with a default timeout
+    func runWithTimeout<T>(
+        timeout: TimeInterval = 10.0,
+        _ operation: @escaping () async throws -> T
+    ) async throws -> T {
+        guard let result = try await withTimeout(timeout, operation: operation) else {
+            XCTFail("Test timed out after \(timeout) seconds")
+            throw TestTimeoutError(timeout: timeout)
+        }
+        return result
     }
 }
 
