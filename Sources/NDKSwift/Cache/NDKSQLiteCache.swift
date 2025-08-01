@@ -1814,79 +1814,112 @@ public actor NDKSQLiteCache: NDKCache {
             let observationId = UUID()
             
             Task {
-                    // Create the observation inline to work around GRDB type constraints
-                    let observation = ValueObservation.tracking { [weak self] db -> [NDKEvent] in
-                        guard let self = self else { return [] }
-                        
-                        var arguments = StatementArguments()
-                        var whereClauses: [String] = []
-                        var joins: [String] = []
-                        var tagIndex = 0
-                        
-                        // Build filter clauses
-                        SQLiteQueryBuilder.buildFilterClauses(
-                            from: filter,
-                            arguments: &arguments,
-                            whereClauses: &whereClauses,
-                            joins: &joins,
-                            tagIndex: &tagIndex
-                        )
-                        
-                        // Build and execute query
-                        let sql = SQLiteQueryBuilder.buildSelectQuery(
-                            joins: joins,
-                            whereClauses: whereClauses,
-                            limit: filter.limit,
-                            orderBy: "e.created_at DESC"
-                        )
-                        
-                        let rows = try Row.fetchAll(db, sql: sql, arguments: arguments)
-                        
-                        return rows.compactMap { row in
-                            self.decodeEventFromRow(row)
+                // Track existing event IDs when includeExisting is false
+                var existingEventIds: Set<String> = []
+                
+                if !includeExisting {
+                    // Query existing events to track their IDs
+                    do {
+                        let existingEvents = try await self.queryEvents(filter)
+                        existingEventIds = Set(existingEvents.map { $0.id })
+                        if self.debugMode {
+                            NDKLogger.log(.info, category: .cache, "🔍 Tracking \(existingEventIds.count) existing event IDs for includeExisting:false")
+                        }
+                    } catch {
+                        if debugMode {
+                            NDKLogger.log(.error, category: .cache, "Failed to query existing events for tracking: \(error)")
                         }
                     }
+                }
+                
+                // Create the observation inline to work around GRDB type constraints
+                let observation = ValueObservation.tracking { [weak self] db -> [NDKEvent] in
+                    guard let self = self else { return [] }
                     
-                    // Start the observation
-                    let cancellable = observation.start(
-                        in: dbQueue,
-                        onError: { error in
-                            continuation.finish(throwing: error)
-                        },
-                        onChange: { events in
-                            if self.debugMode {
-                                NDKLogger.log(.info, category: .cache, "🔔 GRDB observation triggered: \(events.count) events for filter \(filter)")
-                            }
-                            continuation.yield(events)
-                        }
+                    var arguments = StatementArguments()
+                    var whereClauses: [String] = []
+                    var joins: [String] = []
+                    var tagIndex = 0
+                    
+                    // Build filter clauses
+                    SQLiteQueryBuilder.buildFilterClauses(
+                        from: filter,
+                        arguments: &arguments,
+                        whereClauses: &whereClauses,
+                        joins: &joins,
+                        tagIndex: &tagIndex
                     )
                     
-                    // Store the cancellable
-                    await self.storeObservation(id: observationId, cancellable: cancellable)
+                    // Build and execute query
+                    let sql = SQLiteQueryBuilder.buildSelectQuery(
+                        joins: joins,
+                        whereClauses: whereClauses,
+                        limit: filter.limit,
+                        orderBy: "e.created_at DESC"
+                    )
                     
-                    // If includeExisting, immediately query and emit current events
-                    if includeExisting {
-                        do {
-                            let existingEvents = try await self.queryEvents(filter)
-                            if self.debugMode {
-                                NDKLogger.log(.info, category: .cache, "🔍 Initial query for filter \(filter): found \(existingEvents.count) existing events")
-                            }
-                            if !existingEvents.isEmpty {
-                                continuation.yield(existingEvents)
-                            }
-                        } catch {
-                            if debugMode {
-                                NDKLogger.log(.error, category: .cache, "Failed to fetch existing events: \(error)")
+                    let rows = try Row.fetchAll(db, sql: sql, arguments: arguments)
+                    
+                    return rows.compactMap { row in
+                        self.decodeEventFromRow(row)
+                    }
+                }
+                
+                // Start the observation
+                let cancellable = observation.start(
+                    in: dbQueue,
+                    onError: { error in
+                        continuation.finish(throwing: error)
+                    },
+                    onChange: { events in
+                        if self.debugMode {
+                            NDKLogger.log(.info, category: .cache, "🔔 GRDB observation triggered: \(events.count) events for filter \(filter)")
+                        }
+                        
+                        // Filter events based on includeExisting flag
+                        let eventsToEmit: [NDKEvent]
+                        if includeExisting {
+                            eventsToEmit = events
+                        } else {
+                            // Only emit events that weren't in the initial set
+                            eventsToEmit = events.filter { !existingEventIds.contains($0.id) }
+                            if self.debugMode && eventsToEmit.count != events.count {
+                                NDKLogger.log(.info, category: .cache, "🔍 Filtered out \(events.count - eventsToEmit.count) existing events, emitting \(eventsToEmit.count) new events")
                             }
                         }
-                    }
-                    
-                    // Set up cleanup when the stream is terminated
-                    continuation.onTermination = { @Sendable _ in
-                        Task {
-                            await self.removeObservation(id: observationId)
+                        
+                        if !eventsToEmit.isEmpty {
+                            continuation.yield(eventsToEmit)
                         }
                     }
+                )
+                
+                // Store the cancellable
+                await self.storeObservation(id: observationId, cancellable: cancellable)
+                
+                // If includeExisting, immediately query and emit current events
+                if includeExisting {
+                    do {
+                        let existingEvents = try await self.queryEvents(filter)
+                        if self.debugMode {
+                            NDKLogger.log(.info, category: .cache, "🔍 Initial query for filter \(filter): found \(existingEvents.count) existing events")
+                        }
+                        if !existingEvents.isEmpty {
+                            continuation.yield(existingEvents)
+                        }
+                    } catch {
+                        if debugMode {
+                            NDKLogger.log(.error, category: .cache, "Failed to fetch existing events: \(error)")
+                        }
+                    }
+                }
+                
+                // Set up cleanup when the stream is terminated
+                continuation.onTermination = { @Sendable _ in
+                    Task {
+                        await self.removeObservation(id: observationId)
+                    }
+                }
             }
         }
     }
