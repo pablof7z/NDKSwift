@@ -105,7 +105,7 @@ final class SQLiteCachePerformanceTests: XCTestCase {
         
         // Create complex filter with tags
         var complexFilter = NDKFilter(kinds: [1])
-        complexFilter.addTagFilter("#t", values: ["nostr"])
+        complexFilter.addTagFilter("t", values: ["nostr"])
         
         // Test that the optimization still correctly handles tag filters
         let match1 = await cache.eventMatchesFilter(taggedEvents[0], filter: complexFilter)
