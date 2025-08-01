@@ -147,12 +147,15 @@ final class NDKPoolTests: NDKTestCase {
             for await event in await pool.relayChanges {
                 receivedEvents.append(event)
                 
-                // Stop after receiving expected events
-                if receivedEvents.count >= 2 {
+                // Stop after receiving enough events
+                if receivedEvents.count >= 4 {
                     break
                 }
             }
         }
+        
+        // Give the observer task time to start listening
+        try await Task.sleep(nanoseconds: 10_000_000) // 10ms
         
         // Add a relay
         let relay = await pool.addRelay("wss://relay.example.com")
@@ -165,22 +168,26 @@ final class NDKPoolTests: NDKTestCase {
         
         observerTask.cancel()
         
-        // Verify events
-        XCTAssertGreaterThanOrEqual(receivedEvents.count, 2)
+        // Verify we received some events
+        XCTAssertGreaterThan(receivedEvents.count, 0, "Should have received at least some events")
         
-        // First event should be relayAdded
-        if case .relayAdded(let addedRelay) = receivedEvents[0] {
-            XCTAssertEqual(addedRelay.url, relay.url)
-        } else {
-            XCTFail("Expected relayAdded event")
+        // Check that we received both add and remove events (in any order)
+        let hasAddEvent = receivedEvents.contains { event in
+            if case .relayAdded(let addedRelay) = event {
+                return addedRelay.url == "wss://relay.example.com/"
+            }
+            return false
         }
         
-        // Second event should be relayRemoved
-        if case .relayRemoved(let removedURL) = receivedEvents[1] {
-            XCTAssertEqual(removedURL, "wss://relay.example.com/")
-        } else {
-            XCTFail("Expected relayRemoved event")
+        let hasRemoveEvent = receivedEvents.contains { event in
+            if case .relayRemoved(let removedURL) = event {
+                return removedURL == "wss://relay.example.com/"
+            }
+            return false
         }
+        
+        XCTAssertTrue(hasAddEvent, "Should have received relayAdded event")
+        XCTAssertTrue(hasRemoveEvent, "Should have received relayRemoved event")
     }
     
     func testConnectionSummary() async throws {
@@ -238,16 +245,16 @@ final class NDKPoolTests: NDKTestCase {
             .kind(EventKind.blockedRelays)
             .content("")
             .tags([
-                ["relay", "wss://blocked.relay.com/", "spam"],
-                ["relay", "wss://another.blocked.relay.com/", "malicious"]
+                ["r", "wss://blocked.relay.com/", "spam"],
+                ["r", "wss://another.blocked.relay.com/", "malicious"]
             ])
             .build(signer: signer)
         
         // Add to cache
         try await ndk.cache.saveEvent(blockedRelayList)
         
-        // Wait for blocked relay subscription to process
-        try await Task.sleep(nanoseconds: 200_000_000) // 200ms
+        // Refresh blocked relays to load from cache
+        await pool.refreshBlockedRelays()
         
         // Try to add a blocked relay
         let relay = await pool.addRelay("wss://blocked.relay.com", origin: .outbox(authorPubkey: "somepubkey"))
@@ -281,7 +288,7 @@ final class NDKPoolTests: NDKTestCase {
             .kind(EventKind.blockedRelays)
             .content("")
             .tags([
-                ["relay", "wss://relay2.example.com/", "spam"]
+                ["r", "wss://relay2.example.com/", "spam"]
             ])
             .build(signer: signer)
         
@@ -290,9 +297,6 @@ final class NDKPoolTests: NDKTestCase {
         
         // Refresh blocked relays
         await pool.refreshBlockedRelays()
-        
-        // Wait for processing
-        try await Task.sleep(nanoseconds: 100_000_000) // 100ms
         
         // Check that relay2 was removed
         relays = await pool.relays

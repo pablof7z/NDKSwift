@@ -83,16 +83,25 @@ public actor NDKPool {
     /// - Note: The blocked relay list is automatically monitored in the background, so manual
     ///   refresh is typically not necessary unless you need immediate updates.
     public func refreshBlockedRelays() async {
-        // Force refresh by clearing cache
-        blockedRelaysLastFetched = nil
-        let blockedRelays = await getBlockedRelays()
-
-        // Remove any relays that are now blocked
-        for (url, _) in relayMap {
-            if blockedRelays.contains(url) {
-                NDKLogger.log(.info, category: .general, "Removing newly blocked relay from pool: \(url)")
-                await removeRelay(url)
+        guard let ndk = ndk, let signer = ndk.signer else {
+            return
+        }
+        
+        do {
+            let userPubkey = try await signer.pubkey
+            
+            // Fetch the latest blocked relay list from cache
+            let filter = NDKFilter(
+                authors: [userPubkey],
+                kinds: [EventKind.blockedRelays]
+            )
+            
+            let events = try await ndk.cache.queryEvents(filter)
+            if let latestEvent = events.sorted(by: { $0.createdAt > $1.createdAt }).first {
+                await processBlockedRelayListUpdate(latestEvent)
             }
+        } catch {
+            NDKLogger.log(.error, category: .general, "Failed to refresh blocked relays: \(error)")
         }
     }
 
