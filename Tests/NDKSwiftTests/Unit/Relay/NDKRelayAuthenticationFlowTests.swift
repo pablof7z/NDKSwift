@@ -94,7 +94,7 @@ final class NDKRelayAuthenticationFlowTests: XCTestCase {
         
         // Verify authentication was attempted
         XCTAssertTrue(authDelegate.authRequested)
-        let state = await mockRelay.connectionState
+        let state = mockRelay.connectionState
         XCTAssertEqual(state, .authenticating)
         
         // Simulate successful authentication
@@ -198,7 +198,7 @@ final class NDKRelayAuthenticationFlowTests: XCTestCase {
         
         // Verify delegate was called but auth was declined
         XCTAssertTrue(authDelegate.authRequested)
-        let currentState = await mockRelay.connectionState
+        let currentState = mockRelay.connectionState
         if case .authRequired(let challenge) = currentState {
             XCTAssertEqual(challenge, "declined-auth-test")
         } else {
@@ -225,7 +225,7 @@ final class NDKRelayAuthenticationFlowTests: XCTestCase {
         // Simulate connection flow
         await mockRelay.simulateConnect()
         await mockRelay.simulateAuthChallenge(challenge: "stream-test")
-        await mockRelay.updateConnectionState(.authenticating)
+        mockRelay.updateConnectionState(.authenticating)
         await mockRelay.simulateAuthSuccess()
         
         await stateTask.value
