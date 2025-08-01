@@ -243,12 +243,12 @@ final class NDKEventTrackerTests: XCTestCase {
         // Mark old event
         await tracker.markSeen(eventId: oldEventId, relay: testRelay1)
         
+        // Get timestamp between old and new events
+        let cutoffDate = Date()
+        
         // Wait a bit and mark recent event
         try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         await tracker.markSeen(eventId: recentEventId, relay: testRelay1)
-        
-        // Set cutoff date between the two events
-        let cutoffDate = Date()
         
         // When
         await tracker.cleanupOldEvents(cutoffDate: cutoffDate)

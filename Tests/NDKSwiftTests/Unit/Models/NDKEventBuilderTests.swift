@@ -230,8 +230,9 @@ final class NDKEventBuilderTests: XCTestCase {
         
         // Check if imeta tag was added
         let imetaTags = event.tags.filter { $0.first == "imeta" }
-        if !imetaTags.isEmpty {
-            XCTAssertTrue(imetaTags[0].contains { $0.contains("url=https://example.com/image.jpg") })
+        XCTAssertEqual(imetaTags.count, 1, "Should have extracted one imeta tag")
+        if let imetaTag = imetaTags.first {
+            XCTAssertTrue(imetaTag.contains("url https://example.com/image.jpg"), "imeta tag should contain the URL")
         }
     }
     
