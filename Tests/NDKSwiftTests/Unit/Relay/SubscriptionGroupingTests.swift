@@ -12,7 +12,8 @@ final class SubscriptionGroupingTests: XCTestCase {
     
     override func setUp() async throws {
         try await super.setUp()
-        ndk = NDK()
+        // Create NDK with empty relay URLs to ensure pool is created
+        ndk = NDK(relayUrls: [])
         relay = NDKRelay(url: "wss://test.relay.com")
         relay.ndk = ndk
         manager = NDKRelaySubscriptionManager(relay: relay)
