@@ -120,12 +120,18 @@ final class StringExtensionsTests: XCTestCase {
     }
     
     func testIsValidURL_InvalidURLs() {
-        // Note: URL(string:) is quite permissive and accepts many strings
-        // that we might not consider "valid" URLs in practice
-        XCTAssertTrue("not a url".isValidURL) // URL(string:) actually accepts this
+        // Foundation's URL(string:) is quite permissive, so we test what it actually considers invalid
         XCTAssertFalse("".isValidURL)
-        XCTAssertTrue("://invalid".isValidURL) // URL(string:) accepts this
-        XCTAssertTrue("http://".isValidURL)    // URL(string:) accepts this too
+        
+        // Test some edge cases that URL(string:) does handle
+        XCTAssertTrue("not a url".isValidURL) // URL(string:) treats this as a relative URL
+        XCTAssertTrue("://invalid".isValidURL) // URL(string:) accepts malformed schemes
+        XCTAssertTrue("http://".isValidURL)    // URL(string:) accepts URLs without paths
+        
+        // Test truly invalid URLs that URL(string:) rejects
+        // URLs with null characters are rejected by Foundation
+        let nullCharURL = "http://example.com\0invalid"
+        XCTAssertFalse(nullCharURL.isValidURL)
     }
     
     // MARK: - Hex Validation Tests
@@ -194,5 +200,65 @@ final class StringExtensionsTests: XCTestCase {
             let normalized = input.normalizedRelayURL
             XCTAssertEqual(normalized, expected, "Failed to normalize '\(input)'")
         }
+    }
+    
+    // MARK: - Formatted Relay URL Tests
+    
+    func testFormattedRelayURL() {
+        let tests = [
+            ("wss://relay.example.com/", "relay.example.com"),
+            ("ws://relay.example.com/", "relay.example.com"),
+            ("wss://relay.example.com", "relay.example.com"),
+            ("https://relay.example.com/", "https://relay.example.com"), // Non-WebSocket URLs just remove trailing slash
+            ("relay.example.com", "relay.example.com")
+        ]
+        
+        for (input, expected) in tests {
+            let formatted = input.formattedRelayURL
+            XCTAssertEqual(formatted, expected, "Failed to format '\(input)'")
+        }
+    }
+    
+    func testTruncatedRelayURL() {
+        // Test truncation with default max length (25)
+        let longRelay = "wss://very-long-relay-name-that-exceeds-limit.example.com/"
+        let truncated = longRelay.truncatedRelayURL()
+        XCTAssertLessThanOrEqual(truncated.count, 25)
+        XCTAssertTrue(truncated.hasSuffix("..."))
+        
+        // Test truncation with custom max length
+        let customTruncated = longRelay.truncatedRelayURL(maxLength: 15)
+        XCTAssertLessThanOrEqual(customTruncated.count, 15)
+        XCTAssertTrue(customTruncated.hasSuffix("..."))
+        
+        // Test short URL doesn't get truncated
+        let shortRelay = "wss://short.com/"
+        let notTruncated = shortRelay.truncatedRelayURL()
+        XCTAssertEqual(notTruncated, "short.com")
+        XCTAssertFalse(notTruncated.hasSuffix("..."))
+    }
+    
+    // MARK: - Collection Extensions Tests
+    
+    func testStringCollectionNilIfEmpty() {
+        let emptyArray: [String] = []
+        XCTAssertNil(emptyArray.nilIfEmpty)
+        
+        let nonEmptyArray = ["a", "b", "c"]
+        XCTAssertNotNil(nonEmptyArray.nilIfEmpty)
+        XCTAssertEqual(nonEmptyArray.nilIfEmpty?.count, 3)
+    }
+    
+    func testStringCollectionSetOrNil() {
+        let emptyArray: [String] = []
+        XCTAssertNil(emptyArray.setOrNil)
+        
+        let nonEmptyArray = ["a", "b", "c", "a"] // Includes duplicate
+        let resultSet = nonEmptyArray.setOrNil
+        XCTAssertNotNil(resultSet)
+        XCTAssertEqual(resultSet?.count, 3) // Should deduplicate
+        XCTAssertTrue(resultSet?.contains("a") == true)
+        XCTAssertTrue(resultSet?.contains("b") == true)
+        XCTAssertTrue(resultSet?.contains("c") == true)
     }
 }
