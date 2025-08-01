@@ -227,7 +227,6 @@ final class CryptoTests: XCTestCase {
     }
     
     func testSignature_invalidInputs() {
-        let privateKey = Crypto.generatePrivateKey()
         let messageData = "test".data(using: .utf8)!
         let message = Crypto.sha256(messageData)
         
