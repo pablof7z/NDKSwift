@@ -5,11 +5,13 @@ final class RelayConnectionRaceConditionTests: XCTestCase {
     
     override func setUp() async throws {
         try await super.setUp()
-        NDKLogger.logLevel = .debug
+        // Reduce logging noise in tests
+        NDKLogger.logLevel = .error
     }
     
     func testConcurrentConnectionAttempts() async throws {
-        let url = URL(string: "wss://relay.damus.io")!
+        // Use a mock relay URL to avoid real network connections
+        let url = URL(string: "wss://mock.relay.test")!
         let connection = NDKRelayConnection(url: url)
         
         // Attempt to connect multiple times concurrently
@@ -25,24 +27,24 @@ final class RelayConnectionRaceConditionTests: XCTestCase {
         } catch {
             // It's okay if connection fails (network issues), 
             // but we shouldn't get race condition crashes
-            print("Connection error (expected in test environment): \(error)")
+            // Connection errors are expected in test environment with mock URLs
         }
         
         // Verify we're in a consistent state
-        let isConnected = await connection.isConnected
-        print("Connection state after concurrent attempts: \(isConnected)")
+        _ = await connection.isConnected
+        // State should be consistent regardless of concurrent attempts
         
         // Clean up
         await connection.disconnect()
     }
     
     func testRapidConnectDisconnect() async throws {
-        let url = URL(string: "wss://relay.damus.io")!
+        // Use a mock relay URL to avoid real network connections
+        let url = URL(string: "wss://mock.relay.test")!
         let connection = NDKRelayConnection(url: url)
         
         // Rapidly connect and disconnect
-        for i in 0..<5 {
-            print("Attempt \(i + 1)")
+        for _ in 0..<5 {
             
             // Start connection and immediately disconnect
             Task {
