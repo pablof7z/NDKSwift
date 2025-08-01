@@ -182,13 +182,30 @@ final class NDKSubscriptionTests: NDKTestCase {
         
         let event = EventTestFactory.createTextNote()
         
-        // Use eventsUntilEOSE for automatic completion
-        let events = await dataSource.eventsUntilEOSE.reduce(into: []) { result, event in
-            result.append(event)
+        // Start collecting events until EOSE
+        let collectTask = Task {
+            var collected: [NDKEvent] = []
+            for await event in dataSource.eventsUntilEOSE {
+                collected.append(event)
+            }
+            return collected
         }
         
-        // Should be empty since we didn't send any events
-        XCTAssertEqual(events.count, 0)
+        // Give time to set up
+        try await Task.sleep(nanoseconds: 10_000_000) // 0.01s
+        
+        // Send some events
+        try await cache.processEvent(event, from: "wss://test.relay", subscriptionId: "test")
+        
+        // Send EOSE to complete the sequence
+        await dataSource.handleRelayUpdate(.eose(relay: "wss://test.relay"))
+        
+        // Wait for collection to complete
+        let events = await collectTask.value
+        
+        // Should have received the event before EOSE
+        XCTAssertEqual(events.count, 1)
+        XCTAssertEqual(events.first?.id, event.id)
     }
     
     // MARK: - Data Collection Tests
