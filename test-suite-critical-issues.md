@@ -3,6 +3,32 @@
 ## Overview
 This document details critical issues discovered during test suite analysis that require major refactoring.
 
+## Authentication Tests Timing Issue (NEW)
+
+### Issue
+The tests `testAuthenticationDelegateFlow` and `testAuthenticationWithoutDelegate` in `NDKRelayAuthenticationTests.swift` are failing due to incorrect state expectations.
+
+### Problem
+Tests expect relay state to be `.authenticating` immediately after calling `handleAuthChallenge`, but the actual implementation:
+1. First sets state to `.authRequired(challenge: challenge)`
+2. Checks with the authentication delegate
+3. Only if authentication is approved, sets state to `.authenticating`
+
+### Test Failure
+```swift
+await ndk.handleAuthChallenge(challenge: challenge, from: mockRelay)
+let state = await mockRelay.connectionState
+XCTAssertEqual(state, .authenticating) // FAILS - state is still .connected
+```
+
+### Root Cause
+The mock relay doesn't properly update its state when `updateConnectionState` is called, causing the test to see the old `.connected` state instead of the expected progression through `.authRequired` to `.authenticating`.
+
+### Recommended Fix
+1. Fix MockAuthRelay to properly handle state updates
+2. Update tests to check for `.authRequired` state first
+3. Consider adding a completion handler to `handleAuthChallenge` for better testability
+
 ## 1. E2E Tests Connecting to Real Relays
 
 ### Issue
@@ -106,6 +132,20 @@ Lack of proper test utilities and mocking infrastructure makes it difficult to w
 2. Group tests by their issues (network dependency, timing, etc.)
 3. Create a roadmap for fixing and re-enabling tests
 4. Document why each test is disabled
+
+## Fixed Issues During This Session
+
+### SubscriptionAggregationTests - Filter Signature Comparison
+**File**: `Tests/NDKSwiftTests/Unit/DataSource/SubscriptionAggregationTests.swift`
+
+**Issue**: The `AggregationSignature` struct was comparing all properties in its `Equatable` implementation, but tests expected filters with same structure (kinds + tag keys) to be equal regardless of different authors.
+
+**Fix Applied**: Added custom `Equatable` implementation that only compares the signature string:
+```swift
+static func == (lhs: AggregationSignature, rhs: AggregationSignature) -> Bool {
+    return lhs.signature == rhs.signature
+}
+```
 
 ## Next Steps
 
