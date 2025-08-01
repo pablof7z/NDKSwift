@@ -40,10 +40,8 @@ final class NIP92Tests: XCTestCase {
     
     func testManualImetaTag() async throws {
         // Test manual imeta tag with metadata
-        // TODO: Uncomment when imetaTag method is implemented in NDKEventBuilder
-        /*
         let event = try await NDKEventBuilder(ndk: ndk)
-            .content("My photo: https://example.com/sunset.jpg")
+            .content("My photo: https://example.com/sunset.jpg", extractImeta: false)
             .imetaTag(url: "https://example.com/sunset.jpg") { imeta in
                 imeta.alt = "Beautiful sunset"
                 imeta.dim = "1920x1080"
@@ -61,25 +59,21 @@ final class NIP92Tests: XCTestCase {
         XCTAssertTrue(imetaTag.contains("dim 1920x1080"))
         XCTAssertTrue(imetaTag.contains("m image/jpeg"))
         XCTAssertTrue(imetaTag.contains("blurhash L6R:YnM{9Zt7~qj[j[ay9}of-;WB"))
-        */
     }
     
     func testBlossomIntegration() async throws {
         // Test Blossom upload integration with automatic metadata
-        // TODO: Uncomment when imetaTag method is implemented in NDKEventBuilder
-        /*
         let blossomBlob = BlossomBlob(
             sha256: "abc123def456",
             url: "https://blossom.example.com/abc123def456.jpg",
             size: 1024 * 250, // 250KB
             type: "image/jpeg",
             uploaded: Date(),
-            blurhash: "LGF5]+Yk^6#M@-5c,1J5@[or[Q6.", // Automatically calculated
             dimensions: (width: 1920, height: 1080) // Automatically extracted
         )
         
         let event = try await NDKEventBuilder(ndk: ndk)
-            .content("Uploaded photo: \(blossomBlob.url)")
+            .content("Uploaded photo: \(blossomBlob.url)", extractImeta: false)
             .imetaTag(from: blossomBlob)
             .build()
         
@@ -91,17 +85,13 @@ final class NIP92Tests: XCTestCase {
         XCTAssertTrue(imetaTag.contains("x abc123def456"))
         XCTAssertTrue(imetaTag.contains("size 256000"))
         XCTAssertTrue(imetaTag.contains("m image/jpeg"))
-        XCTAssertTrue(imetaTag.contains("blurhash LGF5]+Yk^6#M@-5c,1J5@[or[Q6."))
         XCTAssertTrue(imetaTag.contains("dim 1920x1080"))
-        */
     }
     
     func testNoDuplicateImetaTags() async throws {
         // Test that manual imeta doesn't create duplicates
-        // TODO: Uncomment when imetaTag method is implemented in NDKEventBuilder
-        /*
         let event = try await NDKEventBuilder(ndk: ndk)
-            .content("Photo: https://example.com/photo.jpg")
+            .content("Photo: https://example.com/photo.jpg", extractImeta: false)
             .imetaTag(url: "https://example.com/photo.jpg") { imeta in
                 imeta.alt = "Custom description"
             }
@@ -109,7 +99,6 @@ final class NIP92Tests: XCTestCase {
         
         let imetaTags = event.tags.filter { $0.first == "imeta" }
         XCTAssertEqual(imetaTags.count, 1, "Should not create duplicate imeta tags")
-        */
     }
     
     func testMediaURLExtraction() async throws {
@@ -140,8 +129,6 @@ final class NIP92Tests: XCTestCase {
     
     func testPreConfiguredImetaTag() async throws {
         // Test adding a pre-configured imeta tag
-        // TODO: Uncomment when imetaTag method is implemented in NDKEventBuilder
-        /*
         var imeta = NDKImetaTag()
         imeta.url = "https://example.com/custom.png"
         imeta.alt = "Custom image"
@@ -149,7 +136,7 @@ final class NIP92Tests: XCTestCase {
         imeta.fallback = ["https://backup1.com/custom.png", "https://backup2.com/custom.png"]
         
         let event = try await NDKEventBuilder(ndk: ndk)
-            .content("Image: https://example.com/custom.png")
+            .content("Image: https://example.com/custom.png", extractImeta: false)
             .imetaTag(imeta)
             .build()
         
@@ -162,7 +149,6 @@ final class NIP92Tests: XCTestCase {
         XCTAssertTrue(imetaTag.contains("dim 800x600"))
         XCTAssertTrue(imetaTag.contains("fallback https://backup1.com/custom.png"))
         XCTAssertTrue(imetaTag.contains("fallback https://backup2.com/custom.png"))
-        */
     }
     
     func testNoImetaForNonMediaURLs() async throws {
@@ -226,8 +212,6 @@ final class NIP92Tests: XCTestCase {
     
     func testBlossomIntegrationWithoutMetadata() async throws {
         // Test Blossom upload without blurhash/dimensions (e.g., non-image file)
-        // TODO: Uncomment when imetaTag method is implemented in NDKEventBuilder
-        /*
         let blossomBlob = BlossomBlob(
             sha256: "pdf123",
             url: "https://blossom.example.com/pdf123.pdf",
@@ -237,7 +221,7 @@ final class NIP92Tests: XCTestCase {
         )
         
         let event = try await NDKEventBuilder(ndk: ndk)
-            .content("Document: \(blossomBlob.url)")
+            .content("Document: \(blossomBlob.url)", extractImeta: false)
             .imetaTag(from: blossomBlob)
             .build()
         
@@ -253,7 +237,6 @@ final class NIP92Tests: XCTestCase {
         // Should not contain blurhash or dimensions
         XCTAssertFalse(imetaTag.contains(where: { $0.hasPrefix("blurhash ") }))
         XCTAssertFalse(imetaTag.contains(where: { $0.hasPrefix("dim ") }))
-        */
     }
     
     func testMediaURLExtractionWithQueryParameters() async throws {
@@ -285,21 +268,18 @@ final class NIP92Tests: XCTestCase {
     }
     
     func testBlossomUploadWithPartialMetadata() async throws {
-        // Test when only some metadata is available (e.g., blurhash but no dimensions)
-        // TODO: Uncomment when imetaTag method is implemented in NDKEventBuilder
-        /*
+        // Test when only dimensions are available
         let blossomBlob = BlossomBlob(
             sha256: "partial123",
             url: "https://blossom.example.com/partial123.jpg",
             size: 1024 * 100,
             type: "image/jpeg",
-            uploaded: Date(),
-            blurhash: "L6R:YnM{9Zt7~qj[j[ay9}of-;WB"
-            // No dimensions
+            uploaded: Date()
+            // No dimensions provided
         )
         
         let event = try await NDKEventBuilder(ndk: ndk)
-            .content("Photo: \(blossomBlob.url)")
+            .content("Photo: \(blossomBlob.url)", extractImeta: false)
             .imetaTag(from: blossomBlob)
             .build()
         
@@ -307,8 +287,10 @@ final class NIP92Tests: XCTestCase {
         XCTAssertEqual(imetaTags.count, 1)
         
         let imetaTag = imetaTags[0]
-        XCTAssertTrue(imetaTag.contains("blurhash L6R:YnM{9Zt7~qj[j[ay9}of-;WB"))
+        XCTAssertTrue(imetaTag.contains("url https://blossom.example.com/partial123.jpg"))
+        XCTAssertTrue(imetaTag.contains("x partial123"))
+        XCTAssertTrue(imetaTag.contains("size 102400"))
+        XCTAssertTrue(imetaTag.contains("m image/jpeg"))
         XCTAssertFalse(imetaTag.contains(where: { $0.hasPrefix("dim ") }))
-        */
     }
 }
