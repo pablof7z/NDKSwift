@@ -11,9 +11,9 @@ final class CacheObservationIntegrationTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         
-        // Create SQLite cache with debug mode
+        // Create SQLite cache with debug mode - unique path for each test
         let tempPath = FileManager.default.temporaryDirectory
-            .appendingPathComponent("test-\(UUID().uuidString).db").path
+            .appendingPathComponent("cache-obs-test-\(UUID().uuidString).db").path
         sqliteCache = try await NDKSQLiteCache(path: tempPath, debugMode: true)
         
         // Create NDK with real cache
@@ -21,8 +21,13 @@ final class CacheObservationIntegrationTests: XCTestCase {
     }
     
     override func tearDown() async throws {
-        try await sqliteCache.clear()
-        ndk = nil
+        // Clear the cache
+        if let sqliteCache = sqliteCache {
+            try await sqliteCache.clear()
+        }
+        
+        self.sqliteCache = nil
+        self.ndk = nil
         try await super.tearDown()
     }
     
@@ -31,9 +36,13 @@ final class CacheObservationIntegrationTests: XCTestCase {
     func testAsyncThrowingStream_BasicObservation() async throws {
         // Test basic event observation with AsyncThrowingStream
         let filter = NDKFilter(kinds: [1])
+        
+        // Create the event before starting observation
+        let event = createEvent(kind: 1, content: "Test event")
+        
         let eventStream = await sqliteCache.observeEvents(
             matching: filter,
-            includeExisting: true
+            includeExisting: false // Change to false to only get new events
         )
         
         var receivedBatches: [[NDKEvent]] = []
@@ -51,8 +60,10 @@ final class CacheObservationIntegrationTests: XCTestCase {
             }
         }
         
-        // Save an event
-        let event = createEvent(kind: 1, content: "Test event")
+        // Give the stream a moment to set up
+        try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+        
+        // Save the event after the stream is set up
         try await sqliteCache.saveEvent(event)
         
         await fulfillment(of: [expectation], timeout: 1.0)
@@ -89,10 +100,8 @@ final class CacheObservationIntegrationTests: XCTestCase {
             do {
                 for try await batch in streamWithExisting {
                     eventsWithExisting.append(contentsOf: batch)
-                    if eventsWithExisting.count >= 3 {
-                        expectationWithExisting.fulfill()
-                        break
-                    }
+                    expectationWithExisting.fulfill()
+                    break // Exit after first batch
                 }
             } catch {
                 XCTFail("Stream error: \(error)")
@@ -100,7 +109,13 @@ final class CacheObservationIntegrationTests: XCTestCase {
         }
         
         await fulfillment(of: [expectationWithExisting], timeout: 1.0)
+        
+        // When includeExisting is true, we should get existing events immediately
         XCTAssertEqual(eventsWithExisting.count, 3)
+        
+        // Verify we got the existing events by checking their content
+        let eventContents = eventsWithExisting.map { $0.content }.sorted()
+        XCTAssertEqual(eventContents, ["Existing 1", "Existing 2", "Existing 3"])
         
         // Test with includeExisting = false
         let streamWithoutExisting = await sqliteCache.observeEvents(
@@ -110,6 +125,9 @@ final class CacheObservationIntegrationTests: XCTestCase {
         
         var eventsWithoutExisting: [NDKEvent] = []
         let expectationWithoutExisting = XCTestExpectation(description: "Only new events")
+        
+        // Create the new event before starting the observer task
+        let newEvent = createEvent(kind: 1, content: "New event")
         
         Task {
             do {
@@ -123,8 +141,10 @@ final class CacheObservationIntegrationTests: XCTestCase {
             }
         }
         
-        // Save a new event
-        let newEvent = createEvent(kind: 1, content: "New event")
+        // Give the stream a moment to set up
+        try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+        
+        // Save the new event after the stream is set up
         try await sqliteCache.saveEvent(newEvent)
         
         await fulfillment(of: [expectationWithoutExisting], timeout: 1.0)
@@ -132,6 +152,7 @@ final class CacheObservationIntegrationTests: XCTestCase {
         // Should only receive the new event
         XCTAssertEqual(eventsWithoutExisting.count, 1)
         XCTAssertEqual(eventsWithoutExisting.first?.id, newEvent.id)
+        XCTAssertEqual(eventsWithoutExisting.first?.content, "New event")
     }
     
     // MARK: - GRDB Reactive Tests
@@ -164,6 +185,7 @@ final class CacheObservationIntegrationTests: XCTestCase {
                 for try await batch in stream1 {
                     events1.append(contentsOf: batch)
                     exp1.fulfill()
+                    break // Exit after first batch
                 }
             } catch {}
         }
@@ -173,6 +195,7 @@ final class CacheObservationIntegrationTests: XCTestCase {
                 for try await batch in stream2 {
                     events2.append(contentsOf: batch)
                     exp2.fulfill()
+                    break // Exit after first batch
                 }
             } catch {}
         }
@@ -182,9 +205,15 @@ final class CacheObservationIntegrationTests: XCTestCase {
                 for try await batch in streamAll {
                     eventsAll.append(contentsOf: batch)
                     expAll.fulfill()
+                    if eventsAll.count >= 2 {
+                        break // Exit after receiving both events
+                    }
                 }
             } catch {}
         }
+        
+        // Give observers a moment to set up
+        try await Task.sleep(nanoseconds: 100_000_000) // 100ms
         
         // Save events
         let event1 = createEvent(author: author1, kind: 1, content: "Author 1 event")
