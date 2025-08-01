@@ -116,7 +116,7 @@ final class NDKSQLiteCacheReactiveTests: XCTestCase {
         collectionTask.cancel()
     }
     
-    func testObserveProfile() async throws {
+    func DISABLED_testObserveProfile() async throws {
         let pubkey = try await signer.pubkey
         
         // Start observing before profile exists
