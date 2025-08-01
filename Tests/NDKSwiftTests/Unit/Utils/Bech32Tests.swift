@@ -92,7 +92,7 @@ final class Bech32Tests: XCTestCase {
             case .invalidInput(message: let message):
                 XCTAssertTrue(message.contains("bech32 character"))
             default:
-                XCTFail("Expected validationError error")
+                XCTFail("Expected invalidInput error")
             }
         }
     }
@@ -110,7 +110,7 @@ final class Bech32Tests: XCTestCase {
             case .invalidInput(message: let message):
                 XCTAssertTrue(message.contains("no separator"))
             default:
-                XCTFail("Expected validationError error")
+                XCTFail("Expected invalidInput error")
             }
         }
     }
