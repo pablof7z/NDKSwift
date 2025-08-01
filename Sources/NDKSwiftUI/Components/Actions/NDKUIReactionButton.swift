@@ -120,7 +120,6 @@ public struct NDKUIReactionButton: View {
 
     private func toggleReaction() {
         Task {
-            guard let ndk = ndk else { return }
             await reactionState.toggleReaction(ndk: ndk, event: event)
             onReactionChanged?(reactionState.isReacted)
         }
@@ -133,8 +132,6 @@ public struct NDKUIReactionButton: View {
     }
 
     private func setupReactionObservation() {
-        guard let ndk = ndk else { return }
-
         Task {
             await reactionState.startObserving(ndk: ndk)
         }

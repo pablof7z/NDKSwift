@@ -54,7 +54,7 @@ public struct NDKUIRichTextView: View {
                     // Show URL previews below the text
                     if showLinkPreviews {
                         ForEach(extractURLs(from: parsed.components), id: \.absoluteString) { url in
-                            NDKUIURLPreview(ndk: ndk, url: url, style: previewStyle)
+                            NDKUIURLPreview(url: url, style: previewStyle)
                                 .padding(.top, 4)
                         }
                         
