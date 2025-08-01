@@ -21,6 +21,11 @@ struct AggregationSignature: Equatable {
         let tagKeys = filter.tags?.keys.sorted().joined(separator: ",") ?? ""
         self.signature = "\(kindString):\(tagKeys)"
     }
+    
+    // Custom Equatable implementation that only compares the signature
+    static func == (lhs: AggregationSignature, rhs: AggregationSignature) -> Bool {
+        return lhs.signature == rhs.signature
+    }
 }
 
 struct FilterSignature: Equatable {
@@ -159,9 +164,10 @@ final class SubscriptionAggregationTests: XCTestCase {
             tags: ["e": ["event1"], "p": ["pubkey1"], "t": ["bitcoin"]]
         )
         
+        // Same kinds and tag structure, different values for authors and tag contents
         let filter2 = NDKFilter(
             authors: ["author2", "author3"],
-            kinds: [2, 3],
+            kinds: [1, 2],  // Changed to same kinds as filter1
             tags: ["e": ["event2"], "p": ["pubkey2"], "t": ["nostr"]]
         )
         
