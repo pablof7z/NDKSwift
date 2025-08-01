@@ -10,8 +10,8 @@ public extension Data {
     init?(hexString: String) {
         var hex = hexString.trimmed
         
-        // Remove 0x prefix if present
-        if hex.hasPrefix("0x") {
+        // Remove 0x prefix if present (case insensitive)
+        if hex.lowercased().hasPrefix("0x") {
             hex = String(hex.dropFirst(2))
         }
         
