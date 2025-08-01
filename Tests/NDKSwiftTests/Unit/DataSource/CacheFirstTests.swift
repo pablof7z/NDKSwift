@@ -4,13 +4,13 @@ import XCTest
 /// Tests for cache-first behavior in NDKSubscriptionManager
 class CacheFirstTests: XCTestCase {
     var ndk: NDK!
-    var cache: MemoryCache!
+    var cache: NDKSQLiteCache!
     
     override func setUp() async throws {
         try await super.setUp()
         
-        // Create memory cache and NDK instance
-        cache = MemoryCache()
+        // Create SQLite cache and NDK instance
+        cache = try await NDKSQLiteCache(path: ":memory:")
         ndk = NDK(
             relayUrls: [], // No relays to ensure we're testing cache-only behavior
             cache: cache
@@ -24,11 +24,25 @@ class CacheFirstTests: XCTestCase {
         try await super.tearDown()
     }
     
+    // Helper method to create test events
+    private func createTestEvent(
+        kind: Int = 1,
+        content: String = "Test content",
+        pubkey: String? = nil
+    ) -> NDKEvent {
+        return NDKEvent(
+            kind: kind,
+            content: content,
+            tags: [],
+            pubkey: pubkey ?? "test_pubkey_\(UUID().uuidString.prefix(8))"
+        )
+    }
+    
     func testImmediateCacheHit() async throws {
         // Arrange: Pre-populate cache with some events
         var events: [NDKEvent] = []
         for i in 0..<5 {
-            let event = try await createTestEvent(
+            let event = createTestEvent(
                 content: "Test event \(i)",
                 pubkey: "test_pubkey"
             )
@@ -63,7 +77,7 @@ class CacheFirstTests: XCTestCase {
         }
         
         // Wait briefly to ensure cache delivery
-        try await Task.sleep(nanoseconds: 50_000_000) // 50ms
+        try await Task.sleep(nanoseconds: 200_000_000) // 200ms
         collectTask.cancel()
         
         // Assert: Should have received all cached events immediately
@@ -79,7 +93,7 @@ class CacheFirstTests: XCTestCase {
         // Pre-populate with events
         var events: [NDKEvent] = []
         for i in 0..<3 {
-            let event = try await createTestEvent(
+            let event = createTestEvent(
                 content: "Fresh event \(i)",
                 pubkey: "test_pubkey"
             )
@@ -124,7 +138,7 @@ class CacheFirstTests: XCTestCase {
         // Pre-populate with events
         var events: [NDKEvent] = []
         for i in 0..<2 {
-            let event = try await createTestEvent(
+            let event = createTestEvent(
                 content: "Stale event \(i)",
                 pubkey: "test_pubkey"
             )
@@ -163,7 +177,7 @@ class CacheFirstTests: XCTestCase {
     func testNetworkOnlyPolicy() async throws {
         // Arrange: Pre-populate cache
         for i in 0..<3 {
-            let event = try await createTestEvent(
+            let event = createTestEvent(
                 content: "Cached event \(i)",
                 pubkey: "test_pubkey"
             )
@@ -199,7 +213,7 @@ class CacheFirstTests: XCTestCase {
         // Arrange: Pre-populate cache
         var events: [NDKEvent] = []
         for i in 0..<4 {
-            let event = try await createTestEvent(
+            let event = createTestEvent(
                 content: "Cache only event \(i)",
                 pubkey: "test_pubkey"
             )

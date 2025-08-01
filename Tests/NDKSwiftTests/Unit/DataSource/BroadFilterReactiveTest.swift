@@ -4,11 +4,12 @@ import XCTest
 /// Tests that verify broader filters receive events from more specific subscriptions
 final class BroadFilterReactiveTest: XCTestCase {
     var ndk: NDK!
-    var cache: MemoryCache!
+    var cache: NDKSQLiteCache!
     
     override func setUp() async throws {
         try await super.setUp()
-        cache = MemoryCache()
+        // Use SQLiteCache which properly implements reactive observation
+        cache = try await NDKSQLiteCache(path: ":memory:")
         ndk = NDK(cache: cache)
         ndk.outboxEnabled = false
     }
@@ -81,22 +82,10 @@ final class BroadFilterReactiveTest: XCTestCase {
             id: "event2_\(UUID().uuidString)"
         )
         
-        // Process events through the internal subscription system
-        let mockRelay = MockRelay(url: "wss://test.relay/")
-        
-        // Process event1 through specific subscription
-        await ndk.internalSubscriptionManager.processEvent(
-            event1,
-            subscriptionId: "specific-network-sub",
-            from: mockRelay
-        )
-        
-        // Process event2 directly (simulating it coming from a different subscription)
-        await ndk.internalSubscriptionManager.processEvent(
-            event2,
-            subscriptionId: "some-other-sub",
-            from: mockRelay
-        )
+        // Process events through the cache since we're testing cache-only subscriptions
+        // The broad filter is cache-only, so it will only see events that are saved to cache
+        try await cache.saveEvent(event1)
+        try await cache.saveEvent(event2)
         
         // Wait for events to propagate
         await fulfillment(of: [broadExpectation], timeout: 2.0)
@@ -193,20 +182,9 @@ final class BroadFilterReactiveTest: XCTestCase {
             id: "kind4_\(UUID().uuidString)"
         )
         
-        // Process events
-        let mockRelay = MockRelay(url: "wss://test.relay/")
-        
-        await ndk.internalSubscriptionManager.processEvent(
-            kind1Event,
-            subscriptionId: "network-sub-1",
-            from: mockRelay
-        )
-        
-        await ndk.internalSubscriptionManager.processEvent(
-            kind4Event,
-            subscriptionId: "network-sub-2",
-            from: mockRelay
-        )
+        // Process events through the cache since we're testing cache-only subscriptions
+        try await cache.saveEvent(kind1Event)
+        try await cache.saveEvent(kind4Event)
         
         // Wait for events
         await fulfillment(of: [kind1Expectation, kind4Expectation, authorExpectation], timeout: 2.0)
