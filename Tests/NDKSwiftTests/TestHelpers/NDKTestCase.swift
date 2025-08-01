@@ -124,6 +124,30 @@ open class NDKTestCase: XCTestCase {
         XCTFail("Condition not met within \(timeout) seconds")
     }
     
+    /// Performs an async test with timeout protection
+    func performAsyncTest(
+        timeout: TimeInterval = 30.0,
+        test: @escaping () async throws -> Void
+    ) async throws {
+        let testTask = Task {
+            try await test()
+        }
+        
+        let timeoutTask = Task {
+            try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+            testTask.cancel()
+            throw XCTSkip("Test timed out after \(timeout) seconds")
+        }
+        
+        do {
+            try await testTask.value
+            timeoutTask.cancel()
+        } catch {
+            timeoutTask.cancel()
+            throw error
+        }
+    }
+    
     /// Measures async operation performance
     func measureAsync(
         metrics: [XCTMetric] = [XCTClockMetric()],

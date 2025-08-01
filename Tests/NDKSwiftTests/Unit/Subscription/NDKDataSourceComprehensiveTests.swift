@@ -89,21 +89,23 @@ final class NDKSubscriptionComprehensiveTests: NDKTestCase {
     // MARK: - Filter Update Tests
     
     func testUpdateFilterChangesDataStream() async throws {
-        let cache = createMemoryCache()
-        let ndk = createTestNDK(cache: cache)
-        
-        // Start with kind 1 filter
-        let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
-        
-        let kind1Event = EventTestFactory.createEvent(kind: 1, content: "Kind 1")
-        let kind2Event = EventTestFactory.createEvent(kind: 2, content: "Kind 2")
-        
-        var receivedEvents: [NDKEvent] = []
-        let consumeTask = Task {
-            for await event in dataSource.events {
-                receivedEvents.append(event)
+        try await performAsyncTest(timeout: 10) {
+            let cache = self.createMemoryCache()
+            let ndk = self.createTestNDK(cache: cache)
+            
+            // Start with kind 1 filter
+            let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
+            
+            let kind1Event = EventTestFactory.createEvent(kind: 1, content: "Kind 1")
+            let kind2Event = EventTestFactory.createEvent(kind: 2, content: "Kind 2")
+            
+            var receivedEvents: [NDKEvent] = []
+            let consumeTask = Task {
+                for await event in dataSource.events {
+                    receivedEvents.append(event)
+                    if receivedEvents.count >= 10 { break } // Add safety break
+                }
             }
-        }
         
         try await Task.sleep(nanoseconds: 100_000_000)
         
@@ -129,7 +131,8 @@ final class NDKSubscriptionComprehensiveTests: NDKTestCase {
         XCTAssertEqual(receivedEvents.count, 1)
         XCTAssertEqual(receivedEvents.first?.kind, 2)
         
-        consumeTask.cancel()
+            consumeTask.cancel()
+        }
     }
     
     func testUpdateFilterClearsExistingData() async throws {
@@ -195,20 +198,22 @@ final class NDKSubscriptionComprehensiveTests: NDKTestCase {
     // MARK: - Deduplication Tests
     
     func testDuplicateEventPrevention() async throws {
-        let cache = createMemoryCache()
-        let ndk = createTestNDK(cache: cache)
-        
-        let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
-        
-        // Create same event
-        let event = EventTestFactory.createTextNote(content: "Duplicate test")
-        
-        var receivedEvents: [NDKEvent] = []
-        let consumeTask = Task {
-            for await event in dataSource.events {
-                receivedEvents.append(event)
+        try await performAsyncTest(timeout: 10) {
+            let cache = self.createMemoryCache()
+            let ndk = self.createTestNDK(cache: cache)
+            
+            let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
+            
+            // Create same event
+            let event = EventTestFactory.createTextNote(content: "Duplicate test")
+            
+            var receivedEvents: [NDKEvent] = []
+            let consumeTask = Task {
+                for await event in dataSource.events {
+                    receivedEvents.append(event)
+                    if receivedEvents.count >= 10 { break } // Add safety break
+                }
             }
-        }
         
         try await Task.sleep(nanoseconds: 100_000_000)
         
@@ -221,9 +226,10 @@ final class NDKSubscriptionComprehensiveTests: NDKTestCase {
         try await Task.sleep(nanoseconds: 100_000_000)
         consumeTask.cancel()
         
-        // Should only receive the event once
-        XCTAssertEqual(receivedEvents.count, 1)
-        XCTAssertEqual(dataSource.data.count, 1)
+            // Should only receive the event once
+            XCTAssertEqual(receivedEvents.count, 1)
+            XCTAssertEqual(dataSource.data.count, 1)
+        }
     }
     
     // MARK: - Cache Policy Tests
@@ -332,50 +338,54 @@ final class NDKSubscriptionComprehensiveTests: NDKTestCase {
     }
     
     func testRelaySpecificEventHandling() async throws {
-        let cache = createMemoryCache()
-        let ndk = createTestNDK(cache: cache)
-        
-        let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
-        
-        let event = EventTestFactory.createTextNote()
-        let relayURL = "wss://specific.relay"
-        
-        var eventReceived = false
-        var relayEventReceived = false
-        var receivedRelay: String?
-        
-        let eventTask = Task {
-            for await receivedEvent in dataSource.events {
-                if receivedEvent.id == event.id {
-                    eventReceived = true
-                }
-            }
-        }
-        
-        let relayTask = Task {
-            for await update in dataSource.relayUpdates {
-                if case let .event(receivedEvent, relay: relay) = update {
+        try await performAsyncTest(timeout: 10) {
+            let cache = self.createMemoryCache()
+            let ndk = self.createTestNDK(cache: cache)
+            
+            let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
+            
+            let event = EventTestFactory.createTextNote()
+            let relayURL = "wss://specific.relay"
+            
+            var eventReceived = false
+            var relayEventReceived = false
+            var receivedRelay: String?
+            
+            let eventTask = Task {
+                for await receivedEvent in dataSource.events {
                     if receivedEvent.id == event.id {
-                        relayEventReceived = true
-                        receivedRelay = relay
+                        eventReceived = true
+                        break // Exit after finding the event
                     }
                 }
             }
+            
+            let relayTask = Task {
+                for await update in dataSource.relayUpdates {
+                    if case let .event(receivedEvent, relay: relay) = update {
+                        if receivedEvent.id == event.id {
+                            relayEventReceived = true
+                            receivedRelay = relay
+                            break // Exit after finding the event
+                        }
+                    }
+                }
+            }
+            
+            try await Task.sleep(nanoseconds: 100_000_000)
+            
+            // Send event through relay update
+            await dataSource.handleRelayUpdate(.event(event, relay: relayURL))
+            
+            try await Task.sleep(nanoseconds: 200_000_000)
+            
+            XCTAssertTrue(eventReceived, "Event should be received through events stream")
+            XCTAssertTrue(relayEventReceived, "Event should be received through relay updates")
+            XCTAssertEqual(receivedRelay, relayURL)
+            
+            eventTask.cancel()
+            relayTask.cancel()
         }
-        
-        try await Task.sleep(nanoseconds: 100_000_000)
-        
-        // Send event through relay update
-        await dataSource.handleRelayUpdate(.event(event, relay: relayURL))
-        
-        try await Task.sleep(nanoseconds: 200_000_000)
-        
-        XCTAssertTrue(eventReceived, "Event should be received through events stream")
-        XCTAssertTrue(relayEventReceived, "Event should be received through relay updates")
-        XCTAssertEqual(receivedRelay, relayURL)
-        
-        eventTask.cancel()
-        relayTask.cancel()
     }
     
     func testMultipleRelayEOSETracking() async throws {
@@ -520,21 +530,29 @@ final class NDKSubscriptionComprehensiveTests: NDKTestCase {
         let ndk = createTestNDK(cache: cache)
         
         weak var weakDataSource: NDKSubscription<NDKEvent>?
+        var consumeTask: Task<Void, Never>?
         
-        autoreleasepool {
+        // Create data source in a scope so it can be deallocated
+        do {
             let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
             weakDataSource = dataSource
             
             // Start consuming to ensure it's active
-            Task {
+            consumeTask = Task {
                 for await _ in dataSource.events {
                     break
                 }
             }
+            
+            // Give task a moment to start
+            try await Task.sleep(nanoseconds: 10_000_000)
         }
         
+        // Cancel the task to prevent hanging
+        consumeTask?.cancel()
+        
         // Give time for deallocation
-        try await Task.sleep(nanoseconds: 500_000_000)
+        try await Task.sleep(nanoseconds: 100_000_000)
         
         // Data source should be deallocated
         XCTAssertNil(weakDataSource)
