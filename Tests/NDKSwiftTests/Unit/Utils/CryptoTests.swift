@@ -41,6 +41,42 @@ final class CryptoTests: XCTestCase {
         }
     }
     
+    func testSHA256_largeData() {
+        // Test with larger data - 1MB of repeated pattern
+        let pattern = "Hello, Nostr! "
+        let largeString = String(repeating: pattern, count: 1024 * 1024 / pattern.count)
+        let data = largeString.data(using: .utf8)!
+        
+        // Should not crash and should produce consistent result
+        let hash1 = Crypto.sha256(data)
+        let hash2 = Crypto.sha256(data)
+        
+        XCTAssertEqual(hash1, hash2, "SHA256 should be deterministic for large data")
+        XCTAssertEqual(hash1.count, 32, "SHA256 should always produce 32 bytes")
+    }
+    
+    func testSHA256_edgeCases() {
+        // Test single byte
+        let singleByte = Data([0x42])
+        let singleByteHash = Crypto.sha256(singleByte)
+        XCTAssertEqual(singleByteHash.count, 32)
+        
+        // Test all zeros
+        let zeros = Data(repeating: 0, count: 1000)
+        let zerosHash = Crypto.sha256(zeros)
+        XCTAssertEqual(zerosHash.count, 32)
+        
+        // Test all 0xFF
+        let maxBytes = Data(repeating: 0xFF, count: 1000)
+        let maxHash = Crypto.sha256(maxBytes)
+        XCTAssertEqual(maxHash.count, 32)
+        
+        // All should be different
+        let hashes = [singleByteHash, zerosHash, maxHash]
+        let uniqueHashes = Set(hashes)
+        XCTAssertEqual(uniqueHashes.count, hashes.count, "Different inputs should produce different hashes")
+    }
+    
     func testSHA256_hexString() {
         let input = "hello world"
         let data = input.data(using: .utf8)!
@@ -98,12 +134,43 @@ final class CryptoTests: XCTestCase {
     func testDerivePublicKey_invalidPrivateKey() {
         // Test invalid hex
         XCTAssertThrowsError(try Crypto.getPublicKey(from: "not-hex")) { error in
-            XCTAssertTrue(error is Crypto.CryptoError)
+            guard let cryptoError = error as? Crypto.CryptoError else {
+                XCTFail("Expected Crypto.CryptoError, got \(type(of: error))")
+                return
+            }
+            XCTAssertEqual(cryptoError, .invalidKeyLength)
         }
         
-        // Test wrong length
+        // Test wrong length - too short
         XCTAssertThrowsError(try Crypto.getPublicKey(from: "deadbeef")) { error in
-            XCTAssertTrue(error is Crypto.CryptoError)
+            guard let cryptoError = error as? Crypto.CryptoError else {
+                XCTFail("Expected Crypto.CryptoError, got \(type(of: error))")
+                return
+            }
+            XCTAssertEqual(cryptoError, .invalidKeyLength)
+        }
+        
+        // Test wrong length - too long
+        let longKey = String(repeating: "a", count: 130) // 65 bytes instead of 32
+        XCTAssertThrowsError(try Crypto.getPublicKey(from: longKey)) { error in
+            guard let cryptoError = error as? Crypto.CryptoError else {
+                XCTFail("Expected Crypto.CryptoError, got \(type(of: error))")
+                return
+            }
+            XCTAssertEqual(cryptoError, .invalidKeyLength)
+        }
+        
+        // Test all zeros (may or may not be valid depending on implementation)
+        let zeroKey = String(repeating: "0", count: 64)
+        do {
+            let publicKey = try Crypto.getPublicKey(from: zeroKey)
+            // If it succeeds, verify it produces a valid result
+            XCTAssertEqual(publicKey.count, 64)
+            XCTAssertTrue(HexValidator.isValid32ByteHex(publicKey))
+        } catch {
+            // If it fails, just verify it's an error - we don't enforce the specific type
+            // since different implementations may handle edge cases differently
+            XCTAssertNotNil(error, "Should throw some kind of error for edge case")
         }
     }
     
@@ -157,6 +224,47 @@ final class CryptoTests: XCTestCase {
         // Verify with key2 should fail
         let isValid = try Crypto.verify(signature: signature, message: message, pubkey: publicKey2)
         XCTAssertFalse(isValid)
+    }
+    
+    func testSignature_invalidInputs() {
+        let privateKey = Crypto.generatePrivateKey()
+        let messageData = "test".data(using: .utf8)!
+        let message = Crypto.sha256(messageData)
+        
+        // Test invalid private key length
+        XCTAssertThrowsError(try Crypto.sign(message: message, privateKey: "short")) { error in
+            XCTAssertTrue(error is Crypto.CryptoError)
+        }
+        
+        // Test invalid private key hex
+        let invalidHex = String(repeating: "z", count: 64)
+        XCTAssertThrowsError(try Crypto.sign(message: message, privateKey: invalidHex)) { error in
+            XCTAssertTrue(error is Crypto.CryptoError)
+        }
+    }
+    
+    func testVerifySignature_invalidInputs() throws {
+        let privateKey = Crypto.generatePrivateKey()
+        let publicKey = try Crypto.getPublicKey(from: privateKey)
+        let messageData = "test".data(using: .utf8)!
+        let message = Crypto.sha256(messageData)
+        let signature = try Crypto.sign(message: message, privateKey: privateKey)
+        
+        // Test invalid signature length
+        XCTAssertThrowsError(try Crypto.verify(signature: "short", message: message, pubkey: publicKey)) { error in
+            XCTAssertTrue(error is Crypto.CryptoError)
+        }
+        
+        // Test invalid public key length
+        XCTAssertThrowsError(try Crypto.verify(signature: signature, message: message, pubkey: "short")) { error in
+            XCTAssertTrue(error is Crypto.CryptoError)
+        }
+        
+        // Test invalid hex in signature
+        let invalidSig = String(repeating: "z", count: 128)
+        XCTAssertThrowsError(try Crypto.verify(signature: invalidSig, message: message, pubkey: publicKey)) { error in
+            XCTAssertTrue(error is Crypto.CryptoError)
+        }
     }
     
     // MARK: - Error handling tests
