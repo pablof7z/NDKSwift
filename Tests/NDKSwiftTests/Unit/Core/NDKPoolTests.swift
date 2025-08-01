@@ -141,28 +141,40 @@ final class NDKPoolTests: NDKTestCase {
         }
         
         var receivedEvents: [NDKPoolChangeEvent] = []
+        let addEventReceived = XCTestExpectation(description: "Relay added event received")
+        let removeEventReceived = XCTestExpectation(description: "Relay removed event received")
         
-        // Use expectation to ensure we wait for events
-        let expectation = XCTestExpectation(description: "Receive relay change events")
-        expectation.expectedFulfillmentCount = 2 // We expect at least 2 events (add and remove)
-        
-        // Start observing changes
+        // Start observing changes before performing actions
         let observerTask = Task {
             for await event in await pool.relayChanges {
                 receivedEvents.append(event)
                 
-                // Fulfill expectation for each relevant event
+                // Check for specific events
                 switch event {
-                case .relayAdded(let relay) where relay.url == "wss://relay.example.com/":
-                    expectation.fulfill()
-                case .relayRemoved(let url) where url == "wss://relay.example.com/":
-                    expectation.fulfill()
+                case .relayAdded(let relay):
+                    if relay.url == "wss://relay.example.com/" {
+                        addEventReceived.fulfill()
+                    }
+                case .relayRemoved(let url):
+                    if url == "wss://relay.example.com/" {
+                        removeEventReceived.fulfill()
+                    }
                 default:
                     break
                 }
                 
-                // Stop after receiving enough events
-                if receivedEvents.count >= 10 {
+                // Stop after receiving both expected events
+                if receivedEvents.contains(where: { 
+                    if case .relayAdded(let relay) = $0 {
+                        return relay.url == "wss://relay.example.com/"
+                    }
+                    return false
+                }) && receivedEvents.contains(where: {
+                    if case .relayRemoved(let url) = $0 {
+                        return url == "wss://relay.example.com/"
+                    }
+                    return false
+                }) {
                     break
                 }
             }
@@ -174,15 +186,16 @@ final class NDKPoolTests: NDKTestCase {
         // Add a relay
         _ = await pool.addRelay("wss://relay.example.com")
         
-        // Give time for the add event to be processed
-        try await Task.sleep(nanoseconds: 50_000_000) // 50ms
+        // Wait for add event
+        await fulfillment(of: [addEventReceived], timeout: 2.0)
         
         // Remove the relay
         await pool.removeRelay("wss://relay.example.com")
         
-        // Wait for events with timeout
-        await fulfillment(of: [expectation], timeout: 2.0)
+        // Wait for remove event
+        await fulfillment(of: [removeEventReceived], timeout: 2.0)
         
+        // Cancel observer task
         observerTask.cancel()
         
         // Verify we received the expected events
