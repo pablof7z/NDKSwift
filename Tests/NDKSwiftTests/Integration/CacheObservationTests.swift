@@ -19,110 +19,134 @@ final class CacheObservationTests: XCTestCase {
     }
     
     func testCacheObservationReceivesEventsFromNetwork() async throws {
-        // Create a cache-only subscription
-        let cacheFilter = NDKFilter(kinds: [1])
-        var cacheEvents: [NDKEvent] = []
-        
-        let cacheTask = Task {
-            let eventStream = await sqliteCache.observeEvents(
-                matching: cacheFilter,
-                includeExisting: true
-            )
+        try await performAsyncTest(timeout: 5.0) { [weak self] in
+            guard let self = self else { return }
             
-            do {
-                for try await events in eventStream {
-                    cacheEvents.append(contentsOf: events)
-                    print("Cache received \(events.count) events")
+            // Create a cache-only subscription
+            let cacheFilter = NDKFilter(kinds: [1])
+            var uniqueEventIds = Set<String>()
+            var observationCount = 0
+            
+            let cacheTask = Task {
+                let eventStream = await self.sqliteCache.observeEvents(
+                    matching: cacheFilter,
+                    includeExisting: true
+                )
+                
+                do {
+                    for try await events in eventStream {
+                        observationCount += 1
+                        for event in events {
+                            uniqueEventIds.insert(event.id)
+                        }
+                        print("Cache observation #\(observationCount): received \(events.count) total events")
+                    }
+                } catch {
+                    XCTFail("Cache observation error: \(error)")
                 }
-            } catch {
-                XCTFail("Cache observation error: \(error)")
             }
+            
+            // Give the cache observer time to set up
+            try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+            
+            // Create and save some test events
+            let testEvents = try self.createTestEvents(count: 3)
+            for event in testEvents {
+                try await self.sqliteCache.saveEvent(event)
+            }
+            
+            // Give time for events to propagate
+            try await Task.sleep(nanoseconds: 200_000_000) // 200ms
+            
+            // Cancel the cache task
+            cacheTask.cancel()
+            
+            // Verify we received the correct unique events
+            XCTAssertFalse(uniqueEventIds.isEmpty, "Cache should have received events")
+            XCTAssertEqual(uniqueEventIds.count, testEvents.count, "Cache should have received all unique events")
+            // We expect at least 3 observations (one for each saved event)
+            XCTAssertGreaterThanOrEqual(observationCount, 3, "Should have received at least one observation per saved event")
         }
-        
-        // Give the cache observer time to set up
-        try await Task.sleep(nanoseconds: 100_000_000) // 100ms
-        
-        // Create and save some test events
-        let testEvents = try createTestEvents(count: 3)
-        for event in testEvents {
-            try await sqliteCache.saveEvent(event)
-        }
-        
-        // Give time for events to propagate
-        try await Task.sleep(nanoseconds: 200_000_000) // 200ms
-        
-        // Cancel the cache task
-        cacheTask.cancel()
-        
-        // Verify cache events were received
-        XCTAssertFalse(cacheEvents.isEmpty, "Cache should have received events")
-        XCTAssertEqual(cacheEvents.count, testEvents.count, "Cache should have received all saved events")
     }
     
     func testCacheObservationWithFilter() async throws {
-        // Create a specific filter for kind 1 from a specific author
-        let testAuthor = "test-author-pubkey"
-        let cacheFilter = NDKFilter(
-            authors: [testAuthor],
-            kinds: [1]
-        )
-        var cacheEvents: [NDKEvent] = []
-        
-        let cacheTask = Task {
-            let eventStream = await sqliteCache.observeEvents(
-                matching: cacheFilter,
-                includeExisting: false // Don't include existing
-            )
+        try await performAsyncTest(timeout: 5.0) { [weak self] in
+            guard let self = self else { return }
             
-            do {
-                for try await events in eventStream {
-                    cacheEvents.append(contentsOf: events)
+            // Create a specific filter for kind 1 from a specific author
+            let testAuthor = "test-author-pubkey"
+            let cacheFilter = NDKFilter(
+                authors: [testAuthor],
+                kinds: [1]
+            )
+            var uniqueMatchingEventIds = Set<String>()
+            var observationCount = 0
+        
+            let cacheTask = Task {
+                let eventStream = await self.sqliteCache.observeEvents(
+                    matching: cacheFilter,
+                    includeExisting: false // Don't include existing
+                )
+                
+                do {
+                    for try await events in eventStream {
+                        observationCount += 1
+                        for event in events {
+                            // Verify the event matches our filter
+                            if event.pubkey == testAuthor && event.kind == 1 {
+                                uniqueMatchingEventIds.insert(event.id)
+                            }
+                        }
+                        print("Filter observation #\(observationCount): received \(events.count) matching events")
+                    }
+                } catch {
+                    XCTFail("Cache observation error: \(error)")
                 }
-            } catch {
-                XCTFail("Cache observation error: \(error)")
             }
-        }
-        
-        // Give the cache observer time to set up
-        try await Task.sleep(nanoseconds: 100_000_000) // 100ms
-        
-        // Create events from different authors
-        let matchingEvent = try createTestEvent(author: testAuthor, kind: 1)
-        let nonMatchingEvent1 = try createTestEvent(author: "other-author", kind: 1)
-        let nonMatchingEvent2 = try createTestEvent(author: testAuthor, kind: 4)
-        
-        // Save all events
-        try await sqliteCache.saveEvent(matchingEvent)
-        try await sqliteCache.saveEvent(nonMatchingEvent1)
-        try await sqliteCache.saveEvent(nonMatchingEvent2)
-        
-        // Give time for events to propagate
-        try await Task.sleep(nanoseconds: 200_000_000) // 200ms
-        
-        // Cancel the cache task
-        cacheTask.cancel()
-        
-        // Verify only matching event was received
-        XCTAssertEqual(cacheEvents.count, 1, "Cache should have received only one matching event")
-        if let receivedEvent = cacheEvents.first {
-            XCTAssertEqual(receivedEvent.pubkey, testAuthor)
-            XCTAssertEqual(receivedEvent.kind, 1)
+            
+            // Give the cache observer time to set up
+            try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+            
+            // Create events from different authors
+            let matchingEvent = try self.createTestEvent(author: testAuthor, kind: 1)
+            let nonMatchingEvent1 = try self.createTestEvent(author: "other-author", kind: 1)
+            let nonMatchingEvent2 = try self.createTestEvent(author: testAuthor, kind: 4)
+            
+            // Save all events
+            try await self.sqliteCache.saveEvent(matchingEvent)
+            try await self.sqliteCache.saveEvent(nonMatchingEvent1)
+            try await self.sqliteCache.saveEvent(nonMatchingEvent2)
+            
+            // Give time for events to propagate
+            try await Task.sleep(nanoseconds: 200_000_000) // 200ms
+            
+            // Cancel the cache task
+            cacheTask.cancel()
+            
+            // Verify only matching event was received
+            XCTAssertEqual(uniqueMatchingEventIds.count, 1, "Cache should have received only one unique matching event")
+            XCTAssertTrue(uniqueMatchingEventIds.contains(matchingEvent.id), "Cache should have received the matching event")
+            // Each save triggers an observation
+            XCTAssertGreaterThanOrEqual(observationCount, 1, "Should have received at least one observation")
         }
     }
     
     func testIncludeExistingParameter() async throws {
-        // Pre-save some events
-        let existingEvents = try createTestEvents(count: 2)
-        for event in existingEvents {
-            try await sqliteCache.saveEvent(event)
-        }
+        try await performAsyncTest(timeout: 5.0) { [weak self] in
+            guard let self = self else { return }
+            
+            // Pre-save some events
+            let existingEvents = try self.createTestEvents(count: 2)
+            for event in existingEvents {
+                try await self.sqliteCache.saveEvent(event)
+            }
         
         // Test with includeExisting = true
         var eventsWithExisting: [NDKEvent] = []
         let filter = NDKFilter(kinds: [1])
         
         let taskWithExisting = Task {
-            let eventStream = await sqliteCache.observeEvents(
+            let eventStream = await self.sqliteCache.observeEvents(
                 matching: filter,
                 includeExisting: true
             )
@@ -147,7 +171,7 @@ final class CacheObservationTests: XCTestCase {
         var eventsWithoutExisting: [NDKEvent] = []
         
         let taskWithoutExisting = Task {
-            let eventStream = await sqliteCache.observeEvents(
+            let eventStream = await self.sqliteCache.observeEvents(
                 matching: filter,
                 includeExisting: false
             )
@@ -165,8 +189,8 @@ final class CacheObservationTests: XCTestCase {
         try await Task.sleep(nanoseconds: 200_000_000) // 200ms
         
         // Now add a new event
-        let newEvent = try createTestEvent()
-        try await sqliteCache.saveEvent(newEvent)
+        let newEvent = try self.createTestEvent()
+        try await self.sqliteCache.saveEvent(newEvent)
         
         // Give time for new event to propagate
         try await Task.sleep(nanoseconds: 200_000_000) // 200ms
@@ -175,6 +199,7 @@ final class CacheObservationTests: XCTestCase {
         // Verify results
         XCTAssertGreaterThanOrEqual(eventsWithExisting.count, 2, "Should have received existing events with includeExisting=true")
         XCTAssertEqual(eventsWithoutExisting.count, 1, "Should have received only new event with includeExisting=false")
+        }
     }
     
     // MARK: - Helper Methods

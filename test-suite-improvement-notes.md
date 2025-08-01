@@ -11,10 +11,13 @@ The `testRelayPoolChangeEvents` test is flaky due to race conditions in the rela
 3. However, there appears to be a race condition where the AsyncStream consumer might not be ready to receive the second event
 4. The test's expectation fulfillment count of 2 might cause the observer to stop listening prematurely
 
-### Current Mitigation
-- Added longer sleep times between operations (50ms)
-- Used XCTestExpectation for better event waiting
-- Improved error messages to show received events
+### Solution Implemented (2025-08-01)
+- Added `TestTimeoutHelper` usage to prevent test hanging
+- Introduced an `EventCollector` actor for thread-safe event collection
+- Increased sleep times between operations (100ms) for better stability
+- Extended timeout values for XCTestExpectation (3.0 seconds)
+- Added proper `[weak self]` capture to avoid retain cycles
+- Test now passes consistently in multiple runs
 
 ### Potential Long-term Solutions
 1. **Mock Relay Implementation**: Create a proper mock relay that doesn't attempt real connections

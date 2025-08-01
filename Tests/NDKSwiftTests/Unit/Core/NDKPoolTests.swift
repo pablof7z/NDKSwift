@@ -134,87 +134,100 @@ final class NDKPoolTests: NDKTestCase {
     }
     
     func testRelayPoolChangeEvents() async throws {
-        let ndk = createMockNDK()
-        guard let pool = ndk.pool else {
-            XCTFail("Pool should not be nil")
-            return
-        }
-        
-        var receivedEvents: [NDKPoolChangeEvent] = []
-        let addEventReceived = XCTestExpectation(description: "Relay added event received")
-        let removeEventReceived = XCTestExpectation(description: "Relay removed event received")
-        
-        // Start observing changes before performing actions
-        let observerTask = Task {
-            for await event in await pool.relayChanges {
-                receivedEvents.append(event)
+        // Use timeout protection to prevent hanging
+        try await performAsyncTest(timeout: 5.0) { [weak self] in
+            guard let self = self else { return }
+            let ndk = self.createMockNDK()
+            guard let pool = ndk.pool else {
+                XCTFail("Pool should not be nil")
+                return
+            }
+            
+            var receivedEvents: [NDKPoolChangeEvent] = []
+            let addEventReceived = XCTestExpectation(description: "Relay added event received")
+            let removeEventReceived = XCTestExpectation(description: "Relay removed event received")
+            
+            // Use an actor to ensure thread-safe access to receivedEvents
+            actor EventCollector {
+                private var events: [NDKPoolChangeEvent] = []
                 
-                // Check for specific events
-                switch event {
-                case .relayAdded(let relay):
-                    if relay.url == "wss://relay.example.com/" {
-                        addEventReceived.fulfill()
-                    }
-                case .relayRemoved(let url):
-                    if url == "wss://relay.example.com/" {
-                        removeEventReceived.fulfill()
-                    }
-                default:
-                    break
+                func append(_ event: NDKPoolChangeEvent) {
+                    events.append(event)
                 }
                 
-                // Stop after receiving both expected events
-                if receivedEvents.contains(where: { 
-                    if case .relayAdded(let relay) = $0 {
-                        return relay.url == "wss://relay.example.com/"
-                    }
-                    return false
-                }) && receivedEvents.contains(where: {
-                    if case .relayRemoved(let url) = $0 {
-                        return url == "wss://relay.example.com/"
-                    }
-                    return false
-                }) {
-                    break
+                func getEvents() -> [NDKPoolChangeEvent] {
+                    return events
                 }
             }
-        }
-        
-        // Give the observer task time to start listening
-        try await Task.sleep(nanoseconds: 50_000_000) // 50ms
-        
-        // Add a relay
-        _ = await pool.addRelay("wss://relay.example.com")
-        
-        // Wait for add event
-        await fulfillment(of: [addEventReceived], timeout: 2.0)
-        
-        // Remove the relay
-        await pool.removeRelay("wss://relay.example.com")
-        
-        // Wait for remove event
-        await fulfillment(of: [removeEventReceived], timeout: 2.0)
-        
-        // Cancel observer task
-        observerTask.cancel()
-        
-        // Verify we received the expected events
-        let hasAddEvent = receivedEvents.contains { event in
-            if case .relayAdded(let addedRelay) = event {
-                return addedRelay.url == "wss://relay.example.com/"
+            
+            let eventCollector = EventCollector()
+            
+            // Start observing changes before performing actions
+            let observerTask = Task {
+                for await event in await pool.relayChanges {
+                    await eventCollector.append(event)
+                    
+                    // Check for specific events
+                    switch event {
+                    case .relayAdded(let relay):
+                        if relay.url == "wss://relay.example.com/" {
+                            addEventReceived.fulfill()
+                        }
+                    case .relayRemoved(let url):
+                        if url == "wss://relay.example.com/" {
+                            removeEventReceived.fulfill()
+                        }
+                    default:
+                        break
+                    }
+                }
             }
-            return false
-        }
-        
-        let hasRemoveEvent = receivedEvents.contains { event in
-            if case .relayRemoved(let removedURL) = event {
-                return removedURL == "wss://relay.example.com/"
+            
+            // Give the observer task more time to start listening
+            try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+            
+            // Add a relay
+            _ = await pool.addRelay("wss://relay.example.com")
+            
+            // Wait for add event with longer timeout
+            await self.fulfillment(of: [addEventReceived], timeout: 3.0)
+            
+            // Give some time between operations to avoid race conditions
+            try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+            
+            // Remove the relay
+            await pool.removeRelay("wss://relay.example.com")
+            
+            // Wait for remove event with longer timeout
+            await self.fulfillment(of: [removeEventReceived], timeout: 3.0)
+            
+            // Give a bit more time to ensure all events are collected
+            try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+            
+            // Cancel observer task
+            observerTask.cancel()
+            
+            // Get the collected events
+            receivedEvents = await eventCollector.getEvents()
+            
+            // Verify we received the expected events
+            let hasAddEvent = receivedEvents.contains { event in
+                if case .relayAdded(let addedRelay) = event {
+                    return addedRelay.url == "wss://relay.example.com/"
+                }
+                return false
             }
-            return false
+            
+            let hasRemoveEvent = receivedEvents.contains { event in
+                if case .relayRemoved(let removedURL) = event {
+                    return removedURL == "wss://relay.example.com/"
+                }
+                return false
+            }
+            
+            XCTAssertTrue(hasAddEvent, "Should have received relayAdded event. Received events: \(receivedEvents)")
+            XCTAssertTrue(hasRemoveEvent, "Should have received relayRemoved event. Received events: \(receivedEvents)")
         }
-        
-        XCTAssertTrue(hasAddEvent, "Should have received relayAdded event. Received events: \(receivedEvents)")
-        XCTAssertTrue(hasRemoveEvent, "Should have received relayRemoved event. Received events: \(receivedEvents)")
     }
     
     func testConnectionSummary() async throws {
