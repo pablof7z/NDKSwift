@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Moved problematic E2E tests that connect to real relays to DisabledTests directory
   - Fixed Package.swift resource declaration warnings
   - Documented critical test suite issues in test-suite-critical-issues.md
+- **ReactiveSubscriptionTests**: Fixed failing tests by switching from MemoryCache to SQLiteCache
+  - MemoryCache doesn't support reactive observation (by design)
+  - SQLiteCache properly implements reactive observation through GRDB
+  - Tests now pass consistently without hanging
 
 ### Changed
 - **BREAKING: NDKSwiftUI Environment Pattern Eliminated**: All NDKSwiftUI components now require `ndk: NDK` as their first parameter
