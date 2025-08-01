@@ -1,6 +1,22 @@
 import Foundation
 import CashuSwift
 
+// MARK: - Observer Types for Reactive Support
+
+private struct EventObserver {
+    let filter: NDKFilter
+    let continuation: AsyncThrowingStream<[NDKEvent], Error>.Continuation
+    let includeExisting: Bool
+    var hasEmittedExisting: Bool = false
+}
+
+private struct ProfileObserver {
+    let pubkey: String
+    let continuation: AsyncThrowingStream<NDKUserMetadata?, Error>.Continuation
+    let includeExisting: Bool
+    var hasEmittedExisting: Bool = false
+}
+
 /// Comprehensive in-memory cache implementation for testing and temporary use
 public actor MemoryCache: NDKCache {
     private var events: [String: NDKEvent] = [:]
@@ -18,6 +34,10 @@ public actor MemoryCache: NDKCache {
     
     // Cleanup task for tombstones
     private var cleanupTask: Task<Void, Never>?
+    
+    // Reactive observation support
+    private var eventObservers: [UUID: EventObserver] = [:]
+    private var profileObservers: [UUID: ProfileObserver] = [:]
 
     public init() {
         // Initialize LRU cache with configured item limit for decrypted content
@@ -31,6 +51,32 @@ public actor MemoryCache: NDKCache {
     
     deinit {
         cleanupTask?.cancel()
+    }
+    
+    // MARK: - Observer Management
+    
+    private func addEventObserver(id: UUID, observer: EventObserver) {
+        eventObservers[id] = observer
+    }
+    
+    private func removeEventObserver(id: UUID) {
+        eventObservers.removeValue(forKey: id)
+    }
+    
+    private func markObserverAsEmittedExisting(id: UUID) {
+        if var observer = eventObservers[id] {
+            observer.hasEmittedExisting = true
+            eventObservers[id] = observer
+        }
+    }
+    
+    private func notifyEventObservers(for event: NDKEvent) {
+        for (_, observer) in eventObservers {
+            // Check if event matches filter
+            if observer.filter.matches(event: event) {
+                observer.continuation.yield([event])
+            }
+        }
     }
 
     // MARK: - Event Operations
@@ -386,6 +432,9 @@ public actor MemoryCache: NDKCache {
 
         // Save the event
         try await saveEvent(event)
+        
+        // Notify observers about the new event
+        notifyEventObservers(for: event)
     }
 
     /// Process a kind:5 deletion event according to NIP-09
@@ -460,10 +509,18 @@ public actor MemoryCache: NDKCache {
         matching filter: NDKFilter,
         includeExisting: Bool = true
     ) async -> AsyncThrowingStream<[NDKEvent], Error> {
-        // For MemoryCache, we don't have a built-in change notification system
-        // So we'll create a stream that emits existing events and then completes
         AsyncThrowingStream { continuation in
+            let observerId = UUID()
+            
             Task {
+                // Create and store observer
+                let observer = EventObserver(
+                    filter: filter,
+                    continuation: continuation,
+                    includeExisting: includeExisting
+                )
+                await self.addEventObserver(id: observerId, observer: observer)
+                
                 // If includeExisting, emit current matching events
                 if includeExisting {
                     do {
@@ -471,15 +528,19 @@ public actor MemoryCache: NDKCache {
                         if !existingEvents.isEmpty {
                             continuation.yield(existingEvents)
                         }
+                        await self.markObserverAsEmittedExisting(id: observerId)
                     } catch {
                         continuation.finish(throwing: error)
+                        await self.removeEventObserver(id: observerId)
                         return
                     }
                 }
-                
-                // Since MemoryCache doesn't have change notifications,
-                // we complete the stream after emitting existing events
-                continuation.finish()
+            }
+            
+            continuation.onTermination = { _ in
+                Task {
+                    await self.removeEventObserver(id: observerId)
+                }
             }
         }
     }
