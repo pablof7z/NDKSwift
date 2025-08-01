@@ -162,6 +162,10 @@ final class NDKPoolTests: NDKTestCase {
             
             let eventCollector = EventCollector()
             
+            // Define the test URL and its normalized version
+            let testURL = "wss://relay.example.com"
+            let normalizedURL = testURL.normalizedRelayURL  // This will add trailing slash
+            
             // Start observing changes before performing actions
             let observerTask = Task {
                 for await event in await pool.relayChanges {
@@ -170,11 +174,11 @@ final class NDKPoolTests: NDKTestCase {
                     // Check for specific events
                     switch event {
                     case .relayAdded(let relay):
-                        if relay.url == "wss://relay.example.com/" {
+                        if relay.url == normalizedURL {
                             addEventReceived.fulfill()
                         }
                     case .relayRemoved(let url):
-                        if url == "wss://relay.example.com/" {
+                        if url == normalizedURL {
                             removeEventReceived.fulfill()
                         }
                     default:
@@ -187,7 +191,7 @@ final class NDKPoolTests: NDKTestCase {
             try await Task.sleep(nanoseconds: 100_000_000) // 100ms
             
             // Add a relay
-            _ = await pool.addRelay("wss://relay.example.com")
+            _ = await pool.addRelay(testURL)
             
             // Wait for add event with longer timeout
             await self.fulfillment(of: [addEventReceived], timeout: 3.0)
@@ -195,8 +199,8 @@ final class NDKPoolTests: NDKTestCase {
             // Give some time between operations to avoid race conditions
             try await Task.sleep(nanoseconds: 100_000_000) // 100ms
             
-            // Remove the relay
-            await pool.removeRelay("wss://relay.example.com")
+            // Remove the relay (can use either normalized or non-normalized URL)
+            await pool.removeRelay(testURL)
             
             // Wait for remove event with longer timeout
             await self.fulfillment(of: [removeEventReceived], timeout: 3.0)
@@ -213,14 +217,14 @@ final class NDKPoolTests: NDKTestCase {
             // Verify we received the expected events
             let hasAddEvent = receivedEvents.contains { event in
                 if case .relayAdded(let addedRelay) = event {
-                    return addedRelay.url == "wss://relay.example.com/"
+                    return addedRelay.url == normalizedURL
                 }
                 return false
             }
             
             let hasRemoveEvent = receivedEvents.contains { event in
                 if case .relayRemoved(let removedURL) = event {
-                    return removedURL == "wss://relay.example.com/"
+                    return removedURL == normalizedURL
                 }
                 return false
             }
