@@ -125,7 +125,7 @@ final class NDKSQLiteCacheReactiveTests: XCTestCase {
         let expectation = XCTestExpectation(description: "Receive profile updates")
         expectation.expectedFulfillmentCount = 3 // nil, initial, update
         
-        var receivedProfiles: [NDKUserProfile?] = []
+        var receivedProfiles: [NDKUserMetadata?] = []
         
         let collectionTask = Task {
             do {

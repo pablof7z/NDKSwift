@@ -24,32 +24,26 @@ import NDKSwift
 ///
 ///     var body: some View {
 ///         VStack {
-///             // Profile components take explicit NDK parameter
+///             // All components now use direct NDK parameters
 ///             NDKUIProfilePicture(ndk: ndk, pubkey: pubkey)
 ///             NDKUIDisplayName(ndk: ndk, pubkey: pubkey)
 ///
-///             // Action buttons still use environment for now
+///             // Action buttons now also use direct NDK parameters
 ///             HStack {
-///                 NDKUIReactionButton.like(event: event)
-///                 NDKUIZapButton(event: event)
-///                 NDKUIFollowButton(pubkey: pubkey)
+///                 NDKUIReactionButton.like(ndk: ndk, event: event)
+///                 NDKUIZapButton(ndk: ndk, event: event)
+///                 NDKUIFollowButton(ndk: ndk, pubkey: pubkey)
 ///             }
 ///         }
-///         .environment(\.ndk, ndk) // Only needed for action buttons
+///         // No environment injection needed anymore!
 ///     }
 /// }
 /// ```
 public struct NDKSwiftUI {
     /// The version of NDKSwiftUI
-    public static let version = "0.12"
+    public static let version = "0.13"
 }
 
-// MARK: - Environment Values
-
-extension EnvironmentValues {
-    /// The NDK instance to use for data fetching
-    @Entry public var ndk: NDK?
-}
 
 // MARK: - Public Exports
 

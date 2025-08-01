@@ -304,4 +304,48 @@ actor MockNDKCache: NDKCache {
     // Other required methods with default implementation
     func saveKeyset(_ keyset: CashuSwift.Keyset, mintUrl: String) async throws {}
     func getActiveKeysets(mintUrl: String, unit: String) async -> [CashuSwift.Keyset] { [] }
+    
+    // MARK: - Additional NDKCache Protocol Requirements
+    
+    func addUnpublishedEvent(_ event: NDKEvent, relays: Set<String>) async throws {}
+    func confirmEvent(eventId: String, onRelay relay: String) async throws {}
+    func getEventConfirmationState(eventId: String) async -> EventConfirmationState? { nil }
+    func getUnpublishedEvents(maxAge: TimeInterval, limit: Int?) async -> [(event: NDKEvent, targetRelays: Set<String>)] { [] }
+    
+    func getDecryptedContent(for eventId: String, viewerPubkey: String) async -> String? { nil }
+    func storeDecryptedContent(_ content: String, for eventId: String, viewerPubkey: String) async {}
+    func clearDecryptedContent() async {}
+    func clearDecryptedContent(for viewerPubkey: String) async {}
+    
+    func processEvent(_ event: NDKEvent, from relay: String, subscriptionId: String) async throws {}
+    func getRelaySources(eventId: String) async -> Set<String> { [] }
+    
+    func getLastFetchTime(for filter: NDKFilter) async -> Date? { nil }
+    func recordFetchTime(for filter: NDKFilter, timestamp: Date) async {}
+    
+    func saveNIP05Claim(_ identifier: String, pubkey: String, retrievedAt: Date) async throws {}
+    func getNIP05Entry(_ identifier: String) async -> NIP05CacheEntry? { nil }
+    func getNIP05Entries(pubkey: String) async -> [NIP05CacheEntry] { [] }
+    func searchNIP05(_ prefix: String, limit: Int) async -> [NIP05CacheEntry] { [] }
+    func saveNIP05Resolution(_ entry: NIP05CacheEntry) async throws {}
+    func invalidateNIP05(_ identifier: String, actualPubkey: String?) async throws {}
+    func needsNIP05Verification(_ identifier: String, maxAge: TimeInterval) async -> Bool { true }
+    func getUnverifiedNIP05s(limit: Int) async -> [NIP05CacheEntry] { [] }
+    func canVerifyDomain(_ domain: String) async -> Bool { true }
+    func recordDomainVerificationAttempt(_ domain: String) async {}
+    
+    func saveRelayPreferences(pubkey: String, writeRelays: [String]?, readRelays: [String]?, fetchedAt: Date, expiresAt: Date, checkedRelays: Set<String>?) async throws {}
+    func getRelayPreferences(pubkey: String) async -> (writeRelays: [String]?, readRelays: [String]?, fetchedAt: Date, expiresAt: Date, checkedRelays: Set<String>?)? { nil }
+    
+    func getEventsByTimeRange(from: Timestamp, to: Timestamp, filter: NDKFilter?) async throws -> [NDKEvent] { [] }
+    func getEventIdsWithTimestamps(from: Timestamp, to: Timestamp, filter: NDKFilter?) async throws -> [(id: String, timestamp: Timestamp)] { [] }
+    func hasEvents(ids: [String]) async -> [String: Bool] { ids.reduce(into: [:]) { $0[$1] = false } }
+    
+    func getMultipleProfileMetadata(pubkeys: [String]) async -> [String: (metadata: [String: Any], updatedAt: Timestamp, eventId: String)] { [:] }
+    
+    func observeProfile(pubkey: String, includeExisting: Bool) async -> AsyncThrowingStream<NDKUserMetadata?, Error> {
+        AsyncThrowingStream { continuation in
+            continuation.finish()
+        }
+    }
 }

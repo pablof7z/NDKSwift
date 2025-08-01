@@ -31,7 +31,7 @@ final class SubscriptionGroupingTestabilityTests: XCTestCase {
         // Create a subscription with specific properties
         let subscription = NDKSubscriptionCoordinator(
             id: "test-sub-123",
-            filters: [NDKFilter(kinds: [1], authors: ["alice"])],
+            filters: [NDKFilter(authors: ["alice"], kinds: [1])],
             relays: Set(["wss://relay1.com", "wss://relay2.com"]),
             ndk: ndk,
             closeOnEose: true,
@@ -97,8 +97,8 @@ final class SubscriptionGroupingTestabilityTests: XCTestCase {
     
     #if DEBUG
     func testDebugGroupingState() async throws {
-        let filter1 = NDKFilter(kinds: [1], authors: ["alice"])
-        let filter2 = NDKFilter(kinds: [1], authors: ["bob"])
+        let filter1 = NDKFilter(authors: ["alice"], kinds: [1])
+        let filter2 = NDKFilter(authors: ["bob"], kinds: [1])
         
         // Create multiple subscriptions
         let sub1 = NDKSubscriptionCoordinator(
@@ -207,7 +207,7 @@ final class SubscriptionGroupingTestabilityTests: XCTestCase {
     }
     
     func testDebugInspectGroup() async throws {
-        let filter = NDKFilter(kinds: [1], authors: ["alice"])
+        let filter = NDKFilter(authors: ["alice"], kinds: [1])
         let fingerprint = NDKFilterGrouping.filterFingerprint([filter], closeOnEose: false)
         
         // Initially no group

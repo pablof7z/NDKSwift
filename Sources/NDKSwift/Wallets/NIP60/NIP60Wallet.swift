@@ -454,6 +454,8 @@ public actor NIP60Wallet: NDKPaymentProvider {
 
         // Emit event about mint being removed
         events.yield(NIP60WalletEvent(type: .mintsRemoved([mintURL])))
+        // Emit blacklist update event
+        events.yield(NIP60WalletEvent(type: .blacklistUpdated(updatedBlockedMints)))
 
         NDKLogger.log(.info, category: .wallet, "Successfully blacklisted mint: \(mintURL)")
     }
@@ -473,6 +475,8 @@ public actor NIP60Wallet: NDKPaymentProvider {
         // Update local cache
         cachedBlacklistedMints = updatedBlockedMints
         blacklistLastFetched = Date()
+        // Emit blacklist update event
+        events.yield(NIP60WalletEvent(type: .blacklistUpdated(updatedBlockedMints)))
         NDKLogger.log(.info, category: .wallet, "Successfully removed mint from blacklist: \(mintURL)")
     }
 
@@ -510,6 +514,9 @@ public actor NIP60Wallet: NDKPaymentProvider {
                 events.yield(NIP60WalletEvent(type: .mintsRemoved(Array(newlyBlacklisted))))
             }
         }
+        
+        // Always emit blacklist update event when processing updates
+        events.yield(NIP60WalletEvent(type: .blacklistUpdated(newBlacklistedMints)))
     }
 
     // MARK: - NDKPaymentProvider Protocol

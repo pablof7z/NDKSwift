@@ -377,4 +377,30 @@ actor TestableCache: NDKCache {
     func getUnverifiedNIP05s(limit: Int) async -> [NIP05CacheEntry] {
         return Array(nip05Entries.values.filter { $0.status == .unverified }.prefix(limit))
     }
+    
+    func canVerifyDomain(_ domain: String) async -> Bool {
+        return await canCheckNIP05Domain(domain)
+    }
+    
+    func recordDomainVerificationAttempt(_ domain: String) async {
+        try? await recordNIP05DomainCheck(domain)
+    }
+    
+    func saveProfileMetadata(pubkey: String, metadata: [String: Any], updatedAt: Timestamp, eventId: String) async throws {
+        // No-op for testing - profiles are stored as events
+    }
+    
+    func getProfileMetadata(pubkey: String) async -> (metadata: [String: Any], updatedAt: Timestamp, eventId: String)? {
+        return nil // No-op for testing
+    }
+    
+    func getMultipleProfileMetadata(pubkeys: [String]) async -> [String: (metadata: [String: Any], updatedAt: Timestamp, eventId: String)] {
+        return [:] // No-op for testing
+    }
+    
+    func observeProfile(pubkey: String, includeExisting: Bool) async -> AsyncThrowingStream<NDKUserMetadata?, Error> {
+        return AsyncThrowingStream { continuation in
+            continuation.finish()
+        }
+    }
 }

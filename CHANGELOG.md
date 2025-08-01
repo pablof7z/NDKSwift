@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **BREAKING: NDKSwiftUI Environment Pattern Eliminated**: All NDKSwiftUI components now require `ndk: NDK` as their first parameter
+  - Removed `@Environment(\.ndk)` pattern entirely from all components
+  - Updated components: `NDKUIFollowButton`, `NDKUIReactionButton`, `NDKUIZapButton`, `NDKEventInteractionBar`, `NDKUIProfileLoader` (all variants), `NDKUIRichTextView`
+  - Removed `NDKUIRelayManagementWrapper` - use `NDKUIRelayManagementView(ndk: ndk)` directly
+  - Removed environment key extension `EnvironmentValues.ndk`
+  - All static factory methods now require `ndk` parameter (e.g., `NDKUIFollowButton.compact(ndk:pubkey:)`)
+  - Updated NDKSwiftUI version to 0.13
+
 ### Added
 - **Reactive Profile Observation**: Added `observeProfile` method to NDKCache protocol and implementations
   - `observeProfile(pubkey:includeExisting:)`: Observe real-time profile changes for a specific user

@@ -34,8 +34,36 @@ final class MockRelayPreferenceProvider: RelayPreferenceProvider {
     
     // MARK: - RelayPreferenceProvider
     
-    func getRelaysFor(pubkey: PublicKey) async -> NDKOutboxItem? {
+    func getRelaysSyncFor(pubkey: String, type: RelayListType) async -> NDKOutboxItem? {
+        return relayInfo[pubkey]
+    }
+    
+    func getRelaysFor(pubkey: String, maxAge: TimeInterval, type: RelayListType) async throws -> NDKOutboxItem? {
         fetchCallCount[pubkey, default: 0] += 1
         return relayInfo[pubkey]
+    }
+    
+    func getAllCachedItems() async -> [NDKOutboxItem] {
+        return Array(relayInfo.values)
+    }
+    
+    func track(pubkey: String, readRelays: Set<String>, writeRelays: Set<String>, source: RelayListSource, emitDiscoveryEvent: Bool) async {
+        let item = NDKOutboxItem(
+            pubkey: pubkey,
+            readRelays: Set(readRelays.map { RelayInfo(url: $0) }),
+            writeRelays: Set(writeRelays.map { RelayInfo(url: $0) }),
+            fetchedAt: Date(),
+            source: source
+        )
+        relayInfo[pubkey] = item
+    }
+    
+    func clear() async {
+        relayInfo.removeAll()
+        fetchCallCount.removeAll()
+    }
+    
+    func cleanupExpired() async {
+        // No-op for testing
     }
 }
