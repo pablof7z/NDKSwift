@@ -383,7 +383,7 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
 
         for author in authors {
             // Get cached relay info synchronously (non-blocking)
-            if let item = await getRelaysSyncFor(pubkey: author, type: .read) {
+            if let item = await getRelaysSyncFor(pubkey: author, type: .both) {
                 let readRelays = item.readRelays
                 if !readRelays.isEmpty {
                     NDKLogger.log(.trace, category: .outbox, "✅ Found \(readRelays.count) read relays for \(author.prefix(8))")

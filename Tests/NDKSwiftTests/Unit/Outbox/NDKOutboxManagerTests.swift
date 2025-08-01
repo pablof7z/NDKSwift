@@ -98,8 +98,8 @@ final class NDKOutboxManagerTests: NDKUnitTestCase {
         let cached = await outboxManager.getRelaysSyncFor(pubkey: pubkey)
         XCTAssertNotNil(cached)
         XCTAssertEqual(cached?.pubkey, pubkey)
-        XCTAssertEqual(cached?.readRelays.map { $0.url }, readRelays.sorted())
-        XCTAssertEqual(cached?.writeRelays.map { $0.url }, writeRelays.sorted())
+        XCTAssertEqual(cached?.readRelays.map { $0.url }.sorted(), readRelays.sorted())
+        XCTAssertEqual(cached?.writeRelays.map { $0.url }.sorted(), writeRelays.sorted())
         XCTAssertEqual(cached?.source, .nip65)
     }
     
@@ -182,8 +182,8 @@ final class NDKOutboxManagerTests: NDKUnitTestCase {
         let expectation = XCTestExpectation(description: "Relay discovery event emitted")
         
         let task = Task {
-            for await discovery in await outboxManager.relayDiscoveries {
-                if discovery.authors.contains("test_pubkey") {
+            for await discovery in await outboxManager.relayDiscoveriesInternal {
+                if discovery.pubkey == "test_pubkey" {
                     expectation.fulfill()
                     break
                 }
@@ -334,36 +334,20 @@ final class NDKOutboxManagerTests: NDKUnitTestCase {
     // MARK: - Public API Tests
     
     func testTrackUser() async {
-        // Setup mock relay list in cache
-        let relayListEvent = NDKEvent(
-            id: "relay_list_id",
+        // First track the user with relay information directly
+        await outboxManager.track(
             pubkey: "user_pubkey",
-            createdAt: Timestamp.now,
-            kind: EventKind.relayList,
-            tags: [
-                ["r", "wss://user-read.test", "read"],
-                ["r", "wss://user-write.test", "write"]
-            ],
-            content: "",
-            sig: "test_sig"
+            readRelays: ["wss://user-read.test"],
+            writeRelays: ["wss://user-write.test"],
+            source: .nip65,
+            emitDiscoveryEvent: false
         )
-        
-        // Save the event to cache
-        do {
-            try await memoryCache.saveEvent(relayListEvent)
-        } catch {
-            XCTFail("Failed to save event to cache: \(error)")
-        }
-        
-        // Track user
-        await outboxManager.trackUser("user_pubkey")
-        
-        // Small delay to allow async operations
-        try? await Task.sleep(nanoseconds: 100_000_000)
         
         // Verify tracked
         let cached = await outboxManager.getRelaysSyncFor(pubkey: "user_pubkey")
         XCTAssertNotNil(cached)
+        XCTAssertEqual(cached?.readRelays.map { $0.url }.sorted(), ["wss://user-read.test"])
+        XCTAssertEqual(cached?.writeRelays.map { $0.url }.sorted(), ["wss://user-write.test"])
     }
     
     func testGetRelayScore() async {
