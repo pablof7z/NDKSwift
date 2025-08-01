@@ -3,18 +3,29 @@ import XCTest
 
 final class ReactiveSubscriptionTests: XCTestCase {
     var ndk: NDK!
-    var cache: MemoryCache!
+    var cache: NDKSQLiteCache!
+    var tempDbPath: String!
     
     override func setUp() async throws {
         try await super.setUp()
-        cache = MemoryCache()
+        // Use SQLiteCache which supports reactive observation
+        tempDbPath = FileManager.default.temporaryDirectory
+            .appendingPathComponent("reactive-test-\(UUID().uuidString).db").path
+        cache = try await NDKSQLiteCache(path: tempDbPath, debugMode: true)
         ndk = NDK(cache: cache)
         ndk.outboxEnabled = false // Simplify test by disabling outbox
     }
     
     override func tearDown() async throws {
+        if let cache = cache {
+            try await cache.clear()
+        }
         ndk = nil
         cache = nil
+        // Clean up temp database
+        if let tempDbPath = tempDbPath {
+            try? FileManager.default.removeItem(atPath: tempDbPath)
+        }
         try await super.tearDown()
     }
     
