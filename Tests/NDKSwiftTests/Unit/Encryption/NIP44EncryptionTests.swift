@@ -43,7 +43,7 @@ final class NIP44EncryptionTests: XCTestCase {
         XCTAssertEqual(NIP44.calcPaddedLen(512), 512)
         XCTAssertEqual(NIP44.calcPaddedLen(513), 640)
         XCTAssertEqual(NIP44.calcPaddedLen(1024), 1024)
-        XCTAssertEqual(NIP44.calcPaddedLen(1025), 1152)
+        XCTAssertEqual(NIP44.calcPaddedLen(1025), 1280)
     }
     
     func testCalcPaddedLen_veryLargeMessages() {
@@ -274,7 +274,7 @@ final class NIP44EncryptionTests: XCTestCase {
                 XCTFail("Expected NIP44Error, got \(error)")
                 return
             }
-            XCTAssertEqual(nip44Error, .invalidDataSize)
+            XCTAssertEqual(nip44Error, .invalidPayloadSize)
         }
     }
     
