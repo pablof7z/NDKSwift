@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import NostrDB
 
 struct TagsIterator: IteratorProtocol {
     typealias Element = TagSequence

@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import NostrDB
 
 
 /// The sequence of strings in a single nostr event tag

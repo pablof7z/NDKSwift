@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import NostrDB
 
 #if TXNDEBUG
 fileprivate var txn_count: Int = 0
