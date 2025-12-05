@@ -340,7 +340,9 @@ class NdbNote: Codable, Equatable, Hashable {
                 // Finalize note, save length, and ensure it is higher than zero (which signals finalization has succeeded)
                 len = ndb_builder_finalize(&builder, &n.ptr, nil)
                 guard len > 0 else { throw InitError.generic }
-                
+
+                // SECURITY WARNING: Signature verification disabled - secp256k1 not available
+                // This note is NOT verified and should be treated as untrusted
                 // TODO: Re-enable signature verification after secp256k1 is available from NDK layer
                 /*
                 let scratch_buf_len = MAX_NOTE_SIZE
@@ -391,8 +393,10 @@ class NdbNote: Codable, Equatable, Hashable {
     
     // TODO: Re-enable signature verification after secp256k1 is available from NDK layer
     func verify() -> Bool {
-        // Signature verification disabled until secp256k1 is available
-        return true
+        // SECURITY: Signature verification disabled - secp256k1 not available
+        // Return false to indicate verification cannot be performed
+        // Events using this should handle unverified state appropriately
+        return false
         /*
         let scratch_buf_len = MAX_NOTE_SIZE
         let scratch_buf = malloc(scratch_buf_len)
