@@ -90,6 +90,7 @@ let package = Package(
                 .headerSearchPath("src"),
                 .headerSearchPath("flatcc"),
                 .headerSearchPath("ccan"),
+                .headerSearchPath("ccan/ccan"),
                 .define("MDB_USE_POSIX_SEM", to: "1"),
                 .define("HAVE_UNISTD_H", to: "1"),
             ]

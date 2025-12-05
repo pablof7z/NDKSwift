@@ -1,14 +1,19 @@
 //
 //  Ndb.swift
-//  damus
+//  NostrDB
 //
 //  Created by William Casarin on 2023-08-25.
 //
 
 import Foundation
-import OSLog
 
-fileprivate let APPLICATION_GROUP_IDENTIFIER = "group.com.damus"
+// Stub for Damus Log
+internal enum Log {
+    enum LogCategory { case storage, ndb }
+    static func error(_ msg: String, for cat: LogCategory, _ args: CVarArg...) {}
+    static func debug(_ msg: String, for cat: LogCategory, _ args: CVarArg...) {}
+    static func info(_ msg: String, for cat: LogCategory, _ args: CVarArg...) {}
+}
 
 enum NdbSearchOrder {
     case oldest_first
@@ -68,12 +73,16 @@ class Ndb {
     }
 
     static var db_path: String? {
-        // Use the `group.com.damus` container, so that it can be accessible from other targets
-        // e.g. The notification service extension needs to access Ndb data, which is done through this shared file container.
-        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: APPLICATION_GROUP_IDENTIFIER) else {
+        // Use app group container if available, otherwise fall back to documents directory
+        // This can be configured via NdbConfig in the future
+        if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.damus") {
+            return remove_file_prefix(containerURL.absoluteString)
+        }
+        // Fallback to documents directory
+        guard let path = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.absoluteString else {
             return nil
         }
-        return remove_file_prefix(containerURL.absoluteString)
+        return remove_file_prefix(path)
     }
     
     static private var db_files: [String] = ["data.mdb", "lock.mdb"]
@@ -754,6 +763,8 @@ class Ndb {
         }
     }
     
+    // TODO: Re-enable this after NostrFilter is available from NDK layer
+    /*
     private func waitWithoutTimeout(for noteId: NoteId) async throws(NdbLookupError) -> NdbTxn<NdbNote>? {
         do {
             for try await item in try self.subscribe(filters: [NostrFilter(ids: [noteId])]) {
@@ -777,7 +788,10 @@ class Ndb {
         }
         return nil
     }
+    */
     
+    // TODO: Re-enable this after NostrFilter is available from NDK layer
+    /*
     func waitFor(noteId: NoteId, timeout: TimeInterval = 10) async throws(NdbLookupError) -> NdbTxn<NdbNote>? {
         do {
             return try await withCheckedThrowingContinuation({ continuation in
@@ -803,7 +817,7 @@ class Ndb {
                         }
                     }
                 }
-                
+
                 let timeoutTask = Task {
                     try await Task.sleep(for: .seconds(Int(timeout)))
                     if !done {
@@ -821,6 +835,7 @@ class Ndb {
             else { throw .internalInconsistency }
         }
     }
+    */
     
     /// Determines if a given note was seen on a specific relay URL
     func was(noteKey: NoteKey, seenOn relayUrl: String, txn: SafeNdbTxn<()>? = nil) throws -> Bool {

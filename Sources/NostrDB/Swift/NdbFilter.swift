@@ -1,11 +1,43 @@
 //
 //  NdbFilter.swift
-//  damus
+//  NostrDB
 //
 //  Created by Daniel D'Aquino on 2025-06-02.
 //
 
 import Foundation
+
+// Stub NostrFilter for NostrDB - will be replaced by NDK layer
+struct NostrFilter {
+    let ids: [NoteId]?
+    let kinds: [NostrKind]?
+    let referenced_ids: [NoteId]?
+    let pubkeys: [Pubkey]?
+    let since: UInt64?
+    let until: UInt64?
+    let limit: Int?
+    let authors: [Pubkey]?
+    let hashtag: [String]?
+    let parameter: [String]?
+    let quotes: [NoteId]?
+
+    init(ids: [NoteId]? = nil, kinds: [NostrKind]? = nil, referenced_ids: [NoteId]? = nil,
+         pubkeys: [Pubkey]? = nil, since: UInt64? = nil, until: UInt64? = nil,
+         limit: Int? = nil, authors: [Pubkey]? = nil, hashtag: [String]? = nil,
+         parameter: [String]? = nil, quotes: [NoteId]? = nil) {
+        self.ids = ids
+        self.kinds = kinds
+        self.referenced_ids = referenced_ids
+        self.pubkeys = pubkeys
+        self.since = since
+        self.until = until
+        self.limit = limit
+        self.authors = authors
+        self.hashtag = hashtag
+        self.parameter = parameter
+        self.quotes = quotes
+    }
+}
 
 /// A safe Swift wrapper around `UnsafeMutablePointer<ndb_filter>` that manages memory automatically.
 ///
