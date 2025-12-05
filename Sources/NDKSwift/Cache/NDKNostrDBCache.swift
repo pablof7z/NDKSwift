@@ -207,18 +207,8 @@ public actor NDKNostrDBCache: NDKCache {
 
     /// Convert NdbNote to NDKEvent
     private func convertToNDKEvent(_ note: NdbNote) -> NDKEvent? {
-        // Convert tags
-        var tags: [[String]] = []
-        for tag in note.tags {
-            var tagArr: [String] = []
-            for elem in tag {
-                let str = elem.string()
-                tagArr.append(str)
-            }
-            if !tagArr.isEmpty {
-                tags.append(tagArr)
-            }
-        }
+        // Convert tags using built-in helper
+        let tags = note.tags.strings()
 
         // Convert ID, pubkey, and sig to hex strings
         let id = dataToHex(note.id.id)
