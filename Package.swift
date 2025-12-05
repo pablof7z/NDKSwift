@@ -24,7 +24,6 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/anquii/CryptoSwiftWrapper.git", from: "1.4.3"),
-        .package(url: "https://github.com/jb55/secp256k1.swift.git", branch: "main"),
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "6.29.3"),
         .package(url: "https://github.com/pablof7z/CashuSwift.git", branch: "main"),
     ],
@@ -33,9 +32,7 @@ let package = Package(
         // Targets can depend on other targets in this package and products from dependencies.
         .target(
             name: "NostrDB",
-            dependencies: [
-                .product(name: "secp256k1", package: "secp256k1.swift"),
-            ],
+            dependencies: [],
             path: "Sources/NostrDB",
             exclude: [
                 "Swift",
@@ -102,7 +99,6 @@ let package = Package(
             dependencies: [
                 "NostrDB",
                 .product(name: "CryptoSwiftWrapper", package: "CryptoSwiftWrapper"),
-                .product(name: "secp256k1", package: "secp256k1.swift"),
                 .product(name: "GRDB", package: "GRDB.swift"),
                 .product(name: "CashuSwift", package: "CashuSwift"),
             ],
