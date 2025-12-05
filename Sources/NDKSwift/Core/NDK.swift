@@ -147,6 +147,12 @@ public final class NDK {
 
     // MARK: - Initialization
 
+    /// Initialize NDK with a custom cache instance
+    /// - Parameters:
+    ///   - relayUrls: Initial relay URLs to connect to
+    ///   - signer: Optional signer for signing events
+    ///   - cache: Custom cache instance. If nil, uses MemoryCache
+    ///   - signatureVerificationConfig: Configuration for signature verification
     public init(
         relayUrls: [RelayURL] = [],
         signer: NDKSigner? = nil,
@@ -189,6 +195,29 @@ public final class NDK {
         self.initialRelayUrls = relayUrls
     }
 
+    /// Initialize NDK with a specific cache type
+    /// - Parameters:
+    ///   - relayUrls: Initial relay URLs to connect to
+    ///   - signer: Optional signer for signing events
+    ///   - cacheType: Type of cache to use (default: .sqlite)
+    ///   - cachePath: Optional path for persistent caches (SQLite and NostrDB)
+    ///   - signatureVerificationConfig: Configuration for signature verification
+    /// - Throws: Cache initialization errors
+    public convenience init(
+        relayUrls: [RelayURL] = [],
+        signer: NDKSigner? = nil,
+        cacheType: NDKCacheType,
+        cachePath: String? = nil,
+        signatureVerificationConfig: NDKSignatureVerificationConfig = .default
+    ) async throws {
+        let cache = try await createCache(type: cacheType, path: cachePath)
+        self.init(
+            relayUrls: relayUrls,
+            signer: signer,
+            cache: cache,
+            signatureVerificationConfig: signatureVerificationConfig
+        )
+    }
 
     // MARK: - Relay Management (Delegated to Pool)
 
