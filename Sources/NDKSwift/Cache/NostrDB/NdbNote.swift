@@ -9,17 +9,51 @@ import Foundation
 import NaturalLanguage
 import CommonCrypto
 import CryptoKit
+import NostrDB
 
 // Stub types for Damus dependencies - will be replaced by NDK layer
-struct Keypair {
-    let pubkey: Pubkey
-    let privkey: Privkey?
+// These are internal to avoid conflicts with NDKSwift types
+internal struct NdbPubkey: Equatable, Codable {
+    let data: Data
+    init(_ data: Data) { self.data = data }
+
+    var id: Data { data }
+    var bytes: [UInt8] { [UInt8](data) }
+
+    func withUnsafePointer<T>(_ body: (UnsafeRawPointer) throws -> T) rethrows -> T {
+        try data.withUnsafeBytes { try body($0.baseAddress!) }
+    }
 }
-struct Privkey {
+internal struct NdbNoteId: Equatable, Hashable, Codable {
+    let data: Data
+    init(_ data: Data) { self.data = data }
+
+    var id: Data { data }
+
+    func withUnsafePointer<T>(_ body: (UnsafeRawPointer) throws -> T) rethrows -> T {
+        try data.withUnsafeBytes { try body($0.baseAddress!) }
+    }
+}
+internal struct NdbSignature: Codable {
+    let data: Data
+    init(_ data: Data) { self.data = data }
+}
+// NdbProfileRecord is defined in NdbProfile.swift as a FlatBuffer type
+// We'll use a different name for our wrapper to avoid conflicts
+internal struct NdbCachedProfile {
+    let profile: NdbProfile
+    let lastFetch: Date
+    let receivedAt: Date
+}
+internal struct NdbKeypair {
+    let pubkey: NdbPubkey
+    let privkey: NdbPrivkey?
+}
+internal struct NdbPrivkey {
     let id: Data
     var bytes: [UInt8] { Array(id) }
 }
-struct NostrKind {
+internal struct NostrKind: Equatable {
     let rawValue: UInt32
     static let text = NostrKind(rawValue: 1)
     static let chat = NostrKind(rawValue: 42)
@@ -33,6 +67,27 @@ struct NostrKind {
     static let zap = NostrKind(rawValue: 9735)
     init?(rawValue: UInt32) { self.rawValue = rawValue }
 }
+internal struct NdbInvoice {
+    let description: NdbInvoiceDescription
+    let amount: NdbAmount
+}
+internal struct NdbInvoiceDescription {
+    let description: String
+}
+internal struct NdbAmount {
+    let amount: UInt64
+}
+
+// Typealiases for backward compatibility within NostrDB files
+// Note: Signature is NOT aliased to avoid conflicts with NDKSwift's Signature type
+internal typealias Pubkey = NdbPubkey
+internal typealias NoteId = NdbNoteId
+internal typealias ProfileRecord = NdbCachedProfile
+internal typealias Keypair = NdbKeypair
+internal typealias Privkey = NdbPrivkey
+internal typealias Invoice = NdbInvoice
+internal typealias InvoiceDescription = NdbInvoiceDescription
+internal typealias Amount = NdbAmount
 struct ThreadReply {
     let reply: ReplyRef
     let root: ReplyRef?
@@ -44,9 +99,70 @@ struct ReplyRef {
 struct CommentItem {
     let content: String
 }
+struct References<T>: Collection {
+    let tags: TagsSequence
 
-func decrypt_dm(_ privkey: Privkey?, pubkey: Pubkey, content: String, encoding: String.Encoding) -> String? {
+    var startIndex: Int { 0 }
+    var endIndex: Int { 0 }
+
+    func index(after i: Int) -> Int { i + 1 }
+
+    subscript(position: Int) -> T {
+        fatalError("References subscript not implemented")
+    }
+
+    var first: T? { nil }
+    var last: T? { nil }
+}
+struct QuoteId {
+    var note_id: NoteId { NoteId(Data()) }
+}
+struct NoteRef {}
+struct FollowRef {}
+struct Hashtag {}
+struct ReplaceableParam {}
+struct MuteItem {}
+struct RefId {}
+
+enum DmEncoding {
+    case base64
+    case utf8
+}
+
+func decrypt_dm(_ privkey: Privkey?, pubkey: Pubkey, content: String, encoding: DmEncoding) -> String? {
     return nil
+}
+
+func hexchar(_ val: UInt8) -> UInt8 {
+    if val < 10 {
+        return 48 + val  // '0' + val
+    } else {
+        return 97 + val - 10  // 'a' + (val - 10)
+    }
+}
+
+func hex_decode(_ str: String) -> [UInt8]? {
+    guard str.count % 2 == 0 else { return nil }
+    var bytes: [UInt8] = []
+    var index = str.startIndex
+    while index < str.endIndex {
+        let nextIndex = str.index(index, offsetBy: 2)
+        let byteString = String(str[index..<nextIndex])
+        guard let byte = UInt8(byteString, radix: 16) else { return nil }
+        bytes.append(byte)
+        index = nextIndex
+    }
+    return bytes
+}
+
+func localeToLanguage(_ locale: String) -> String {
+    return locale
+}
+
+extension Data {
+    var byteArray: [UInt8] {
+        return [UInt8](self)
+    }
 }
 
 // Stub secp256k1 constants - will be replaced by NDK layer
@@ -155,7 +271,7 @@ class NdbNote: Codable, Equatable, Hashable {
         memcmp(self.raw_note_id, other.raw_note_id, 32) == 0
     }
 
-    var sig: Signature {
+    var sig: NdbSignature {
         .init(Data(bytes: ndb_note_sig(note.ptr), count: 64))
     }
     
@@ -222,7 +338,7 @@ class NdbNote: Codable, Equatable, Hashable {
         let tags = try container.decode([[String]].self, forKey: .tags)
         let createdAt = try container.decode(UInt32.self, forKey: .created_at)
         let noteId = try container.decode(NoteId.self, forKey: .id)
-        let signature = try container.decode(Signature.self, forKey: .sig)
+        let signature = try container.decode(NdbSignature.self, forKey: .sig)
         
         guard let note = NdbNote.init(content: content, author: pubkey, kind: kind, tags: tags, createdAt: createdAt, id: noteId, sig: signature) else {
             throw DecodingError.initializationFailed
@@ -247,7 +363,7 @@ class NdbNote: Codable, Equatable, Hashable {
     
     fileprivate enum NoteConstructionMaterial {
         case keypair(Keypair)
-        case manual(Pubkey, Signature, NoteId)
+        case manual(Pubkey, NdbSignature, NoteId)
         
         var pubkey: Pubkey {
             switch self {
@@ -380,7 +496,7 @@ class NdbNote: Codable, Equatable, Hashable {
         self.init(content: content, noteConstructionMaterial: .keypair(keypair), kind: kind, tags: tags, createdAt: createdAt)
     }
     
-    convenience init?(content: String, author: Pubkey, kind: UInt32 = 1, tags: [[String]] = [], createdAt: UInt32 = UInt32(Date().timeIntervalSince1970), id: NoteId, sig: Signature) {
+    convenience init?(content: String, author: Pubkey, kind: UInt32 = 1, tags: [[String]] = [], createdAt: UInt32 = UInt32(Date().timeIntervalSince1970), id: NoteId, sig: NdbSignature) {
         self.init(content: content, noteConstructionMaterial: .manual(author, sig, id), kind: kind, tags: tags, createdAt: createdAt)
     }
 
@@ -468,9 +584,10 @@ extension NdbNote {
     func is_hellthread(max_pubkeys: Int) -> Bool {
         switch known_kind {
         case .text, .boost, .like, .zap:
-            Set(referenced_pubkeys).count > max_pubkeys
+            // TODO: Implement proper set counting from References
+            return false
         default:
-            false
+            return false
         }
     }
 

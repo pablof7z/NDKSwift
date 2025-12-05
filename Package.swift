@@ -35,8 +35,6 @@ let package = Package(
             dependencies: [],
             path: "Sources/NostrDB",
             exclude: [
-                "Swift",
-                "FlatBuffers",
                 "ccan/ccan/crypto/sha256/benchmarks",
                 "ccan/ccan/tal/benchmark",
                 "ccan/ccan/htable/tools",

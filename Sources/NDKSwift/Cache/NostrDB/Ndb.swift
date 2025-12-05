@@ -6,6 +6,10 @@
 //
 
 import Foundation
+import NostrDB
+
+typealias NoteKey = UInt64
+typealias ProfileKey = UInt64
 
 // Stub for Damus Log
 internal enum Log {
@@ -420,7 +424,7 @@ class Ndb {
         }
     }
 
-    private func lookup_profile_by_key_inner<Y>(_ key: ProfileKey, txn: NdbTxn<Y>) -> ProfileRecord? {
+    private func lookup_profile_by_key_inner<Y>(_ key: ProfileKey, txn: NdbTxn<Y>) -> NdbCachedProfile? {
         var size: Int = 0
         guard let profile_p = ndb_get_profile_by_key(&txn.txn, key, &size) else {
             return nil
@@ -429,11 +433,11 @@ class Ndb {
         return profile_flatbuf_to_record(ptr: profile_p, size: size, key: key)
     }
 
-    private func profile_flatbuf_to_record(ptr: UnsafeMutableRawPointer, size: Int, key: UInt64) -> ProfileRecord? {
+    private func profile_flatbuf_to_record(ptr: UnsafeMutableRawPointer, size: Int, key: UInt64) -> NdbCachedProfile? {
         do {
             var buf = ByteBuffer(assumingMemoryBound: ptr, capacity: size)
-            let rec: NdbProfileRecord = try getDebugCheckedRoot(byteBuffer: &buf)
-            return ProfileRecord(data: rec, key: key)
+            let rec: NdbProfile = try getDebugCheckedRoot(byteBuffer: &buf)
+            return NdbCachedProfile(profile: rec, lastFetch: Date(), receivedAt: Date())
         } catch {
             // Handle error appropriately
             print("UNUSUAL: \(error)")
@@ -441,8 +445,8 @@ class Ndb {
         }
     }
 
-    private func lookup_note_with_txn_inner<Y>(id: NoteId, txn: NdbTxn<Y>) -> NdbNote? {
-        return id.id.withUnsafeBytes { (ptr: UnsafeRawBufferPointer) -> NdbNote? in
+    private func lookup_note_with_txn_inner<Y>(id: NdbNoteId, txn: NdbTxn<Y>) -> NdbNote? {
+        return id.data.withUnsafeBytes { (ptr: UnsafeRawBufferPointer) -> NdbNote? in
             var key: UInt64 = 0
             var size: Int = 0
             guard let baseAddress = ptr.baseAddress,
@@ -454,8 +458,8 @@ class Ndb {
         }
     }
 
-    private func lookup_profile_with_txn_inner<Y>(pubkey: Pubkey, txn: NdbTxn<Y>) -> ProfileRecord? {
-        return pubkey.id.withUnsafeBytes { (ptr: UnsafeRawBufferPointer) -> ProfileRecord? in
+    private func lookup_profile_with_txn_inner<Y>(pubkey: NdbPubkey, txn: NdbTxn<Y>) -> NdbCachedProfile? {
+        return pubkey.data.withUnsafeBytes { (ptr: UnsafeRawBufferPointer) -> NdbCachedProfile? in
             var size: Int = 0
             var key: UInt64 = 0
 
@@ -469,17 +473,17 @@ class Ndb {
         }
     }
 
-    func lookup_profile_by_key_with_txn<Y>(key: ProfileKey, txn: NdbTxn<Y>) -> ProfileRecord? {
+    func lookup_profile_by_key_with_txn<Y>(key: ProfileKey, txn: NdbTxn<Y>) -> NdbCachedProfile? {
         lookup_profile_by_key_inner(key, txn: txn)
     }
 
-    func lookup_profile_by_key(key: ProfileKey) -> NdbTxn<ProfileRecord?>? {
+    func lookup_profile_by_key(key: ProfileKey) -> NdbTxn<NdbCachedProfile?>? {
         return NdbTxn(ndb: self) { txn in
             lookup_profile_by_key_inner(key, txn: txn)
         }
     }
 
-    func lookup_note_with_txn<Y>(id: NoteId, txn: NdbTxn<Y>) -> NdbNote? {
+    func lookup_note_with_txn<Y>(id: NdbNoteId, txn: NdbTxn<Y>) -> NdbNote? {
         lookup_note_with_txn_inner(id: id, txn: txn)
     }
 
@@ -494,7 +498,7 @@ class Ndb {
     }
 
     func lookup_profile_key_with_txn<Y>(_ pubkey: Pubkey, txn: NdbTxn<Y>) -> ProfileKey? {
-        return pubkey.id.withUnsafeBytes { (ptr: UnsafeRawBufferPointer) -> NoteKey? in
+        return pubkey.data.withUnsafeBytes { (ptr: UnsafeRawBufferPointer) -> NoteKey? in
             guard let p = ptr.baseAddress else { return nil }
             let r = ndb_get_profilekey_by_pubkey(&txn.txn, p)
             if r == 0 {
@@ -504,9 +508,9 @@ class Ndb {
         }
     }
 
-    func lookup_note_key_with_txn(_ id: NoteId, txn: some RawNdbTxnAccessible) -> NoteKey? {
+    func lookup_note_key_with_txn(_ id: NdbNoteId, txn: some RawNdbTxnAccessible) -> NoteKey? {
         guard !closed else { return nil }
-        return id.id.withUnsafeBytes { (ptr: UnsafeRawBufferPointer) -> NoteKey? in
+        return id.data.withUnsafeBytes { (ptr: UnsafeRawBufferPointer) -> NoteKey? in
             guard let p = ptr.baseAddress else {
                 return nil
             }
@@ -518,7 +522,7 @@ class Ndb {
         }
     }
 
-    func lookup_note_key(_ id: NoteId) -> NoteKey? {
+    func lookup_note_key(_ id: NdbNoteId) -> NoteKey? {
         guard let txn = NdbTxn(ndb: self, with: { txn in
             lookup_note_key_with_txn(id, txn: txn)
         }) else {
@@ -528,19 +532,19 @@ class Ndb {
         return txn.value
     }
 
-    func lookup_note(_ id: NoteId, txn_name: String? = nil) -> NdbTxn<NdbNote?>? {
+    func lookup_note(_ id: NdbNoteId, txn_name: String? = nil) -> NdbTxn<NdbNote?>? {
         NdbTxn(ndb: self, name: txn_name) { txn in
             lookup_note_with_txn_inner(id: id, txn: txn)
         }
     }
 
-    func lookup_profile(_ pubkey: Pubkey, txn_name: String? = nil) -> NdbTxn<ProfileRecord?>? {
+    func lookup_profile(_ pubkey: NdbPubkey, txn_name: String? = nil) -> NdbTxn<NdbCachedProfile?>? {
         NdbTxn(ndb: self, name: txn_name) { txn in
             lookup_profile_with_txn_inner(pubkey: pubkey, txn: txn)
         }
     }
 
-    func lookup_profile_with_txn<Y>(_ pubkey: Pubkey, txn: NdbTxn<Y>) -> ProfileRecord? {
+    func lookup_profile_with_txn<Y>(_ pubkey: NdbPubkey, txn: NdbTxn<Y>) -> NdbCachedProfile? {
         lookup_profile_with_txn_inner(pubkey: pubkey, txn: txn)
     }
     
@@ -765,7 +769,7 @@ class Ndb {
     
     // TODO: Re-enable this after NostrFilter is available from NDK layer
     /*
-    private func waitWithoutTimeout(for noteId: NoteId) async throws(NdbLookupError) -> NdbTxn<NdbNote>? {
+    private func waitWithoutTimeout(for noteId: NdbNoteId) async throws(NdbLookupError) -> NdbTxn<NdbNote>? {
         do {
             for try await item in try self.subscribe(filters: [NostrFilter(ids: [noteId])]) {
                 switch item {
@@ -792,7 +796,7 @@ class Ndb {
     
     // TODO: Re-enable this after NostrFilter is available from NDK layer
     /*
-    func waitFor(noteId: NoteId, timeout: TimeInterval = 10) async throws(NdbLookupError) -> NdbTxn<NdbNote>? {
+    func waitFor(noteId: NdbNoteId, timeout: TimeInterval = 10) async throws(NdbLookupError) -> NdbTxn<NdbNote>? {
         do {
             return try await withCheckedThrowingContinuation({ continuation in
                 var done = false

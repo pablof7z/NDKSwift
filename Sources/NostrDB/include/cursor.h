@@ -2,7 +2,7 @@
 #ifndef JB55_CURSOR_H
 #define JB55_CURSOR_H
 
-#include "ccan/likely/likely.h"
+#include "../ccan/ccan/likely/likely.h"
 
 #include <stdio.h>
 #include <inttypes.h>

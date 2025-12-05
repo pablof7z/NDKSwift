@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import NostrDB
 
 struct NdbStrIter: IteratorProtocol {
     typealias Element = CChar

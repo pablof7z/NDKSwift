@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import NostrDB
 
 // Stub NostrFilter for NostrDB - will be replaced by NDK layer
 struct NostrFilter {
