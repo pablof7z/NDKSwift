@@ -45,7 +45,7 @@ let package = Package(
                 // C sources - root level
                 "mdb.c",
                 "midl.c",
-                "hex.c",
+                // "hex.c", // Excluded - using hex.h inline implementations
                 "bolt11.c",
                 "list.c",
                 "mem.c",
