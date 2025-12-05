@@ -47,7 +47,7 @@ class Ndb {
     }
     
     static func safemode() -> Ndb? {
-        guard let path = db_path ?? old_db_path else { return nil }
+        guard let path = db_path() ?? old_db_path else { return nil }
 
         // delete the database and start fresh
         if Self.db_files_exist(path: path) {
@@ -72,10 +72,10 @@ class Ndb {
         return remove_file_prefix(path)
     }
 
-    static var db_path: String? {
+    static func db_path(appGroupIdentifier: String? = nil) -> String? {
         // Use app group container if available, otherwise fall back to documents directory
-        // This can be configured via NdbConfig in the future
-        if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.damus") {
+        if let appGroup = appGroupIdentifier,
+           let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup) {
             return remove_file_prefix(containerURL.absoluteString)
         }
         // Fallback to documents directory
@@ -110,12 +110,12 @@ class Ndb {
             }
         }
         
-        guard let db_path = Self.db_path,
+        guard let db_path = Self.db_path(),
               owns_db_file || Self.db_files_exist(path: db_path) else {
             return nil      // If the caller claims to not own the DB file, and the DB files do not exist, then we should not initialize Ndb
         }
 
-        guard let path = path.map(remove_file_prefix) ?? Ndb.db_path else {
+        guard let path = path.map(remove_file_prefix) ?? Ndb.db_path() else {
             return nil
         }
 
@@ -170,12 +170,12 @@ class Ndb {
     }
     
     private static func migrate_db_location_if_needed() throws {
-        guard let old_db_path, let db_path else {
+        guard let old_db_path, let db_path = db_path() else {
             throw Errors.cannot_find_db_path
         }
-        
+
         let file_manager = FileManager.default
-        
+
         let old_db_files_exist = Self.db_files_exist(path: old_db_path)
         let new_db_files_exist = Self.db_files_exist(path: db_path)
         
