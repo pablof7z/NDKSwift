@@ -6,45 +6,75 @@ import Foundation
 /// It implements the NDKCache protocol and provides high-performance event
 /// storage with native nostrdb querying capabilities.
 ///
-/// ## Implementation Status
-/// This is a stub implementation. The full integration with NostrDB C library
-/// will be completed in a follow-up task. For now, it provides protocol-compliant
-/// behavior using the default implementations from NDKCache.
-///
-/// ## Future Features
+/// ## Features
 /// - Fast event storage and retrieval using nostrdb's C-based engine
-/// - Native filter-to-query conversion
-/// - Automatic event indexing for full-text search
+/// - Persistent storage with LMDB backend
+/// - High-performance event indexing
 /// - Memory-efficient event management
 ///
 /// ## Usage
 /// ```swift
-/// let cache = NDKNostrDBCache(path: "path/to/db")
+/// let cache = try await NDKNostrDBCache(path: "path/to/db")
 /// try await cache.saveEvent(event)
-/// let events = try await cache.queryEvents(filter)
+/// let event = await cache.getEvent(id: eventId)
 /// ```
 public actor NDKNostrDBCache: NDKCache {
-    private let path: String?
+    private var ndb: Ndb?
     private var events: [String: NDKEvent] = [:]
 
     /// Initialize a new NostrDB cache
     /// - Parameter path: Optional path to the database directory. If nil, uses the default location.
-    public init(path: String? = nil) {
-        self.path = path
+    /// - Throws: NDKNostrDBCacheError if the database cannot be opened
+    public init(path: String? = nil) async throws {
+        self.ndb = Ndb(path: path)
+        if self.ndb == nil {
+            throw NDKNostrDBCacheError.failedToOpen
+        }
     }
 
     // MARK: - Event Operations
 
     public func saveEvent(_ event: NDKEvent) async throws {
-        // TODO: Integrate with NostrDB C library
-        // For now, store in memory
+        guard let ndb = ndb else {
+            throw NDKNostrDBCacheError.notInitialized
+        }
+
+        // Convert NDKEvent to JSON for nostrdb processing
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(event)
+        guard let json = String(data: data, encoding: .utf8) else {
+            throw NDKNostrDBCacheError.encodingFailed
+        }
+
+        // Process the event through nostrdb
+        _ = ndb.process_event(json)
+        // Note: process_event returns false for duplicates or invalid events
+        // This is not necessarily an error, so we don't throw
+
+        // Also keep in memory for queryEvents (until we implement full nostrdb queries)
         events[event.id] = event
     }
 
     public func getEvent(id: String) async -> NDKEvent? {
-        // TODO: Query from NostrDB
-        // For now, return from memory
-        return events[id]
+        guard let ndb = ndb else { return nil }
+
+        // Convert hex ID to NdbNoteId
+        guard let idData = hexToData(id) else { return nil }
+        let noteId = NdbNoteId(idData)
+
+        // Lookup the note from nostrdb
+        guard let txn = ndb.lookup_note(noteId) else {
+            // Fall back to in-memory cache if not in nostrdb yet
+            return events[id]
+        }
+
+        let note = txn.unsafeUnownedValue
+        guard let note = note else {
+            return events[id]
+        }
+
+        // Convert NdbNote to NDKEvent
+        return convertToNDKEvent(note)
     }
 
     public func queryEvents(_ filter: NDKFilter) async throws -> [NDKEvent] {
@@ -88,16 +118,18 @@ public actor NDKNostrDBCache: NDKCache {
     }
 
     public func deleteEvent(id: String) async throws {
-        // TODO: Handle deletion in NostrDB
-        // For now, remove from memory
+        // Note: NostrDB doesn't support deletion of individual events
+        // Events are immutable once stored in LMDB
+        // We only remove from in-memory cache
         events.removeValue(forKey: id)
     }
 
     // MARK: - Cache Management
 
     public func clear() async throws {
-        // TODO: Clear NostrDB database
-        // For now, clear memory
+        // Note: NostrDB doesn't provide a clear/reset API
+        // To clear the database, you would need to delete the LMDB files
+        // We can only clear the in-memory cache
         events.removeAll()
     }
 
@@ -170,4 +202,69 @@ public actor NDKNostrDBCache: NDKCache {
 
         return (metadata: metadata, updatedAt: latestEvent.createdAt, eventId: latestEvent.id)
     }
+
+    // MARK: - Helper Methods
+
+    /// Convert NdbNote to NDKEvent
+    private func convertToNDKEvent(_ note: NdbNote) -> NDKEvent? {
+        // Convert tags
+        var tags: [[String]] = []
+        for tag in note.tags {
+            var tagArr: [String] = []
+            for elem in tag {
+                let str = elem.string()
+                tagArr.append(str)
+            }
+            if !tagArr.isEmpty {
+                tags.append(tagArr)
+            }
+        }
+
+        // Convert ID, pubkey, and sig to hex strings
+        let id = dataToHex(note.id.id)
+        let pubkey = dataToHex(note.pubkey.data)
+        let sig = dataToHex(note.sig.data)
+
+        return NDKEvent(
+            id: id,
+            pubkey: pubkey,
+            createdAt: Timestamp(note.created_at),
+            kind: Kind(note.kind),
+            tags: tags,
+            content: note.content,
+            sig: sig
+        )
+    }
+
+    /// Convert hex string to Data
+    private func hexToData(_ hex: String) -> Data? {
+        var data = Data(capacity: hex.count / 2)
+        var index = hex.startIndex
+
+        while index < hex.endIndex {
+            let nextIndex = hex.index(index, offsetBy: 2, limitedBy: hex.endIndex) ?? hex.endIndex
+            let byteString = String(hex[index..<nextIndex])
+            guard let byte = UInt8(byteString, radix: 16) else {
+                return nil
+            }
+            data.append(byte)
+            index = nextIndex
+        }
+
+        return data.count == hex.count / 2 ? data : nil
+    }
+
+    /// Convert Data to hex string
+    private func dataToHex(_ data: Data) -> String {
+        return data.map { String(format: "%02x", $0) }.joined()
+    }
+}
+
+// MARK: - Error Types
+
+/// Errors that can occur when using NDKNostrDBCache
+public enum NDKNostrDBCacheError: Error {
+    case failedToOpen
+    case notInitialized
+    case encodingFailed
 }
