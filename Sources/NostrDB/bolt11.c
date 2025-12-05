@@ -12,7 +12,7 @@
 #include "bech32.h"
 #include "utf8.h"
 #include "compiler.h"
-#include "endian.h"
+#include "ccan/endian/endian.h"
 #include "list.h"
 #include "talstr.h"
 #include "tal.h"

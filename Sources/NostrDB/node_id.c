@@ -39,7 +39,7 @@ bool point32_from_node_id(struct point32 *key, const struct node_id *id)
 char *tal_hexstr(const tal_t *ctx, const void *data, size_t len)
 {
     char *str = tal_arr(ctx, char, hex_str_size(len));
-    hex_encode(data, len, str, hex_str_size(len));
+    hex_encode(data, len, str);
     return str;
 }
 

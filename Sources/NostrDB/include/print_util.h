@@ -19,6 +19,20 @@ static void ndb_print_text_search_key(int bytes_size, struct ndb_text_search_key
 
 }
 
+static void ndb_print_text_search_result(struct ndb_txn *txn, struct ndb_text_search_result *result)
+{
+	char hex_id[65];
+	struct ndb_note *note;
+
+	note = ndb_get_note_by_key(txn, result->key.note_id, NULL);
+	if (note) {
+		hex_encode(ndb_note_id(note), 32, hex_id);
+		printf("note_id:%s prefix:%d ", hex_id, result->prefix_chars);
+	}
+	ndb_print_text_search_key(0, &result->key);
+	printf("\n");
+}
+
 static void print_tag_kv(struct ndb_txn *txn, MDB_val *k, MDB_val *v)
 {
 	char hex_id[65];

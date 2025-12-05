@@ -142,7 +142,7 @@ static int push_bech32_mention(struct ndb_content_parser *p, struct ndb_str_bloc
 		goto fail;
 	
 	if (bech32_decode_len(prefix, u5.p, &u5_out_len, bech32->str,
-			      bech32->len, MAX_PREFIX) == BECH32_ENCODING_NONE) {
+			      bech32->len) == BECH32_ENCODING_NONE) {
 		goto fail;
 	}
 
@@ -180,7 +180,8 @@ static int push_invoice_str(struct ndb_content_parser *p, struct ndb_str_block *
 	struct bolt11 *bolt11;
 	char *fail;
 
-	if (!(bolt11 = bolt11_decode_minimal(NULL, str->str, &fail)))
+	u5 *sigdata = NULL;
+	if (!(bolt11 = bolt11_decode_nosig(NULL, str->str, &sigdata, &fail)))
 		return 0;
 
 	start = p->buffer.p;

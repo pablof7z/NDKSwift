@@ -327,7 +327,7 @@ int parse_nostr_bech32(unsigned char *buf, int buflen,
 	char prefix[MAX_PREFIX];
 	
 	if (bech32_decode_len(prefix, u5, &u5_out_len, (const char*)start,
-			      parsed_len, MAX_PREFIX) == BECH32_ENCODING_NONE)
+			      parsed_len) == BECH32_ENCODING_NONE)
 	{
 		return 0;
 	}
