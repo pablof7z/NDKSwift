@@ -24,7 +24,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/anquii/CryptoSwiftWrapper.git", from: "1.4.3"),
-        .package(url: "https://github.com/zeugmaster/swift-secp256k1.git", branch: "main"),
+        .package(url: "https://github.com/jb55/secp256k1.swift.git", branch: "main"),
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "6.29.3"),
         .package(url: "https://github.com/pablof7z/CashuSwift.git", branch: "main"),
     ],
@@ -32,10 +32,77 @@ let package = Package(
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         // Targets can depend on other targets in this package and products from dependencies.
         .target(
+            name: "NostrDB",
+            dependencies: [
+                .product(name: "secp256k1", package: "secp256k1.swift"),
+            ],
+            path: "Sources/NostrDB",
+            exclude: [
+                "Swift",
+                "FlatBuffers",
+                "ccan/ccan/crypto/sha256/benchmarks",
+                "ccan/ccan/tal/benchmark",
+                "ccan/ccan/htable/tools",
+            ],
+            sources: [
+                // C sources - root level
+                "mdb.c",
+                "midl.c",
+                "hex.c",
+                "bolt11.c",
+                "list.c",
+                "mem.c",
+                "hash_u5.c",
+                "talstr.c",
+                "utf8.c",
+                "bech32.c",
+                "bech32_util.c",
+                "tal.c",
+                "take.c",
+                "amount.c",
+                "error.c",
+                "node_id.c",
+                "ndb.c",
+                // C sources - src/
+                "src/nostrdb.c",
+                "src/block.c",
+                "src/content_parser.c",
+                "src/nostr_bech32.c",
+                "src/invoice.c",
+                // FlatCC sources
+                "flatcc/builder.c",
+                "flatcc/emitter.c",
+                "flatcc/json_parser.c",
+                "flatcc/json_printer.c",
+                "flatcc/refmap.c",
+                "flatcc/verifier.c",
+                // CCAN sources
+                "ccan/ccan/crypto/sha256/sha256.c",
+                "ccan/ccan/htable/htable.c",
+                "ccan/ccan/list/list.c",
+                "ccan/ccan/mem/mem.c",
+                "ccan/ccan/str/str.c",
+                "ccan/ccan/str/debug.c",
+                "ccan/ccan/tal/tal.c",
+                "ccan/ccan/tal/str/str.c",
+                "ccan/ccan/take/take.c",
+            ],
+            publicHeadersPath: "include",
+            cSettings: [
+                .headerSearchPath("."),
+                .headerSearchPath("src"),
+                .headerSearchPath("flatcc"),
+                .headerSearchPath("ccan"),
+                .define("MDB_USE_POSIX_SEM", to: "1"),
+                .define("HAVE_UNISTD_H", to: "1"),
+            ]
+        ),
+        .target(
             name: "NDKSwift",
             dependencies: [
+                "NostrDB",
                 .product(name: "CryptoSwiftWrapper", package: "CryptoSwiftWrapper"),
-                .product(name: "secp256k1", package: "swift-secp256k1"),
+                .product(name: "secp256k1", package: "secp256k1.swift"),
                 .product(name: "GRDB", package: "GRDB.swift"),
                 .product(name: "CashuSwift", package: "CashuSwift"),
             ],
