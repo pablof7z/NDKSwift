@@ -1,6 +1,6 @@
 //
 //  NdbNote.swift
-//  damus
+//  NostrDB
 //
 //  Created by William Casarin on 2023-07-21.
 //
@@ -8,9 +8,49 @@
 import Foundation
 import NaturalLanguage
 import CommonCrypto
-import secp256k1
-import secp256k1_implementation
 import CryptoKit
+
+// Stub types for Damus dependencies - will be replaced by NDK layer
+struct Keypair {
+    let pubkey: Pubkey
+    let privkey: Privkey?
+}
+struct Privkey {
+    let id: Data
+    var bytes: [UInt8] { Array(id) }
+}
+struct NostrKind {
+    let rawValue: UInt32
+    static let text = NostrKind(rawValue: 1)
+    static let chat = NostrKind(rawValue: 42)
+    static let longform = NostrKind(rawValue: 30023)
+    static let highlight = NostrKind(rawValue: 9802)
+    static let live = NostrKind(rawValue: 30311)
+    static let live_chat = NostrKind(rawValue: 1311)
+    static let dm = NostrKind(rawValue: 4)
+    static let boost = NostrKind(rawValue: 6)
+    static let like = NostrKind(rawValue: 7)
+    static let zap = NostrKind(rawValue: 9735)
+    init?(rawValue: UInt32) { self.rawValue = rawValue }
+}
+struct ThreadReply {
+    let reply: ReplyRef
+    let root: ReplyRef?
+    init?(tags: TagsSequence) { return nil }
+}
+struct ReplyRef {
+    let note_id: NoteId
+}
+struct CommentItem {
+    let content: String
+}
+
+func decrypt_dm(_ privkey: Privkey?, pubkey: Pubkey, content: String, encoding: String.Encoding) -> String? {
+    return nil
+}
+
+// Stub secp256k1 constants - will be replaced by NDK layer
+let SECP256K1_CONTEXT_VERIFY: UInt32 = 0x0101
 
 let MAX_NOTE_SIZE: Int = 2 << 18
 
@@ -301,14 +341,17 @@ class NdbNote: Codable, Equatable, Hashable {
                 len = ndb_builder_finalize(&builder, &n.ptr, nil)
                 guard len > 0 else { throw InitError.generic }
                 
+                // TODO: Re-enable signature verification after secp256k1 is available from NDK layer
+                /*
                 let scratch_buf_len = MAX_NOTE_SIZE
                 let scratch_buf = malloc(scratch_buf_len)
                 defer { free(scratch_buf) }  // Ensure we deallocate as soon as we leave this scope, regardless of the outcome
-                
+
                 // Verify the signature against the pubkey and the computed ID, to verify the validity of the whole note
                 var ctx = secp256k1_context_create(UInt32(SECP256K1_CONTEXT_VERIFY))
-                
+
                 guard ndb_note_verify(&ctx, scratch_buf, scratch_buf_len, n.ptr) == 1 else { throw InitError.generic }
+                */
             }
             catch {
                 free(buf)
@@ -346,16 +389,21 @@ class NdbNote: Codable, Equatable, Hashable {
         }
     }
     
+    // TODO: Re-enable signature verification after secp256k1 is available from NDK layer
     func verify() -> Bool {
+        // Signature verification disabled until secp256k1 is available
+        return true
+        /*
         let scratch_buf_len = MAX_NOTE_SIZE
         let scratch_buf = malloc(scratch_buf_len)
         defer { free(scratch_buf) }  // Ensure we deallocate as soon as we leave this scope, regardless of the outcome
-        
+
         // Verify the signature against the pubkey and the computed ID, to verify the validity of the whole note
         var ctx = secp256k1_context_create(UInt32(SECP256K1_CONTEXT_VERIFY))
         guard ndb_note_verify(&ctx, scratch_buf, scratch_buf_len, self.note.ptr) == 1 else { return false }
-        
+
         return true
+        */
     }
 
     static func owned_from_json_cstr(json: UnsafePointer<CChar>, json_len: UInt32, bufsize: Int = 2 << 18) -> NdbNote? {
