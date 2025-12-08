@@ -1,0 +1,1738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Olas — Interactive Storyboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            /* Ocean palette */
+            --deep-teal: #0D7377;
+            --ocean-blue: #14919B;
+            --seafoam: #7ED7C1;
+            --zap-gold: #FFB800;
+            --heart-red: #FF4757;
+            --success: #2ED573;
+
+            /* Light mode */
+            --bg-light: #F8FFFE;
+            --card-light: rgba(255, 255, 255, 0.7);
+            --text-light: #1A2B32;
+            --secondary-light: #6B8187;
+
+            /* Dark mode */
+            --bg-dark: #0A1215;
+            --card-dark: rgba(20, 33, 37, 0.7);
+            --text-dark: #E8F4F5;
+            --secondary-dark: #7B9BA1;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        body.dark {
+            --bg: var(--bg-dark);
+            --card: var(--card-dark);
+            --text: var(--text-dark);
+            --secondary: var(--secondary-dark);
+        }
+
+        body.light {
+            --bg: var(--bg-light);
+            --card: var(--card-light);
+            --text: var(--text-light);
+            --secondary: var(--secondary-light);
+        }
+
+        h1 {
+            color: white;
+            font-weight: 600;
+            font-size: 28px;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .controls button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            backdrop-filter: blur(10px);
+        }
+
+        .controls button:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+        }
+
+        .controls button.active {
+            background: white;
+            color: var(--deep-teal);
+        }
+
+        .phone-frame {
+            width: 375px;
+            height: 812px;
+            background: var(--bg);
+            border-radius: 50px;
+            overflow: hidden;
+            position: relative;
+            box-shadow:
+                0 50px 100px rgba(0,0,0,0.3),
+                0 0 0 12px #1a1a1a,
+                inset 0 0 0 2px #333;
+        }
+
+        .notch {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 150px;
+            height: 35px;
+            background: #1a1a1a;
+            border-radius: 0 0 20px 20px;
+            z-index: 100;
+        }
+
+        .status-bar {
+            height: 44px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            padding: 0 30px 8px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .screen {
+            height: calc(100% - 44px - 83px);
+            overflow-y: auto;
+            overflow-x: hidden;
+            display: none;
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        .screen::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* Tab Bar */
+        .tab-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 83px;
+            background: var(--card);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-top: 1px solid rgba(255,255,255,0.2);
+            display: flex;
+            justify-content: space-around;
+            align-items: flex-start;
+            padding-top: 10px;
+        }
+
+        .tab-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            opacity: 0.5;
+            transition: all 0.3s ease;
+        }
+
+        .tab-item.active {
+            opacity: 1;
+        }
+
+        .tab-item svg {
+            width: 28px;
+            height: 28px;
+            fill: var(--text);
+        }
+
+        .tab-item.active svg {
+            fill: var(--deep-teal);
+        }
+
+        .tab-item span {
+            font-size: 10px;
+            color: var(--text);
+        }
+
+        .tab-item.active span {
+            color: var(--deep-teal);
+        }
+
+        .tab-item.create-tab {
+            opacity: 1;
+        }
+
+        .tab-item.create-tab .create-btn {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--deep-teal), var(--ocean-blue));
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: -10px;
+            box-shadow: 0 4px 15px rgba(13, 115, 119, 0.4);
+        }
+
+        .tab-item.create-tab svg {
+            fill: white;
+        }
+
+        /* Home Screen */
+        .home-header {
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .home-header h2 {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+        }
+
+        .post-card {
+            margin-bottom: 20px;
+        }
+
+        .post-header {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            gap: 12px;
+        }
+
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--seafoam), var(--ocean-blue));
+        }
+
+        .avatar.small {
+            width: 32px;
+            height: 32px;
+        }
+
+        .post-user-info {
+            flex: 1;
+        }
+
+        .post-username {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text);
+        }
+
+        .post-time {
+            font-size: 12px;
+            color: var(--secondary);
+        }
+
+        .post-image {
+            width: 100%;
+            aspect-ratio: 1;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .post-image.landscape {
+            aspect-ratio: 4/3;
+        }
+
+        .post-image.portrait {
+            aspect-ratio: 4/5;
+        }
+
+        .post-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .post-actions {
+            display: flex;
+            padding: 12px 16px;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .reaction-group {
+            display: flex;
+            gap: 8px;
+        }
+
+        .reaction-btn {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 14px;
+            color: var(--text);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .reaction-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .reaction-btn.liked .heart {
+            color: var(--heart-red);
+        }
+
+        .zap-count {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            color: var(--zap-gold);
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .post-caption {
+            padding: 0 16px 12px;
+            font-size: 14px;
+            color: var(--text);
+            line-height: 1.4;
+        }
+
+        .post-caption .username {
+            font-weight: 600;
+        }
+
+        .post-caption .hashtag {
+            color: var(--deep-teal);
+        }
+
+        .view-comments {
+            padding: 0 16px 16px;
+            font-size: 14px;
+            color: var(--secondary);
+            cursor: pointer;
+        }
+
+        /* Explore Screen */
+        .search-bar {
+            margin: 10px 16px 20px;
+            padding: 12px 16px;
+            background: var(--card);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--secondary);
+            font-size: 16px;
+        }
+
+        .category-section {
+            margin-bottom: 24px;
+        }
+
+        .category-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 16px 12px;
+        }
+
+        .category-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .category-arrow {
+            color: var(--secondary);
+            font-size: 14px;
+        }
+
+        .category-scroll {
+            display: flex;
+            gap: 8px;
+            padding: 0 16px;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+
+        .category-scroll::-webkit-scrollbar {
+            display: none;
+        }
+
+        .explore-thumb {
+            width: 140px;
+            height: 140px;
+            border-radius: 12px;
+            flex-shrink: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .explore-thumb .overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 8px;
+            background: linear-gradient(transparent, rgba(0,0,0,0.6));
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            color: white;
+            font-size: 12px;
+        }
+
+        /* Profile Screen */
+        .profile-header {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .profile-avatar {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--seafoam), var(--ocean-blue));
+            border: 3px solid var(--card);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .profile-username {
+            font-size: 14px;
+            color: var(--secondary);
+        }
+
+        .profile-displayname {
+            font-size: 22px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .profile-stats {
+            display: flex;
+            gap: 40px;
+            padding: 16px 0;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .stat-number {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--secondary);
+        }
+
+        .profile-bio {
+            text-align: center;
+            padding: 0 40px;
+            font-size: 14px;
+            color: var(--text);
+            line-height: 1.5;
+        }
+
+        .profile-actions {
+            display: flex;
+            gap: 12px;
+            padding: 20px;
+            width: 100%;
+        }
+
+        .profile-btn {
+            flex: 1;
+            padding: 12px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .profile-btn.primary {
+            background: linear-gradient(135deg, var(--deep-teal), var(--ocean-blue));
+            color: white;
+        }
+
+        .profile-btn.secondary {
+            background: var(--card);
+            backdrop-filter: blur(10px);
+            color: var(--text);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .profile-tabs {
+            display: flex;
+            border-bottom: 1px solid rgba(127,127,127,0.2);
+        }
+
+        .profile-tab {
+            flex: 1;
+            padding: 16px;
+            text-align: center;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--secondary);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .profile-tab.active {
+            color: var(--text);
+            border-bottom-color: var(--deep-teal);
+        }
+
+        .profile-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2px;
+            padding: 2px;
+        }
+
+        .grid-item {
+            aspect-ratio: 1;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .collections-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            padding: 16px;
+        }
+
+        .collection-card {
+            border-radius: 16px;
+            overflow: hidden;
+            background: var(--card);
+            backdrop-filter: blur(10px);
+        }
+
+        .collection-cover {
+            aspect-ratio: 1;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .collection-info {
+            padding: 12px;
+        }
+
+        .collection-name {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text);
+        }
+
+        .collection-count {
+            font-size: 12px;
+            color: var(--secondary);
+        }
+
+        /* Notifications Screen */
+        .notifications-header {
+            padding: 15px 20px;
+        }
+
+        .notifications-header h2 {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .notif-section-title {
+            padding: 16px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--secondary);
+        }
+
+        .notif-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            gap: 12px;
+        }
+
+        .notif-item.unread {
+            border-left: 3px solid var(--ocean-blue);
+        }
+
+        .notif-content {
+            flex: 1;
+            font-size: 14px;
+            color: var(--text);
+            line-height: 1.4;
+        }
+
+        .notif-content strong {
+            font-weight: 600;
+        }
+
+        .notif-time {
+            font-size: 12px;
+            color: var(--secondary);
+        }
+
+        .notif-thumb {
+            width: 44px;
+            height: 44px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        /* Create Screen */
+        .create-screen {
+            background: var(--bg);
+        }
+
+        .create-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+        }
+
+        .create-header h2 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .create-header .cancel {
+            font-size: 16px;
+            color: var(--secondary);
+            cursor: pointer;
+        }
+
+        .create-header .next {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--deep-teal);
+            cursor: pointer;
+        }
+
+        .create-preview {
+            aspect-ratio: 1;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .create-preview svg {
+            width: 80px;
+            height: 80px;
+            fill: var(--secondary);
+            opacity: 0.5;
+        }
+
+        .source-toggle {
+            display: flex;
+            background: var(--card);
+            backdrop-filter: blur(10px);
+            margin: 16px;
+            border-radius: 12px;
+            padding: 4px;
+        }
+
+        .source-btn {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--secondary);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .source-btn.active {
+            background: var(--deep-teal);
+            color: white;
+        }
+
+        .recent-photos {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 2px;
+            padding: 2px;
+        }
+
+        .recent-photo {
+            aspect-ratio: 1;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .recent-photo:hover {
+            opacity: 0.8;
+        }
+
+        /* Edit Screen */
+        .edit-tools {
+            display: flex;
+            justify-content: space-around;
+            padding: 16px;
+            border-bottom: 1px solid rgba(127,127,127,0.2);
+        }
+
+        .edit-tool {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            opacity: 0.6;
+            transition: all 0.3s;
+        }
+
+        .edit-tool.active {
+            opacity: 1;
+            color: var(--deep-teal);
+        }
+
+        .edit-tool svg {
+            width: 24px;
+            height: 24px;
+            fill: currentColor;
+        }
+
+        .edit-tool span {
+            font-size: 12px;
+            color: inherit;
+        }
+
+        .filters-row {
+            display: flex;
+            gap: 16px;
+            padding: 20px 16px;
+            overflow-x: auto;
+        }
+
+        .filter-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+
+        .filter-preview {
+            width: 70px;
+            height: 70px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: 2px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .filter-item.active .filter-preview {
+            border-color: var(--deep-teal);
+        }
+
+        .filter-name {
+            font-size: 12px;
+            color: var(--secondary);
+        }
+
+        .filter-item.active .filter-name {
+            color: var(--deep-teal);
+            font-weight: 600;
+        }
+
+        /* Share Screen */
+        .share-content {
+            padding: 20px;
+        }
+
+        .share-preview-row {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .share-thumb {
+            width: 80px;
+            height: 80px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            flex-shrink: 0;
+        }
+
+        .caption-input {
+            flex: 1;
+            background: none;
+            border: none;
+            font-size: 16px;
+            color: var(--text);
+            resize: none;
+            font-family: inherit;
+            outline: none;
+        }
+
+        .caption-input::placeholder {
+            color: var(--secondary);
+        }
+
+        .share-option {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 0;
+            border-bottom: 1px solid rgba(127,127,127,0.1);
+            cursor: pointer;
+        }
+
+        .share-option span {
+            font-size: 16px;
+            color: var(--text);
+        }
+
+        .share-option .arrow {
+            color: var(--secondary);
+        }
+
+        .hashtag-suggestions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 16px 0;
+        }
+
+        .hashtag-pill {
+            padding: 8px 14px;
+            background: var(--card);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            font-size: 14px;
+            color: var(--deep-teal);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .hashtag-pill:hover {
+            background: var(--deep-teal);
+            color: white;
+        }
+
+        /* Onboarding Screen */
+        .onboarding {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            padding: 60px 30px 40px;
+            text-align: center;
+        }
+
+        .onboarding-logo {
+            font-size: 64px;
+            margin-bottom: 8px;
+        }
+
+        .onboarding-title {
+            font-size: 42px;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 8px;
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+        }
+
+        .onboarding-tagline {
+            font-size: 16px;
+            color: var(--secondary);
+            margin-bottom: auto;
+        }
+
+        .onboarding-btn {
+            padding: 18px;
+            border-radius: 14px;
+            font-size: 17px;
+            font-weight: 600;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 12px;
+        }
+
+        .onboarding-btn.primary {
+            background: linear-gradient(135deg, var(--deep-teal), var(--ocean-blue));
+            color: white;
+            box-shadow: 0 4px 20px rgba(13, 115, 119, 0.4);
+        }
+
+        .onboarding-btn.secondary {
+            background: var(--card);
+            backdrop-filter: blur(10px);
+            color: var(--text);
+            border: 1px solid rgba(127,127,127,0.2);
+        }
+
+        /* Emoji picker */
+        .emoji-picker {
+            position: absolute;
+            bottom: 100px;
+            left: 16px;
+            right: 16px;
+            background: var(--card);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 16px;
+            display: none;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        .emoji-picker.show {
+            display: block;
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .emoji-grid {
+            display: flex;
+            justify-content: space-around;
+            font-size: 28px;
+        }
+
+        .emoji-grid span {
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .emoji-grid span:hover {
+            transform: scale(1.3);
+        }
+
+        /* Heart animation */
+        .heart-burst {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            font-size: 80px;
+            pointer-events: none;
+            animation: heartBurst 0.6s ease-out forwards;
+        }
+
+        @keyframes heartBurst {
+            0% {
+                transform: translate(-50%, -50%) scale(0);
+                opacity: 1;
+            }
+            50% {
+                transform: translate(-50%, -50%) scale(1.2);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 0;
+            }
+        }
+
+        /* Zap picker */
+        .zap-picker {
+            position: absolute;
+            bottom: 100px;
+            left: 16px;
+            right: 16px;
+            background: var(--card);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 20px;
+            display: none;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        .zap-picker.show {
+            display: block;
+            animation: slideUp 0.3s ease;
+        }
+
+        .zap-picker h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 16px;
+            text-align: center;
+        }
+
+        .zap-amounts {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .zap-amount {
+            padding: 14px;
+            background: rgba(255, 184, 0, 0.1);
+            border-radius: 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+        }
+
+        .zap-amount:hover {
+            background: rgba(255, 184, 0, 0.2);
+            border-color: var(--zap-gold);
+        }
+
+        .zap-amount .sats {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--zap-gold);
+        }
+
+        .zap-amount .label {
+            font-size: 11px;
+            color: var(--secondary);
+            margin-top: 2px;
+        }
+
+        /* Sample images using gradients */
+        .sample-img-1 { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .sample-img-2 { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+        .sample-img-3 { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+        .sample-img-4 { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+        .sample-img-5 { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+        .sample-img-6 { background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%); }
+        .sample-img-7 { background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); }
+        .sample-img-8 { background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); }
+        .sample-img-9 { background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%); }
+    </style>
+</head>
+<body class="light">
+    <h1>Olas — Interactive Storyboard</h1>
+
+    <div class="controls">
+        <button onclick="setTheme('light')" class="active" id="lightBtn">Light Mode</button>
+        <button onclick="setTheme('dark')" id="darkBtn">Dark Mode</button>
+        <span style="color: white; opacity: 0.5;">|</span>
+        <button onclick="showScreen('onboarding')">Onboarding</button>
+        <button onclick="showScreen('home')" class="active" id="homeBtn">Home</button>
+        <button onclick="showScreen('explore')" id="exploreBtn">Explore</button>
+        <button onclick="showScreen('create')" id="createBtn">Create</button>
+        <button onclick="showScreen('edit')" id="editBtn">Edit</button>
+        <button onclick="showScreen('share')" id="shareBtn">Share</button>
+        <button onclick="showScreen('notifications')" id="notifBtn">Notifications</button>
+        <button onclick="showScreen('profile')" id="profileBtn">Profile</button>
+    </div>
+
+    <div class="phone-frame">
+        <div class="notch"></div>
+        <div class="status-bar">
+            <span>9:41</span>
+            <span>5G 100%</span>
+        </div>
+
+        <!-- Onboarding Screen -->
+        <div class="screen" id="onboarding">
+            <div class="onboarding">
+                <div class="onboarding-logo">🌊</div>
+                <div class="onboarding-title">Olas</div>
+                <div class="onboarding-tagline">Share moments. Ride the wave.</div>
+                <div class="onboarding-btn primary" onclick="showScreen('home')">Create Account</div>
+                <div class="onboarding-btn secondary">I have a Nostr account</div>
+            </div>
+        </div>
+
+        <!-- Home Screen -->
+        <div class="screen active" id="home">
+            <div class="home-header">
+                <h2>Olas</h2>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 5v14M5 12h14"/>
+                </svg>
+            </div>
+
+            <div class="post-card">
+                <div class="post-header">
+                    <div class="avatar sample-img-3"></div>
+                    <div class="post-user-info">
+                        <div class="post-username">oceanwaves</div>
+                        <div class="post-time">2h ago</div>
+                    </div>
+                </div>
+                <div class="post-image sample-img-1" ondblclick="showHeartBurst(this)"></div>
+                <div class="post-actions">
+                    <div class="reaction-group">
+                        <div class="reaction-btn liked" onclick="toggleReaction(this)">
+                            <span class="heart">❤️</span> 128
+                        </div>
+                        <div class="reaction-btn" onclick="showEmojiPicker()">🔥 24</div>
+                        <div class="reaction-btn" onclick="showComments()">💬 12</div>
+                    </div>
+                    <div class="zap-count" onclick="showZapPicker()">
+                        ⚡ 2.1k sats
+                    </div>
+                </div>
+                <div class="post-caption">
+                    <span class="username">oceanwaves</span> Chasing the perfect sunset 🌅
+                    <span class="hashtag">#photography</span>
+                    <span class="hashtag">#ocean</span>
+                    <span class="hashtag">#sunset</span>
+                </div>
+                <div class="view-comments">View all 12 comments</div>
+            </div>
+
+            <div class="post-card">
+                <div class="post-header">
+                    <div class="avatar sample-img-5"></div>
+                    <div class="post-user-info">
+                        <div class="post-username">wanderlust</div>
+                        <div class="post-time">4h ago</div>
+                    </div>
+                </div>
+                <div class="post-image portrait sample-img-2" ondblclick="showHeartBurst(this)"></div>
+                <div class="post-actions">
+                    <div class="reaction-group">
+                        <div class="reaction-btn" onclick="toggleReaction(this)">
+                            <span class="heart">🤍</span> 89
+                        </div>
+                        <div class="reaction-btn">🔥 18</div>
+                        <div class="reaction-btn">💬 7</div>
+                    </div>
+                    <div class="zap-count">
+                        ⚡ 450 sats
+                    </div>
+                </div>
+                <div class="post-caption">
+                    <span class="username">wanderlust</span> Lost in the streets of Lisbon 🇵🇹
+                    <span class="hashtag">#travel</span>
+                    <span class="hashtag">#portugal</span>
+                </div>
+                <div class="view-comments">View all 7 comments</div>
+            </div>
+
+            <div class="emoji-picker" id="emojiPicker">
+                <div class="emoji-grid">
+                    <span onclick="selectEmoji('❤️')">❤️</span>
+                    <span onclick="selectEmoji('🔥')">🔥</span>
+                    <span onclick="selectEmoji('😂')">😂</span>
+                    <span onclick="selectEmoji('😢')">😢</span>
+                    <span onclick="selectEmoji('😮')">😮</span>
+                    <span onclick="selectEmoji('👏')">👏</span>
+                </div>
+            </div>
+
+            <div class="zap-picker" id="zapPicker">
+                <h3>⚡ Send Zap</h3>
+                <div class="zap-amounts">
+                    <div class="zap-amount" onclick="sendZap(21)">
+                        <div class="sats">21</div>
+                        <div class="label">sats</div>
+                    </div>
+                    <div class="zap-amount" onclick="sendZap(100)">
+                        <div class="sats">100</div>
+                        <div class="label">sats</div>
+                    </div>
+                    <div class="zap-amount" onclick="sendZap(500)">
+                        <div class="sats">500</div>
+                        <div class="label">sats</div>
+                    </div>
+                    <div class="zap-amount" onclick="sendZap(1000)">
+                        <div class="sats">1k</div>
+                        <div class="label">sats</div>
+                    </div>
+                    <div class="zap-amount" onclick="sendZap(5000)">
+                        <div class="sats">5k</div>
+                        <div class="label">sats</div>
+                    </div>
+                    <div class="zap-amount" onclick="sendZap('custom')">
+                        <div class="sats">...</div>
+                        <div class="label">custom</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Explore Screen -->
+        <div class="screen" id="explore">
+            <div class="search-bar">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"/>
+                    <path d="M21 21l-4.35-4.35"/>
+                </svg>
+                Search users, hashtags...
+            </div>
+
+            <div class="category-section">
+                <div class="category-header">
+                    <span class="category-title">Trending Now</span>
+                    <span class="category-arrow">→</span>
+                </div>
+                <div class="category-scroll">
+                    <div class="explore-thumb sample-img-1">
+                        <div class="overlay">❤️ 2.4k</div>
+                    </div>
+                    <div class="explore-thumb sample-img-2">
+                        <div class="overlay">❤️ 1.8k</div>
+                    </div>
+                    <div class="explore-thumb sample-img-3">
+                        <div class="overlay">❤️ 1.2k</div>
+                    </div>
+                    <div class="explore-thumb sample-img-4">
+                        <div class="overlay">❤️ 987</div>
+                    </div>
+                    <div class="explore-thumb sample-img-5">
+                        <div class="overlay">❤️ 856</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="category-section">
+                <div class="category-header">
+                    <span class="category-title">Photography</span>
+                    <span class="category-arrow">→</span>
+                </div>
+                <div class="category-scroll">
+                    <div class="explore-thumb sample-img-6">
+                        <div class="overlay">❤️ 543</div>
+                    </div>
+                    <div class="explore-thumb sample-img-7">
+                        <div class="overlay">❤️ 421</div>
+                    </div>
+                    <div class="explore-thumb sample-img-8">
+                        <div class="overlay">❤️ 389</div>
+                    </div>
+                    <div class="explore-thumb sample-img-9">
+                        <div class="overlay">❤️ 312</div>
+                    </div>
+                    <div class="explore-thumb sample-img-1">
+                        <div class="overlay">❤️ 287</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="category-section">
+                <div class="category-header">
+                    <span class="category-title">Art & Illustration</span>
+                    <span class="category-arrow">→</span>
+                </div>
+                <div class="category-scroll">
+                    <div class="explore-thumb sample-img-2">
+                        <div class="overlay">❤️ 678</div>
+                    </div>
+                    <div class="explore-thumb sample-img-4">
+                        <div class="overlay">❤️ 534</div>
+                    </div>
+                    <div class="explore-thumb sample-img-6">
+                        <div class="overlay">❤️ 423</div>
+                    </div>
+                    <div class="explore-thumb sample-img-8">
+                        <div class="overlay">❤️ 398</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="category-section">
+                <div class="category-header">
+                    <span class="category-title">Travel</span>
+                    <span class="category-arrow">→</span>
+                </div>
+                <div class="category-scroll">
+                    <div class="explore-thumb sample-img-3">
+                        <div class="overlay">❤️ 891</div>
+                    </div>
+                    <div class="explore-thumb sample-img-5">
+                        <div class="overlay">❤️ 756</div>
+                    </div>
+                    <div class="explore-thumb sample-img-7">
+                        <div class="overlay">❤️ 645</div>
+                    </div>
+                    <div class="explore-thumb sample-img-9">
+                        <div class="overlay">❤️ 534</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="category-section">
+                <div class="category-header">
+                    <span class="category-title">Nature</span>
+                    <span class="category-arrow">→</span>
+                </div>
+                <div class="category-scroll">
+                    <div class="explore-thumb sample-img-4">
+                        <div class="overlay">❤️ 723</div>
+                    </div>
+                    <div class="explore-thumb sample-img-1">
+                        <div class="overlay">❤️ 612</div>
+                    </div>
+                    <div class="explore-thumb sample-img-3">
+                        <div class="overlay">❤️ 534</div>
+                    </div>
+                    <div class="explore-thumb sample-img-5">
+                        <div class="overlay">❤️ 489</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Create Screen -->
+        <div class="screen" id="create">
+            <div class="create-header">
+                <span class="cancel" onclick="showScreen('home')">Cancel</span>
+                <h2>New Post</h2>
+                <span class="next" onclick="showScreen('edit')">Next</span>
+            </div>
+            <div class="create-preview">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+                </svg>
+            </div>
+            <div class="source-toggle">
+                <div class="source-btn">📷 Camera</div>
+                <div class="source-btn active">🖼 Gallery</div>
+            </div>
+            <div class="recent-photos">
+                <div class="recent-photo sample-img-1"></div>
+                <div class="recent-photo sample-img-2"></div>
+                <div class="recent-photo sample-img-3"></div>
+                <div class="recent-photo sample-img-4"></div>
+                <div class="recent-photo sample-img-5"></div>
+                <div class="recent-photo sample-img-6"></div>
+                <div class="recent-photo sample-img-7"></div>
+                <div class="recent-photo sample-img-8"></div>
+                <div class="recent-photo sample-img-9"></div>
+                <div class="recent-photo sample-img-1"></div>
+                <div class="recent-photo sample-img-2"></div>
+                <div class="recent-photo sample-img-3"></div>
+            </div>
+        </div>
+
+        <!-- Edit Screen -->
+        <div class="screen" id="edit">
+            <div class="create-header">
+                <span class="cancel" onclick="showScreen('create')">←</span>
+                <h2>Edit</h2>
+                <span class="next" onclick="showScreen('share')">Next</span>
+            </div>
+            <div class="create-preview sample-img-1"></div>
+            <div class="edit-tools">
+                <div class="edit-tool active" onclick="selectTool(this)">
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+                    <span>Filters</span>
+                </div>
+                <div class="edit-tool" onclick="selectTool(this)">
+                    <svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+                    <span>Adjust</span>
+                </div>
+                <div class="edit-tool" onclick="selectTool(this)">
+                    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+                    <span>Crop</span>
+                </div>
+                <div class="edit-tool" onclick="selectTool(this)">
+                    <svg viewBox="0 0 24 24"><path d="M4 7V4h16v3M9 20h6M12 4v16" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+                    <span>Text</span>
+                </div>
+            </div>
+            <div class="filters-row">
+                <div class="filter-item active">
+                    <div class="filter-preview sample-img-1"></div>
+                    <span class="filter-name">Original</span>
+                </div>
+                <div class="filter-item">
+                    <div class="filter-preview sample-img-3"></div>
+                    <span class="filter-name">Ola</span>
+                </div>
+                <div class="filter-item">
+                    <div class="filter-preview sample-img-4"></div>
+                    <span class="filter-name">Marea</span>
+                </div>
+                <div class="filter-item">
+                    <div class="filter-preview sample-img-5"></div>
+                    <span class="filter-name">Coral</span>
+                </div>
+                <div class="filter-item">
+                    <div class="filter-preview sample-img-6"></div>
+                    <span class="filter-name">Reef</span>
+                </div>
+                <div class="filter-item">
+                    <div class="filter-preview sample-img-7"></div>
+                    <span class="filter-name">Tide</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Share Screen -->
+        <div class="screen" id="share">
+            <div class="create-header">
+                <span class="cancel" onclick="showScreen('edit')">←</span>
+                <h2>Share</h2>
+                <span class="next" style="background: linear-gradient(135deg, var(--deep-teal), var(--ocean-blue)); color: white; padding: 8px 16px; border-radius: 8px;">Post</span>
+            </div>
+            <div class="share-content">
+                <div class="share-preview-row">
+                    <div class="share-thumb sample-img-1"></div>
+                    <textarea class="caption-input" placeholder="Write a caption..." rows="3">Chasing the perfect sunset 🌅</textarea>
+                </div>
+                <div class="hashtag-suggestions">
+                    <div class="hashtag-pill">#photography</div>
+                    <div class="hashtag-pill">#sunset</div>
+                    <div class="hashtag-pill">#ocean</div>
+                    <div class="hashtag-pill">#nature</div>
+                    <div class="hashtag-pill">#travel</div>
+                </div>
+                <div class="share-option">
+                    <span>Add to collection</span>
+                    <span class="arrow">→</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notifications Screen -->
+        <div class="screen" id="notifications">
+            <div class="notifications-header">
+                <h2>Notifications</h2>
+            </div>
+
+            <div class="notif-section-title">Today</div>
+
+            <div class="notif-item unread">
+                <div class="avatar small sample-img-3"></div>
+                <div class="notif-content">
+                    <strong>alice</strong> reacted ❤️ to your post
+                    <div class="notif-time">2m ago</div>
+                </div>
+                <div class="notif-thumb sample-img-1"></div>
+            </div>
+
+            <div class="notif-item unread">
+                <div class="avatar small sample-img-5"></div>
+                <div class="notif-content">
+                    <strong>bob</strong> and 3 others ⚡ zapped your post
+                    <div class="notif-time" style="color: var(--zap-gold);">1.4k sats</div>
+                </div>
+                <div class="notif-thumb sample-img-1"></div>
+            </div>
+
+            <div class="notif-item">
+                <div class="avatar small sample-img-7"></div>
+                <div class="notif-content">
+                    <strong>carlos</strong> commented: "Amazing shot! 🔥"
+                    <div class="notif-time">1h ago</div>
+                </div>
+                <div class="notif-thumb sample-img-1"></div>
+            </div>
+
+            <div class="notif-section-title">This Week</div>
+
+            <div class="notif-item">
+                <div class="avatar small sample-img-2"></div>
+                <div class="notif-content">
+                    <strong>diana</strong> reacted 🔥 to your post
+                    <div class="notif-time">3d ago</div>
+                </div>
+                <div class="notif-thumb sample-img-2"></div>
+            </div>
+
+            <div class="notif-item">
+                <div class="avatar small sample-img-4"></div>
+                <div class="notif-content">
+                    <strong>elena</strong> and 12 others reacted to your post
+                    <div class="notif-time">5d ago</div>
+                </div>
+                <div class="notif-thumb sample-img-2"></div>
+            </div>
+        </div>
+
+        <!-- Profile Screen -->
+        <div class="screen" id="profile">
+            <div style="display: flex; justify-content: space-between; padding: 15px 20px;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="2">
+                    <path d="M4 6h16M4 12h16M4 18h16"/>
+                </svg>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                </svg>
+            </div>
+
+            <div class="profile-header">
+                <div class="profile-avatar"></div>
+                <div class="profile-username">@oceanwaves</div>
+                <div class="profile-displayname">Ocean Waves</div>
+            </div>
+
+            <div class="profile-stats">
+                <div class="stat-item">
+                    <div class="stat-number">42</div>
+                    <div class="stat-label">Posts</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">128</div>
+                    <div class="stat-label">Following</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">1.2k</div>
+                    <div class="stat-label">Followers</div>
+                </div>
+            </div>
+
+            <div class="profile-bio">
+                Ocean photographer 🌊<br>
+                Chasing waves and light<br>
+                Based in Portugal 🇵🇹
+            </div>
+
+            <div class="profile-actions">
+                <div class="profile-btn primary">Edit Profile</div>
+                <div class="profile-btn secondary">Share</div>
+            </div>
+
+            <div class="profile-tabs">
+                <div class="profile-tab active" onclick="showProfileTab('posts')">Posts</div>
+                <div class="profile-tab" onclick="showProfileTab('collections')">Collections</div>
+            </div>
+
+            <div id="posts-tab">
+                <div class="profile-grid">
+                    <div class="grid-item sample-img-1"></div>
+                    <div class="grid-item sample-img-2"></div>
+                    <div class="grid-item sample-img-3"></div>
+                    <div class="grid-item sample-img-4"></div>
+                    <div class="grid-item sample-img-5"></div>
+                    <div class="grid-item sample-img-6"></div>
+                    <div class="grid-item sample-img-7"></div>
+                    <div class="grid-item sample-img-8"></div>
+                    <div class="grid-item sample-img-9"></div>
+                </div>
+            </div>
+
+            <div id="collections-tab" style="display: none;">
+                <div class="collections-grid">
+                    <div class="collection-card">
+                        <div class="collection-cover sample-img-1"></div>
+                        <div class="collection-info">
+                            <div class="collection-name">Sunsets</div>
+                            <div class="collection-count">24 posts</div>
+                        </div>
+                    </div>
+                    <div class="collection-card">
+                        <div class="collection-cover sample-img-3"></div>
+                        <div class="collection-info">
+                            <div class="collection-name">Portugal</div>
+                            <div class="collection-count">18 posts</div>
+                        </div>
+                    </div>
+                    <div class="collection-card">
+                        <div class="collection-cover sample-img-5"></div>
+                        <div class="collection-info">
+                            <div class="collection-name">Ocean Life</div>
+                            <div class="collection-count">31 posts</div>
+                        </div>
+                    </div>
+                    <div class="collection-card">
+                        <div class="collection-cover sample-img-7"></div>
+                        <div class="collection-info">
+                            <div class="collection-name">Best of 2024</div>
+                            <div class="collection-count">12 posts</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab Bar -->
+        <div class="tab-bar">
+            <div class="tab-item active" onclick="showScreen('home')">
+                <svg viewBox="0 0 24 24"><path d="M3 12c0-1.1.4-2 1-2.6L12 3l8 6.4c.6.6 1 1.5 1 2.6v8c0 1.1-.9 2-2 2h-4v-6h-6v6H5c-1.1 0-2-.9-2-2v-8z"/></svg>
+                <span>Home</span>
+            </div>
+            <div class="tab-item" onclick="showScreen('explore')">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16.24 7.76l-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z" fill="currentColor"/></svg>
+                <span>Explore</span>
+            </div>
+            <div class="tab-item create-tab" onclick="showScreen('create')">
+                <div class="create-btn">
+                    <svg viewBox="0 0 24 24" width="24" height="24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+                </div>
+            </div>
+            <div class="tab-item" onclick="showScreen('notifications')">
+                <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+                <span>Activity</span>
+            </div>
+            <div class="tab-item" onclick="showScreen('profile')">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+                <span>Profile</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function setTheme(theme) {
+            document.body.className = theme;
+            document.getElementById('lightBtn').classList.toggle('active', theme === 'light');
+            document.getElementById('darkBtn').classList.toggle('active', theme === 'dark');
+        }
+
+        function showScreen(screenId) {
+            // Hide all screens
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            // Show selected screen
+            document.getElementById(screenId).classList.add('active');
+
+            // Update tab bar
+            document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+            if (screenId === 'home') document.querySelectorAll('.tab-item')[0].classList.add('active');
+            if (screenId === 'explore') document.querySelectorAll('.tab-item')[1].classList.add('active');
+            if (screenId === 'create' || screenId === 'edit' || screenId === 'share') document.querySelectorAll('.tab-item')[2].classList.add('active');
+            if (screenId === 'notifications') document.querySelectorAll('.tab-item')[3].classList.add('active');
+            if (screenId === 'profile') document.querySelectorAll('.tab-item')[4].classList.add('active');
+
+            // Update control buttons
+            document.querySelectorAll('.controls button').forEach(b => {
+                if (!b.id.includes('Btn') || b.id === 'lightBtn' || b.id === 'darkBtn') return;
+                b.classList.remove('active');
+            });
+            const btnMap = {
+                'home': 'homeBtn',
+                'explore': 'exploreBtn',
+                'create': 'createBtn',
+                'edit': 'editBtn',
+                'share': 'shareBtn',
+                'notifications': 'notifBtn',
+                'profile': 'profileBtn'
+            };
+            if (btnMap[screenId]) {
+                document.getElementById(btnMap[screenId])?.classList.add('active');
+            }
+
+            // Close pickers
+            document.getElementById('emojiPicker').classList.remove('show');
+            document.getElementById('zapPicker').classList.remove('show');
+        }
+
+        function showHeartBurst(element) {
+            const heart = document.createElement('div');
+            heart.className = 'heart-burst';
+            heart.textContent = '❤️';
+            element.appendChild(heart);
+            setTimeout(() => heart.remove(), 600);
+        }
+
+        function toggleReaction(element) {
+            element.classList.toggle('liked');
+            const heart = element.querySelector('.heart');
+            heart.textContent = element.classList.contains('liked') ? '❤️' : '🤍';
+        }
+
+        function showEmojiPicker() {
+            document.getElementById('zapPicker').classList.remove('show');
+            document.getElementById('emojiPicker').classList.toggle('show');
+        }
+
+        function showZapPicker() {
+            document.getElementById('emojiPicker').classList.remove('show');
+            document.getElementById('zapPicker').classList.toggle('show');
+        }
+
+        function selectEmoji(emoji) {
+            document.getElementById('emojiPicker').classList.remove('show');
+            // Would update reaction
+        }
+
+        function sendZap(amount) {
+            document.getElementById('zapPicker').classList.remove('show');
+            // Would send zap
+        }
+
+        function showComments() {
+            // Would show comments sheet
+        }
+
+        function selectTool(element) {
+            document.querySelectorAll('.edit-tool').forEach(t => t.classList.remove('active'));
+            element.classList.add('active');
+        }
+
+        function showProfileTab(tab) {
+            document.querySelectorAll('.profile-tab').forEach(t => t.classList.remove('active'));
+            if (tab === 'posts') {
+                document.querySelectorAll('.profile-tab')[0].classList.add('active');
+                document.getElementById('posts-tab').style.display = 'block';
+                document.getElementById('collections-tab').style.display = 'none';
+            } else {
+                document.querySelectorAll('.profile-tab')[1].classList.add('active');
+                document.getElementById('posts-tab').style.display = 'none';
+                document.getElementById('collections-tab').style.display = 'block';
+            }
+        }
+
+        // Close pickers when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.emoji-picker') && !e.target.closest('.reaction-btn')) {
+                document.getElementById('emojiPicker').classList.remove('show');
+            }
+            if (!e.target.closest('.zap-picker') && !e.target.closest('.zap-count')) {
+                document.getElementById('zapPicker').classList.remove('show');
+            }
+        });
+    </script>
+</body>
+</html>
