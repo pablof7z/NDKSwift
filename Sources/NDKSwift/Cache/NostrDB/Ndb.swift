@@ -102,28 +102,35 @@ class Ndb {
         let ingest_threads: Int32 = 4
         var mapsize: Int = 1024 * 1024 * 1024 * 32
         
-        if path == nil && owns_db_file {
-            // `nil` path indicates the default path will be used.
-            // The default path changed over time, so migrate the database to the new location if needed
-            do {
-                try Self.migrate_db_location_if_needed()
+        // Determine the effective path to use
+        let effectivePath: String
+        if let customPath = path {
+            // Use the custom path provided
+            effectivePath = remove_file_prefix(customPath)
+        } else {
+            // Use default path - migrate if needed
+            if owns_db_file {
+                do {
+                    try Self.migrate_db_location_if_needed()
+                }
+                catch {
+                    Log.error("Error migrating NostrDB to new file container", for: .storage)
+                }
             }
-            catch {
-                // If it fails to migrate, the app can still run without serious consequences. Log instead.
-                Log.error("Error migrating NostrDB to new file container", for: .storage)
+
+            guard let defaultPath = Self.db_path() else {
+                return nil
             }
-        }
-        
-        guard let db_path = Self.db_path(),
-              owns_db_file || Self.db_files_exist(path: db_path) else {
-            return nil      // If the caller claims to not own the DB file, and the DB files do not exist, then we should not initialize Ndb
+
+            // If caller doesn't own DB, files must already exist
+            if !owns_db_file && !Self.db_files_exist(path: defaultPath) {
+                return nil
+            }
+
+            effectivePath = defaultPath
         }
 
-        guard let path = path.map(remove_file_prefix) ?? Ndb.db_path() else {
-            return nil
-        }
-
-        let ok = path.withCString { testdir in
+        let ok = effectivePath.withCString { testdir in
             var ok = false
             while !ok && mapsize > 1024 * 1024 * 700 {
                 var cfg = ndb_config(flags: 0, ingester_threads: ingest_threads, writer_scratch_buffer_size: DEFAULT_WRITER_SCRATCH_SIZE, mapsize: mapsize, filter_context: nil, ingest_filter: nil, sub_cb_ctx: nil, sub_cb: nil)

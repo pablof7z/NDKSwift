@@ -1,0 +1,67 @@
+appId: com.ndkswift.nostrdbdemo
+name: NostrDB Performance Test
+
+---
+# Wait for app to initialize
+- assertVisible:
+    id: "performance_view"
+    timeout: 10000
+
+- assertVisible:
+    text: "NostrDB Ready"
+    timeout: 15000
+
+# Test Save Performance
+- tapOn:
+    id: "save_100_button"
+
+- assertVisible:
+    text: "Saved 100 events"
+    timeout: 30000
+
+# Test Retrieve Performance
+- tapOn:
+    id: "retrieve_button"
+
+- assertVisible:
+    text: "Retrieved"
+    timeout: 30000
+
+# Test Query Performance
+- tapOn:
+    id: "query_button"
+
+- assertVisible:
+    text: "Query returned"
+    timeout: 15000
+
+# Test Text Search
+- tapOn:
+    id: "search_button"
+
+- assertVisible:
+    text: "Text search"
+    timeout: 15000
+
+# Check Events Tab
+- tapOn:
+    text: "Events"
+
+- assertVisible:
+    id: "events_list"
+    timeout: 5000
+
+# Check Logs Tab
+- tapOn:
+    text: "Logs"
+
+- assertVisible:
+    id: "logs_view"
+    timeout: 5000
+
+# Go back to Performance
+- tapOn:
+    text: "Performance"
+
+- assertVisible:
+    id: "performance_view"

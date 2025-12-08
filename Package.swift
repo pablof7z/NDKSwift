@@ -46,14 +46,14 @@ let package = Package(
                 // "hex.c", // Excluded - using hex.h inline implementations
                 "bolt11.c",
                 "hash_u5.c",
-                "talstr.c",
+                // "talstr.c", // Excluded - duplicates ccan/ccan/tal/str/str.c
                 "utf8.c",
                 "bech32.c",
                 "bech32_util.c",
                 "amount.c",
                 "error.c",
                 "node_id.c",
-                "ndb.c",
+                // "ndb.c", // Excluded - CLI tool with main() function
                 // C sources - src/
                 "src/nostrdb.c",
                 "src/block.c",

@@ -132,9 +132,11 @@ This ensures code signing persists across project regenerations.
 
 **Cache System**:
 - `NDKCache` protocol allows pluggable storage
-- `NDKSQLiteCache` for persistent storage with migrations
+- `NDKSQLiteCache` for persistent storage with migrations (recommended default)
+- `NDKNostrDBCache` for high-performance storage using nostrdb C library (LMDB backend)
 - `MemoryCache` for in-memory caching with LRU eviction
 - Caches handle events, profiles, and wallet data
+- NostrDB provides native full-text search and relay source tracking
 
 **Blossom Integration**:
 - `BlossomClient` handles file upload/download
@@ -187,6 +189,17 @@ This ensures code signing persists across project regenerations.
 - SQLite cache uses GRDB.swift for persistent storage
 - Blossom support is implemented as an extension to NDK core
 - JSON encoding/decoding should always use JSONCoding utility for consistency
+
+### NostrDB Notes
+- NostrDB is integrated from Damus as a Swift Package Manager target (`NostrDB`)
+- C sources are in `Sources/NostrDB/`, Swift bindings in `Sources/NDKSwift/Cache/NostrDB/`
+- The C library uses LMDB for persistent storage with mmap
+- Some C source files are excluded from build:
+  - `talstr.c` - duplicates `ccan/ccan/tal/str/str.c`
+  - `ndb.c` - CLI tool with its own `main()` function
+  - `hex.c` - using inline implementations from `hex.h`
+- NostrDB tests are disabled (`testsEnabled = false`) because the C library crashes (SIGTRAP) during mmap initialization in test environments
+- To enable NostrDB tests: set `NDKNostrDBCacheTests.testsEnabled = true`
 
 ## Subscription API Design
 
