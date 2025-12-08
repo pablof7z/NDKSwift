@@ -6,6 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **NostrDB Integration**: Added high-performance cache backend using nostrdb C library from Damus
+  - `NDKNostrDBCache`: New cache implementation using nostrdb's LMDB backend
+  - Integrated nostrdb C sources directly as a Swift Package Manager target (`NostrDB`)
+  - Ported Swift bindings from Damus (Ndb.swift, NdbNote.swift, NdbProfile.swift, etc.)
+  - Implements full `NDKCache` protocol: event storage, retrieval, queries, profile lookup
+  - Native full-text search via nostrdb's search index
+  - Relay source tracking for events
+  - Note: NostrDB tests are currently disabled due to C library initialization issues in test environments
+  - Usage: `let cache = try await NDKNostrDBCache(path: "/path/to/db")`
+
 ### Fixed
 - **Test Suite Improvements**: Fixed hanging E2E tests by properly excluding them from the test target
   - Added `exclude: ["DisabledTests"]` to Package.swift test target configuration

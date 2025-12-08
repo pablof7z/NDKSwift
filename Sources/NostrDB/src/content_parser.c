@@ -114,7 +114,7 @@ static int push_bech32_mention(struct ndb_content_parser *p, struct ndb_str_bloc
 	unsigned char *start;
 	uint16_t *u8_size;
 	enum nostr_bech32_type type;
-	size_t u5_out_len, u8_out_len;
+	size_t u5_out_len = 0, u8_out_len = 0;
 	static const int MAX_PREFIX = 9;    // 8 bytes for the text, 1 byte for the null terminator
 	char prefix[9] = {0};
 

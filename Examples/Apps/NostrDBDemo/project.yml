@@ -1,0 +1,57 @@
+name: NostrDBDemo
+options:
+  bundleIdPrefix: com.ndkswift
+  deploymentTarget:
+    iOS: "26.0"
+  xcodeVersion: "26.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: ${DEVELOPMENT_TEAM}
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "5.9"
+
+packages:
+  NDKSwift:
+    path: ../../..
+
+targets:
+  NostrDBDemo:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+        type: group
+    resources:
+      - path: Resources
+        type: group
+    settings:
+      base:
+        INFOPLIST_FILE: Resources/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.ndkswift.nostrdbdemo
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_ENTITLEMENTS: Resources/NostrDBDemo.entitlements
+    dependencies:
+      - package: NDKSwift
+        product: NDKSwift
+    entitlements:
+      path: Resources/NostrDBDemo.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.network.client: true
+
+schemes:
+  NostrDBDemo:
+    build:
+      targets:
+        NostrDBDemo: all
+    run:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

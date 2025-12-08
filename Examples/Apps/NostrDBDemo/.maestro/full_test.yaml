@@ -1,0 +1,88 @@
+appId: com.ndkswift.nostrdbdemo
+name: NostrDB Full Test Suite
+
+---
+# === INITIALIZATION TEST ===
+- extendedWaitUntil:
+    visible:
+      id: "performance_view"
+    timeout: 10000
+
+- extendedWaitUntil:
+    visible:
+      text: "Ready"
+    timeout: 20000
+
+- takeScreenshot: "01_initialized"
+
+# === SAVE PERFORMANCE TEST ===
+- tapOn:
+    id: "save_100_button"
+
+- extendedWaitUntil:
+    visible:
+      text: "Average save time"
+    timeout: 60000
+
+- takeScreenshot: "02_save_complete"
+
+# === RETRIEVE PERFORMANCE TEST ===
+- tapOn:
+    id: "retrieve_button"
+
+- extendedWaitUntil:
+    visible:
+      text: "Average retrieve time"
+    timeout: 60000
+
+- takeScreenshot: "03_retrieve_complete"
+
+# === QUERY PERFORMANCE TEST ===
+- tapOn:
+    id: "query_button"
+
+- extendedWaitUntil:
+    visible:
+      text: "Query returned"
+    timeout: 30000
+
+- takeScreenshot: "04_query_complete"
+
+# === TEXT SEARCH TEST ===
+- tapOn:
+    id: "search_button"
+
+- extendedWaitUntil:
+    visible:
+      text: "Text search"
+    timeout: 30000
+
+- takeScreenshot: "05_search_complete"
+
+# === VIEW EVENTS ===
+- tapOn:
+    text: "Events"
+
+- extendedWaitUntil:
+    visible:
+      id: "events_list"
+    timeout: 5000
+
+- takeScreenshot: "06_events_view"
+
+# === VIEW LOGS ===
+- tapOn:
+    text: "Logs"
+
+- extendedWaitUntil:
+    visible:
+      id: "logs_view"
+    timeout: 5000
+
+- takeScreenshot: "07_logs_view"
+
+# === FINAL METRICS ===
+- tapOn:
+    text: "Performance"
+
+- takeScreenshot: "08_final_metrics"

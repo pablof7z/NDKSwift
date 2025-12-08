@@ -1,0 +1,80 @@
+appId: com.ndkswift.nostrdbdemo
+name: NostrDB Simple Performance Test
+
+---
+# Wait for app to load and initialize
+- extendedWaitUntil:
+    visible:
+      text: "Performance"
+    timeout: 15000
+
+- takeScreenshot: "01_app_loaded"
+
+# Wait for cache to initialize (NostrDB or SQLite fallback)
+- extendedWaitUntil:
+    visible:
+      text: "Ready"
+    timeout: 30000
+
+- takeScreenshot: "02_initialized"
+
+# Run Save Performance Test
+- tapOn:
+    text: "Save 100"
+
+- extendedWaitUntil:
+    visible:
+      text: "stored"
+    timeout: 60000
+
+- takeScreenshot: "03_after_save"
+
+# Run Retrieve Test
+- tapOn:
+    text: "Retrieve"
+
+- extendedWaitUntil:
+    visible:
+      text: "Avg Retrieve"
+    timeout: 60000
+
+- takeScreenshot: "04_after_retrieve"
+
+# Run Query Test
+- tapOn:
+    text: "Query"
+
+- extendedWaitUntil:
+    visible:
+      text: "Query Time"
+    timeout: 30000
+
+- takeScreenshot: "05_after_query"
+
+# Run Text Search
+- tapOn:
+    text: "Search"
+
+- extendedWaitUntil:
+    visible:
+      text: "Text Search"
+    timeout: 30000
+
+- takeScreenshot: "06_after_search"
+
+# Check Logs Tab
+- tapOn:
+    text: "Logs"
+
+- extendedWaitUntil:
+    visible:
+      text: "Debug Logs"
+    timeout: 5000
+
+- takeScreenshot: "07_logs_view"
+
+# Back to Performance for final screenshot
+- tapOn:
+    text: "Performance"
+
+- takeScreenshot: "08_final_metrics"
