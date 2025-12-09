@@ -150,7 +150,7 @@ public enum Payment {
                 throw NDKError.paymentFailed(reason: "Lightning payment was not successful")
             }
 
-            // Log DLEQ verification failure but continue
+            // Log DLEQ verification status
             if case .fail = meltResult.dleqResult {
                 NDKLogger.log(.warning, category: .wallet, "⚠️ DLEQ verification failed but continuing since payment was successful. Mint: \(mintURL)")
             }

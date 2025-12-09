@@ -526,20 +526,8 @@ extension Nutzap {
                 return .invalidProofs(reason: ErrorMessageConstants.withContext("P2PK signing error", context: message))
             case .invalidSplit(let message):
                 return .invalidProofs(reason: ErrorMessageConstants.withContext(ErrorMessageConstants.invalid("split"), context: message))
-            case .invalidKeysetID(let message):
-                return .invalidProofs(reason: ErrorMessageConstants.withContext(ErrorMessageConstants.invalid("keyset ID"), context: message))
-            case .paymentRequestEncoding(let message):
-                return .invalidProofs(reason: ErrorMessageConstants.withContext("Payment request encoding error", context: message))
-            case .paymentRequestDecoding(let message):
-                return .invalidProofs(reason: ErrorMessageConstants.withContext("Payment request decoding error", context: message))
-            case .paymentRequestValidation(let message):
-                return .invalidProofs(reason: ErrorMessageConstants.withContext("Payment request validation error", context: message))
-            case .unsupportedTransport(let message):
-                return .invalidProofs(reason: ErrorMessageConstants.withContext("Unsupported transport", context: message))
-            case .lockingConditionMismatch(let message):
-                return .invalidProofs(reason: ErrorMessageConstants.withContext("Locking condition mismatch", context: message))
-            case .paymentRequestAmount(let message):
-                return .invalidProofs(reason: ErrorMessageConstants.withContext("Payment request amount error", context: message))
+            @unknown default:
+                return .unknownError("Unknown CashuError")
             }
         case let ndkError as NDKError:
             switch ndkError {

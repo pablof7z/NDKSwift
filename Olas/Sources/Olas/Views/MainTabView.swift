@@ -5,6 +5,7 @@ import NDKSwift
 public struct MainTabView: View {
     @EnvironmentObject private var authViewModel: AuthViewModel
     @StateObject private var walletViewModel: WalletViewModel
+    @StateObject private var sparkWalletManager: SparkWalletManager
     @StateObject private var muteListManager: MuteListManager
     @State private var selectedTab = 0
     @State private var hasNotifications = false
@@ -15,6 +16,7 @@ public struct MainTabView: View {
     public init(ndk: NDK) {
         self.ndk = ndk
         self._walletViewModel = StateObject(wrappedValue: WalletViewModel(ndk: ndk))
+        self._sparkWalletManager = StateObject(wrappedValue: SparkWalletManager(ndk: ndk))
         self._muteListManager = StateObject(wrappedValue: MuteListManager(ndk: ndk))
     }
 
@@ -49,7 +51,7 @@ public struct MainTabView: View {
             // Profile
             NavigationStack {
                 if let pubkey = authViewModel.currentUser?.pubkey {
-                    ProfileView(ndk: ndk, pubkey: pubkey, currentUserPubkey: pubkey)
+                    ProfileView(ndk: ndk, pubkey: pubkey, currentUserPubkey: pubkey, sparkWalletManager: sparkWalletManager)
                 } else {
                     Text("Not logged in")
                 }
@@ -71,6 +73,7 @@ public struct MainTabView: View {
         }
         .task {
             await walletViewModel.loadWallet()
+            await sparkWalletManager.restoreWalletIfExists()
             muteListManager.startSubscription()
         }
         .environmentObject(walletViewModel)

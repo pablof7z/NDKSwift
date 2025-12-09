@@ -6,6 +6,7 @@ public struct ProfileView: View {
     let ndk: NDK
     let pubkey: String
     let currentUserPubkey: String?
+    var sparkWalletManager: SparkWalletManager?
 
     @EnvironmentObject private var muteListManager: MuteListManager
     @State private var profile: NDKUserMetadata?
@@ -14,6 +15,7 @@ public struct ProfileView: View {
     @State private var showEditProfile = false
     @State private var selectedTab: ProfileTab = .posts
     @State private var selectedPost: NDKEvent?
+    @State private var likedSubscription: NDKMetaSubscription?
 
     private var isOwnProfile: Bool {
         guard let currentUserPubkey else { return false }
@@ -24,10 +26,11 @@ public struct ProfileView: View {
         muteListManager.isMuted(pubkey)
     }
 
-    public init(ndk: NDK, pubkey: String, currentUserPubkey: String? = nil) {
+    public init(ndk: NDK, pubkey: String, currentUserPubkey: String? = nil, sparkWalletManager: SparkWalletManager? = nil) {
         self.ndk = ndk
         self.pubkey = pubkey
         self.currentUserPubkey = currentUserPubkey
+        self.sparkWalletManager = sparkWalletManager
     }
 
     public var body: some View {
@@ -59,9 +62,22 @@ public struct ProfileView: View {
                 // Tabs
                 ProfileTabsBar(selectedTab: $selectedTab)
 
-                // Content grid - shows posts as they stream in
-                PostsGridView(posts: posts, ndk: ndk) { post in
-                    selectedPost = post
+                // Content grid - shows posts based on selected tab
+                switch selectedTab {
+                case .posts:
+                    PostsGridView(posts: posts, ndk: ndk) { post in
+                        selectedPost = post
+                    }
+                case .liked:
+                    if let likedSubscription {
+                        PostsGridView(posts: likedSubscription.events, ndk: ndk) { post in
+                            selectedPost = post
+                        }
+                    } else {
+                        EmptyStateView(message: "Loading liked posts...")
+                    }
+                case .zaps:
+                    EmptyStateView(message: "Zaps coming soon")
                 }
             }
         }
@@ -72,6 +88,7 @@ public struct ProfileView: View {
             await loadProfile()
             await loadPosts()
             await loadFollowing()
+            loadLikedPosts()
         }
         .sheet(isPresented: $showEditProfile) {
             EditProfileView(ndk: ndk, currentProfile: profile) {
@@ -89,9 +106,9 @@ public struct ProfileView: View {
             )
         }
         .toolbar {
-            if isOwnProfile {
+            if isOwnProfile, let sparkWalletManager = sparkWalletManager {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    NavigationLink(destination: SettingsView(ndk: ndk)) {
+                    NavigationLink(destination: SettingsView(ndk: ndk, sparkWalletManager: sparkWalletManager)) {
                         Image(systemName: "gearshape")
                             .font(.system(size: 16, weight: .medium))
                             .foregroundStyle(.white)
@@ -148,6 +165,20 @@ public struct ProfileView: View {
         } catch {
             followingCount = 0
         }
+    }
+
+    private func loadLikedPosts() {
+        // Subscribe to reactions (kind 7) from this user that target images/videos (kinds 20, 22)
+        let filter = NDKFilter(
+            authors: [pubkey],
+            kinds: [OlasConstants.EventKinds.reaction],
+            tags: ["k": Set(["20", "22"])]
+        )
+
+        likedSubscription = ndk.metaSubscribe(
+            filter: filter,
+            sort: .tagTime
+        )
     }
 
     private func toggleMute() async {
@@ -732,5 +763,25 @@ private struct BlurhashPlaceholder: View {
 
     private func decodeBlurHash(_ hash: String) -> UIImage? {
         return BlurhashDecoder.decode(hash, size: CGSize(width: 32, height: 32))
+    }
+}
+
+// MARK: - Empty State View
+
+private struct EmptyStateView: View {
+    let message: String
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "photo.on.rectangle.angled")
+                .font(.system(size: 48))
+                .foregroundStyle(.secondary.opacity(0.5))
+
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 60)
     }
 }
