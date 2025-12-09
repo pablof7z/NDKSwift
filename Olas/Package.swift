@@ -18,8 +18,8 @@ let package = Package(
         .target(
             name: "Olas",
             dependencies: [
-                .product(name: "NDKSwift", package: "master"),
-                .product(name: "NDKSwiftUI", package: "master"),
+                .product(name: "NDKSwift", package: "spark"),
+                .product(name: "NDKSwiftUI", package: "spark"),
                 .product(name: "UnifiedBlurHash", package: "UnifiedBlurHash")
             ],
             exclude: ["OlasApp.swift"]

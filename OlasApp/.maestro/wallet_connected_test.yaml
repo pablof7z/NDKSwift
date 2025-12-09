@@ -1,0 +1,127 @@
+appId: com.olas.app
+name: Olas Wallet Connected State Test
+
+---
+# Test: Verify wallet UI when connected (assumes wallet is already set up)
+# This test requires a wallet to be created/imported first
+
+# Wait for app to load
+- extendedWaitUntil:
+    visible:
+      text: "Home"
+    timeout: 15000
+
+- takeScreenshot: "01_app_loaded"
+
+# Navigate to Wallet tab
+- tapOn:
+    text: "Wallet"
+
+- extendedWaitUntil:
+    visible:
+      text: "Wallet"
+    timeout: 5000
+
+- takeScreenshot: "02_wallet_tab"
+
+# Check if wallet is connected (shows balance) or not connected (shows setup)
+# This test assumes wallet IS connected
+
+# Verify connected wallet elements
+- assertVisible:
+    text: "Balance"
+
+- assertVisible:
+    text: "sats"
+
+- assertVisible:
+    text: "Receive"
+
+- assertVisible:
+    text: "Send"
+
+- takeScreenshot: "03_connected_wallet"
+
+# Test Receive flow
+- tapOn:
+    text: "Receive"
+
+- extendedWaitUntil:
+    visible:
+      text: "Receive Payment"
+    timeout: 5000
+
+- takeScreenshot: "04_receive_sheet"
+
+# Verify receive screen elements
+- assertVisible:
+    text: "Amount (sats)"
+
+- assertVisible:
+    text: "Generate Invoice"
+
+# Close receive sheet
+- tapOn:
+    text: "Close"
+
+- extendedWaitUntil:
+    visible:
+      text: "Balance"
+    timeout: 5000
+
+- takeScreenshot: "05_back_to_wallet"
+
+# Test Send flow
+- tapOn:
+    text: "Send"
+
+- extendedWaitUntil:
+    visible:
+      text: "Send Payment"
+    timeout: 5000
+
+- takeScreenshot: "06_send_sheet"
+
+# Verify send screen elements
+- assertVisible:
+    text: "Lightning Invoice or Address"
+
+- assertVisible:
+    text: "Pay Invoice"
+
+# Close send sheet
+- tapOn:
+    text: "Close"
+
+- extendedWaitUntil:
+    visible:
+      text: "Balance"
+    timeout: 5000
+
+- takeScreenshot: "07_test_complete"
+
+# Test settings access
+- tapOn:
+    id: "gearshape"
+
+- extendedWaitUntil:
+    visible:
+      text: "Spark Wallet"
+    timeout: 5000
+
+- takeScreenshot: "08_wallet_settings"
+
+# Verify settings elements
+- assertVisible:
+    text: "Connection Status"
+
+- assertVisible:
+    text: "Connected"
+
+- assertVisible:
+    text: "Sync Wallet"
+
+- assertVisible:
+    text: "Disconnect Wallet"
+
+- takeScreenshot: "09_settings_complete"

@@ -302,12 +302,12 @@ public actor SparkWallet: NDKPaymentProvider {
             typeFilter: sdkTypeFilter,
             statusFilter: sdkStatusFilter,
             assetFilter: nil,
+            sparkHtlcStatusFilter: nil,
             fromTimestamp: nil,
             toTimestamp: nil,
             offset: offset,
             limit: limit,
-            sortAscending: false,
-            htlcStatusFilter: nil
+            sortAscending: false
         )
 
         let response = try await sdk.listPayments(request: request)
@@ -333,7 +333,7 @@ public actor SparkWallet: NDKPaymentProvider {
         case .bolt11Invoice(let details):
             let amountSats = details.amountMsat.map { Int64($0) / 1000 }
             return .bolt11Invoice(SparkBolt11Details(
-                invoice: details.invoice,
+                invoice: details.invoice.bolt11,
                 amountSats: amountSats,
                 description: details.description,
                 expiry: details.expiry,
@@ -343,26 +343,26 @@ public actor SparkWallet: NDKPaymentProvider {
         case .bitcoinAddress(let details):
             return .bitcoinAddress(SparkBitcoinAddressDetails(
                 address: details.address,
-                network: details.network.rawValue,
-                amountSats: details.amountSat.map { Int64($0) }
+                network: String(describing: details.network),
+                amountSats: nil
             ))
 
-        case .lnUrlPay(let details):
-            let minSats = Int64(details.minSendableMsat) / 1000
-            let maxSats = Int64(details.maxSendableMsat) / 1000
+        case .lnurlPay(let details):
+            let minSats = Int64(details.minSendable) / 1000
+            let maxSats = Int64(details.maxSendable) / 1000
             return .lnurlPay(SparkLnurlPayDetails(
                 domain: details.domain,
                 minSendableSats: minSats,
                 maxSendableSats: maxSats,
                 metadata: details.metadataStr,
-                lightningAddress: details.lightningAddress
+                lightningAddress: details.address
             ))
 
-        case .lnUrlWithdraw(let details):
-            let minSats = Int64(details.minWithdrawableMsat) / 1000
-            let maxSats = Int64(details.maxWithdrawableMsat) / 1000
+        case .lnurlWithdraw(let details):
+            let minSats = Int64(details.minWithdrawable) / 1000
+            let maxSats = Int64(details.maxWithdrawable) / 1000
             return .lnurlWithdraw(SparkLnurlWithdrawDetails(
-                domain: details.domain,
+                domain: details.callback,
                 minWithdrawableSats: minSats,
                 maxWithdrawableSats: maxSats,
                 description: details.defaultDescription
@@ -372,19 +372,16 @@ public actor SparkWallet: NDKPaymentProvider {
             return .sparkAddress(SparkAddressDetails(address: details.address))
 
         case .sparkInvoice(let details):
-            let amountSats = Int64(details.amount.asString(radix: 10)) ?? 0
+            let amountSats = details.amount.flatMap { Int64($0.asString(radix: 10)) } ?? 0
             return .sparkInvoice(SparkInvoiceDetails(
                 invoice: details.invoice,
                 amountSats: amountSats
             ))
 
-        case .nodeId(let nodeId):
-            return .nodeId(nodeId)
-
         case .url(let url):
             return .url(url)
 
-        case .lnUrlAuth, .lnUrlError:
+        case .lnurlAuth, .lightningAddress, .bolt12Invoice, .bolt12Offer, .silentPaymentAddress, .bip21, .bolt12InvoiceRequest:
             throw SparkWalletError.unsupportedPaymentType
         }
     }
@@ -405,11 +402,12 @@ public actor SparkWallet: NDKPaymentProvider {
         let response = try await sdk.prepareSendPayment(request: request)
 
         let totalAmountSats = Int64(response.amount.asString(radix: 10)) ?? 0
-        let feeSats = Int64(response.feesSat)
+        // Note: Fees are included in the total amount, not available separately in SDK v0.5.2
+        let feeSats: Int64 = 0
 
         return SparkPreparedPayment(
             destination: input,
-            amountSats: totalAmountSats - feeSats,
+            amountSats: totalAmountSats,
             feeSats: feeSats,
             totalSats: totalAmountSats,
             prepareResponse: response
@@ -568,7 +566,7 @@ public struct SparkPayment: Identifiable, Sendable {
     public let destination: String?
     public let preimage: String?
 
-    init(from payment: Payment) {
+    init(from payment: BreezSdkSpark.Payment) {
         self.id = payment.id
         self.type = payment.paymentType == .send ? .send : .receive
         self.status = {
@@ -579,11 +577,26 @@ public struct SparkPayment: Identifiable, Sendable {
             }
         }()
         self.amountSats = Int64(payment.amount.asString(radix: 10)) ?? 0
-        self.feeSats = Int64(payment.feesSat)
-        self.timestamp = Date(timeIntervalSince1970: TimeInterval(payment.createdAt))
-        self.description = payment.paymentDescription
-        self.destination = payment.destination
-        self.preimage = payment.preimage
+        self.feeSats = Int64(payment.fees.asString(radix: 10)) ?? 0
+        self.timestamp = Date(timeIntervalSince1970: TimeInterval(payment.timestamp))
+
+        // Extract details from PaymentDetails if available
+        if let details = payment.details {
+            switch details {
+            case .lightning(let description, let preimage, _, _, let destinationPubkey, _, _, _):
+                self.description = description
+                self.preimage = preimage
+                self.destination = destinationPubkey
+            case .spark(_, _), .token(_, _, _), .withdraw(_), .deposit(_):
+                self.description = nil
+                self.preimage = nil
+                self.destination = nil
+            }
+        } else {
+            self.description = nil
+            self.preimage = nil
+            self.destination = nil
+        }
     }
 }
 

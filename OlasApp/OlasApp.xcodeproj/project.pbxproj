@@ -186,6 +186,9 @@
 			);
 			mainGroup = 8B41F63C2DEDD0D5001A66F9;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				8B41F6862DEDD300001A66F9 /* XCLocalSwiftPackageReference "OlasAppPackage" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 8B41F6462DEDD0D5001A66F9 /* Products */;
 			projectDirPath = "";
@@ -469,13 +472,22 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		8B41F6862DEDD300001A66F9 /* XCLocalSwiftPackageReference "OlasAppPackage" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = OlasAppPackage;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		8B41F6822DEDD23B001A66F9 /* OlasAppFeature */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = 8B41F6862DEDD300001A66F9 /* XCLocalSwiftPackageReference "OlasAppPackage" */;
 			productName = OlasAppFeature;
 		};
 		8B41F6842DEDD25C001A66F9 /* OlasAppFeature */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = 8B41F6862DEDD300001A66F9 /* XCLocalSwiftPackageReference "OlasAppPackage" */;
 			productName = OlasAppFeature;
 		};
 /* End XCSwiftPackageProductDependency section */

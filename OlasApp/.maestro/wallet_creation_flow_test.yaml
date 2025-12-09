@@ -1,0 +1,86 @@
+appId: com.olas.app
+name: Olas Wallet Creation Full Flow Test
+
+---
+# Test: Full wallet creation flow including mnemonic display
+# WARNING: This test will create a real wallet on mainnet
+# Only run in test environments or when you intend to create a wallet
+
+# Wait for app to load
+- extendedWaitUntil:
+    visible:
+      text: "Home"
+    timeout: 15000
+
+- takeScreenshot: "01_app_loaded"
+
+# Navigate to Wallet tab
+- tapOn:
+    text: "Wallet"
+
+- extendedWaitUntil:
+    visible:
+      text: "Spark Wallet"
+    timeout: 5000
+
+- takeScreenshot: "02_wallet_tab"
+
+# Tap Create New Wallet
+- tapOn:
+    text: "Create New Wallet"
+
+- extendedWaitUntil:
+    visible:
+      text: "Create Your Wallet"
+    timeout: 5000
+
+- takeScreenshot: "03_create_wallet_prompt"
+
+# Tap Generate Wallet button
+- tapOn:
+    text: "Generate Wallet"
+
+# Wait for mnemonic generation (may take a moment to connect to Spark network)
+- extendedWaitUntil:
+    visible:
+      text: "Your Recovery Phrase"
+    timeout: 60000
+
+- takeScreenshot: "04_mnemonic_displayed"
+
+# Verify mnemonic screen elements
+- assertVisible:
+    text: "Write these words down in order"
+
+- assertVisible:
+    text: "I have written down my recovery phrase"
+
+# Check the confirmation toggle
+- tapOn:
+    text: "I have written down my recovery phrase"
+
+- takeScreenshot: "05_mnemonic_confirmed"
+
+# Continue button should now be enabled
+- tapOn:
+    text: "Continue"
+
+# Should return to wallet view with connected state
+- extendedWaitUntil:
+    visible:
+      text: "Balance"
+    timeout: 10000
+
+- takeScreenshot: "06_wallet_connected"
+
+# Verify wallet is now connected
+- assertVisible:
+    text: "sats"
+
+- assertVisible:
+    text: "Receive"
+
+- assertVisible:
+    text: "Send"
+
+- takeScreenshot: "07_creation_complete"

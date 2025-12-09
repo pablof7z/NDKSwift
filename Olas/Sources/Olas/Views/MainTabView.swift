@@ -7,15 +7,16 @@ public struct MainTabView: View {
     @StateObject private var walletViewModel: WalletViewModel
     @StateObject private var muteListManager: MuteListManager
     @State private var selectedTab = 0
-    @State private var hasNotifications = false
     @State private var showCreatePost = false
 
     private let ndk: NDK
+    @ObservedObject private var sparkWalletManager: SparkWalletManager
 
-    public init(ndk: NDK) {
+    public init(ndk: NDK, sparkWalletManager: SparkWalletManager) {
         self.ndk = ndk
         self._walletViewModel = StateObject(wrappedValue: WalletViewModel(ndk: ndk))
         self._muteListManager = StateObject(wrappedValue: MuteListManager(ndk: ndk))
+        self.sparkWalletManager = sparkWalletManager
     }
 
     public var body: some View {
@@ -39,7 +40,7 @@ public struct MainTabView: View {
                 }
                 .tag(2)
 
-            // Wallet
+            // Wallet (cashu/NIP-60)
             WalletView(ndk: ndk, walletViewModel: walletViewModel)
                 .tabItem {
                     Label("Wallet", systemImage: selectedTab == 3 ? "creditcard.fill" : "creditcard")
@@ -49,7 +50,7 @@ public struct MainTabView: View {
             // Profile
             NavigationStack {
                 if let pubkey = authViewModel.currentUser?.pubkey {
-                    ProfileView(ndk: ndk, pubkey: pubkey, currentUserPubkey: pubkey)
+                    ProfileView(ndk: ndk, pubkey: pubkey, currentUserPubkey: pubkey, sparkWalletManager: sparkWalletManager)
                 } else {
                     Text("Not logged in")
                 }
@@ -75,5 +76,6 @@ public struct MainTabView: View {
         }
         .environmentObject(walletViewModel)
         .environmentObject(muteListManager)
+        .environmentObject(sparkWalletManager)
     }
 }

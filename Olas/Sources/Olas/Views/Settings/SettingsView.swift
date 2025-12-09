@@ -5,10 +5,12 @@ public struct SettingsView: View {
     let ndk: NDK
     @EnvironmentObject private var authViewModel: AuthViewModel
     @StateObject private var blossomManager: NDKBlossomServerManager
+    @ObservedObject var sparkWalletManager: SparkWalletManager
 
-    public init(ndk: NDK) {
+    public init(ndk: NDK, sparkWalletManager: SparkWalletManager) {
         self.ndk = ndk
         self._blossomManager = StateObject(wrappedValue: NDKBlossomServerManager(ndk: ndk))
+        self.sparkWalletManager = sparkWalletManager
     }
 
     public var body: some View {
@@ -20,8 +22,15 @@ public struct SettingsView: View {
             }
 
             Section("Wallet") {
-                NavigationLink(destination: SparkWalletSettingsView(ndk: ndk)) {
-                    SettingsRow(icon: "bolt.fill", title: "Spark Wallet", color: OlasTheme.Colors.zapGold)
+                NavigationLink(destination: SparkWalletSettingsView(walletManager: sparkWalletManager)) {
+                    HStack {
+                        SettingsRow(icon: "bolt.fill", title: "Spark Wallet", color: OlasTheme.Colors.zapGold)
+                        Spacer()
+                        if sparkWalletManager.connectionStatus == .connected {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                        }
+                    }
                 }
             }
 

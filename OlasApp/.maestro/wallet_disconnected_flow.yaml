@@ -1,0 +1,75 @@
+appId: com.olas.app
+name: Wallet Disconnected Flow
+
+---
+# Sub-flow for testing disconnected wallet setup state
+
+- takeScreenshot: "disconnected_01_setup_visible"
+
+# Verify setup screen elements
+- assertVisible:
+    text: "Spark Wallet"
+
+- assertVisible:
+    text: "Self-custodial Bitcoin Lightning wallet"
+
+- assertVisible:
+    text: "Create New Wallet"
+
+- assertVisible:
+    text: "Import Existing Wallet"
+
+- takeScreenshot: "disconnected_02_elements_verified"
+
+# Test Create Wallet flow
+- tapOn:
+    text: "Create New Wallet"
+
+- extendedWaitUntil:
+    visible:
+      text: "Create Your Wallet"
+    timeout: 5000
+
+- takeScreenshot: "disconnected_03_create_sheet"
+
+- assertVisible:
+    text: "A new 12-word recovery phrase will be generated"
+
+- assertVisible:
+    text: "Generate Wallet"
+
+# Cancel create
+- tapOn:
+    text: "Cancel"
+
+- extendedWaitUntil:
+    visible:
+      text: "Create New Wallet"
+    timeout: 5000
+
+- takeScreenshot: "disconnected_04_back_from_create"
+
+# Test Import Wallet flow
+- tapOn:
+    text: "Import Existing Wallet"
+
+- extendedWaitUntil:
+    visible:
+      text: "Import Wallet"
+    timeout: 5000
+
+- takeScreenshot: "disconnected_05_import_sheet"
+
+- assertVisible:
+    text: "Enter your 12 or 24-word recovery phrase"
+
+# Cancel import
+- tapOn:
+    text: "Cancel"
+
+- extendedWaitUntil:
+    visible:
+      text: "Spark Wallet"
+    timeout: 5000
+
+- takeScreenshot: "disconnected_06_flow_complete"

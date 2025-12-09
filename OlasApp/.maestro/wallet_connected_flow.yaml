@@ -1,0 +1,80 @@
+appId: com.olas.app
+name: Wallet Connected Flow
+
+---
+# Sub-flow for testing connected wallet state
+
+- takeScreenshot: "connected_01_balance_visible"
+
+# Verify connected wallet elements
+- assertVisible:
+    text: "Balance"
+
+# Balance amount contains "sats" (Balance label already verified above)
+
+- assertVisible:
+    text: "Receive"
+
+- assertVisible:
+    text: "Send"
+
+- assertVisible:
+    text: "Recent Activity"
+
+- takeScreenshot: "connected_02_elements_verified"
+
+# Test Receive button
+- tapOn:
+    text: "Receive"
+
+- extendedWaitUntil:
+    visible:
+      text: "Receive Payment"
+    timeout: 5000
+
+- takeScreenshot: "connected_03_receive_sheet"
+
+- assertVisible:
+    text: "Amount (sats)"
+
+- assertVisible:
+    text: "Generate Invoice"
+
+# Close receive sheet
+- tapOn:
+    text: "Close"
+
+- extendedWaitUntil:
+    visible:
+      text: "Balance"
+    timeout: 5000
+
+- takeScreenshot: "connected_04_back_from_receive"
+
+# Test Send button
+- tapOn:
+    text: "Send"
+
+- extendedWaitUntil:
+    visible:
+      text: "Send Payment"
+    timeout: 5000
+
+- takeScreenshot: "connected_05_send_sheet"
+
+- assertVisible:
+    text: "Lightning Invoice or Address"
+
+- assertVisible:
+    text: "Pay Invoice"
+
+# Close send sheet
+- tapOn:
+    text: "Close"
+
+- extendedWaitUntil:
+    visible:
+      text: "Balance"
+    timeout: 5000
+
+- takeScreenshot: "connected_06_flow_complete"

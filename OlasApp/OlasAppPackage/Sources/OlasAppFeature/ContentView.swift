@@ -5,6 +5,7 @@ import NDKSwift
 public struct ContentView: View {
     @StateObject private var authViewModel = AuthViewModel()
     @State private var ndk: NDK?
+    @State private var sparkWalletManager: SparkWalletManager?
     @State private var isInitialized = false
     @AppStorage("appTheme") private var appTheme: String = "System"
 
@@ -27,8 +28,8 @@ public struct ContentView: View {
                     }
             } else if !authViewModel.isLoggedIn {
                 OnboardingView(authViewModel: authViewModel)
-            } else if let ndk = ndk {
-                MainTabView(ndk: ndk)
+            } else if let ndk = ndk, let sparkWalletManager = sparkWalletManager {
+                MainTabView(ndk: ndk, sparkWalletManager: sparkWalletManager)
                     .environmentObject(authViewModel)
             }
         }
@@ -69,8 +70,13 @@ public struct ContentView: View {
 
         await newNDK.connect()
 
+        // Initialize SparkWalletManager
+        let walletManager = SparkWalletManager(ndk: newNDK)
+        await walletManager.restoreWalletIfExists()
+
         await MainActor.run {
             self.ndk = newNDK
+            self.sparkWalletManager = walletManager
             self.isInitialized = true
         }
     }

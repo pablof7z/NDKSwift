@@ -19,7 +19,7 @@ let package = Package(
             name: "OlasAppFeature",
             dependencies: [
                 .product(name: "Olas", package: "Olas"),
-                .product(name: "NDKSwift", package: "master")
+                .product(name: "NDKSwift", package: "spark")
             ]
         ),
         .testTarget(

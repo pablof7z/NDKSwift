@@ -1,0 +1,44 @@
+appId: com.olas.app
+name: Olas Wallet Setup Test
+
+---
+# Test: Verify wallet tab appears and basic wallet UI works
+# This test works whether wallet is connected or disconnected
+
+# Launch the app first
+- launchApp
+
+# Wait for app to load - check for Profile tab which is always visible in tab bar
+- extendedWaitUntil:
+    visible:
+      text: "Profile"
+    timeout: 15000
+
+- takeScreenshot: "01_app_loaded"
+
+# Navigate to Wallet tab
+- tapOn:
+    text: "Wallet"
+
+- extendedWaitUntil:
+    visible:
+      text: "Wallet"
+    timeout: 5000
+
+- takeScreenshot: "02_wallet_tab"
+
+# Check if wallet is connected (shows Balance) or not connected (shows Create New Wallet)
+# The test will verify one of the two states
+
+# Try to find Balance (connected state) or Create New Wallet (disconnected state)
+- runFlow:
+    when:
+      visible: "Balance"
+    file: wallet_connected_flow.yaml
+
+- runFlow:
+    when:
+      visible: "Create New Wallet"
+    file: wallet_disconnected_flow.yaml
+
+- takeScreenshot: "03_test_complete"

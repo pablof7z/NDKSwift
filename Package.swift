@@ -6,10 +6,10 @@ import PackageDescription
 let package = Package(
     name: "NDKSwift",
     platforms: [
-        .iOS(.v17),
-        .macOS(.v14),
-        .tvOS(.v17),
-        .watchOS(.v10),
+        .iOS("18.0"),
+        .macOS("15.0"),
+        .tvOS("18.0"),
+        .watchOS("11.0"),
     ],
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
@@ -27,6 +27,7 @@ let package = Package(
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "6.29.3"),
         .package(url: "https://github.com/zeugmaster/CashuSwift.git", branch: "main"),
         .package(url: "https://github.com/breez/breez-sdk-spark-swift.git", from: "0.5.2"),
+        .package(url: "https://github.com/pengpengliu/BIP39.git", from: "1.0.0"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -98,6 +99,7 @@ let package = Package(
                 .product(name: "GRDB", package: "GRDB.swift"),
                 .product(name: "CashuSwift", package: "CashuSwift"),
                 .product(name: "BreezSdkSpark", package: "breez-sdk-spark-swift"),
+                .product(name: "BIP39", package: "BIP39"),
             ],
             resources: [
                 .process("Wallets/Common/README.md")

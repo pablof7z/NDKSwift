@@ -58,4 +58,10 @@ public enum OlasConstants {
             }
         }
     }
+
+    // MARK: - Spark Wallet
+
+    /// Breez API key for Spark wallet
+    /// Request your key at: https://breez.technology/request-api-key
+    public static let breezApiKey: String = "MIIBbzCCASGgAwIBAgIHPrdM6+5v5zAFBgMrZXAwEDEOMAwGA1UEAxMFQnJlZXowHhcNMjUxMjA5MTY0OTE1WhcNMzUxMjA3MTY0OTE1WjAyMRYwFAYDVQQKEw1TYW5pdHkgSXNsYW5kMRgwFgYDVQQDEw9QYWJsbyBGZXJuYW5kZXowKjAFBgMrZXADIQDQg/XL3yA8HKIgyimHU/Qbpxy0tvzris1fDUtEs6ldd6N4MHYwDgYDVR0PAQH/BAQDAgWgMAwGA1UdEwEB/wQCMAAwHQYDVR0OBBYEFNo5o+5ea0sNMlW/75VgGJCv2AcJMB8GA1UdIwQYMBaAFN6q1pJW843ndJIW/Ey2ILJrKJhrMBYGA1UdEQQPMA2BC3BmZXJAbWUuY29tMAUGAytlcANBAIXuxPsRXhdsnJGuzTHBu/5+gKlspwkCmUa0LUNvasjMRf6kpHkEUEL+4LptlVcVhz5kB+TRpDbHJhaYQu0dEAI="
 }
