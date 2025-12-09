@@ -50,7 +50,7 @@ final class SparkWalletTests: XCTestCase {
 
     // MARK: - fulfill Tests
 
-    func testFulfillThrowsNotConnectedError() async {
+    func testFulfillThrowsProviderNotAvailableError() async {
         let wallet = SparkWallet(apiKey: "test-api-key")
         let request = LightningInvoiceRequest(
             invoice: "lnbc100n1test",
@@ -61,19 +61,21 @@ final class SparkWalletTests: XCTestCase {
         do {
             _ = try await wallet.fulfill(request)
             XCTFail("Should throw error when not connected")
-        } catch let error as SparkWalletError {
-            XCTAssertEqual(error, .notConnected)
-            XCTAssertEqual(error.errorDescription, "Spark wallet is not connected")
+        } catch let error as PaymentError {
+            if case .providerNotAvailable = error {
+                XCTAssertEqual(error.errorDescription, "Payment provider is not available")
+            } else {
+                XCTFail("Expected providerNotAvailable error, got \(error)")
+            }
         } catch {
-            XCTFail("Should throw SparkWalletError, got \(error)")
+            XCTFail("Should throw PaymentError, got \(error)")
         }
     }
 
-    func testFulfillThrowsUnsupportedPaymentTypeError() async {
-        // This test would need a connected wallet to verify unsupported payment type
-        // For now, we just verify the error type exists and has correct description
-        let error = SparkWalletError.unsupportedPaymentType
-        XCTAssertEqual(error.errorDescription, "Unsupported payment type for Spark wallet")
+    func testSparkWalletErrorTypesExist() {
+        // Verify error types exist with correct descriptions
+        XCTAssertEqual(SparkWalletError.unsupportedPaymentType.errorDescription, "Unsupported payment type for Spark wallet")
+        XCTAssertEqual(SparkWalletError.notConnected.errorDescription, "Spark wallet is not connected")
     }
 
     // MARK: - getBalance Tests
