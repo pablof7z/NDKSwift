@@ -1,61 +1,70 @@
 import SwiftUI
 import NDKSwift
+import NDKSwiftUI
 
 public struct ProfileView: View {
     let ndk: NDK
     let pubkey: String
+    let currentUserPubkey: String?
 
+    @EnvironmentObject private var muteListManager: MuteListManager
     @State private var profile: NDKUserMetadata?
     @State private var posts: [NDKEvent] = []
     @State private var followingCount = 0
-    @State private var isLoading = true
     @State private var showEditProfile = false
-
-    @EnvironmentObject private var authViewModel: AuthViewModel
+    @State private var selectedTab: ProfileTab = .posts
 
     private var isOwnProfile: Bool {
-        pubkey == authViewModel.currentUser?.pubkey
+        guard let currentUserPubkey else { return false }
+        return pubkey == currentUserPubkey
     }
 
-    public init(ndk: NDK, pubkey: String) {
+    private var isMuted: Bool {
+        muteListManager.isMuted(pubkey)
+    }
+
+    public init(ndk: NDK, pubkey: String, currentUserPubkey: String? = nil) {
         self.ndk = ndk
         self.pubkey = pubkey
+        self.currentUserPubkey = currentUserPubkey
     }
 
     public var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                ProfileHeaderView(
-                    profile: profile,
+                // Hero section with banner and profile info
+                ProfileHeroSection(profile: profile)
+
+                // Stats bar
+                ProfileStatsBar(
                     postsCount: posts.count,
-                    followingCount: followingCount,
-                    isOwnProfile: isOwnProfile,
-                    onEditProfile: { showEditProfile = true }
+                    followingCount: followingCount
                 )
 
-                Divider()
-                    .padding(.vertical, 8)
+                // Bio and actions
+                ProfileBioSection(
+                    ndk: ndk,
+                    pubkey: pubkey,
+                    profile: profile,
+                    isOwnProfile: isOwnProfile,
+                    isMuted: isMuted,
+                    onEditProfile: { showEditProfile = true },
+                    onToggleMute: { Task { await toggleMute() } }
+                )
 
-                if isLoading {
-                    ProgressView()
-                        .padding(.top, 40)
-                } else if posts.isEmpty {
-                    VStack(spacing: 12) {
-                        Image(systemName: "camera")
-                            .font(.system(size: 40))
-                            .foregroundStyle(.secondary)
-                        Text("No posts yet")
-                            .font(.headline)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.top, 60)
-                } else {
-                    PostsGridView(posts: posts, ndk: ndk)
-                }
+                // Collections
+                ProfileCollectionsSection(isOwnProfile: isOwnProfile)
+
+                // Tabs
+                ProfileTabsBar(selectedTab: $selectedTab)
+
+                // Content grid - shows posts as they stream in
+                PostsGridView(posts: posts, ndk: ndk)
             }
         }
-        .navigationTitle(profile?.bestDisplayName ?? "Profile")
+        .ignoresSafeArea(edges: .top)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .task {
             await loadProfile()
             await loadPosts()
@@ -71,6 +80,11 @@ public struct ProfileView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     NavigationLink(destination: SettingsView(ndk: ndk)) {
                         Image(systemName: "gearshape")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(.white)
+                            .frame(width: 36, height: 36)
+                            .background(.black.opacity(0.4))
+                            .clipShape(Circle())
                     }
                 }
             }
@@ -86,25 +100,29 @@ public struct ProfileView: View {
         }
     }
 
-    private func loadPosts() async {
-        isLoading = true
-        defer { isLoading = false }
+    private var feedKinds: [Kind] {
+        var kinds: [Kind] = [OlasConstants.EventKinds.image]
+        if SettingsManager.shared.showVideos {
+            kinds.append(OlasConstants.EventKinds.shortVideo)
+        }
+        return kinds
+    }
 
+    private func loadPosts() async {
         let filter = NDKFilter(
             authors: [pubkey],
-            kinds: [OlasConstants.EventKinds.image],
+            kinds: feedKinds,
             limit: 50
         )
 
         let subscription = ndk.subscribe(filter: filter)
-        var fetchedPosts: [NDKEvent] = []
 
+        // Stream posts as they arrive - insert sorted to maintain order
         for await event in subscription.events {
-            fetchedPosts.append(event)
-            if fetchedPosts.count >= 50 { break }
+            // Insert in sorted position (newest first)
+            let insertIndex = posts.firstIndex { event.createdAt > $0.createdAt } ?? posts.endIndex
+            posts.insert(event, at: insertIndex)
         }
-
-        posts = fetchedPosts.sorted { $0.createdAt > $1.createdAt }
     }
 
     private func loadFollowing() async {
@@ -118,198 +136,530 @@ public struct ProfileView: View {
             followingCount = 0
         }
     }
+
+    private func toggleMute() async {
+        let impact = UIImpactFeedbackGenerator(style: .medium)
+        impact.impactOccurred()
+
+        do {
+            if isMuted {
+                try await muteListManager.unmute(pubkey)
+            } else {
+                try await muteListManager.mute(pubkey)
+            }
+        } catch {
+            // Mute/unmute failed silently
+        }
+    }
 }
 
-struct ProfileHeaderView: View {
+// MARK: - Profile Tab Enum
+
+enum ProfileTab: String, CaseIterable {
+    case posts = "Posts"
+    case liked = "Liked"
+    case zaps = "Zaps"
+}
+
+// MARK: - Hero Section
+
+struct ProfileHeroSection: View {
     let profile: NDKUserMetadata?
-    let postsCount: Int
-    let followingCount: Int
-    let isOwnProfile: Bool
-    let onEditProfile: () -> Void
 
     var body: some View {
-        VStack(spacing: 16) {
-            // Banner
-            if let bannerUrl = profile?.banner, let url = URL(string: bannerUrl) {
-                AsyncImage(url: url) { image in
-                    image
-                        .resizable()
-                        .scaledToFill()
-                } placeholder: {
-                    Rectangle()
-                        .fill(
-                            LinearGradient(
-                                colors: [OlasTheme.Colors.deepTeal, OlasTheme.Colors.oceanBlue],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                }
-                .frame(height: 120)
-                .clipped()
-            } else {
-                Rectangle()
-                    .fill(
-                        LinearGradient(
-                            colors: [OlasTheme.Colors.deepTeal, OlasTheme.Colors.oceanBlue],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .frame(height: 120)
-            }
-
-            VStack(spacing: 12) {
-                // Avatar
-                if let pictureUrl = profile?.picture, let url = URL(string: pictureUrl) {
+        GeometryReader { geometry in
+            ZStack(alignment: .bottom) {
+                // Banner image
+                if let bannerUrl = profile?.banner, let url = URL(string: bannerUrl) {
                     AsyncImage(url: url) { image in
                         image
                             .resizable()
                             .scaledToFill()
                     } placeholder: {
-                        Circle()
-                            .fill(.secondary.opacity(0.3))
+                        defaultBannerGradient
                     }
-                    .frame(width: 90, height: 90)
-                    .clipShape(Circle())
-                    .overlay(Circle().stroke(.background, lineWidth: 4))
-                    .offset(y: -60)
+                    .frame(width: geometry.size.width, height: 300)
+                    .clipped()
                 } else {
-                    Circle()
-                        .fill(.secondary.opacity(0.3))
-                        .frame(width: 90, height: 90)
-                        .overlay(
-                            Image(systemName: "person.fill")
-                                .font(.system(size: 40))
-                                .foregroundStyle(.secondary)
-                        )
-                        .overlay(Circle().stroke(.background, lineWidth: 4))
-                        .offset(y: -60)
+                    defaultBannerGradient
+                        .frame(height: 300)
                 }
 
-                VStack(spacing: 4) {
-                    Text(profile?.bestDisplayName ?? "Anonymous")
-                        .font(.title2.bold())
+                // Gradient overlay
+                LinearGradient(
+                    stops: [
+                        .init(color: .black.opacity(0.3), location: 0),
+                        .init(color: .clear, location: 0.3),
+                        .init(color: .clear, location: 0.5),
+                        .init(color: .black.opacity(0.95), location: 1)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 300)
 
-                    if let nip05 = profile?.nip05 {
-                        Text(nip05)
-                            .font(.subheadline)
-                            .foregroundStyle(OlasTheme.Colors.deepTeal)
+                // Profile info at bottom of hero
+                HStack(alignment: .bottom, spacing: 14) {
+                    // Avatar
+                    ProfileAvatar(pictureUrl: profile?.picture, size: 80)
+
+                    // Name and username
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(profile?.bestDisplayName ?? "Anonymous")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundStyle(.white)
+
+                        if let name = profile?.name, !name.isEmpty {
+                            Text("@\(name)")
+                                .font(.system(size: 14))
+                                .foregroundStyle(.white.opacity(0.6))
+                        }
                     }
 
-                    if let about = profile?.about, !about.isEmpty {
-                        Text(about)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                            .lineLimit(3)
-                            .padding(.horizontal)
-                    }
+                    Spacer()
                 }
-                .offset(y: -50)
-
-                // Stats
-                HStack(spacing: 40) {
-                    StatView(value: postsCount, label: "Posts")
-                    StatView(value: followingCount, label: "Following")
-                }
-                .offset(y: -40)
-
-                // Edit button for own profile
-                if isOwnProfile {
-                    Button(action: onEditProfile) {
-                        Text("Edit Profile")
-                            .font(.subheadline.bold())
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                            .background(.ultraThinMaterial)
-                            .cornerRadius(8)
-                    }
-                    .padding(.horizontal)
-                    .offset(y: -30)
-                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 20)
             }
         }
-        .padding(.bottom, isOwnProfile ? -20 : -40)
+        .frame(height: 300)
+    }
+
+    private var defaultBannerGradient: some View {
+        LinearGradient(
+            colors: [OlasTheme.Colors.deepTeal, OlasTheme.Colors.oceanBlue],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
     }
 }
 
-struct StatView: View {
-    let value: Int
+// MARK: - Profile Avatar
+
+struct ProfileAvatar: View {
+    let pictureUrl: String?
+    let size: CGFloat
+
+    var body: some View {
+        if let pictureUrl, let url = URL(string: pictureUrl) {
+            AsyncImage(url: url) { image in
+                image
+                    .resizable()
+                    .scaledToFill()
+            } placeholder: {
+                placeholderAvatar
+            }
+            .frame(width: size, height: size)
+            .clipShape(Circle())
+            .overlay(Circle().stroke(.black, lineWidth: 3))
+            .shadow(color: .black.opacity(0.4), radius: 6, y: 2)
+        } else {
+            placeholderAvatar
+                .frame(width: size, height: size)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(.black, lineWidth: 3))
+        }
+    }
+
+    private var placeholderAvatar: some View {
+        Circle()
+            .fill(.secondary.opacity(0.3))
+            .overlay(
+                Image(systemName: "person.fill")
+                    .font(.system(size: size * 0.4))
+                    .foregroundStyle(.secondary)
+            )
+    }
+}
+
+// MARK: - Stats Bar
+
+struct ProfileStatsBar: View {
+    let postsCount: Int
+    let followingCount: Int
+
+    var body: some View {
+        HStack(spacing: 32) {
+            StatItem(value: formatCount(postsCount), label: "posts")
+            StatItem(value: formatCount(followingCount), label: "following")
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .bottom) {
+            Divider().opacity(0.3)
+        }
+    }
+
+    private func formatCount(_ count: Int) -> String {
+        if count >= 1000000 {
+            return String(format: "%.1fM", Double(count) / 1000000)
+        } else if count >= 1000 {
+            return String(format: "%.1fK", Double(count) / 1000)
+        }
+        return "\(count)"
+    }
+}
+
+struct StatItem: View {
+    let value: String
     let label: String
 
     var body: some View {
-        VStack(spacing: 2) {
-            Text("\(value)")
-                .font(.headline.bold())
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            Text(value)
+                .font(.system(size: 17, weight: .bold))
             Text(label)
-                .font(.caption)
+                .font(.system(size: 14))
                 .foregroundStyle(.secondary)
         }
     }
 }
+
+// MARK: - Bio Section
+
+struct ProfileBioSection: View {
+    let ndk: NDK
+    let pubkey: String
+    let profile: NDKUserMetadata?
+    let isOwnProfile: Bool
+    let isMuted: Bool
+    let onEditProfile: () -> Void
+    let onToggleMute: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Muted indicator
+            if isMuted && !isOwnProfile {
+                HStack(spacing: 8) {
+                    Image(systemName: "speaker.slash.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
+                    Text("You have muted this user")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(.secondary.opacity(0.1))
+                .cornerRadius(8)
+            }
+
+            // Bio text
+            if let about = profile?.about, !about.isEmpty {
+                Text(about)
+                    .font(.system(size: 15))
+                    .lineSpacing(2)
+            }
+
+            // NIP-05
+            if let nip05 = profile?.nip05, !nip05.isEmpty {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 16, height: 16)
+                        .background(OlasTheme.Colors.oceanBlue)
+                        .clipShape(Circle())
+
+                    Text(nip05)
+                        .font(.system(size: 14))
+                        .foregroundStyle(OlasTheme.Colors.oceanBlue)
+                }
+            }
+
+            // Action buttons
+            HStack(spacing: 10) {
+                if isOwnProfile {
+                    Button(action: onEditProfile) {
+                        Text("Edit Profile")
+                            .font(.system(size: 14, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(OlasTheme.Colors.oceanBlue)
+                            .foregroundStyle(.white)
+                            .cornerRadius(12)
+                    }
+                } else {
+                    NDKUIFollowButton(ndk: ndk, pubkey: pubkey)
+                }
+
+                Button(action: {}) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 14, weight: .semibold))
+                        .frame(width: 44, height: 44)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(.secondary.opacity(0.3), lineWidth: 1.5)
+                        )
+                }
+
+                if !isOwnProfile {
+                    Button(action: {}) {
+                        Text("⚡")
+                            .font(.system(size: 18))
+                            .frame(width: 44, height: 44)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(.secondary.opacity(0.3), lineWidth: 1.5)
+                            )
+                    }
+
+                    // Mute/Unmute button
+                    Button(action: onToggleMute) {
+                        Image(systemName: isMuted ? "speaker.wave.2" : "speaker.slash")
+                            .font(.system(size: 14, weight: .semibold))
+                            .frame(width: 44, height: 44)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(isMuted ? OlasTheme.Colors.oceanBlue : .secondary.opacity(0.3), lineWidth: 1.5)
+                            )
+                            .foregroundStyle(isMuted ? OlasTheme.Colors.oceanBlue : .primary)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .overlay(alignment: .bottom) {
+            Divider().opacity(0.3)
+        }
+    }
+}
+
+// MARK: - Collections Section
+
+struct ProfileCollectionsSection: View {
+    let isOwnProfile: Bool
+
+    // Placeholder collections - these would come from actual data
+    private let collections = [
+        ("Surf", "🏄"),
+        ("Travel", "✈️"),
+        ("Sunsets", "🌅"),
+        ("Food", "🍜"),
+        ("Code", "💻")
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            // Section header
+            HStack {
+                Text("COLLECTIONS")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .tracking(0.5)
+
+                Spacer()
+
+                Button(action: {}) {
+                    Text("See All")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(OlasTheme.Colors.oceanBlue)
+                }
+            }
+            .padding(.horizontal, 20)
+
+            // Horizontal scroll of collections
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 14) {
+                    // Add new collection (only for own profile)
+                    if isOwnProfile {
+                        CollectionItem(name: "New", isAddButton: true)
+                    }
+
+                    // Collection items
+                    ForEach(collections, id: \.0) { name, emoji in
+                        CollectionItem(name: name, emoji: emoji)
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
+        }
+        .padding(.vertical, 20)
+        .overlay(alignment: .bottom) {
+            Divider().opacity(0.3)
+        }
+    }
+}
+
+struct CollectionItem: View {
+    let name: String
+    var emoji: String? = nil
+    var isAddButton: Bool = false
+
+    var body: some View {
+        VStack(spacing: 8) {
+            if isAddButton {
+                // Add button style
+                Circle()
+                    .stroke(style: StrokeStyle(lineWidth: 2, dash: [5]))
+                    .foregroundStyle(.secondary.opacity(0.3))
+                    .frame(width: 66, height: 66)
+                    .overlay(
+                        Image(systemName: "plus")
+                            .font(.system(size: 24, weight: .light))
+                            .foregroundStyle(.secondary.opacity(0.6))
+                    )
+            } else {
+                // Collection thumbnail with gradient ring
+                ZStack {
+                    // Gradient ring
+                    Circle()
+                        .stroke(
+                            LinearGradient(
+                                colors: [OlasTheme.Colors.oceanBlue, OlasTheme.Colors.seafoam],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 3
+                        )
+                        .frame(width: 72, height: 72)
+
+                    // Inner circle with emoji placeholder
+                    Circle()
+                        .fill(Color(white: 0.15))
+                        .frame(width: 64, height: 64)
+                        .overlay(
+                            Text(emoji ?? "📷")
+                                .font(.system(size: 28))
+                        )
+                }
+            }
+
+            Text(name)
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+// MARK: - Tabs Bar
+
+struct ProfileTabsBar: View {
+    @Binding var selectedTab: ProfileTab
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(ProfileTab.allCases, id: \.self) { tab in
+                Button(action: { selectedTab = tab }) {
+                    VStack(spacing: 0) {
+                        Text(tab.rawValue)
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(selectedTab == tab ? Color.primary : Color.secondary.opacity(0.6))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+
+                        // Underline indicator
+                        Rectangle()
+                            .fill(selectedTab == tab ? OlasTheme.Colors.oceanBlue : .clear)
+                            .frame(height: 2)
+                            .padding(.horizontal, 20)
+                    }
+                }
+            }
+        }
+        .overlay(alignment: .bottom) {
+            Divider().opacity(0.3)
+        }
+    }
+}
+
+// MARK: - Posts Grid
 
 struct PostsGridView: View {
     let posts: [NDKEvent]
     let ndk: NDK
 
     private let columns = [
-        GridItem(.flexible(), spacing: 2),
-        GridItem(.flexible(), spacing: 2),
-        GridItem(.flexible(), spacing: 2)
+        GridItem(.flexible(), spacing: 1),
+        GridItem(.flexible(), spacing: 1),
+        GridItem(.flexible(), spacing: 1)
     ]
 
     var body: some View {
-        LazyVGrid(columns: columns, spacing: 2) {
+        LazyVGrid(columns: columns, spacing: 1) {
             ForEach(posts, id: \.id) { post in
                 PostGridCell(event: post)
             }
         }
+        .background(Color(white: 0.15))
     }
 }
 
 struct PostGridCell: View {
     let event: NDKEvent
 
-    private var imageUrl: String? {
-        // Extract image URL from imeta tag or content
-        for tag in event.tags {
-            if tag.first == "imeta" {
-                for part in tag {
-                    if part.hasPrefix("url ") {
-                        return String(part.dropFirst(4))
+    private var isVideo: Bool {
+        event.kind == OlasConstants.EventKinds.shortVideo
+    }
+
+    private var thumbnailUrl: URL? {
+        if isVideo {
+            let video = NDKVideo(event: event)
+            if let thumb = video.thumbnailURL {
+                return URL(string: thumb)
+            }
+            return nil
+        } else {
+            // Extract image URL from imeta tag or content
+            for tag in event.tags {
+                if tag.first == "imeta" {
+                    for part in tag {
+                        if part.hasPrefix("url ") {
+                            return URL(string: String(part.dropFirst(4)))
+                        }
                     }
                 }
             }
+            // Fallback: look for URL in content
+            let urlPattern = #"https?://[^\s]+"#
+            if let match = event.content.range(of: urlPattern, options: .regularExpression) {
+                return URL(string: String(event.content[match]))
+            }
+            return nil
         }
-        // Fallback: look for URL in content
-        let urlPattern = #"https?://[^\s]+"#
-        if let match = event.content.range(of: urlPattern, options: .regularExpression) {
-            return String(event.content[match])
-        }
-        return nil
     }
 
     var body: some View {
         GeometryReader { geo in
-            if let urlString = imageUrl, let url = URL(string: urlString) {
-                AsyncImage(url: url) { image in
-                    image
-                        .resizable()
-                        .scaledToFill()
-                } placeholder: {
+            ZStack {
+                if let url = thumbnailUrl {
+                    AsyncImage(url: url) { image in
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    } placeholder: {
+                        Rectangle()
+                            .fill(Color(white: 0.1))
+                    }
+                    .frame(width: geo.size.width, height: geo.size.width)
+                    .clipped()
+                } else {
                     Rectangle()
-                        .fill(.secondary.opacity(0.2))
+                        .fill(Color(white: 0.1))
+                        .overlay(
+                            Image(systemName: isVideo ? "video" : "photo")
+                                .foregroundStyle(.secondary)
+                        )
                 }
-                .frame(width: geo.size.width, height: geo.size.width)
-                .clipped()
-            } else {
-                Rectangle()
-                    .fill(.secondary.opacity(0.2))
-                    .overlay(
-                        Image(systemName: "photo")
-                            .foregroundStyle(.secondary)
-                    )
+
+                // Video indicator overlay
+                if isVideo {
+                    VStack {
+                        Spacer()
+                        HStack {
+                            Spacer()
+                            Image(systemName: "play.fill")
+                                .font(.caption)
+                                .foregroundStyle(.white)
+                                .padding(4)
+                                .background(.black.opacity(0.5))
+                                .clipShape(Circle())
+                                .padding(6)
+                        }
+                    }
+                }
             }
         }
         .aspectRatio(1, contentMode: .fit)

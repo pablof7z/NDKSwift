@@ -6,28 +6,25 @@ struct CommentsSheet: View {
     let event: NDKEvent
     let ndk: NDK
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var muteListManager: MuteListManager
 
     @State private var comments: [NDKEvent] = []
     @State private var newComment = ""
-    @State private var isLoading = true
     @State private var isSending = false
     @FocusState private var isInputFocused: Bool
+
+    private var filteredComments: [NDKEvent] {
+        comments.filter { !muteListManager.isMuted($0.pubkey) }
+    }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Comments list
+                // Comments list - streams in as they arrive
                 ScrollView {
                     LazyVStack(spacing: 0) {
-                        if isLoading {
-                            ProgressView()
-                                .padding(.top, 40)
-                        } else if comments.isEmpty {
-                            emptyState
-                        } else {
-                            ForEach(comments, id: \.id) { comment in
-                                CommentRow(comment: comment, ndk: ndk)
-                            }
+                        ForEach(filteredComments, id: \.id) { comment in
+                            CommentRow(comment: comment, ndk: ndk)
                         }
                     }
                 }
@@ -59,23 +56,6 @@ struct CommentsSheet: View {
         .presentationCornerRadius(24)
     }
 
-    private var emptyState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "bubble.left.and.bubble.right")
-                .font(.system(size: 50))
-                .foregroundStyle(.secondary.opacity(0.5))
-
-            Text("No comments yet")
-                .font(.headline)
-                .foregroundStyle(.secondary)
-
-            Text("Start the conversation")
-                .font(.subheadline)
-                .foregroundStyle(.tertiary)
-        }
-        .padding(.top, 60)
-    }
-
     private var commentInput: some View {
         HStack(spacing: 12) {
             TextField("Add a comment...", text: $newComment, axis: .vertical)
@@ -103,9 +83,6 @@ struct CommentsSheet: View {
     }
 
     private func loadComments() async {
-        isLoading = true
-        defer { isLoading = false }
-
         // Fetch comments (kind 1111) that reference this event
         let filter = NDKFilter(
             kinds: [OlasConstants.EventKinds.comment],
@@ -113,8 +90,8 @@ struct CommentsSheet: View {
         )
 
         let subscription = ndk.subscribe(filter: filter)
-        var fetchedComments: [NDKEvent] = []
 
+        // Stream comments as they arrive
         for await commentEvent in subscription.events {
             // Check if comment references our event
             let referencesOurEvent = commentEvent.tags.contains { tag in
@@ -122,13 +99,11 @@ struct CommentsSheet: View {
             }
 
             if referencesOurEvent {
-                fetchedComments.append(commentEvent)
+                // Insert in sorted position (oldest first for comments)
+                let insertIndex = comments.firstIndex { commentEvent.createdAt < $0.createdAt } ?? comments.endIndex
+                comments.insert(commentEvent, at: insertIndex)
             }
-
-            if fetchedComments.count >= 50 { break }
         }
-
-        comments = fetchedComments.sorted { $0.createdAt < $1.createdAt }
     }
 
     private func sendComment() async {

@@ -2,19 +2,39 @@ import SwiftUI
 import NDKSwift
 import NDKSwiftUI
 
+extension NDKEvent: @retroactive Identifiable {}
+
 public struct ExploreView: View {
     let ndk: NDK
 
+    @EnvironmentObject private var authViewModel: AuthViewModel
+    @EnvironmentObject private var muteListManager: MuteListManager
     @State private var searchText = ""
-    @State private var isSearching = false
     @State private var searchResults: [NDKEvent] = []
     @State private var userResults: [SearchUserResult] = []
     @State private var trendingPosts: [NDKEvent] = []
     @State private var suggestedUsers: [SuggestedUser] = []
-    @State private var isLoading = true
     @State private var selectedTab: ExploreTab = .forYou
+    @State private var selectedPost: NDKEvent?
+    @State private var seenPubkeys: Set<String> = []
 
     @FocusState private var isSearchFocused: Bool
+
+    private var filteredTrendingPosts: [NDKEvent] {
+        trendingPosts.filter { !muteListManager.isMuted($0.pubkey) }
+    }
+
+    private var filteredSuggestedUsers: [SuggestedUser] {
+        suggestedUsers.filter { !muteListManager.isMuted($0.pubkey) }
+    }
+
+    private var filteredSearchResults: [NDKEvent] {
+        searchResults.filter { !muteListManager.isMuted($0.pubkey) }
+    }
+
+    private var filteredUserResults: [SearchUserResult] {
+        userResults.filter { !muteListManager.isMuted($0.pubkey) }
+    }
 
     enum ExploreTab: String, CaseIterable {
         case forYou = "For You"
@@ -45,6 +65,25 @@ public struct ExploreView: View {
             #endif
             .task {
                 await loadDiscoverContent()
+            }
+            .sheet(item: $selectedPost) { post in
+                NavigationStack {
+                    ScrollView {
+                        PostCard(event: post, ndk: ndk)
+                    }
+                    .navigationTitle("Post")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            Button("Done") {
+                                selectedPost = nil
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationDestination(for: String.self) { pubkey in
+                ProfileView(ndk: ndk, pubkey: pubkey, currentUserPubkey: authViewModel.currentUser?.pubkey)
             }
         }
     }
@@ -100,14 +139,11 @@ public struct ExploreView: View {
         LazyVStack(spacing: 0) {
             if searchText.isEmpty {
                 recentSearches
-            } else if isSearching {
-                ProgressView()
-                    .padding(.top, 40)
-            } else if userResults.isEmpty && searchResults.isEmpty {
+            } else if filteredUserResults.isEmpty && filteredSearchResults.isEmpty {
                 emptySearchResults
             } else {
                 // User results
-                if !userResults.isEmpty {
+                if !filteredUserResults.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Users")
                             .font(.headline)
@@ -115,14 +151,17 @@ public struct ExploreView: View {
                             .padding(.horizontal, 16)
                             .padding(.top, 16)
 
-                        ForEach(userResults) { user in
-                            SearchUserRow(user: user, ndk: ndk)
+                        ForEach(filteredUserResults) { user in
+                            NavigationLink(value: user.pubkey) {
+                                SearchUserRow(user: user, ndk: ndk)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
 
                 // Post results
-                if !searchResults.isEmpty {
+                if !filteredSearchResults.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Posts")
                             .font(.headline)
@@ -131,7 +170,7 @@ public struct ExploreView: View {
                             .padding(.top, 16)
 
                         LazyVStack(spacing: 1) {
-                            ForEach(searchResults, id: \.id) { event in
+                            ForEach(filteredSearchResults, id: \.id) { event in
                                 SearchPostRow(event: event, ndk: ndk)
                             }
                         }
@@ -179,18 +218,13 @@ public struct ExploreView: View {
             // Tab picker
             tabPicker
 
-            if isLoading {
-                ProgressView()
-                    .padding(.top, 60)
-            } else {
-                // Suggested Users Section
-                if !suggestedUsers.isEmpty {
-                    suggestedUsersSection
-                }
-
-                // Trending/Recent Grid
-                postsGrid
+            // Suggested Users Section - shows as users stream in
+            if !filteredSuggestedUsers.isEmpty {
+                suggestedUsersSection
             }
+
+            // Trending/Recent Grid - shows posts as they stream in
+            postsGrid
         }
     }
 
@@ -235,8 +269,11 @@ public struct ExploreView: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
-                    ForEach(suggestedUsers) { user in
-                        SuggestedUserCard(user: user, ndk: ndk)
+                    ForEach(filteredSuggestedUsers) { user in
+                        NavigationLink(value: user.pubkey) {
+                            SuggestedUserCard(user: user, ndk: ndk)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -253,37 +290,44 @@ public struct ExploreView: View {
             ],
             spacing: 2
         ) {
-            ForEach(trendingPosts, id: \.id) { event in
-                GridPostCell(event: event, ndk: ndk)
+            ForEach(filteredTrendingPosts, id: \.id) { event in
+                GridPostCell(event: event, ndk: ndk) {
+                    selectedPost = event
+                }
             }
         }
         .padding(.top, 16)
     }
 
-    private func loadDiscoverContent() async {
-        isLoading = true
-        defer { isLoading = false }
+    private var feedKinds: [Kind] {
+        var kinds: [Kind] = [OlasConstants.EventKinds.image]
+        if SettingsManager.shared.showVideos {
+            kinds.append(OlasConstants.EventKinds.shortVideo)
+        }
+        return kinds
+    }
 
-        // Fetch recent image posts (kind 20)
+    private func loadDiscoverContent() async {
+        // Fetch recent posts (images and optionally videos)
         let filter = NDKFilter(
-            kinds: [OlasConstants.EventKinds.image],
+            kinds: feedKinds,
             limit: 50
         )
 
         let subscription = ndk.subscribe(filter: filter)
-        var posts: [NDKEvent] = []
 
+        // Stream posts as they arrive
         for await event in subscription.events {
-            posts.append(event)
-            if posts.count >= 30 { break }
+            // Insert in sorted position (newest first)
+            let insertIndex = trendingPosts.firstIndex { event.createdAt > $0.createdAt } ?? trendingPosts.endIndex
+            trendingPosts.insert(event, at: insertIndex)
+
+            // Add to suggested users if we haven't seen this pubkey yet
+            if !seenPubkeys.contains(event.pubkey) && suggestedUsers.count < 10 {
+                seenPubkeys.insert(event.pubkey)
+                suggestedUsers.append(SuggestedUser(pubkey: event.pubkey))
+            }
         }
-
-        // Sort by created_at descending
-        trendingPosts = posts.sorted { $0.createdAt > $1.createdAt }
-
-        // Generate suggested users from post authors
-        let uniquePubkeys = Array(Set(posts.map(\.pubkey))).prefix(10)
-        suggestedUsers = uniquePubkeys.map { SuggestedUser(pubkey: $0) }
     }
 
     private func performSearch(query: String) async {
@@ -293,8 +337,9 @@ public struct ExploreView: View {
             return
         }
 
-        isSearching = true
-        defer { isSearching = false }
+        // Clear previous results
+        searchResults = []
+        userResults = []
 
         // Search for users by npub or name
         if query.hasPrefix("npub") {
@@ -303,15 +348,15 @@ public struct ExploreView: View {
                 userResults = [SearchUserResult(pubkey: user.pubkey)]
             }
         } else {
-            // Search metadata events for matching names
+            // Search metadata events for matching names - stream results
             let metadataFilter = NDKFilter(
                 kinds: [EventKind.metadata],
-                limit: 20
+                limit: 50
             )
 
             let metaSub = ndk.subscribe(filter: metadataFilter)
-            var matchingUsers: [SearchUserResult] = []
 
+            // Stream user results as they match
             for await event in metaSub.events {
                 if let data = event.content.data(using: .utf8),
                    let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
@@ -319,32 +364,25 @@ public struct ExploreView: View {
                     let name = json["name"] as? String
                     let searchableName = displayName ?? name ?? ""
                     if searchableName.localizedCaseInsensitiveContains(query) {
-                        matchingUsers.append(SearchUserResult(pubkey: event.pubkey))
+                        userResults.append(SearchUserResult(pubkey: event.pubkey))
                     }
                 }
-                if matchingUsers.count >= 10 { break }
             }
-
-            userResults = matchingUsers
         }
 
-        // Search posts for content matching query
+        // Search posts for content matching query - stream results
         let postFilter = NDKFilter(
-            kinds: [OlasConstants.EventKinds.image],
-            limit: 30
+            kinds: feedKinds,
+            limit: 50
         )
 
         let postSub = ndk.subscribe(filter: postFilter)
-        var matchingPosts: [NDKEvent] = []
 
         for await event in postSub.events {
             if event.content.localizedCaseInsensitiveContains(query) {
-                matchingPosts.append(event)
+                searchResults.append(event)
             }
-            if matchingPosts.count >= 15 { break }
         }
-
-        searchResults = matchingPosts
     }
 }
 
@@ -404,17 +442,7 @@ private struct SearchUserRow: View {
 
             Spacer()
 
-            Button {
-                // Follow action
-            } label: {
-                Text("Follow")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 6)
-                    .background(OlasTheme.Colors.deepTeal)
-                    .cornerRadius(8)
-            }
+            NDKUIFollowButton(ndk: ndk, pubkey: user.pubkey, style: .compact)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
@@ -431,9 +459,13 @@ private struct SearchPostRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Thumbnail
+            // Thumbnail with blurhash placeholder
             if let imageURL = image.primaryImageURL, let url = URL(string: imageURL) {
-                CachedAsyncImage(url: url) { loadedImage in
+                CachedAsyncImage(
+                    url: url,
+                    blurhash: image.primaryBlurhash,
+                    aspectRatio: 1
+                ) { loadedImage in
                     loadedImage
                         .resizable()
                         .scaledToFill()
@@ -444,6 +476,7 @@ private struct SearchPostRow: View {
                 .frame(width: 60, height: 60)
                 .cornerRadius(8)
                 .clipped()
+                .accessibilityLabel(image.primaryAlt ?? "Post thumbnail")
             }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -467,8 +500,6 @@ private struct SuggestedUserCard: View {
     let user: SuggestedUser
     let ndk: NDK
 
-    @State private var isFollowing = false
-
     var body: some View {
         VStack(spacing: 12) {
             NDKUIProfilePicture(ndk: ndk, pubkey: user.pubkey, size: 70)
@@ -484,66 +515,103 @@ private struct SuggestedUserCard: View {
                     .foregroundStyle(.tertiary)
             }
 
-            Button {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                    isFollowing.toggle()
-                }
-                triggerHaptic()
-            } label: {
-                Text(isFollowing ? "Following" : "Follow")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(isFollowing ? Color.secondary : Color.white)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 6)
-                    .background(isFollowing ? Color.secondary.opacity(0.2) : OlasTheme.Colors.deepTeal)
-                    .cornerRadius(8)
-            }
+            NDKUIFollowButton(ndk: ndk, pubkey: user.pubkey, style: .compact)
         }
         .frame(width: 130)
         .padding(.vertical, 16)
         .background(.ultraThinMaterial)
         .cornerRadius(16)
     }
-
-    private func triggerHaptic() {
-        #if os(iOS)
-        let impact = UIImpactFeedbackGenerator(style: .light)
-        impact.impactOccurred()
-        #endif
-    }
 }
 
 private struct GridPostCell: View {
     let event: NDKEvent
     let ndk: NDK
+    let onTap: () -> Void
+
+    private var isVideo: Bool {
+        event.kind == OlasConstants.EventKinds.shortVideo
+    }
 
     private var image: NDKImage {
         NDKImage(event: event)
     }
 
+    private var video: NDKVideo {
+        NDKVideo(event: event)
+    }
+
+    private var thumbnailURL: URL? {
+        if isVideo {
+            // For videos, try thumbnail first, then fallback to video URL (some players show first frame)
+            if let thumb = video.thumbnailURL, let url = URL(string: thumb) {
+                return url
+            }
+            return nil
+        } else {
+            if let urlStr = image.primaryImageURL {
+                return URL(string: urlStr)
+            }
+            return nil
+        }
+    }
+
+    private var blurhash: String? {
+        isVideo ? video.primaryBlurhash : image.primaryBlurhash
+    }
+
     var body: some View {
         GeometryReader { geometry in
-            if let imageURL = image.primaryImageURL, let url = URL(string: imageURL) {
-                CachedAsyncImage(url: url) { loadedImage in
-                    loadedImage
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: geometry.size.width, height: geometry.size.width)
-                        .clipped()
-                } placeholder: {
+            ZStack {
+                if let url = thumbnailURL {
+                    CachedAsyncImage(
+                        url: url,
+                        blurhash: blurhash,
+                        aspectRatio: 1
+                    ) { loadedImage in
+                        loadedImage
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: geometry.size.width, height: geometry.size.width)
+                            .clipped()
+                    } placeholder: {
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.1))
+                            .overlay(ProgressView().tint(OlasTheme.Colors.deepTeal))
+                    }
+                    .accessibilityLabel(isVideo ? (video.primaryAlt ?? "Video") : (image.primaryAlt ?? "Post image"))
+                } else {
                     Rectangle()
                         .fill(Color.gray.opacity(0.1))
-                        .overlay(ProgressView())
+                        .overlay(
+                            Image(systemName: isVideo ? "video" : "photo")
+                                .foregroundStyle(.secondary)
+                        )
+                        .accessibilityLabel(isVideo ? "Video not available" : "Image not available")
                 }
-            } else {
-                Rectangle()
-                    .fill(Color.gray.opacity(0.1))
-                    .overlay(
-                        Image(systemName: "photo")
-                            .foregroundStyle(.secondary)
-                    )
+
+                // Video indicator overlay
+                if isVideo {
+                    VStack {
+                        Spacer()
+                        HStack {
+                            Spacer()
+                            Image(systemName: "play.fill")
+                                .font(.caption)
+                                .foregroundStyle(.white)
+                                .padding(4)
+                                .background(.black.opacity(0.5))
+                                .clipShape(Circle())
+                                .padding(6)
+                        }
+                    }
+                }
             }
         }
         .aspectRatio(1, contentMode: .fit)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onTap()
+        }
     }
 }

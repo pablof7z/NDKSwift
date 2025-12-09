@@ -11,9 +11,12 @@ public struct PostCard: View {
     @State private var isLiked = false
     @State private var showLikeAnimation = false
     @State private var showComments = false
+    @State private var showFullscreenImage = false
+    @State private var showReportSheet = false
     @State private var likeCount = 0
     @State private var commentCount = 0
-    @State private var zapAmount = 0
+
+    @EnvironmentObject private var muteListManager: MuteListManager
 
     public init(event: NDKEvent, ndk: NDK, onProfileTap: ((String) -> Void)? = nil) {
         self.event = event
@@ -25,35 +28,60 @@ public struct PostCard: View {
         NDKImage(event: event)
     }
 
+    private var isVideo: Bool {
+        event.kind == OlasConstants.EventKinds.shortVideo
+    }
+
     public var body: some View {
+        if isVideo {
+            VideoPostCard(event: event, ndk: ndk, onProfileTap: onProfileTap)
+        } else {
+            imagePostContent
+        }
+    }
+
+    private var imagePostContent: some View {
         VStack(alignment: .leading, spacing: 0) {
             postHeader
             postImage
             postActions
             postCaption
         }
+        .accessibilityIdentifier("post_card")
         .task {
             await loadReactions()
         }
         .sheet(isPresented: $showComments) {
             CommentsSheet(event: event, ndk: ndk)
         }
+        .fullScreenCover(isPresented: $showFullscreenImage) {
+            if let imageURL = image.primaryImageURL, let url = URL(string: imageURL) {
+                FullscreenImageViewer(
+                    url: url,
+                    blurhash: image.primaryBlurhash,
+                    aspectRatio: image.primaryAspectRatio,
+                    isPresented: $showFullscreenImage
+                )
+            }
+        }
+        .sheet(isPresented: $showReportSheet) {
+            ReportSheet(event: event, ndk: ndk)
+        }
     }
 
     private var postHeader: some View {
         HStack(spacing: 12) {
-            NDKUIProfilePicture(ndk: ndk, pubkey: event.pubkey, size: 40)
-                .clipShape(Circle())
-                .onTapGesture {
-                    onProfileTap?(event.pubkey)
-                }
+            profilePictureButton
 
             VStack(alignment: .leading, spacing: 2) {
-                NDKUIDisplayName(ndk: ndk, pubkey: event.pubkey)
-                    .font(.subheadline.weight(.semibold))
-                    .onTapGesture {
-                        onProfileTap?(event.pubkey)
-                    }
+                Button {
+                    onProfileTap?(event.pubkey)
+                } label: {
+                    NDKUIDisplayName(ndk: ndk, pubkey: event.pubkey)
+                        .font(.subheadline.weight(.semibold))
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("post_author_name")
 
                 NDKUIRelativeTime(timestamp: event.createdAt)
                     .font(.caption)
@@ -62,35 +90,64 @@ public struct PostCard: View {
 
             Spacer()
 
-            Button {
-                // More options
+            Menu {
+                Button(role: .destructive) {
+                    showReportSheet = true
+                } label: {
+                    Label("Report", systemImage: "exclamationmark.triangle")
+                }
+
+                Button(role: .destructive) {
+                    Task { await muteAuthor() }
+                } label: {
+                    Label("Mute Author", systemImage: "speaker.slash")
+                }
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.body)
                     .foregroundStyle(.secondary)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+        .accessibilityIdentifier("post_author_header")
+    }
+
+    private var profilePictureButton: some View {
+        Button {
+            onProfileTap?(event.pubkey)
+        } label: {
+            NDKUIProfilePicture(ndk: ndk, pubkey: event.pubkey, size: 40)
+                .clipShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("post_author_avatar")
     }
 
     private var postImage: some View {
         ZStack {
             Group {
                 if let imageURL = image.primaryImageURL, let url = URL(string: imageURL) {
-                    CachedAsyncImage(url: url) { loadedImage in
+                    CachedAsyncImage(
+                        url: url,
+                        blurhash: image.primaryBlurhash,
+                        aspectRatio: image.primaryAspectRatio
+                    ) { loadedImage in
                         loadedImage
                             .resizable()
                             .aspectRatio(contentMode: .fit)
                     } placeholder: {
                         Rectangle()
                             .fill(Color.gray.opacity(0.1))
-                            .aspectRatio(1, contentMode: .fit)
+                            .aspectRatio(image.primaryAspectRatio ?? 1, contentMode: .fit)
                             .overlay(
                                 ProgressView()
                                     .tint(OlasTheme.Colors.deepTeal)
                             )
                     }
+                    .accessibilityLabel(image.primaryAlt ?? "Post image")
                 } else {
                     Rectangle()
                         .fill(Color.gray.opacity(0.1))
@@ -100,11 +157,15 @@ public struct PostCard: View {
                                 .font(.largeTitle)
                                 .foregroundStyle(.secondary)
                         )
+                        .accessibilityLabel("Image not available")
                 }
             }
             .contentShape(Rectangle())
             .onTapGesture(count: 2) {
                 handleDoubleTap()
+            }
+            .onTapGesture(count: 1) {
+                showFullscreenImage = true
             }
 
             // Like animation overlay
@@ -122,9 +183,7 @@ public struct PostCard: View {
                 showComments = true
             }
 
-            ZapButton(zapAmount: zapAmount) {
-                // Zap action
-            }
+            ZapButton(event: event, ndk: ndk)
 
             Spacer()
 
@@ -214,54 +273,60 @@ public struct PostCard: View {
     }
 
     private func loadReactions() async {
-        // Load reactions (kind 7)
+        // Load reactions and comments in parallel, streaming counts as they arrive
+        async let reactionTask: () = loadReactionCount()
+        async let commentTask: () = loadCommentCount()
+        _ = await (reactionTask, commentTask)
+    }
+
+    private func loadReactionCount() async {
         let reactionFilter = NDKFilter(
             kinds: [OlasConstants.EventKinds.reaction],
             limit: 500
         )
 
         let subscription = ndk.subscribe(filter: reactionFilter)
-        var reactions = 0
 
+        // Stream reaction count - increment as each reaction arrives
         for await reactionEvent in subscription.events {
             let referencesOurEvent = reactionEvent.tags.contains { tag in
                 tag.first == "e" && tag.count > 1 && tag[1] == event.id
             }
 
             if referencesOurEvent && reactionEvent.content == "+" {
-                reactions += 1
+                likeCount += 1
             }
-
-            if reactions >= 100 { break }
         }
+    }
 
-        await MainActor.run {
-            likeCount = reactions
-        }
-
-        // Load comments count
+    private func loadCommentCount() async {
         let commentFilter = NDKFilter(
             kinds: [OlasConstants.EventKinds.comment],
             limit: 100
         )
 
         let commentSub = ndk.subscribe(filter: commentFilter)
-        var comments = 0
 
+        // Stream comment count - increment as each comment arrives
         for await commentEvent in commentSub.events {
             let referencesOurEvent = commentEvent.tags.contains { tag in
                 tag.first == "e" && tag.count > 1 && tag[1] == event.id
             }
 
             if referencesOurEvent {
-                comments += 1
+                commentCount += 1
             }
-
-            if comments >= 50 { break }
         }
+    }
 
-        await MainActor.run {
-            commentCount = comments
+    private func muteAuthor() async {
+        let impact = UIImpactFeedbackGenerator(style: .medium)
+        impact.impactOccurred()
+
+        do {
+            try await muteListManager.mute(event.pubkey)
+        } catch {
+            // Mute failed silently - user can retry
         }
     }
 }
@@ -304,5 +369,93 @@ private struct PostCaptionText: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - FullscreenImageViewer
+
+struct FullscreenImageViewer: View {
+    let url: URL
+    let blurhash: String?
+    let aspectRatio: CGFloat?
+    @Binding var isPresented: Bool
+
+    @State private var scale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
+    @State private var offset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
+    @GestureState private var dragOffset: CGSize = .zero
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                Color.black.ignoresSafeArea()
+
+                CachedAsyncImage(url: url, blurhash: blurhash, aspectRatio: aspectRatio) { loadedImage in
+                    loadedImage
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .scaleEffect(scale)
+                        .offset(x: offset.width + dragOffset.width, y: offset.height + dragOffset.height)
+                        .gesture(
+                            MagnificationGesture()
+                                .onChanged { value in
+                                    let delta = value / lastScale
+                                    lastScale = value
+                                    scale = min(max(scale * delta, 1), 5)
+                                }
+                                .onEnded { _ in
+                                    lastScale = 1.0
+                                    if scale < 1.0 {
+                                        withAnimation(.spring()) {
+                                            scale = 1.0
+                                            offset = .zero
+                                        }
+                                    }
+                                }
+                        )
+                        .simultaneousGesture(
+                            DragGesture()
+                                .updating($dragOffset) { value, state, _ in
+                                    if scale > 1 {
+                                        state = value.translation
+                                    }
+                                }
+                                .onEnded { value in
+                                    if scale > 1 {
+                                        offset.width += value.translation.width
+                                        offset.height += value.translation.height
+                                    } else if abs(value.translation.height) > 100 {
+                                        isPresented = false
+                                    }
+                                }
+                        )
+                        .onTapGesture(count: 2) {
+                            withAnimation(.spring()) {
+                                if scale > 1 {
+                                    scale = 1.0
+                                    offset = .zero
+                                } else {
+                                    scale = 2.5
+                                }
+                            }
+                        }
+                } placeholder: {
+                    ProgressView()
+                        .tint(.white)
+                }
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            Button {
+                isPresented = false
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title)
+                    .foregroundStyle(.white.opacity(0.8))
+                    .padding()
+            }
+        }
+        .statusBarHidden()
     }
 }

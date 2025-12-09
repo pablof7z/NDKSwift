@@ -4,6 +4,9 @@ import NDKSwift
 
 public struct FeedView: View {
     @StateObject private var viewModel: FeedViewModel
+    @StateObject private var relayMetadataCache = RelayMetadataCache.shared
+    @EnvironmentObject private var authViewModel: AuthViewModel
+    @EnvironmentObject private var muteListManager: MuteListManager
     private let ndk: NDK
 
     @State private var navigationPath = NavigationPath()
@@ -11,6 +14,15 @@ public struct FeedView: View {
     public init(ndk: NDK) {
         self.ndk = ndk
         _viewModel = StateObject(wrappedValue: FeedViewModel(ndk: ndk))
+    }
+
+    private var currentFeedDisplayName: String {
+        switch viewModel.feedMode {
+        case .following:
+            return "Following"
+        case .relay(let url):
+            return relayMetadataCache.displayName(for: url)
+        }
     }
 
     public var body: some View {
@@ -27,22 +39,50 @@ public struct FeedView: View {
             }
             .refreshable {
                 viewModel.stopSubscription()
-                viewModel.startSubscription()
+                viewModel.startSubscription(muteListManager: muteListManager)
             }
-            .navigationTitle("Olas")
-            .navigationDestination(for: String.self) { pubkey in
-                ProfileView(ndk: ndk, pubkey: pubkey)
-            }
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    Text("Olas")
-                        .font(.title2.weight(.bold))
-                        .foregroundStyle(OlasTheme.Colors.deepTeal)
+                    Menu {
+                        Button {
+                            viewModel.switchMode(to: .following, muteListManager: muteListManager)
+                        } label: {
+                            Label("Following", systemImage: viewModel.feedMode == .following ? "checkmark" : "")
+                        }
+
+                        Divider()
+
+                        ForEach(DiscoveryRelays.relays, id: \.self) { relayURL in
+                            Button {
+                                viewModel.switchMode(to: .relay(url: relayURL), muteListManager: muteListManager)
+                            } label: {
+                                let isSelected = viewModel.feedMode == .relay(url: relayURL)
+                                Label(relayMetadataCache.displayName(for: relayURL), systemImage: isSelected ? "checkmark" : "")
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(currentFeedDisplayName)
+                                .fontWeight(.semibold)
+                            Image(systemName: "chevron.down")
+                                .font(.caption.weight(.semibold))
+                        }
+                        .foregroundStyle(.primary)
+                    }
                 }
+            }
+            .navigationDestination(for: String.self) { pubkey in
+                ProfileView(ndk: ndk, pubkey: pubkey, currentUserPubkey: authViewModel.currentUser?.pubkey)
             }
         }
         .onAppear {
-            viewModel.startSubscription()
+            viewModel.startSubscription(muteListManager: muteListManager)
+            Task {
+                for relayURL in DiscoveryRelays.relays {
+                    await relayMetadataCache.fetchMetadata(for: relayURL)
+                }
+            }
         }
         .onDisappear {
             viewModel.stopSubscription()
