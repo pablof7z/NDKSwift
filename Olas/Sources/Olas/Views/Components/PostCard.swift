@@ -8,6 +8,11 @@ public struct PostCard: View {
     let ndk: NDK
 
     @State private var isLiked = false
+    @State private var showLikeAnimation = false
+    @State private var showComments = false
+    @State private var likeCount = 0
+    @State private var commentCount = 0
+    @State private var zapAmount = 0
 
     public init(event: NDKEvent, ndk: NDK) {
         self.event = event
@@ -24,6 +29,12 @@ public struct PostCard: View {
             postImage
             postActions
             postCaption
+        }
+        .task {
+            await loadReactions()
+        }
+        .sheet(isPresented: $showComments) {
+            CommentsSheet(event: event, ndk: ndk)
         }
     }
 
@@ -42,80 +53,95 @@ public struct PostCard: View {
             }
 
             Spacer()
+
+            Button {
+                // More options
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
     }
 
     private var postImage: some View {
-        Group {
-            if let imageURL = image.primaryImageURL, let url = URL(string: imageURL) {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .empty:
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.2))
-                            .aspectRatio(1, contentMode: .fit)
-                            .overlay(ProgressView())
-                    case .success(let loadedImage):
-                        loadedImage
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                    case .failure:
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.2))
-                            .aspectRatio(1, contentMode: .fit)
-                            .overlay(
-                                Image(systemName: "photo")
+        ZStack {
+            Group {
+                if let imageURL = image.primaryImageURL, let url = URL(string: imageURL) {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .empty:
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.1))
+                                .aspectRatio(1, contentMode: .fit)
+                                .overlay(
+                                    ProgressView()
+                                        .tint(OlasTheme.Colors.deepTeal)
+                                )
+                        case .success(let loadedImage):
+                            loadedImage
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                        case .failure:
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.1))
+                                .aspectRatio(1, contentMode: .fit)
+                                .overlay(
+                                    VStack(spacing: 8) {
+                                        Image(systemName: "photo")
+                                            .font(.largeTitle)
+                                        Text("Unable to load")
+                                            .font(.caption)
+                                    }
                                     .foregroundStyle(.secondary)
-                            )
-                    @unknown default:
-                        EmptyView()
+                                )
+                        @unknown default:
+                            EmptyView()
+                        }
                     }
+                } else {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.1))
+                        .aspectRatio(1, contentMode: .fit)
+                        .overlay(
+                            Image(systemName: "photo")
+                                .font(.largeTitle)
+                                .foregroundStyle(.secondary)
+                        )
                 }
-            } else {
-                Rectangle()
-                    .fill(Color.gray.opacity(0.2))
-                    .aspectRatio(1, contentMode: .fit)
-                    .overlay(
-                        Image(systemName: "photo")
-                            .foregroundStyle(.secondary)
-                    )
             }
-        }
-        .contentShape(Rectangle())
-        .onTapGesture(count: 2) {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                isLiked = true
+            .contentShape(Rectangle())
+            .onTapGesture(count: 2) {
+                handleDoubleTap()
             }
+
+            // Like animation overlay
+            LikeAnimation(isAnimating: $showLikeAnimation)
         }
     }
 
     private var postActions: some View {
-        HStack(spacing: 16) {
-            Button {
-                isLiked.toggle()
-            } label: {
-                Image(systemName: isLiked ? "heart.fill" : "heart")
-                    .foregroundStyle(isLiked ? OlasTheme.Colors.heartRed : .primary)
+        HStack(spacing: 20) {
+            LikeButton(isLiked: $isLiked, likeCount: likeCount) {
+                Task { await toggleLike() }
             }
 
-            Button {
-                // Comments action
-            } label: {
-                Image(systemName: "bubble.right")
+            CommentButton(commentCount: commentCount) {
+                showComments = true
             }
 
-            Button {
+            ZapButton(zapAmount: zapAmount) {
                 // Zap action
-            } label: {
-                Image(systemName: "bolt")
-                    .foregroundStyle(OlasTheme.Colors.zapGold)
             }
 
             Spacer()
+
+            ShareButton {
+                // Share action
+            }
         }
-        .font(.title3)
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
     }
@@ -123,14 +149,137 @@ public struct PostCard: View {
     private var postCaption: some View {
         Group {
             if !event.content.isEmpty {
-                HStack {
-                    Text(event.content)
-                        .font(.subheadline)
-                    Spacer()
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .top, spacing: 0) {
+                        NDKUIDisplayName(ndk: ndk, pubkey: event.pubkey)
+                            .font(.subheadline.weight(.semibold))
+
+                        Text(" ")
+
+                        Text(event.content)
+                            .font(.subheadline)
+                    }
+                    .lineLimit(3)
+
+                    if likeCount > 0 {
+                        Text("\(likeCount) like\(likeCount == 1 ? "" : "s")")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 16)
+            } else if likeCount > 0 {
+                Text("\(likeCount) like\(likeCount == 1 ? "" : "s")")
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
             }
+        }
+    }
+
+    private func handleDoubleTap() {
+        guard !isLiked else { return }
+
+        // Haptic feedback
+        let impact = UIImpactFeedbackGenerator(style: .medium)
+        impact.impactOccurred()
+
+        // Show animation
+        showLikeAnimation = true
+
+        // Update state
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+            isLiked = true
+            likeCount += 1
+        }
+
+        // Publish reaction
+        Task { await publishReaction() }
+    }
+
+    private func toggleLike() async {
+        if isLiked {
+            // Unlike - we don't actually delete, just update UI
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                likeCount = max(0, likeCount - 1)
+            }
+        } else {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                likeCount += 1
+            }
+            await publishReaction()
+        }
+    }
+
+    private func publishReaction() async {
+        do {
+            _ = try await ndk.publish { builder in
+                builder
+                    .kind(OlasConstants.EventKinds.reaction)
+                    .content("+")
+                    .tag(["e", event.id])
+                    .tag(["p", event.pubkey])
+                    .tag(["k", "\(event.kind)"])
+            }
+        } catch {
+            // Revert on error
+            withAnimation {
+                isLiked = false
+                likeCount = max(0, likeCount - 1)
+            }
+        }
+    }
+
+    private func loadReactions() async {
+        // Load reactions (kind 7)
+        let reactionFilter = NDKFilter(
+            kinds: [OlasConstants.EventKinds.reaction],
+            limit: 500
+        )
+
+        let subscription = ndk.subscribe(filter: reactionFilter)
+        var reactions = 0
+
+        for await reactionEvent in subscription.events {
+            let referencesOurEvent = reactionEvent.tags.contains { tag in
+                tag.first == "e" && tag.count > 1 && tag[1] == event.id
+            }
+
+            if referencesOurEvent && reactionEvent.content == "+" {
+                reactions += 1
+            }
+
+            if reactions >= 100 { break }
+        }
+
+        await MainActor.run {
+            likeCount = reactions
+        }
+
+        // Load comments count
+        let commentFilter = NDKFilter(
+            kinds: [OlasConstants.EventKinds.comment],
+            limit: 100
+        )
+
+        let commentSub = ndk.subscribe(filter: commentFilter)
+        var comments = 0
+
+        for await commentEvent in commentSub.events {
+            let referencesOurEvent = commentEvent.tags.contains { tag in
+                tag.first == "e" && tag.count > 1 && tag[1] == event.id
+            }
+
+            if referencesOurEvent {
+                comments += 1
+            }
+
+            if comments >= 50 { break }
+        }
+
+        await MainActor.run {
+            commentCount = comments
         }
     }
 }
