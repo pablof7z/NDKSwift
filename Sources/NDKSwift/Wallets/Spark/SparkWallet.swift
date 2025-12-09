@@ -12,6 +12,7 @@ public actor SparkWallet: NDKPaymentProvider {
 
     // MARK: - Properties
 
+    private let logPrefix = "[Spark]"
     private var sdk: BreezSdk?
     private let apiKey: String
     private let storagePath: String
@@ -50,6 +51,8 @@ public actor SparkWallet: NDKPaymentProvider {
             throw SparkWalletError.alreadyConnected
         }
 
+        NDKLogger.log(.info, category: .wallet, "\(logPrefix) Starting connection...")
+
         // Create storage directory if needed
         try FileManager.default.createDirectory(
             atPath: storagePath,
@@ -65,11 +68,13 @@ public actor SparkWallet: NDKPaymentProvider {
         let request = ConnectRequest(config: config, seed: seed)
 
         // Connect to network
+        NDKLogger.log(.debug, category: .wallet, "\(logPrefix) Connecting to Spark network...")
         sdk = try await connect(request: request)
 
         // Start listening for events
         await startEventListener()
 
+        NDKLogger.log(.info, category: .wallet, "\(logPrefix) Connected successfully")
         eventContinuation.yield(.connected)
     }
 
@@ -105,23 +110,39 @@ public actor SparkWallet: NDKPaymentProvider {
     public func canFulfill(_ request: PaymentRequest) async -> Bool {
         guard sdk != nil else { return false }
 
-        // SparkWallet can fulfill Lightning invoice requests
-        if request is LightningInvoiceRequest {
-            return true
+        // SparkWallet can only fulfill Lightning invoice requests
+        guard request is LightningInvoiceRequest else {
+            return false
         }
 
-        // Could also handle Spark-native requests in future
-        return false
+        // Check balance if we can
+        if let balance = try? await getBalance() {
+            return balance >= request.amountSats
+        }
+
+        // If we can't check balance, assume we can pay
+        return true
     }
 
     public func fulfill(_ request: PaymentRequest) async throws -> PaymentConfirmation {
         guard let sdk = sdk else {
-            throw SparkWalletError.notConnected
+            throw PaymentError.providerNotAvailable
         }
 
         guard let lightningRequest = request as? LightningInvoiceRequest else {
-            throw SparkWalletError.unsupportedPaymentType
+            throw PaymentError.cannotFulfillRequest
         }
+
+        // Check balance before attempting payment
+        if let balance = try? await getBalance(),
+           balance < lightningRequest.amountSats {
+            throw PaymentError.insufficientBalance(
+                available: balance,
+                required: lightningRequest.amountSats
+            )
+        }
+
+        NDKLogger.log(.debug, category: .wallet, "\(logPrefix) Preparing payment for \(lightningRequest.amountSats) sats")
 
         // Prepare payment first
         let prepareRequest = PrepareSendPaymentRequest(
@@ -131,9 +152,13 @@ public actor SparkWallet: NDKPaymentProvider {
 
         let prepareResponse = try await sdk.prepareSendPayment(request: prepareRequest)
 
+        NDKLogger.log(.debug, category: .wallet, "\(logPrefix) Executing payment...")
+
         // Execute payment
         let sendRequest = SendPaymentRequest(prepareResponse: prepareResponse)
         let response = try await sdk.sendPayment(request: sendRequest)
+
+        NDKLogger.log(.info, category: .wallet, "\(logPrefix) Payment succeeded: \(prepareResponse.amount) sats")
 
         // Convert to PaymentConfirmation
         return LightningPaymentConfirmation(
