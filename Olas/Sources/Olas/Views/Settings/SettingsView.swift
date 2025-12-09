@@ -4,9 +4,11 @@ import NDKSwift
 public struct SettingsView: View {
     let ndk: NDK
     @EnvironmentObject private var authViewModel: AuthViewModel
+    @StateObject private var blossomManager: NDKBlossomServerManager
 
     public init(ndk: NDK) {
         self.ndk = ndk
+        self._blossomManager = StateObject(wrappedValue: NDKBlossomServerManager(ndk: ndk))
     }
 
     public var body: some View {
@@ -21,8 +23,14 @@ public struct SettingsView: View {
                 NavigationLink(destination: AppearanceSettingsView()) {
                     SettingsRow(icon: "paintbrush", title: "Appearance", color: .purple)
                 }
+                NavigationLink(destination: VideoSettingsView()) {
+                    SettingsRow(icon: "video", title: "Video", color: .red)
+                }
                 NavigationLink(destination: RelaySettingsView(ndk: ndk)) {
                     SettingsRow(icon: "network", title: "Relays", color: .green)
+                }
+                NavigationLink(destination: BlossomSettingsView(manager: blossomManager)) {
+                    SettingsRow(icon: "externaldrive.badge.icloud", title: "Media Servers", color: .teal)
                 }
             }
 
