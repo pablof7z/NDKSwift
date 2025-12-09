@@ -48,10 +48,10 @@
     {
       "identity" : "cashuswift",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/zeugmaster/CashuSwift.git",
+      "location" : "https://github.com/pablof7z/CashuSwift.git",
       "state" : {
         "branch" : "main",
-        "revision" : "9ba13208bb1fb4e1d3e58549b689e4f1b538f3e7"
+        "revision" : "f1259bad9fc8d869f4df1065998dc2f553dfcd5e"
       }
     },
     {

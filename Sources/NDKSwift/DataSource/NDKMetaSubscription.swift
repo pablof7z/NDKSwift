@@ -300,8 +300,8 @@ public final class NDKMetaSubscription: @unchecked Sendable {
 
             for (pubkey, entry) in byAuthor {
                 filters.append(NDKFilter(
-                    kinds: Array(entry.kinds),
                     authors: [pubkey],
+                    kinds: Array(entry.kinds),
                     tags: ["d": entry.dTags]
                 ))
             }

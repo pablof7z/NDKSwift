@@ -14,6 +14,10 @@ public enum OlasConstants {
         "https://nostr.build"
     ]
 
+    /// Breez API key for Spark wallet
+    /// Request your own at https://breez.technology/request-api-key
+    public static let breezApiKey = "YOUR_BREEZ_API_KEY"
+
     public enum EventKinds {
         public static let image: Kind = 20
         public static let shortVideo: Kind = 22  // NIP-71 short-form video
