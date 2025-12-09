@@ -78,36 +78,18 @@ public struct PostCard: View {
         ZStack {
             Group {
                 if let imageURL = image.primaryImageURL, let url = URL(string: imageURL) {
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .empty:
-                            Rectangle()
-                                .fill(Color.gray.opacity(0.1))
-                                .aspectRatio(1, contentMode: .fit)
-                                .overlay(
-                                    ProgressView()
-                                        .tint(OlasTheme.Colors.deepTeal)
-                                )
-                        case .success(let loadedImage):
-                            loadedImage
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                        case .failure:
-                            Rectangle()
-                                .fill(Color.gray.opacity(0.1))
-                                .aspectRatio(1, contentMode: .fit)
-                                .overlay(
-                                    VStack(spacing: 8) {
-                                        Image(systemName: "photo")
-                                            .font(.largeTitle)
-                                        Text("Unable to load")
-                                            .font(.caption)
-                                    }
-                                    .foregroundStyle(.secondary)
-                                )
-                        @unknown default:
-                            EmptyView()
-                        }
+                    CachedAsyncImage(url: url) { loadedImage in
+                        loadedImage
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                    } placeholder: {
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.1))
+                            .aspectRatio(1, contentMode: .fit)
+                            .overlay(
+                                ProgressView()
+                                    .tint(OlasTheme.Colors.deepTeal)
+                            )
                     }
                 } else {
                     Rectangle()

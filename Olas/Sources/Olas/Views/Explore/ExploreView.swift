@@ -433,16 +433,13 @@ private struct SearchPostRow: View {
         HStack(spacing: 12) {
             // Thumbnail
             if let imageURL = image.primaryImageURL, let url = URL(string: imageURL) {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let loadedImage):
-                        loadedImage
-                            .resizable()
-                            .scaledToFill()
-                    default:
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.1))
-                    }
+                CachedAsyncImage(url: url) { loadedImage in
+                    loadedImage
+                        .resizable()
+                        .scaledToFill()
+                } placeholder: {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.1))
                 }
                 .frame(width: 60, height: 60)
                 .cornerRadius(8)
@@ -527,26 +524,16 @@ private struct GridPostCell: View {
     var body: some View {
         GeometryReader { geometry in
             if let imageURL = image.primaryImageURL, let url = URL(string: imageURL) {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let loadedImage):
-                        loadedImage
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: geometry.size.width, height: geometry.size.width)
-                            .clipped()
-                    case .empty:
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.1))
-                            .overlay(ProgressView())
-                    default:
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.1))
-                            .overlay(
-                                Image(systemName: "photo")
-                                    .foregroundStyle(.secondary)
-                            )
-                    }
+                CachedAsyncImage(url: url) { loadedImage in
+                    loadedImage
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: geometry.size.width, height: geometry.size.width)
+                        .clipped()
+                } placeholder: {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.1))
+                        .overlay(ProgressView())
                 }
             } else {
                 Rectangle()
