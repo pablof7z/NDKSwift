@@ -5,6 +5,7 @@ import NDKSwift
 public struct MainTabView: View {
     @State private var selectedTab = 0
     @State private var hasNotifications = false
+    @State private var showCreatePost = false
 
     private let ndk: NDK
 
@@ -27,8 +28,8 @@ public struct MainTabView: View {
                 }
                 .tag(1)
 
-            // Create placeholder
-            Text("Create")
+            // Create - triggers sheet
+            Color.clear
                 .tabItem {
                     Label("", systemImage: "plus.app.fill")
                 }
@@ -51,5 +52,14 @@ public struct MainTabView: View {
                 .tag(4)
         }
         .tint(OlasTheme.Colors.deepTeal)
+        .onChange(of: selectedTab) { oldValue, newValue in
+            if newValue == 2 {
+                showCreatePost = true
+                selectedTab = oldValue
+            }
+        }
+        .fullScreenCover(isPresented: $showCreatePost) {
+            CreatePostView(ndk: ndk)
+        }
     }
 }
