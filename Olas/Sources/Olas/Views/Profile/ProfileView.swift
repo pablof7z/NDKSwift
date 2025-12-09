@@ -13,6 +13,7 @@ public struct ProfileView: View {
     @State private var followingCount = 0
     @State private var showEditProfile = false
     @State private var selectedTab: ProfileTab = .posts
+    @State private var selectedPost: NDKEvent?
 
     private var isOwnProfile: Bool {
         guard let currentUserPubkey else { return false }
@@ -59,7 +60,9 @@ public struct ProfileView: View {
                 ProfileTabsBar(selectedTab: $selectedTab)
 
                 // Content grid - shows posts as they stream in
-                PostsGridView(posts: posts, ndk: ndk)
+                PostsGridView(posts: posts, ndk: ndk) { post in
+                    selectedPost = post
+                }
             }
         }
         .ignoresSafeArea(edges: .top)
@@ -74,6 +77,16 @@ public struct ProfileView: View {
             EditProfileView(ndk: ndk, currentProfile: profile) {
                 Task { await loadProfile() }
             }
+        }
+        .fullScreenCover(item: $selectedPost) { post in
+            FullscreenPostViewer(
+                event: post,
+                ndk: ndk,
+                isPresented: Binding(
+                    get: { selectedPost != nil },
+                    set: { if !$0 { selectedPost = nil } }
+                )
+            )
         }
         .toolbar {
             if isOwnProfile {
@@ -570,6 +583,7 @@ struct ProfileTabsBar: View {
 struct PostsGridView: View {
     let posts: [NDKEvent]
     let ndk: NDK
+    let onPostTap: (NDKEvent) -> Void
 
     private let columns = [
         GridItem(.flexible(), spacing: 1),
@@ -580,7 +594,9 @@ struct PostsGridView: View {
     var body: some View {
         LazyVGrid(columns: columns, spacing: 1) {
             ForEach(posts, id: \.id) { post in
-                PostGridCell(event: post)
+                PostGridCell(event: post) {
+                    onPostTap(post)
+                }
             }
         }
         .background(Color(white: 0.15))
@@ -589,14 +605,18 @@ struct PostsGridView: View {
 
 struct PostGridCell: View {
     let event: NDKEvent
+    let onTap: () -> Void
 
     private var isVideo: Bool {
         event.kind == OlasConstants.EventKinds.shortVideo
     }
 
+    private var video: NDKVideo {
+        NDKVideo(event: event)
+    }
+
     private var thumbnailUrl: URL? {
         if isVideo {
-            let video = NDKVideo(event: event)
             if let thumb = video.thumbnailURL {
                 return URL(string: thumb)
             }
@@ -621,6 +641,13 @@ struct PostGridCell: View {
         }
     }
 
+    private var blurhash: String? {
+        if isVideo {
+            return video.primaryBlurhash
+        }
+        return NDKImage(event: event).primaryBlurhash
+    }
+
     var body: some View {
         GeometryReader { geo in
             ZStack {
@@ -630,22 +657,39 @@ struct PostGridCell: View {
                             .resizable()
                             .scaledToFill()
                     } placeholder: {
-                        Rectangle()
-                            .fill(Color(white: 0.1))
+                        // Show blurhash placeholder if available
+                        if let hash = blurhash {
+                            BlurhashPlaceholder(blurhash: hash)
+                        } else {
+                            Rectangle()
+                                .fill(Color(white: 0.1))
+                        }
                     }
                     .frame(width: geo.size.width, height: geo.size.width)
                     .clipped()
+                } else if isVideo {
+                    // Video without thumbnail - show gradient with play icon
+                    LinearGradient(
+                        colors: [OlasTheme.Colors.deepTeal.opacity(0.8), OlasTheme.Colors.oceanBlue.opacity(0.8)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .overlay(
+                        Image(systemName: "play.circle.fill")
+                            .font(.system(size: 32))
+                            .foregroundStyle(.white.opacity(0.9))
+                    )
                 } else {
                     Rectangle()
                         .fill(Color(white: 0.1))
                         .overlay(
-                            Image(systemName: isVideo ? "video" : "photo")
+                            Image(systemName: "photo")
                                 .foregroundStyle(.secondary)
                         )
                 }
 
-                // Video indicator overlay
-                if isVideo {
+                // Video indicator overlay (bottom right)
+                if isVideo && thumbnailUrl != nil {
                     VStack {
                         Spacer()
                         HStack {
@@ -663,5 +707,30 @@ struct PostGridCell: View {
             }
         }
         .aspectRatio(1, contentMode: .fit)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onTap()
+        }
+    }
+}
+
+// MARK: - Blurhash Placeholder
+
+private struct BlurhashPlaceholder: View {
+    let blurhash: String
+
+    var body: some View {
+        if let image = decodeBlurHash(blurhash) {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+        } else {
+            Rectangle()
+                .fill(Color(white: 0.1))
+        }
+    }
+
+    private func decodeBlurHash(_ hash: String) -> UIImage? {
+        return BlurhashDecoder.decode(hash, size: CGSize(width: 32, height: 32))
     }
 }

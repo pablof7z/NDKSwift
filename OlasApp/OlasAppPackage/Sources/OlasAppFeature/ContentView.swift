@@ -6,6 +6,15 @@ public struct ContentView: View {
     @StateObject private var authViewModel = AuthViewModel()
     @State private var ndk: NDK?
     @State private var isInitialized = false
+    @AppStorage("appTheme") private var appTheme: String = "System"
+
+    private var colorScheme: ColorScheme? {
+        switch appTheme {
+        case "Light": return .light
+        case "Dark": return .dark
+        default: return nil
+        }
+    }
 
     public init() {}
 
@@ -30,6 +39,7 @@ public struct ContentView: View {
                 ndk?.signer = nil
             }
         }
+        .preferredColorScheme(colorScheme)
     }
 
     private func initializeNDK() async {

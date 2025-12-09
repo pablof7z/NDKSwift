@@ -126,12 +126,32 @@ public struct NDKVideo {
         return imetas.first?.m
     }
 
-    /// Get the thumbnail/preview image URL from the imeta tag
-    /// NIP-71 specifies this as the "image" field in imeta
+    /// Get the thumbnail/preview image URL
+    /// Checks multiple sources: imeta "image" field, "thumb" tag, "image" tag
     public var thumbnailURL: String? {
-        guard let firstImeta = imetas.first else { return nil }
-        // Check additionalFields for "image" key (NIP-71 thumbnail)
-        return firstImeta.additionalFields["image"]
+        // 1. Check imeta additionalFields for "image" key (NIP-71 style)
+        if let firstImeta = imetas.first,
+           let imageUrl = firstImeta.additionalFields["image"] {
+            return imageUrl
+        }
+
+        // 2. Check for "thumb" tag at event level
+        if let thumbUrl = tagValue("thumb") {
+            return thumbUrl
+        }
+
+        // 3. Check for "image" tag at event level
+        if let imageUrl = tagValue("image") {
+            return imageUrl
+        }
+
+        // 4. Check for "preview" in additionalFields
+        if let firstImeta = imetas.first,
+           let previewUrl = firstImeta.additionalFields["preview"] {
+            return previewUrl
+        }
+
+        return nil
     }
 
     /// Get the video duration in seconds from imeta tag

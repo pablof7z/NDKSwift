@@ -1,0 +1,51 @@
+appId: com.olas.app
+name: User Profile Navigation Test
+
+---
+# Wait for app to load and show feed
+- extendedWaitUntil:
+    visible:
+      text: "Olas"
+    timeout: 15000
+
+- takeScreenshot: "01_feed_loaded"
+
+# Wait for posts to load - look for time indicators like "13h", "2d", etc
+- extendedWaitUntil:
+    visible:
+      text: ".*\\d+[smhd].*"
+    timeout: 20000
+
+- takeScreenshot: "02_posts_visible"
+
+# Tap on the profile picture button using accessibility label
+- tapOn:
+    text: "Profile picture for.*"
+
+- takeScreenshot: "03_after_tap_profile_pic"
+
+# Give navigation time to happen
+- swipe:
+    start: "50%,50%"
+    end: "50%,50%"
+    duration: 500
+
+- takeScreenshot: "04_check_navigation"
+
+# Verify we navigated to a profile view
+# Profile should show stats like "posts" and "following"
+- extendedWaitUntil:
+    visible:
+      text: "posts"
+    timeout: 5000
+
+- assertVisible:
+    text: "following"
+
+- takeScreenshot: "05_profile_view_visible"
+
+# Verify we can see the Follow button (means we're on someone else's profile)
+- assertVisible:
+    text: "Follow"
+
+- takeScreenshot: "06_follow_button_visible"

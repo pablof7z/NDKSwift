@@ -91,6 +91,12 @@ public struct PostCard: View {
             Spacer()
 
             Menu {
+                Button {
+                    copyEventId()
+                } label: {
+                    Label("Copy ID", systemImage: "doc.on.doc")
+                }
+
                 Button(role: .destructive) {
                     showReportSheet = true
                 } label: {
@@ -121,56 +127,75 @@ public struct PostCard: View {
         } label: {
             NDKUIProfilePicture(ndk: ndk, pubkey: event.pubkey, size: 40)
                 .clipShape(Circle())
+                .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("post_author_avatar")
     }
 
     private var postImage: some View {
-        ZStack {
-            Group {
-                if let imageURL = image.primaryImageURL, let url = URL(string: imageURL) {
-                    CachedAsyncImage(
-                        url: url,
-                        blurhash: image.primaryBlurhash,
-                        aspectRatio: image.primaryAspectRatio
-                    ) { loadedImage in
-                        loadedImage
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                    } placeholder: {
+        GeometryReader { geometry in
+            let maxHeight = geometry.size.width * 1.25 // Max aspect ratio of 4:5 (portrait)
+
+            ZStack {
+                Group {
+                    if let imageURL = image.primaryImageURL, let url = URL(string: imageURL) {
+                        CachedAsyncImage(
+                            url: url,
+                            blurhash: image.primaryBlurhash,
+                            aspectRatio: image.primaryAspectRatio
+                        ) { loadedImage in
+                            loadedImage
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.1))
+                                .overlay(
+                                    ProgressView()
+                                        .tint(OlasTheme.Colors.deepTeal)
+                                )
+                        }
+                        .accessibilityLabel(image.primaryAlt ?? "Post image")
+                    } else {
                         Rectangle()
                             .fill(Color.gray.opacity(0.1))
-                            .aspectRatio(image.primaryAspectRatio ?? 1, contentMode: .fit)
                             .overlay(
-                                ProgressView()
-                                    .tint(OlasTheme.Colors.deepTeal)
+                                Image(systemName: "photo")
+                                    .font(.largeTitle)
+                                    .foregroundStyle(.secondary)
                             )
+                            .accessibilityLabel("Image not available")
                     }
-                    .accessibilityLabel(image.primaryAlt ?? "Post image")
-                } else {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.1))
-                        .aspectRatio(1, contentMode: .fit)
-                        .overlay(
-                            Image(systemName: "photo")
-                                .font(.largeTitle)
-                                .foregroundStyle(.secondary)
-                        )
-                        .accessibilityLabel("Image not available")
                 }
-            }
-            .contentShape(Rectangle())
-            .onTapGesture(count: 2) {
-                handleDoubleTap()
-            }
-            .onTapGesture(count: 1) {
-                showFullscreenImage = true
-            }
+                .frame(width: geometry.size.width, height: min(imageHeight(for: geometry.size.width), maxHeight))
+                .clipped()
+                .contentShape(Rectangle())
+                .onTapGesture(count: 2) {
+                    handleDoubleTap()
+                }
+                .onTapGesture(count: 1) {
+                    showFullscreenImage = true
+                }
 
-            // Like animation overlay
-            LikeAnimation(isAnimating: $showLikeAnimation)
+                // Like animation overlay
+                LikeAnimation(isAnimating: $showLikeAnimation)
+            }
         }
+        .frame(height: imageDisplayHeight)
+    }
+
+    private func imageHeight(for width: CGFloat) -> CGFloat {
+        if let aspectRatio = image.primaryAspectRatio, aspectRatio > 0 {
+            return width / aspectRatio
+        }
+        return width // Square fallback
+    }
+
+    private var imageDisplayHeight: CGFloat {
+        let screenWidth = UIScreen.main.bounds.width
+        let maxHeight = screenWidth * 1.25
+        return min(imageHeight(for: screenWidth), maxHeight)
     }
 
     private var postActions: some View {
@@ -328,6 +353,16 @@ public struct PostCard: View {
         } catch {
             // Mute failed silently - user can retry
         }
+    }
+
+    private func copyEventId() {
+        guard let nevent = try? Bech32.nevent(eventId: event.id, author: event.pubkey, kind: event.kind) else {
+            return
+        }
+        UIPasteboard.general.string = nevent
+
+        let impact = UINotificationFeedbackGenerator()
+        impact.notificationOccurred(.success)
     }
 }
 

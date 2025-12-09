@@ -331,20 +331,20 @@ public actor NDKZapManager {
             let mintQuote = try JSONCoding.decodeFromDictionary(CashuSwift.Bolt11.MintQuote.self, from: mintQuoteData)
 
             // Issue tokens for the paid quote
-            let (proofs, validDLEQ) = try await CashuSwift.issue(
+            let issueResult = try await CashuSwift.issue(
                 for: mintQuote,
-                with: cashuMint,
+                mint: cashuMint,
                 seed: seed
             )
 
-            if !validDLEQ {
+            if case .fail = issueResult.dleqResult {
                 NDKLogger.log(.warning, category: .general, "⚠️ Warning: DLEQ verification failed for minted proofs")
             }
 
             // Now we need to swap these proofs to P2PK-locked ones
             // Use the CashuSwift send API correctly
-            let token = try await CashuSwift.send(
-                inputs: proofs,
+            let sendResult = try await CashuSwift.send(
+                inputs: issueResult.proofs,
                 mint: cashuMint,
                 amount: Int(quote.amount),
                 seed: seed,
@@ -352,7 +352,7 @@ public actor NDKZapManager {
             )
 
             // Extract the locked proofs from the token
-            guard let mintProofs = token.token.proofsByMint[quote.mint.absoluteString] else {
+            guard let mintProofs = sendResult.token.proofsByMint[quote.mint.absoluteString] else {
                 throw ZapError.mintTokenCreationFailed(
                     mint: quote.mint.host ?? quote.mint.absoluteString,
                     reason: "No proofs returned from mint"

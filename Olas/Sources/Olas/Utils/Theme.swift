@@ -4,10 +4,13 @@ import SwiftUI
 public enum OlasTheme {
     // MARK: - Colors
     public enum Colors {
-        // Primary Ocean palette
-        public static let deepTeal = Color(hex: "0D7377")
-        public static let oceanBlue = Color(hex: "14919B")
-        public static let seafoam = Color(hex: "7ED7C1")
+        // Primary accent - neutral black/white (adapts to light/dark mode)
+        public static let accent = Color.primary
+
+        // Legacy aliases - now neutral
+        public static let deepTeal = Color.primary
+        public static let oceanBlue = Color.primary
+        public static let seafoam = Color.secondary
 
         // Feedback colors
         public static let zapGold = Color(hex: "FFB800")

@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import UnifiedBlurHash
 
 /// Thread-safe image cache using NSCache
 actor ImageCache {
@@ -59,22 +60,43 @@ actor ImageCache {
     }
 }
 
-/// Cached async image view with loading and error states
+// MARK: - Blurhash Decoder
+
+/// Decodes blurhash strings into UIImage placeholders
+enum BlurhashDecoder {
+    /// Decode a blurhash string into a UIImage
+    /// - Parameters:
+    ///   - blurhash: The blurhash string from NIP-68 imeta tag
+    ///   - size: Target size for the decoded image (small is fine, it will be scaled)
+    /// - Returns: A UIImage representing the blurred placeholder, or nil if decoding fails
+    static func decode(_ blurhash: String, size: CGSize = CGSize(width: 32, height: 32)) -> UIImage? {
+        return UIImage(blurHash: blurhash, size: size)
+    }
+}
+
+// MARK: - CachedAsyncImage
+
+/// Cached async image view with blurhash placeholder support (NIP-68)
 struct CachedAsyncImage<Content: View, Placeholder: View>: View {
     let url: URL?
+    let blurhash: String?
+    let aspectRatio: CGFloat?
     let content: (Image) -> Content
     let placeholder: () -> Placeholder
 
     @State private var image: UIImage?
-    @State private var isLoading = true
-    @State private var loadFailed = false
+    @State private var blurhashImage: UIImage?
 
     init(
         url: URL?,
+        blurhash: String? = nil,
+        aspectRatio: CGFloat? = nil,
         @ViewBuilder content: @escaping (Image) -> Content,
         @ViewBuilder placeholder: @escaping () -> Placeholder
     ) {
         self.url = url
+        self.blurhash = blurhash
+        self.aspectRatio = aspectRatio
         self.content = content
         self.placeholder = placeholder
     }
@@ -83,6 +105,11 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
         Group {
             if let image {
                 content(Image(uiImage: image))
+            } else if let blurhashImage {
+                // Show decoded blurhash as placeholder while loading
+                Image(uiImage: blurhashImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
             } else {
                 placeholder()
             }
@@ -90,34 +117,71 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
         .task(id: url) {
             await loadImage()
         }
+        .onAppear {
+            decodeBlurhash()
+        }
+    }
+
+    private func decodeBlurhash() {
+        guard blurhashImage == nil, let blurhash, !blurhash.isEmpty else { return }
+
+        // Decode at a small size - it will be scaled up with blur effect
+        let size: CGSize
+        if let aspectRatio, aspectRatio > 0 {
+            // Use aspect ratio to get correct proportions
+            if aspectRatio > 1 {
+                size = CGSize(width: 32, height: 32 / aspectRatio)
+            } else {
+                size = CGSize(width: 32 * aspectRatio, height: 32)
+            }
+        } else {
+            size = CGSize(width: 32, height: 32)
+        }
+
+        blurhashImage = BlurhashDecoder.decode(blurhash, size: size)
     }
 
     private func loadImage() async {
-        guard let url else {
-            isLoading = false
-            loadFailed = true
-            return
-        }
-
-        isLoading = true
-        loadFailed = false
+        guard let url else { return }
 
         if let loadedImage = await ImageCache.shared.loadImage(from: url) {
             self.image = loadedImage
-            isLoading = false
-        } else {
-            isLoading = false
-            loadFailed = true
         }
     }
 }
 
-// Convenience initializer for simple use case
+// MARK: - Convenience Initializers
+
 extension CachedAsyncImage where Placeholder == ProgressView<EmptyView, EmptyView> {
     init(
         url: URL?,
+        blurhash: String? = nil,
+        aspectRatio: CGFloat? = nil,
         @ViewBuilder content: @escaping (Image) -> Content
     ) {
-        self.init(url: url, content: content, placeholder: { ProgressView() })
+        self.init(
+            url: url,
+            blurhash: blurhash,
+            aspectRatio: aspectRatio,
+            content: content,
+            placeholder: { ProgressView() }
+        )
+    }
+}
+
+extension CachedAsyncImage where Placeholder == EmptyView {
+    init(
+        url: URL?,
+        blurhash: String? = nil,
+        aspectRatio: CGFloat? = nil,
+        @ViewBuilder content: @escaping (Image) -> Content
+    ) {
+        self.init(
+            url: url,
+            blurhash: blurhash,
+            aspectRatio: aspectRatio,
+            content: content,
+            placeholder: { EmptyView() }
+        )
     }
 }

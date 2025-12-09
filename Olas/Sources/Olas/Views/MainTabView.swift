@@ -59,7 +59,7 @@ public struct MainTabView: View {
             }
             .tag(4)
         }
-        .tint(OlasTheme.Colors.deepTeal)
+        .tint(.primary)
         .onChange(of: selectedTab) { oldValue, newValue in
             if newValue == 2 {
                 showCreatePost = true
