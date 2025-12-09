@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 
 /// NDKImage represents a Nostr image event (kind 20)
 public struct NDKImage {
@@ -126,6 +127,22 @@ public struct NDKImage {
               let width = Int(parts[0]),
               let height = Int(parts[1]) else { return nil }
         return (width, height)
+    }
+
+    /// Get the blurhash for the primary image (NIP-68)
+    public var primaryBlurhash: String? {
+        return imetas.first?.blurhash
+    }
+
+    /// Get the alt text for the primary image (accessibility)
+    public var primaryAlt: String? {
+        return imetas.first?.alt
+    }
+
+    /// Get the aspect ratio for the primary image (width / height)
+    public var primaryAspectRatio: CGFloat? {
+        guard let dims = primaryImageDimensions, dims.height > 0 else { return nil }
+        return CGFloat(dims.width) / CGFloat(dims.height)
     }
 
     // MARK: - Convenience Tag Methods

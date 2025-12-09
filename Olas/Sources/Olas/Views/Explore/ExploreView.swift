@@ -66,21 +66,15 @@ public struct ExploreView: View {
             .task {
                 await loadDiscoverContent()
             }
-            .sheet(item: $selectedPost) { post in
-                NavigationStack {
-                    ScrollView {
-                        PostCard(event: post, ndk: ndk)
-                    }
-                    .navigationTitle("Post")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarTrailing) {
-                            Button("Done") {
-                                selectedPost = nil
-                            }
-                        }
-                    }
-                }
+            .fullScreenCover(item: $selectedPost) { post in
+                FullscreenPostViewer(
+                    event: post,
+                    ndk: ndk,
+                    isPresented: Binding(
+                        get: { selectedPost != nil },
+                        set: { if !$0 { selectedPost = nil } }
+                    )
+                )
             }
             .navigationDestination(for: String.self) { pubkey in
                 ProfileView(ndk: ndk, pubkey: pubkey, currentUserPubkey: authViewModel.currentUser?.pubkey)
@@ -580,18 +574,31 @@ private struct GridPostCell: View {
                             .overlay(ProgressView().tint(OlasTheme.Colors.deepTeal))
                     }
                     .accessibilityLabel(isVideo ? (video.primaryAlt ?? "Video") : (image.primaryAlt ?? "Post image"))
+                } else if isVideo {
+                    // Video without thumbnail - show gradient with play icon
+                    LinearGradient(
+                        colors: [OlasTheme.Colors.deepTeal.opacity(0.8), OlasTheme.Colors.oceanBlue.opacity(0.8)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .overlay(
+                        Image(systemName: "play.circle.fill")
+                            .font(.system(size: 32))
+                            .foregroundStyle(.white.opacity(0.9))
+                    )
+                    .accessibilityLabel("Video")
                 } else {
                     Rectangle()
                         .fill(Color.gray.opacity(0.1))
                         .overlay(
-                            Image(systemName: isVideo ? "video" : "photo")
+                            Image(systemName: "photo")
                                 .foregroundStyle(.secondary)
                         )
-                        .accessibilityLabel(isVideo ? "Video not available" : "Image not available")
+                        .accessibilityLabel("Image not available")
                 }
 
-                // Video indicator overlay
-                if isVideo {
+                // Video indicator overlay (only when there's a thumbnail)
+                if isVideo && thumbnailURL != nil {
                     VStack {
                         Spacer()
                         HStack {

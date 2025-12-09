@@ -94,9 +94,10 @@ public struct NDKUIDisplayName: View {
             }
     }
 
-    // MARK: - Private Properties
+    // MARK: - Public Properties
 
-    private var displayText: String {
+    /// The resolved display text for this user
+    public var displayText: String {
         // Try display name first
         if let displayName = metadata?.displayName,
            displayName.hasContent {

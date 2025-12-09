@@ -332,12 +332,13 @@ public enum Nutzap {
                 proofs: [mintURL: mintProofs],
                 unit: "sat"
             )
-            let (unlockedProofs, _, _) = try await CashuSwift.receive(
+            let receiveResult = try await CashuSwift.receive(
                 token: lockedToken,
                 of: mint,
                 seed: nil,
                 privateKey: privateKey
             )
+            let unlockedProofs = receiveResult.proofs
 
             // Add unlocked proofs to our wallet
             for proof in unlockedProofs {
@@ -413,7 +414,7 @@ public enum Nutzap {
         mintURL: String
     ) async throws -> (proofs: [CashuSwift.Proof], change: [CashuSwift.Proof]?) {
         // Use CashuSwift's send function with P2PK locking
-        let (token, changeProofs, _) = try await CashuSwift.send(
+        let sendResult = try await CashuSwift.send(
             inputs: proofs,
             mint: mint,
             amount: Int(amount),
@@ -424,11 +425,11 @@ public enum Nutzap {
 
         // Get the locked proofs from the token
         let lockedProofs = try GuardHelpers.unwrap(
-            token.proofsByMint[mintURL],
+            sendResult.token.proofsByMint[mintURL],
             error: NDKError.walletInvalidProof(details: "No proofs found in created token for mint \(mintURL)")
         )
 
-        return (proofs: lockedProofs, change: changeProofs)
+        return (proofs: lockedProofs, change: sendResult.change.isEmpty ? nil : sendResult.change)
     }
 
 
@@ -525,6 +526,20 @@ extension Nutzap {
                 return .invalidProofs(reason: ErrorMessageConstants.withContext("P2PK signing error", context: message))
             case .invalidSplit(let message):
                 return .invalidProofs(reason: ErrorMessageConstants.withContext(ErrorMessageConstants.invalid("split"), context: message))
+            case .invalidKeysetID(let message):
+                return .invalidProofs(reason: ErrorMessageConstants.withContext(ErrorMessageConstants.invalid("keyset ID"), context: message))
+            case .paymentRequestEncoding(let message):
+                return .invalidProofs(reason: ErrorMessageConstants.withContext("Payment request encoding error", context: message))
+            case .paymentRequestDecoding(let message):
+                return .invalidProofs(reason: ErrorMessageConstants.withContext("Payment request decoding error", context: message))
+            case .paymentRequestValidation(let message):
+                return .invalidProofs(reason: ErrorMessageConstants.withContext("Payment request validation error", context: message))
+            case .unsupportedTransport(let message):
+                return .invalidProofs(reason: ErrorMessageConstants.withContext("Unsupported transport", context: message))
+            case .lockingConditionMismatch(let message):
+                return .invalidProofs(reason: ErrorMessageConstants.withContext("Locking condition mismatch", context: message))
+            case .paymentRequestAmount(let message):
+                return .invalidProofs(reason: ErrorMessageConstants.withContext("Payment request amount error", context: message))
             }
         case let ndkError as NDKError:
             switch ndkError {

@@ -1,6 +1,7 @@
 import SwiftUI
 import PhotosUI
 import NDKSwift
+import UnifiedBlurHash
 
 public struct CreatePostView: View {
     @Environment(\.dismiss) private var dismiss
@@ -10,17 +11,19 @@ public struct CreatePostView: View {
     @State private var editedImage: UIImage?
     @State private var caption = ""
     @State private var isPublishing = false
+    @State private var publishingProgress: Double = 0
+    @State private var publishingStatus: String = ""
+    @State private var showSuccess = false
     @State private var error: Error?
     @State private var showError = false
 
     @State private var step: PostCreationStep = .selectPhoto
-    @State private var showPhotoPicker = false
-    @State private var showEditor = false
 
     enum PostCreationStep {
         case selectPhoto
         case editPhoto
         case addCaption
+        case publishing
     }
 
     public init(ndk: NDK) {
@@ -29,197 +32,156 @@ public struct CreatePostView: View {
 
     public var body: some View {
         NavigationStack {
-            Group {
-                switch step {
-                case .selectPhoto:
-                    photoSelectionView
+            ZStack {
+                Color.black.ignoresSafeArea()
 
-                case .editPhoto:
-                    if let image = selectedImage {
-                        ImageEditorView(
-                            image: .constant(image),
-                            isPresented: $showEditor
-                        ) { finalImage in
-                            editedImage = finalImage
-                            step = .addCaption
+                Group {
+                    switch step {
+                    case .selectPhoto:
+                        PhotoLibraryView(
+                            selectedImage: $selectedImage,
+                            onNext: {
+                                if selectedImage != nil {
+                                    step = .editPhoto
+                                }
+                            },
+                            onCancel: {
+                                dismiss()
+                            }
+                        )
+
+                    case .editPhoto:
+                        if let image = Binding($selectedImage) {
+                            ImageEditorView(
+                                image: image,
+                                onComplete: { finalImage in
+                                    editedImage = finalImage
+                                    step = .addCaption
+                                },
+                                onBack: {
+                                    step = .selectPhoto
+                                }
+                            )
                         }
-                    }
 
-                case .addCaption:
-                    captionView
+                    case .addCaption:
+                        if let image = editedImage ?? selectedImage {
+                            CaptionView(
+                                image: image,
+                                caption: $caption,
+                                onShare: {
+                                    step = .publishing
+                                    Task {
+                                        await publishPost()
+                                    }
+                                },
+                                onBack: {
+                                    step = .editPhoto
+                                }
+                            )
+                        }
+
+                    case .publishing:
+                        publishingView
+                    }
                 }
             }
             .alert("Error", isPresented: $showError) {
-                Button("OK") {}
+                Button("OK") {
+                    step = .addCaption
+                }
             } message: {
                 Text(error?.localizedDescription ?? "Unknown error")
             }
         }
+        .preferredColorScheme(.dark)
     }
 
-    private var photoSelectionView: some View {
+    private var publishingView: some View {
         VStack(spacing: 24) {
             Spacer()
 
-            Image(systemName: "photo.badge.plus")
-                .font(.system(size: 80))
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [OlasTheme.Colors.deepTeal, OlasTheme.Colors.oceanBlue],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+            if showSuccess {
+                // Success state
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [OlasTheme.Colors.deepTeal, OlasTheme.Colors.oceanBlue],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
                     )
-                )
-
-            Text("Create New Post")
-                .font(.title2.bold())
-
-            Text("Share a photo with your followers")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-            Spacer()
-
-            VStack(spacing: 12) {
-                PhotosPicker(selection: Binding(
-                    get: { nil },
-                    set: { item in
-                        Task {
-                            if let data = try? await item?.loadTransferable(type: Data.self),
-                               let image = UIImage(data: data) {
-                                selectedImage = image
-                                step = .editPhoto
-                            }
-                        }
+                    .frame(width: 80, height: 80)
+                    .overlay {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 36, weight: .bold))
+                            .foregroundStyle(.white)
                     }
-                ), matching: .images) {
-                    Text("Choose from Library")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(
+                    .transition(.scale.combined(with: .opacity))
+
+                Text("Posted!")
+                    .font(.system(size: 20, weight: .semibold))
+
+                Text("Your post is now live")
+                    .font(.system(size: 15))
+                    .foregroundStyle(.secondary)
+            } else {
+                // Progress state
+                ZStack {
+                    Circle()
+                        .stroke(Color(white: 0.2), lineWidth: 4)
+                        .frame(width: 80, height: 80)
+
+                    Circle()
+                        .trim(from: 0, to: publishingProgress)
+                        .stroke(
                             LinearGradient(
                                 colors: [OlasTheme.Colors.deepTeal, OlasTheme.Colors.oceanBlue],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            style: StrokeStyle(lineWidth: 4, lineCap: .round)
                         )
-                        .foregroundStyle(.white)
-                        .cornerRadius(14)
+                        .frame(width: 80, height: 80)
+                        .rotationEffect(.degrees(-90))
+                        .animation(.easeInOut(duration: 0.3), value: publishingProgress)
                 }
 
-                Button {
-                    showPhotoPicker = true
-                } label: {
-                    Text("Take a Photo")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(.ultraThinMaterial)
-                        .cornerRadius(14)
-                }
-            }
-            .padding(.horizontal, 30)
-            .padding(.bottom, 40)
-        }
-        .navigationTitle("New Post")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") {
-                    dismiss()
-                }
-            }
-        }
-        .fullScreenCover(isPresented: $showPhotoPicker) {
-            CameraView(image: Binding(
-                get: { selectedImage },
-                set: { image in
-                    if let image {
-                        selectedImage = image
-                        step = .editPhoto
-                    }
-                }
-            ))
-        }
-    }
+                Text(publishingStatus.isEmpty ? "Uploading..." : publishingStatus)
+                    .font(.system(size: 17, weight: .semibold))
 
-    private var captionView: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                VStack(spacing: 16) {
-                    if let image = editedImage ?? selectedImage {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxHeight: 300)
-                            .cornerRadius(12)
-                            .padding(.top)
-                    }
-
-                    TextField("Write a caption...", text: $caption, axis: .vertical)
-                        .lineLimit(5...10)
-                        .padding()
-                        .background(.ultraThinMaterial)
-                        .cornerRadius(12)
-                        .padding(.horizontal)
-                }
+                Text("Preparing your image")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
             }
 
             Spacer()
-
-            Button {
-                Task {
-                    await publishPost()
-                }
-            } label: {
-                if isPublishing {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                } else {
-                    Text("Share")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                }
-            }
-            .background(
-                LinearGradient(
-                    colors: [OlasTheme.Colors.deepTeal, OlasTheme.Colors.oceanBlue],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            )
-            .foregroundStyle(.white)
-            .cornerRadius(14)
-            .padding()
-            .disabled(isPublishing)
         }
-        .navigationTitle("New Post")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Back") {
-                    step = .editPhoto
-                }
-                .disabled(isPublishing)
-            }
-        }
+        .frame(maxWidth: .infinity)
+        .background(Color.black)
     }
 
     private func publishPost() async {
         guard let image = editedImage ?? selectedImage else { return }
 
         isPublishing = true
-        defer { isPublishing = false }
+        publishingProgress = 0.1
+        publishingStatus = "Uploading..."
 
         do {
-            // Upload image to Blossom or similar service
+            // Upload image
+            publishingProgress = 0.3
             let imageUrl = try await uploadImage(image)
+
+            publishingProgress = 0.6
+            publishingStatus = "Publishing..."
 
             // Get image dimensions
             let dimensions = "\(Int(image.size.width))x\(Int(image.size.height))"
+
+            // Generate blurhash (NIP-68)
+            publishingProgress = 0.8
+            let blurhash = await UnifiedBlurHash.getBlurHashString(from: image)
 
             // Publish kind 20 event
             _ = try await ndk.publish { builder in
@@ -229,8 +191,20 @@ public struct CreatePostView: View {
                     .imetaTag(url: imageUrl) { imeta in
                         imeta.dim = dimensions
                         imeta.m = "image/jpeg"
+                        imeta.blurhash = blurhash
                     }
             }
+
+            publishingProgress = 1.0
+            publishingStatus = "Done!"
+
+            // Show success
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                showSuccess = true
+            }
+
+            // Dismiss after delay
+            try? await Task.sleep(for: .seconds(1.5))
 
             await MainActor.run {
                 dismiss()
@@ -238,6 +212,7 @@ public struct CreatePostView: View {
         } catch {
             self.error = error
             showError = true
+            isPublishing = false
         }
     }
 
@@ -298,5 +273,16 @@ enum PostError: LocalizedError {
         case .invalidUploadResponse:
             return "Invalid response from upload server"
         }
+    }
+}
+
+// Helper extension for optional binding
+extension Binding {
+    init?(_ source: Binding<Value?>) {
+        guard source.wrappedValue != nil else { return nil }
+        self.init(
+            get: { source.wrappedValue! },
+            set: { source.wrappedValue = $0 }
+        )
     }
 }

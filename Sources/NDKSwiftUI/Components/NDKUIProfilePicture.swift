@@ -118,9 +118,7 @@ public struct NDKUIProfilePicture: View {
             RoundedRectangle(cornerRadius: effectiveCornerRadius)
                 .stroke(borderColor ?? Color.clear, lineWidth: borderWidth)
         )
-        .onTapGesture {
-            tapAction?()
-        }
+        .modifier(TapGestureModifier(tapAction: tapAction))
         .accessibilityLabel("Profile picture for \(displayName)")
         .onAppear {
             loadProfile()
@@ -188,6 +186,24 @@ public struct NDKUIProfilePicture: View {
         var copy = self
         copy.tapAction = action
         return copy
+    }
+}
+
+// MARK: - TapGestureModifier
+
+/// A modifier that conditionally adds tap gesture handling only when a tap action is provided.
+/// When no action is provided, the view passes through touches to parent views.
+private struct TapGestureModifier: ViewModifier {
+    let tapAction: (() -> Void)?
+
+    func body(content: Content) -> some View {
+        if let action = tapAction {
+            content
+                .contentShape(Circle())
+                .onTapGesture { action() }
+        } else {
+            content
+        }
     }
 }
 

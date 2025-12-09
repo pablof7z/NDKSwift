@@ -138,20 +138,20 @@ public enum Payment {
             )
 
             // Execute the melt operation
-            let (paid, change, dleqValid) = try await CashuSwift.melt(
-                with: quote,
+            let meltResult = try await CashuSwift.melt(
+                quote: quote,
                 mint: mint,
                 proofs: selectedProofs,
                 blankOutputs: blankOutputs
             )
 
             // Check if payment was successful
-            guard paid else {
+            guard meltResult.quote.state == .paid else {
                 throw NDKError.paymentFailed(reason: "Lightning payment was not successful")
             }
 
             // Log DLEQ verification failure but continue
-            if !dleqValid {
+            if case .fail = meltResult.dleqResult {
                 NDKLogger.log(.warning, category: .wallet, "⚠️ DLEQ verification failed but continuing since payment was successful. Mint: \(mintURL)")
             }
 
@@ -159,7 +159,7 @@ public enum Payment {
             await proofStateManager.markProofsAsDeleted(selectedProofs)
 
             // Add change proofs if any
-            if let changeProofs = change {
+            if let changeProofs = meltResult.change {
                 for proof in changeProofs {
                     await proofStateManager.addProof(proof, mint: mintURL)
                 }
@@ -167,7 +167,7 @@ public enum Payment {
 
             // Update wallet state
             let stateChange = WalletStateChange(
-                store: change ?? [],
+                store: meltResult.change ?? [],
                 destroy: selectedProofs,
                 mint: mintURL,
                 memo: StringConstants.Transactions.lightningPayment
@@ -342,7 +342,7 @@ public enum Payment {
 
         do {
             // Use CashuSwift's send function with P2PK locking
-            let (token, changeProofs, _) = try await CashuSwift.send(
+            let sendResult = try await CashuSwift.send(
                 inputs: selectedProofs,
                 mint: mint,
                 amount: Int(amount),
@@ -353,7 +353,7 @@ public enum Payment {
 
             // Get the locked proofs from the token
             let lockedProofs = try GuardHelpers.unwrap(
-                token.proofsByMint[mintURL.absoluteString],
+                sendResult.token.proofsByMint[mintURL.absoluteString],
                 error: NDKError.invalidProof("No proofs in created token")
             )
 
@@ -361,22 +361,22 @@ public enum Payment {
             await proofStateManager.markProofsAsDeleted(selectedProofs)
 
             // Add change proofs if any
-            if !changeProofs.isEmpty {
-                for proof in changeProofs {
+            if !sendResult.change.isEmpty {
+                for proof in sendResult.change {
                     await proofStateManager.addProof(proof, mint: mintURL.absoluteString)
                 }
             }
 
             // Update wallet state
             let stateChange = WalletStateChange(
-                store: changeProofs,
+                store: sendResult.change,
                 destroy: selectedProofs,
                 mint: mintURL.absoluteString,
                 memo: StringConstants.Transactions.sendTokens
             )
             _ = try await wallet.update(stateChange: stateChange)
 
-            return (proofs: lockedProofs, change: changeProofs)
+            return (proofs: lockedProofs, change: sendResult.change.isEmpty ? nil : sendResult.change)
 
         } catch {
             // Release reservation on failure

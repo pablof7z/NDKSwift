@@ -32,8 +32,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/zeugmaster/BIP32.git",
       "state" : {
-        "branch" : "main",
-        "revision" : "9147451d2fecc9678ef0ab4a880c8dd105ff5c8e"
+        "revision" : "9147451d2fecc9678ef0ab4a880c8dd105ff5c8e",
+        "version" : "1.2.1"
       }
     },
     {
@@ -48,10 +48,10 @@
     {
       "identity" : "cashuswift",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/pablof7z/CashuSwift.git",
+      "location" : "https://github.com/zeugmaster/CashuSwift.git",
       "state" : {
         "branch" : "main",
-        "revision" : "0e1b39ba4cafa41a83a415c79dda27ee1f38e4c7"
+        "revision" : "9ba13208bb1fb4e1d3e58549b689e4f1b538f3e7"
       }
     },
     {
@@ -93,10 +93,10 @@
     {
       "identity" : "swift-secp256k1",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/zeugmaster/swift-secp256k1.git",
+      "location" : "https://github.com/21-DOT-DEV/swift-secp256k1",
       "state" : {
-        "branch" : "main",
-        "revision" : "73cf2403b7a69de8efc612d251a6e0d01211e1c4"
+        "revision" : "e2f4de7caec61e971081d44e73ea6ef20359743b",
+        "version" : "0.19.0"
       }
     },
     {

@@ -80,21 +80,21 @@ public actor MintRetryHandler {
                 NDKLogger.log(.info, category: .wallet, "🔄 Attempting to mint tokens (attempt \(attemptCount)/\(config.maxRetries))...")
 
                 // Try to mint the tokens
-                let (proofs, validDLEQ) = try await CashuSwift.issue(
+                let issueResult = try await CashuSwift.issue(
                     for: mintQuote,
-                    with: mint,
+                    mint: mint,
                     seed: nil
                 )
 
                 // Log DLEQ verification status but accept proofs regardless
-                if !validDLEQ {
+                if case .fail = issueResult.dleqResult {
                     NDKLogger.log(.warning, category: .wallet, "⚠️ DLEQ verification failed for mint quote \(mintQuote.quote) but accepting proofs since payment was made. Mint: \(mint.url)")
                 }
 
                 // Accept proofs even if DLEQ failed - user has already paid
-                if !proofs.isEmpty {
-                    NDKLogger.log(.info, category: .wallet, "✅ Successfully minted \(proofs.count) proofs after \(attemptCount) attempts (DLEQ valid: \(validDLEQ))")
-                    return (proofs, false)
+                if !issueResult.proofs.isEmpty {
+                    NDKLogger.log(.info, category: .wallet, "✅ Successfully minted \(issueResult.proofs.count) proofs after \(attemptCount) attempts (DLEQ: \(issueResult.dleqResult))")
+                    return (issueResult.proofs, false)
                 }
 
             } catch {
