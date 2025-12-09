@@ -6,18 +6,22 @@ public struct FeedView: View {
     @StateObject private var viewModel: FeedViewModel
     private let ndk: NDK
 
+    @State private var navigationPath = NavigationPath()
+
     public init(ndk: NDK) {
         self.ndk = ndk
         _viewModel = StateObject(wrappedValue: FeedViewModel(ndk: ndk))
     }
 
     public var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             ScrollView {
                 LazyVStack(spacing: 0) {
                     ForEach(viewModel.posts, id: \.id) { event in
-                        PostCard(event: event, ndk: ndk)
-                            .padding(.bottom, 8)
+                        PostCard(event: event, ndk: ndk) { pubkey in
+                            navigationPath.append(pubkey)
+                        }
+                        .padding(.bottom, 8)
                     }
                 }
             }
@@ -26,6 +30,9 @@ public struct FeedView: View {
                 viewModel.startSubscription()
             }
             .navigationTitle("Olas")
+            .navigationDestination(for: String.self) { pubkey in
+                ProfileView(ndk: ndk, pubkey: pubkey)
+            }
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Text("Olas")

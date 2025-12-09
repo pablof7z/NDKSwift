@@ -66,6 +66,15 @@ public struct ProfileView: View {
                 Task { await loadProfile() }
             }
         }
+        .toolbar {
+            if isOwnProfile {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    NavigationLink(destination: SettingsView(ndk: ndk)) {
+                        Image(systemName: "gearshape")
+                    }
+                }
+            }
+        }
     }
 
     private func loadProfile() async {

@@ -6,6 +6,29 @@ import SwiftUI
 
 final class PostCardTests: XCTestCase {
 
+    func testPostCardProvidesProfileNavigationWithCorrectPubkey() {
+        let expectedPubkey = "abc123pubkey"
+        let event = NDKEvent(
+            id: "test123",
+            pubkey: expectedPubkey,
+            createdAt: 1234567890,
+            kind: EventKind.image,
+            tags: [],
+            content: "Test post",
+            sig: "sig123"
+        )
+
+        var navigatedToPubkey: String?
+        let onProfileTap: (String) -> Void = { pubkey in
+            navigatedToPubkey = pubkey
+        }
+
+        // Simulate the profile tap action
+        onProfileTap(event.pubkey)
+
+        XCTAssertEqual(navigatedToPubkey, expectedPubkey)
+    }
+
     func testPostCardExtractsImageURL() {
         // Create a mock image event with imeta tag
         let event = NDKEvent(

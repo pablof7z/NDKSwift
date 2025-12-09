@@ -22,10 +22,9 @@ public struct MainTabView: View {
                 }
                 .tag(0)
 
-            // Explore placeholder
-            Text("Explore")
+            ExploreView(ndk: ndk)
                 .tabItem {
-                    Label("Explore", systemImage: selectedTab == 1 ? "safari.fill" : "safari")
+                    Label("Explore", systemImage: selectedTab == 1 ? "magnifyingglass.circle.fill" : "magnifyingglass.circle")
                 }
                 .tag(1)
 
