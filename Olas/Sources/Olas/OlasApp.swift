@@ -3,19 +3,30 @@ import NDKSwift
 
 @main
 struct OlasApp: App {
+    @StateObject private var authViewModel = AuthViewModel()
     @State private var ndk: NDK?
     @State private var isInitialized = false
 
     var body: some Scene {
         WindowGroup {
             Group {
-                if let ndk = ndk, isInitialized {
-                    MainTabView(ndk: ndk)
-                } else {
+                if !isInitialized {
                     ProgressView("Connecting...")
                         .task {
                             await initializeNDK()
                         }
+                } else if !authViewModel.isLoggedIn {
+                    OnboardingView(authViewModel: authViewModel)
+                } else if let ndk = ndk {
+                    MainTabView(ndk: ndk)
+                        .environmentObject(authViewModel)
+                }
+            }
+            .onChange(of: authViewModel.isLoggedIn) { _, isLoggedIn in
+                if isLoggedIn {
+                    ndk?.signer = authViewModel.signer
+                } else {
+                    ndk?.signer = nil
                 }
             }
         }
@@ -36,6 +47,14 @@ struct OlasApp: App {
             newNDK.cache = cache
         } catch {
             print("Failed to initialize cache: \(error)")
+        }
+
+        // Restore session if available
+        await authViewModel.restoreSession()
+
+        // Set signer if logged in
+        if authViewModel.isLoggedIn {
+            newNDK.signer = authViewModel.signer
         }
 
         await newNDK.connect()
