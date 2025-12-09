@@ -3,6 +3,7 @@ import SwiftUI
 import NDKSwift
 
 public struct MainTabView: View {
+    @EnvironmentObject private var authViewModel: AuthViewModel
     @State private var selectedTab = 0
     @State private var hasNotifications = false
     @State private var showCreatePost = false
@@ -44,12 +45,18 @@ public struct MainTabView: View {
                     .tag(3)
             }
 
-            // Profile placeholder
-            Text("Profile")
-                .tabItem {
-                    Label("Profile", systemImage: selectedTab == 4 ? "person.fill" : "person")
+            // Profile
+            NavigationStack {
+                if let pubkey = authViewModel.currentUser?.pubkey {
+                    ProfileView(ndk: ndk, pubkey: pubkey)
+                } else {
+                    Text("Not logged in")
                 }
-                .tag(4)
+            }
+            .tabItem {
+                Label("Profile", systemImage: selectedTab == 4 ? "person.fill" : "person")
+            }
+            .tag(4)
         }
         .tint(OlasTheme.Colors.deepTeal)
         .onChange(of: selectedTab) { oldValue, newValue in
