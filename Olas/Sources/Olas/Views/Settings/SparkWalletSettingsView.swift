@@ -2,50 +2,54 @@ import SwiftUI
 import NDKSwift
 
 public struct SparkWalletSettingsView: View {
-    let ndk: NDK
+    @ObservedObject var walletManager: SparkWalletManager
 
-    @State private var connectionStatus: SparkConnectionStatus = .disconnected
-    @State private var balance: Int64 = 0
-    @State private var lightningAddress: String?
     @State private var showCreateWallet = false
     @State private var showImportWallet = false
     @State private var showDisconnectAlert = false
-    @State private var isLoading = false
-    @State private var error: String?
+    @State private var showLightningAddressSetup = false
 
-    public init(ndk: NDK) {
-        self.ndk = ndk
+    public init(walletManager: SparkWalletManager) {
+        self.walletManager = walletManager
     }
 
     public var body: some View {
         List {
             statusSection
 
-            if connectionStatus == .connected {
+            if walletManager.connectionStatus == .connected {
                 balanceSection
                 addressSection
                 actionsSection
             } else {
                 setupSection
             }
+
+            if let error = walletManager.error {
+                Section {
+                    Text(error)
+                        .foregroundStyle(.red)
+                        .font(.caption)
+                }
+            }
         }
         .navigationTitle("Spark Wallet")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
-        .task {
-            await checkConnection()
-        }
         .sheet(isPresented: $showCreateWallet) {
-            CreateSparkWalletView(ndk: ndk, onComplete: { await checkConnection() })
+            CreateSparkWalletView(walletManager: walletManager)
         }
         .sheet(isPresented: $showImportWallet) {
-            ImportSparkWalletView(ndk: ndk, onComplete: { await checkConnection() })
+            ImportSparkWalletView(walletManager: walletManager)
+        }
+        .sheet(isPresented: $showLightningAddressSetup) {
+            LightningAddressSetupView(walletManager: walletManager)
         }
         .alert("Disconnect Wallet", isPresented: $showDisconnectAlert) {
             Button("Cancel", role: .cancel) {}
             Button("Disconnect", role: .destructive) {
-                Task { await disconnect() }
+                Task { await walletManager.disconnect(clearMnemonic: true) }
             }
         } message: {
             Text("This will disconnect your Spark wallet. You can reconnect later using your mnemonic.")
@@ -57,11 +61,11 @@ public struct SparkWalletSettingsView: View {
     private var statusSection: some View {
         Section {
             HStack {
-                Image(systemName: connectionStatus.icon)
-                    .foregroundStyle(connectionStatus.color)
-                Text(connectionStatus.description)
+                Image(systemName: walletManager.connectionStatus.icon)
+                    .foregroundStyle(walletManager.connectionStatus.color)
+                Text(walletManager.connectionStatus.description)
                 Spacer()
-                if isLoading {
+                if walletManager.isLoading {
                     ProgressView()
                 }
             }
@@ -76,7 +80,7 @@ public struct SparkWalletSettingsView: View {
                 Text("Balance")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Text(formatSats(balance))
+                Text(formatSats(walletManager.balance))
                     .font(.title.bold())
             }
             .padding(.vertical, 8)
@@ -85,7 +89,7 @@ public struct SparkWalletSettingsView: View {
 
     private var addressSection: some View {
         Section {
-            if let address = lightningAddress {
+            if let address = walletManager.lightningAddress {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Lightning Address")
                         .font(.caption)
@@ -105,7 +109,7 @@ public struct SparkWalletSettingsView: View {
                 }
             } else {
                 Button("Setup Lightning Address") {
-                    // Show lightning address registration
+                    showLightningAddressSetup = true
                 }
             }
         } header: {
@@ -116,7 +120,7 @@ public struct SparkWalletSettingsView: View {
     private var actionsSection: some View {
         Section {
             Button {
-                Task { await sync() }
+                Task { await walletManager.sync() }
             } label: {
                 HStack {
                     Image(systemName: "arrow.triangle.2.circlepath")
@@ -163,32 +167,6 @@ public struct SparkWalletSettingsView: View {
         }
     }
 
-    // MARK: - Actions
-
-    private func checkConnection() async {
-        isLoading = true
-        defer { isLoading = false }
-
-        // Check if spark wallet is connected via zapManager
-        // For now, set disconnected - would integrate with actual SparkWallet instance
-        connectionStatus = .disconnected
-    }
-
-    private func sync() async {
-        isLoading = true
-        defer { isLoading = false }
-        // Sync wallet via SparkWallet instance
-    }
-
-    private func disconnect() async {
-        isLoading = true
-        defer { isLoading = false }
-        // Disconnect via SparkWallet instance
-        connectionStatus = .disconnected
-        balance = 0
-        lightningAddress = nil
-    }
-
     // MARK: - Helpers
 
     private func formatSats(_ amount: Int64) -> String {
@@ -199,68 +177,42 @@ public struct SparkWalletSettingsView: View {
     }
 }
 
-// MARK: - Connection Status
-
-enum SparkConnectionStatus {
-    case disconnected
-    case connecting
-    case connected
-    case error(String)
-
-    var icon: String {
-        switch self {
-        case .disconnected: return "bolt.slash.fill"
-        case .connecting: return "bolt.horizontal.fill"
-        case .connected: return "bolt.fill"
-        case .error: return "exclamationmark.triangle.fill"
-        }
-    }
-
-    var color: Color {
-        switch self {
-        case .disconnected: return .secondary
-        case .connecting: return .orange
-        case .connected: return OlasTheme.Colors.zapGold
-        case .error: return .red
-        }
-    }
-
-    var description: String {
-        switch self {
-        case .disconnected: return "Not Connected"
-        case .connecting: return "Connecting..."
-        case .connected: return "Connected"
-        case .error(let msg): return "Error: \(msg)"
-        }
-    }
-}
-
 // MARK: - Create Wallet View
 
 struct CreateSparkWalletView: View {
-    let ndk: NDK
-    let onComplete: () async -> Void
+    @ObservedObject var walletManager: SparkWalletManager
 
     @Environment(\.dismiss) private var dismiss
-    @State private var mnemonic: String?
-    @State private var mnemonicConfirmed = false
+
+    enum CreationStep {
+        case prompt
+        case showMnemonic(String)
+        case verify(String, [Int])
+    }
+
+    @State private var step: CreationStep = .prompt
     @State private var isCreating = false
     @State private var error: String?
+    @State private var verificationInputs: [String] = ["", "", ""]
+    @State private var verificationError: String?
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 24) {
-                if let mnemonic = mnemonic {
-                    mnemonicDisplay(mnemonic)
-                } else {
-                    createPrompt
+            ScrollView {
+                VStack(spacing: 24) {
+                    switch step {
+                    case .prompt:
+                        createPrompt
+                    case .showMnemonic(let mnemonic):
+                        mnemonicDisplay(mnemonic)
+                    case .verify(let mnemonic, let indices):
+                        verificationView(mnemonic: mnemonic, indices: indices)
+                    }
                 }
+                .padding()
             }
-            .padding()
             .navigationTitle("Create Wallet")
-            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
-            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -311,27 +263,92 @@ struct CreateSparkWalletView: View {
 
     private func mnemonicDisplay(_ mnemonic: String) -> some View {
         VStack(spacing: 20) {
-            Image(systemName: "checkmark.seal.fill")
+            Image(systemName: "shield.checkered")
                 .font(.system(size: 60))
-                .foregroundStyle(.green)
+                .foregroundStyle(OlasTheme.Colors.zapGold)
 
             Text("Your Recovery Phrase")
                 .font(.title2.bold())
 
-            Text("Write these words down in order. Never share them with anyone.")
+            Text("Write these words down in order. Never share them with anyone. You'll need to verify a few words on the next screen.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
-            VStack(alignment: .leading, spacing: 8) {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                 let words = mnemonic.split(separator: " ")
                 ForEach(Array(words.enumerated()), id: \.offset) { index, word in
                     HStack {
                         Text("\(index + 1).")
                             .foregroundStyle(.secondary)
-                            .frame(width: 30, alignment: .trailing)
+                            .frame(width: 24, alignment: .trailing)
                         Text(String(word))
                             .font(.body.monospaced())
+                        Spacer()
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(6)
+                }
+            }
+            .padding()
+
+            Button {
+                // Generate 3 random word indices to verify
+                let words = mnemonic.split(separator: " ")
+                var indices = Set<Int>()
+                while indices.count < 3 {
+                    indices.insert(Int.random(in: 0..<words.count))
+                }
+                verificationInputs = ["", "", ""]
+                step = .verify(mnemonic, Array(indices).sorted())
+            } label: {
+                Text("I've Written It Down")
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(OlasTheme.Colors.deepTeal)
+                    .foregroundStyle(.white)
+                    .cornerRadius(12)
+            }
+
+            Button {
+                dismiss()
+            } label: {
+                Text("Skip Verification (Not Recommended)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func verificationView(mnemonic: String, indices: [Int]) -> some View {
+        let words = mnemonic.split(separator: " ").map(String.init)
+
+        return VStack(spacing: 20) {
+            Image(systemName: "checkmark.shield")
+                .font(.system(size: 60))
+                .foregroundStyle(OlasTheme.Colors.deepTeal)
+
+            Text("Verify Your Phrase")
+                .font(.title2.bold())
+
+            Text("Enter the following words from your recovery phrase to confirm you've written it down correctly.")
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
+            VStack(spacing: 16) {
+                ForEach(Array(indices.enumerated()), id: \.offset) { arrayIndex, wordIndex in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Word #\(wordIndex + 1)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        TextField("Enter word \(wordIndex + 1)", text: $verificationInputs[arrayIndex])
+                            .textFieldStyle(.roundedBorder)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
                     }
                 }
             }
@@ -339,40 +356,70 @@ struct CreateSparkWalletView: View {
             .background(Color(.systemGray6))
             .cornerRadius(12)
 
-            Toggle("I have written down my recovery phrase", isOn: $mnemonicConfirmed)
+            if let error = verificationError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
 
             Button {
-                Task {
-                    await onComplete()
-                    dismiss()
-                }
+                verifyWords(mnemonic: mnemonic, indices: indices, words: words)
             } label: {
-                Text("Continue")
+                Text("Verify & Complete")
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(mnemonicConfirmed ? OlasTheme.Colors.deepTeal : Color.gray)
+                    .background(allFieldsFilled ? OlasTheme.Colors.deepTeal : .gray)
                     .foregroundStyle(.white)
                     .cornerRadius(12)
             }
-            .disabled(!mnemonicConfirmed)
+            .disabled(!allFieldsFilled)
+
+            Button {
+                step = .showMnemonic(mnemonic)
+            } label: {
+                Text("Go Back")
+                    .foregroundStyle(OlasTheme.Colors.deepTeal)
+            }
         }
+    }
+
+    private var allFieldsFilled: Bool {
+        verificationInputs.allSatisfy { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+    }
+
+    private func verifyWords(mnemonic: String, indices: [Int], words: [String]) {
+        for (arrayIndex, wordIndex) in indices.enumerated() {
+            let input = verificationInputs[arrayIndex].trimmingCharacters(in: .whitespaces).lowercased()
+            let expected = words[wordIndex].lowercased()
+
+            if input != expected {
+                verificationError = "Word #\(wordIndex + 1) is incorrect. Please check your recovery phrase and try again."
+                return
+            }
+        }
+
+        // All words verified correctly
+        verificationError = nil
+        dismiss()
     }
 
     private func createWallet() async {
         isCreating = true
         defer { isCreating = false }
 
-        // Would call SparkWallet.createWallet() here
-        // For now, generate a placeholder
-        mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+        do {
+            let newMnemonic = try await walletManager.createWallet()
+            step = .showMnemonic(newMnemonic)
+        } catch {
+            self.error = error.localizedDescription
+        }
     }
 }
 
 // MARK: - Import Wallet View
 
 struct ImportSparkWalletView: View {
-    let ndk: NDK
-    let onComplete: () async -> Void
+    @ObservedObject var walletManager: SparkWalletManager
 
     @Environment(\.dismiss) private var dismiss
     @State private var mnemonic = ""
@@ -400,6 +447,10 @@ struct ImportSparkWalletView: View {
                     .padding(8)
                     .background(Color(.systemGray6))
                     .cornerRadius(12)
+                    .autocorrectionDisabled()
+                    #if os(iOS)
+                    .textInputAutocapitalization(.never)
+                    #endif
 
                 if let error = error {
                     Text(error)
@@ -449,8 +500,113 @@ struct ImportSparkWalletView: View {
         isImporting = true
         defer { isImporting = false }
 
-        // Would call SparkWallet.connect(mnemonic:) here
-        await onComplete()
-        dismiss()
+        let cleanedMnemonic = mnemonic.trimmingCharacters(in: .whitespacesAndNewlines)
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+
+        do {
+            try await walletManager.importWallet(mnemonic: cleanedMnemonic)
+            dismiss()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+}
+
+// MARK: - Lightning Address Setup View
+
+struct LightningAddressSetupView: View {
+    @ObservedObject var walletManager: SparkWalletManager
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var username = ""
+    @State private var isRegistering = false
+    @State private var error: String?
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 24) {
+                Image(systemName: "bolt.fill")
+                    .font(.system(size: 60))
+                    .foregroundStyle(OlasTheme.Colors.zapGold)
+
+                Text("Setup Lightning Address")
+                    .font(.title2.bold())
+
+                Text("Choose a username for your Lightning address. You'll be able to receive payments at username@spark.money")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+
+                HStack {
+                    TextField("username", text: $username)
+                        .textFieldStyle(.roundedBorder)
+                        .autocorrectionDisabled()
+                        #if os(iOS)
+                        .textInputAutocapitalization(.never)
+                        #endif
+
+                    Text("@spark.money")
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal)
+
+                if let error = error {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+
+                Button {
+                    Task { await registerAddress() }
+                } label: {
+                    HStack {
+                        if isRegistering {
+                            ProgressView()
+                                .tint(.white)
+                        }
+                        Text("Register Address")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(isValidUsername ? OlasTheme.Colors.zapGold : .gray)
+                    .foregroundStyle(.white)
+                    .cornerRadius(12)
+                }
+                .disabled(!isValidUsername || isRegistering)
+
+                Spacer()
+            }
+            .padding()
+            .navigationTitle("Lightning Address")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private var isValidUsername: Bool {
+        let trimmed = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.count >= 3 && trimmed.allSatisfy { $0.isLetter || $0.isNumber || $0 == "_" }
+    }
+
+    private func registerAddress() async {
+        isRegistering = true
+        defer { isRegistering = false }
+
+        let cleanedUsername = username.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+
+        do {
+            try await walletManager.registerLightningAddress(cleanedUsername)
+            dismiss()
+        } catch {
+            self.error = error.localizedDescription
+        }
     }
 }
