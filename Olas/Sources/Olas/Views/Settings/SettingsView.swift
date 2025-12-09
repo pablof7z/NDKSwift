@@ -19,6 +19,12 @@ public struct SettingsView: View {
                 }
             }
 
+            Section("Wallet") {
+                NavigationLink(destination: SparkWalletSettingsView(ndk: ndk)) {
+                    SettingsRow(icon: "bolt.fill", title: "Spark Wallet", color: OlasTheme.Colors.zapGold)
+                }
+            }
+
             Section("App") {
                 NavigationLink(destination: AppearanceSettingsView()) {
                     SettingsRow(icon: "paintbrush", title: "Appearance", color: .purple)

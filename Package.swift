@@ -26,6 +26,7 @@ let package = Package(
         .package(url: "https://github.com/krzyzanowskim/CryptoSwift.git", from: "1.8.0"),
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "6.29.3"),
         .package(url: "https://github.com/zeugmaster/CashuSwift.git", branch: "main"),
+        .package(url: "https://github.com/breez/breez-sdk-spark-swift.git", from: "0.5.2"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -96,6 +97,7 @@ let package = Package(
                 .product(name: "CryptoSwift", package: "CryptoSwift"),
                 .product(name: "GRDB", package: "GRDB.swift"),
                 .product(name: "CashuSwift", package: "CashuSwift"),
+                .product(name: "BreezSdkSpark", package: "breez-sdk-spark-swift"),
             ],
             resources: [
                 .process("Wallets/Common/README.md")

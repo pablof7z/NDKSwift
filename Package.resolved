@@ -46,6 +46,15 @@
       }
     },
     {
+      "identity" : "breez-sdk-spark-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/breez/breez-sdk-spark-swift.git",
+      "state" : {
+        "revision" : "df192e5b76ac919311eee655f1c061cdfe302998",
+        "version" : "0.5.2"
+      }
+    },
+    {
       "identity" : "cashuswift",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/zeugmaster/CashuSwift.git",
