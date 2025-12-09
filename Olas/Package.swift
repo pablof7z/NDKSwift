@@ -19,7 +19,8 @@ let package = Package(
             dependencies: [
                 .product(name: "NDKSwift", package: "master"),
                 .product(name: "NDKSwiftUI", package: "master")
-            ]
+            ],
+            exclude: ["OlasApp.swift"]
         ),
         .testTarget(
             name: "OlasTests",
