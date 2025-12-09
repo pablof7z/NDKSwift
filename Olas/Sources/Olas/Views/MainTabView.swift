@@ -4,6 +4,8 @@ import NDKSwift
 
 public struct MainTabView: View {
     @EnvironmentObject private var authViewModel: AuthViewModel
+    @StateObject private var walletViewModel: WalletViewModel
+    @StateObject private var muteListManager: MuteListManager
     @State private var selectedTab = 0
     @State private var hasNotifications = false
     @State private var showCreatePost = false
@@ -12,6 +14,8 @@ public struct MainTabView: View {
 
     public init(ndk: NDK) {
         self.ndk = ndk
+        self._walletViewModel = StateObject(wrappedValue: WalletViewModel(ndk: ndk))
+        self._muteListManager = StateObject(wrappedValue: MuteListManager(ndk: ndk))
     }
 
     public var body: some View {
@@ -35,19 +39,17 @@ public struct MainTabView: View {
                 }
                 .tag(2)
 
-            // Notifications - only show if has notifications
-            if hasNotifications {
-                Text("Notifications")
-                    .tabItem {
-                        Label("Activity", systemImage: selectedTab == 3 ? "bell.fill" : "bell")
-                    }
-                    .tag(3)
-            }
+            // Wallet
+            WalletView(ndk: ndk, walletViewModel: walletViewModel)
+                .tabItem {
+                    Label("Wallet", systemImage: selectedTab == 3 ? "creditcard.fill" : "creditcard")
+                }
+                .tag(3)
 
             // Profile
             NavigationStack {
                 if let pubkey = authViewModel.currentUser?.pubkey {
-                    ProfileView(ndk: ndk, pubkey: pubkey)
+                    ProfileView(ndk: ndk, pubkey: pubkey, currentUserPubkey: pubkey)
                 } else {
                     Text("Not logged in")
                 }
@@ -67,5 +69,11 @@ public struct MainTabView: View {
         .fullScreenCover(isPresented: $showCreatePost) {
             CreatePostView(ndk: ndk)
         }
+        .task {
+            await walletViewModel.loadWallet()
+            muteListManager.startSubscription()
+        }
+        .environmentObject(walletViewModel)
+        .environmentObject(muteListManager)
     }
 }
