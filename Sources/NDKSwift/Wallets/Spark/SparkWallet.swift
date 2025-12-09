@@ -276,8 +276,8 @@ private class SparkEventHandler: EventListener {
         self.continuation = continuation
     }
 
-    func onEvent(e: SdkEvent) {
-        switch e {
+    func onEvent(event: SdkEvent) async {
+        switch event {
         case .paymentSucceeded(let details):
             continuation.yield(.paymentSucceeded(amountSats: Int64(details.payment.amountSat)))
         case .paymentFailed(let details):
