@@ -6,6 +6,7 @@ import NDKSwiftUI
 public struct PostCard: View {
     let event: NDKEvent
     let ndk: NDK
+    let onProfileTap: ((String) -> Void)?
 
     @State private var isLiked = false
     @State private var showLikeAnimation = false
@@ -14,9 +15,10 @@ public struct PostCard: View {
     @State private var commentCount = 0
     @State private var zapAmount = 0
 
-    public init(event: NDKEvent, ndk: NDK) {
+    public init(event: NDKEvent, ndk: NDK, onProfileTap: ((String) -> Void)? = nil) {
         self.event = event
         self.ndk = ndk
+        self.onProfileTap = onProfileTap
     }
 
     private var image: NDKImage {
@@ -42,10 +44,16 @@ public struct PostCard: View {
         HStack(spacing: 12) {
             NDKUIProfilePicture(ndk: ndk, pubkey: event.pubkey, size: 40)
                 .clipShape(Circle())
+                .onTapGesture {
+                    onProfileTap?(event.pubkey)
+                }
 
             VStack(alignment: .leading, spacing: 2) {
                 NDKUIDisplayName(ndk: ndk, pubkey: event.pubkey)
                     .font(.subheadline.weight(.semibold))
+                    .onTapGesture {
+                        onProfileTap?(event.pubkey)
+                    }
 
                 NDKUIRelativeTime(timestamp: event.createdAt)
                     .font(.caption)
@@ -150,16 +158,8 @@ public struct PostCard: View {
         Group {
             if !event.content.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    HStack(alignment: .top, spacing: 0) {
-                        NDKUIDisplayName(ndk: ndk, pubkey: event.pubkey)
-                            .font(.subheadline.weight(.semibold))
-
-                        Text(" ")
-
-                        Text(event.content)
-                            .font(.subheadline)
-                    }
-                    .lineLimit(3)
+                    PostCaptionText(ndk: ndk, pubkey: event.pubkey, content: event.content)
+                        .lineLimit(3)
 
                     if likeCount > 0 {
                         Text("\(likeCount) like\(likeCount == 1 ? "" : "s")")
@@ -280,6 +280,47 @@ public struct PostCard: View {
 
         await MainActor.run {
             commentCount = comments
+        }
+    }
+}
+
+// MARK: - PostCaptionText
+
+/// A component that displays username and caption as flowing inline text
+private struct PostCaptionText: View {
+    let ndk: NDK
+    let pubkey: String
+    let content: String
+
+    @State private var metadata: NDKUserMetadata?
+    @State private var profileTask: Task<Void, Never>?
+
+    var body: some View {
+        (Text(displayName).fontWeight(.semibold) + Text(" ") + Text(content))
+            .font(.subheadline)
+            .onAppear { loadProfile() }
+            .onDisappear { profileTask?.cancel() }
+    }
+
+    private var displayName: String {
+        if let displayName = metadata?.displayName, !displayName.isEmpty {
+            return displayName
+        }
+        if let name = metadata?.name, !name.isEmpty {
+            return name
+        }
+        let npub = NDKUser(pubkey: pubkey).npub
+        return String(npub.prefix(16)) + "..."
+    }
+
+    private func loadProfile() {
+        profileTask?.cancel()
+        profileTask = Task {
+            for await metadata in await ndk.profileManager.subscribe(for: pubkey) {
+                await MainActor.run {
+                    self.metadata = metadata
+                }
+            }
         }
     }
 }

@@ -33,7 +33,7 @@
       "location" : "https://github.com/zeugmaster/BIP32.git",
       "state" : {
         "branch" : "main",
-        "revision" : "1be94093fb7fe87dc0ccc8e2c041cc05218efff6"
+        "revision" : "9147451d2fecc9678ef0ab4a880c8dd105ff5c8e"
       }
     },
     {
@@ -55,12 +55,12 @@
       }
     },
     {
-      "identity" : "cryptoswiftwrapper",
+      "identity" : "cryptoswift",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/anquii/CryptoSwiftWrapper.git",
+      "location" : "https://github.com/krzyzanowskim/CryptoSwift.git",
       "state" : {
-        "revision" : "0d57e806de368b5d2364fabb7c789b48661ec90c",
-        "version" : "1.4.3"
+        "revision" : "e45a26384239e028ec87fbcc788f513b67e10d8f",
+        "version" : "1.9.0"
       }
     },
     {
