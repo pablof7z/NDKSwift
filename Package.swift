@@ -23,7 +23,7 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/anquii/CryptoSwiftWrapper.git", from: "1.4.3"),
+        .package(url: "https://github.com/krzyzanowskim/CryptoSwift.git", from: "1.8.0"),
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "6.29.3"),
         .package(url: "https://github.com/pablof7z/CashuSwift.git", branch: "main"),
     ],
@@ -93,7 +93,7 @@ let package = Package(
             name: "NDKSwift",
             dependencies: [
                 "NostrDB",
-                .product(name: "CryptoSwiftWrapper", package: "CryptoSwiftWrapper"),
+                .product(name: "CryptoSwift", package: "CryptoSwift"),
                 .product(name: "GRDB", package: "GRDB.swift"),
                 .product(name: "CashuSwift", package: "CashuSwift"),
             ],
