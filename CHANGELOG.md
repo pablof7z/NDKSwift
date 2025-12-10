@@ -6,7 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13] - 2025-12-11
+
 ### Added
+- **Module Refactoring**: Split NDKSwift into separate modules to reduce binary bloat
+  - `NDKSwiftCore`: Core NDK functionality
+  - `NDKSwiftSQLite`: SQLite cache backend
+  - `NDKSwiftNostrDB`: NostrDB cache backend
+  - `NDKSwiftCashu`: Cashu integration
+  - `NDKSwiftUI`: SwiftUI components
+  - Apps can now import only the modules they need, significantly reducing binary size
 - **NostrDB Integration**: Added high-performance cache backend using nostrdb C library from Damus
   - `NDKNostrDBCache`: New cache implementation using nostrdb's LMDB backend
   - Integrated nostrdb C sources directly as a Swift Package Manager target (`NostrDB`)
