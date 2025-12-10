@@ -6,7 +6,7 @@ import UIKit
 #elseif canImport(AppKit)
 import AppKit
 #endif
-import NDKSwift
+import NDKSwiftCore
 
 /// A reusable URL preview component that displays rich link previews or embedded images
 public struct NDKUIURLPreview: View {

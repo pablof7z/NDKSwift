@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 import CashuSwift
 
 final class NIP60WalletE2ETests: XCTestCase {

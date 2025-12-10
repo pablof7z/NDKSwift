@@ -1,6 +1,6 @@
 import XCTest
 import Foundation
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 final class NDKSignerRegistryTests: XCTestCase {
     var registry: NDKSignerRegistry!

@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 /// Basic tests for NIP-17 implementation
 final class NIP17BasicTests: XCTestCase {

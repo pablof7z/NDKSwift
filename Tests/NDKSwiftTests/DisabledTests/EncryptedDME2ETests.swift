@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 /// End-to-end tests for encrypted direct message exchange
 /// Tests both NIP-04 and NIP-44 encryption standards

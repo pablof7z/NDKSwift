@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 /// Mock delegate for testing relay connection events
 class MockRelayConnectionDelegate: NDKRelayConnectionDelegate {

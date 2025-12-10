@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 /// Integration tests for NIP-42 authentication flow
 final class NIP42AuthenticationIntegrationTests: XCTestCase {

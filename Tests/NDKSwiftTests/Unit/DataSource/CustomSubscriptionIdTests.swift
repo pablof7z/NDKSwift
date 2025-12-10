@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 final class CustomSubscriptionIdTests: XCTestCase {
     var ndk: NDK!

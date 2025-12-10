@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 /// Comprehensive tests for NIP-42 authentication flow including automatic retry
 final class NDKRelayAuthenticationFlowTests: XCTestCase {

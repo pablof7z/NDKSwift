@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 /// Tests to ensure subscription grouping doesn't cause cross-contamination of results
 /// This is a regression test for ensuring that observers with similar filters

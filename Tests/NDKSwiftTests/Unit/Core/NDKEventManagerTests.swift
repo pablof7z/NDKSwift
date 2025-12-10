@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 /// Tests for NDKEventManager's publish functionality
 final class NDKEventManagerTests: NDKTestCase {

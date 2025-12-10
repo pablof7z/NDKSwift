@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 import Combine
 
 // TODO: These tests need to be rewritten to work with the new API

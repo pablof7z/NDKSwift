@@ -1,5 +1,5 @@
 import SwiftUI
-import NDKSwift
+import NDKSwiftCore
 
 /// A unified relay management view for Nostr apps
 public struct NDKUIRelayManagementView: View {

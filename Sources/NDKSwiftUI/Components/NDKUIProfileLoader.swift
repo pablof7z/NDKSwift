@@ -1,5 +1,5 @@
 import SwiftUI
-import NDKSwift
+import NDKSwiftCore
 
 /// A utility view that loads and provides profile data to its content
 ///

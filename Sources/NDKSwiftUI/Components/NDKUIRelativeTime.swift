@@ -1,5 +1,5 @@
 import SwiftUI
-import NDKSwift
+import NDKSwiftCore
 
 /// Displays a timestamp in relative format (e.g., "2m ago", "1h ago", "Yesterday")
 ///

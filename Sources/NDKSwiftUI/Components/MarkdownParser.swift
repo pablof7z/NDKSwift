@@ -1,5 +1,5 @@
 import Foundation
-import NDKSwift
+import NDKSwiftCore
 
 // MARK: - Markdown AST Types
 

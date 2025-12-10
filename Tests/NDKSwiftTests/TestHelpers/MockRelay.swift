@@ -1,6 +1,6 @@
 import Foundation
 import Combine
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 /// Type alias for backward compatibility
 typealias MockRelay = MockRelayProtocol

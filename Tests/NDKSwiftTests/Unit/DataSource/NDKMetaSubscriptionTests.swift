@@ -1,5 +1,6 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
+import NDKSwiftSQLite
 
 @available(iOS 17.0, macOS 14.0, *)
 final class NDKMetaSubscriptionTests: XCTestCase {
@@ -32,7 +33,7 @@ final class NDKMetaSubscriptionTests: XCTestCase {
 
     @MainActor
     func testMetaSubscriptionInitialization() async throws {
-        let filter = NDKFilter(kinds: [6], authors: ["test_pubkey"])
+        let filter = NDKFilter(authors: ["test_pubkey"], kinds: [6])
         let metaSub = NDKMetaSubscription(ndk: ndk, filter: filter)
 
         XCTAssertEqual(metaSub.events.count, 0)
@@ -130,7 +131,7 @@ final class NDKMetaSubscriptionTests: XCTestCase {
 
     @MainActor
     func testMetaSubscribeFactoryMethod() async throws {
-        let filter = NDKFilter(kinds: [6, 16], authors: ["test_pubkey"])
+        let filter = NDKFilter(authors: ["test_pubkey"], kinds: [6, 16])
         let metaSub = ndk.metaSubscribe(filter: filter, sort: .count)
 
         XCTAssertEqual(metaSub.sort, .count)
