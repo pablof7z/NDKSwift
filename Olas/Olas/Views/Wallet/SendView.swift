@@ -5,7 +5,7 @@ import NDKSwiftUI
 
 struct SendView: View {
     let ndk: NDK
-    @ObservedObject var walletViewModel: WalletViewModel
+    var walletViewModel: WalletViewModel
 
     @Environment(\.dismiss) private var dismiss
 

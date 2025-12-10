@@ -3,10 +3,12 @@ import SwiftUI
 import NDKSwift
 
 struct MainTabView: View {
-    @EnvironmentObject private var authViewModel: AuthViewModel
-    @StateObject private var walletViewModel: WalletViewModel
-    @StateObject private var sparkWalletManager: SparkWalletManager
-    @StateObject private var muteListManager: MuteListManager
+    @Environment(AuthViewModel.self) private var authViewModel
+    @State private var walletViewModel: WalletViewModel
+    @State private var sparkWalletManager: SparkWalletManager
+    @State private var muteListManager: MuteListManager
+    @State private var blossomManager: NDKBlossomServerManager
+    @State private var collectionsManager: CollectionsManager
     @State private var selectedTab = 0
     @State private var hasNotifications = false
     @State private var showCreatePost = false
@@ -15,9 +17,11 @@ struct MainTabView: View {
 
     public init(ndk: NDK) {
         self.ndk = ndk
-        self._walletViewModel = StateObject(wrappedValue: WalletViewModel(ndk: ndk))
-        self._sparkWalletManager = StateObject(wrappedValue: SparkWalletManager(ndk: ndk))
-        self._muteListManager = StateObject(wrappedValue: MuteListManager(ndk: ndk))
+        self._walletViewModel = State(wrappedValue: WalletViewModel(ndk: ndk))
+        self._sparkWalletManager = State(wrappedValue: SparkWalletManager(ndk: ndk))
+        self._muteListManager = State(wrappedValue: MuteListManager(ndk: ndk))
+        self._blossomManager = State(wrappedValue: NDKBlossomServerManager(ndk: ndk))
+        self._collectionsManager = State(wrappedValue: CollectionsManager(ndk: ndk))
     }
 
     public var body: some View {
@@ -27,12 +31,14 @@ struct MainTabView: View {
                     Label("Home", systemImage: selectedTab == 0 ? "wave.3.up.circle.fill" : "wave.3.up.circle")
                 }
                 .tag(0)
+                .accessibilityIdentifier("homeTab")
 
             ExploreView(ndk: ndk)
                 .tabItem {
                     Label("Explore", systemImage: selectedTab == 1 ? "magnifyingglass.circle.fill" : "magnifyingglass.circle")
                 }
                 .tag(1)
+                .accessibilityIdentifier("exploreTab")
 
             // Create - triggers sheet
             Color.clear
@@ -40,13 +46,21 @@ struct MainTabView: View {
                     Label("", systemImage: "plus.app.fill")
                 }
                 .tag(2)
+                .accessibilityIdentifier("createTab")
 
-            // Wallet
-            WalletView(ndk: ndk, walletViewModel: walletViewModel)
-                .tabItem {
-                    Label("Wallet", systemImage: selectedTab == 3 ? "creditcard.fill" : "creditcard")
+            // Wallet - Show Spark if connected, otherwise Cashu
+            Group {
+                if sparkWalletManager.connectionStatus == .connected {
+                    SparkWalletView(walletManager: sparkWalletManager)
+                } else {
+                    WalletView(ndk: ndk, walletViewModel: walletViewModel, sparkWalletManager: sparkWalletManager)
                 }
-                .tag(3)
+            }
+            .tabItem {
+                Label("Wallet", systemImage: selectedTab == 3 ? "creditcard.fill" : "creditcard")
+            }
+            .tag(3)
+            .accessibilityIdentifier("walletTab")
 
             // Profile
             NavigationStack {
@@ -60,6 +74,7 @@ struct MainTabView: View {
                 Label("Profile", systemImage: selectedTab == 4 ? "person.fill" : "person")
             }
             .tag(4)
+            .accessibilityIdentifier("profileTab")
         }
         .tint(.primary)
         .onChange(of: selectedTab) { oldValue, newValue in
@@ -69,14 +84,16 @@ struct MainTabView: View {
             }
         }
         .fullScreenCover(isPresented: $showCreatePost) {
-            CreatePostView(ndk: ndk)
+            CreatePostView(ndk: ndk, blossomManager: blossomManager)
         }
         .task {
             await walletViewModel.loadWallet()
             await sparkWalletManager.restoreWalletIfExists()
             muteListManager.startSubscription()
+            collectionsManager.startSubscription()
         }
-        .environmentObject(walletViewModel)
-        .environmentObject(muteListManager)
+        .environment(walletViewModel)
+        .environment(muteListManager)
+        .environment(collectionsManager)
     }
 }

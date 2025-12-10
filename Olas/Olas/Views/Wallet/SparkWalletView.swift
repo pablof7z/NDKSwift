@@ -1,9 +1,12 @@
 import SwiftUI
 import NDKSwift
+import NDKSwiftUI
 import CoreImage.CIFilterBuiltins
 
+// MARK: - Main Wallet View
+
 struct SparkWalletView: View {
-    @ObservedObject var walletManager: SparkWalletManager
+    var walletManager: SparkWalletManager
 
     @State private var showCreateWallet = false
     @State private var showImportWallet = false
@@ -11,11 +14,7 @@ struct SparkWalletView: View {
     @State private var showSend = false
     @State private var showSettings = false
 
-    public init(walletManager: SparkWalletManager) {
-        self.walletManager = walletManager
-    }
-
-    public var body: some View {
+    var body: some View {
         NavigationStack {
             Group {
                 if walletManager.connectionStatus == .connected {
@@ -24,28 +23,30 @@ struct SparkWalletView: View {
                     setupView
                 }
             }
-            .navigationTitle("Wallet")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     if walletManager.connectionStatus == .connected {
                         Button {
                             showSettings = true
                         } label: {
-                            Image(systemName: "gearshape")
+                            Image(systemName: "gearshape.fill")
+                                .font(.system(size: 16))
+                                .foregroundStyle(.secondary)
                         }
                     }
                 }
             }
+            .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showCreateWallet) {
                 CreateSparkWalletView(walletManager: walletManager)
             }
             .sheet(isPresented: $showImportWallet) {
                 ImportSparkWalletView(walletManager: walletManager)
             }
-            .sheet(isPresented: $showReceive) {
+            .fullScreenCover(isPresented: $showReceive) {
                 ReceiveView(walletManager: walletManager)
             }
-            .sheet(isPresented: $showSend) {
+            .fullScreenCover(isPresented: $showSend) {
                 SparkSendView(walletManager: walletManager)
             }
             .sheet(isPresented: $showSettings) {
@@ -59,287 +60,336 @@ struct SparkWalletView: View {
     // MARK: - Connected View
 
     private var connectedView: some View {
-        ScrollView {
-            VStack(spacing: 32) {
-                balanceCard
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 0) {
+                // Balance - tappable to switch sats/fiat
+                balanceDisplay
+                    .padding(.top, 32)
+                    .padding(.bottom, 40)
+
+                // Action buttons
                 actionButtons
-                recentTransactions
+                    .padding(.horizontal, 20)
+
+                // Activity (only if not empty)
+                if !walletManager.payments.isEmpty {
+                    activityList
+                        .padding(.top, 40)
+                }
             }
-            .padding()
+            .padding(.bottom, 32)
         }
         .refreshable {
             await walletManager.sync()
         }
     }
 
-    private var balanceCard: some View {
-        VStack(spacing: 12) {
-            Text("Balance")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+    private var balanceDisplay: some View {
+        Button {
+            walletManager.togglePrimaryDisplay()
+        } label: {
+            VStack(spacing: 6) {
+                // Primary amount
+                if walletManager.showFiatAsPrimary, let fiat = walletManager.satsToFiat(walletManager.balance) {
+                    Text(walletManager.formatFiat(fiat))
+                        .font(.system(size: 56, weight: .bold, design: .rounded))
+                        .foregroundStyle(.primary)
+                } else {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(walletManager.formatSats(walletManager.balance))
+                            .font(.system(size: 56, weight: .bold, design: .rounded))
+                        Text("sats")
+                            .font(.system(size: 18, weight: .medium, design: .rounded))
+                            .foregroundStyle(.secondary)
+                    }
+                }
 
-            Text(formatSats(walletManager.balance))
-                .font(.system(size: 48, weight: .bold, design: .rounded))
-                .foregroundStyle(OlasTheme.Colors.deepTeal)
-
-            if let address = walletManager.lightningAddress {
-                HStack {
-                    Image(systemName: "bolt.fill")
-                        .foregroundStyle(OlasTheme.Colors.zapGold)
-                    Text(address)
-                        .font(.caption)
+                // Secondary amount
+                if walletManager.showFiatAsPrimary {
+                    Text("\(walletManager.formatSats(walletManager.balance)) sats")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                } else if let fiat = walletManager.satsToFiat(walletManager.balance) {
+                    Text(walletManager.formatFiat(fiat))
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
-            }
 
-            if walletManager.isLoading {
-                ProgressView()
-                    .padding(.top, 8)
+                // Loading or lightning address
+                if walletManager.isLoading {
+                    HStack(spacing: 6) {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                        Text("Syncing...")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(.top, 4)
+                }
             }
+            .contentTransition(.numericText())
+            .animation(.spring(duration: 0.3), value: walletManager.balance)
+            .animation(.spring(duration: 0.2), value: walletManager.showFiatAsPrimary)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 32)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color(.systemBackground))
-                .shadow(color: .black.opacity(0.1), radius: 10, y: 5)
-        )
+        .buttonStyle(.plain)
     }
 
     private var actionButtons: some View {
-        HStack(spacing: 20) {
+        HStack(spacing: 12) {
+            // Receive
             Button {
                 showReceive = true
             } label: {
-                VStack(spacing: 8) {
-                    Image(systemName: "arrow.down.circle.fill")
-                        .font(.system(size: 32))
+                VStack(spacing: 10) {
+                    ZStack {
+                        Circle()
+                            .fill(OlasTheme.Colors.success)
+                            .frame(width: 56, height: 56)
+                        Image(systemName: "arrow.down")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundStyle(.white)
+                    }
                     Text("Receive")
-                        .font(.caption)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.primary)
                 }
                 .frame(maxWidth: .infinity)
-                .padding()
-                .background(OlasTheme.Colors.deepTeal.opacity(0.1))
-                .foregroundStyle(OlasTheme.Colors.deepTeal)
-                .cornerRadius(16)
+                .padding(.vertical, 20)
+                .background(Color(.secondarySystemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             }
+            .buttonStyle(.plain)
 
+            // Send
             Button {
                 showSend = true
             } label: {
-                VStack(spacing: 8) {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 32))
+                VStack(spacing: 10) {
+                    ZStack {
+                        Circle()
+                            .fill(OlasTheme.Colors.brandPrimary)
+                            .frame(width: 56, height: 56)
+                        Image(systemName: "arrow.up")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundStyle(.white)
+                    }
                     Text("Send")
-                        .font(.caption)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.primary)
                 }
                 .frame(maxWidth: .infinity)
-                .padding()
-                .background(OlasTheme.Colors.zapGold.opacity(0.1))
-                .foregroundStyle(OlasTheme.Colors.zapGold)
-                .cornerRadius(16)
+                .padding(.vertical, 20)
+                .background(Color(.secondarySystemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             }
+            .buttonStyle(.plain)
         }
     }
 
-    private var recentTransactions: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Recent Activity")
-                .font(.headline)
+    private var activityList: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Activity")
+                .font(.title3.weight(.semibold))
+                .padding(.horizontal, 20)
+                .padding(.bottom, 16)
 
-            if walletManager.payments.isEmpty {
-                VStack(spacing: 8) {
-                    Text("No recent transactions")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 32)
-                }
-                .frame(maxWidth: .infinity)
-                .background(Color(.systemGray6))
-                .cornerRadius(12)
-            } else {
-                LazyVStack(spacing: 0) {
-                    ForEach(walletManager.payments) { payment in
-                        PaymentRow(payment: payment)
-                        if payment.id != walletManager.payments.last?.id {
-                            Divider()
-                                .padding(.leading, 48)
-                        }
+            VStack(spacing: 0) {
+                ForEach(Array(walletManager.payments.enumerated()), id: \.element.id) { index, payment in
+                    SparkTransactionRow(payment: payment, walletManager: walletManager)
+
+                    if index < walletManager.payments.count - 1 {
+                        Divider()
+                            .padding(.leading, 68)
                     }
                 }
-                .background(Color(.systemBackground))
-                .cornerRadius(12)
-                .shadow(color: .black.opacity(0.05), radius: 5, y: 2)
             }
+            .background(Color(.secondarySystemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .padding(.horizontal, 20)
         }
     }
 
     // MARK: - Setup View
 
     private var setupView: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 0) {
             Spacer()
 
-            Image(systemName: "bolt.fill")
-                .font(.system(size: 80))
-                .foregroundStyle(OlasTheme.Colors.zapGold)
+            VStack(spacing: 20) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [OlasTheme.Colors.zapGold, OlasTheme.Colors.brandPrimary],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 100, height: 100)
 
-            Text("Spark Wallet")
-                .font(.title.bold())
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: 44))
+                        .foregroundStyle(.white)
+                }
 
-            Text("Self-custodial Bitcoin Lightning wallet. Your keys, your coins.")
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
+                VStack(spacing: 8) {
+                    Text("Lightning Wallet")
+                        .font(.title.bold())
+                    Text("Self-custodial Bitcoin")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer()
 
             if walletManager.connectionStatus == .connecting {
-                ProgressView("Connecting...")
-                    .padding()
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text("Connecting...")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.bottom, 24)
             }
 
             if let error = walletManager.error {
                 Text(error)
                     .font(.caption)
                     .foregroundStyle(.red)
-                    .padding(.horizontal)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+                    .padding(.bottom, 16)
             }
 
             VStack(spacing: 12) {
                 Button {
                     showCreateWallet = true
                 } label: {
-                    HStack {
-                        Image(systemName: "plus.circle.fill")
-                        Text("Create New Wallet")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(OlasTheme.Colors.deepTeal)
-                    .foregroundStyle(.white)
-                    .cornerRadius(12)
+                    Text("Create Wallet")
+                        .font(.body.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 18)
+                        .background(OlasTheme.Colors.brandPrimary)
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
 
                 Button {
                     showImportWallet = true
                 } label: {
-                    HStack {
-                        Image(systemName: "arrow.down.circle.fill")
-                        Text("Import Existing Wallet")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color(.systemGray5))
-                    .foregroundStyle(.primary)
-                    .cornerRadius(12)
+                    Text("I Have a Wallet")
+                        .font(.body.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 18)
+                        .foregroundStyle(.primary)
                 }
             }
-            .padding(.horizontal)
-            .padding(.top, 20)
-
-            Spacer()
+            .padding(.horizontal, 24)
+            .padding(.bottom, 48)
         }
-        .padding()
-    }
-
-    private func formatSats(_ amount: Int64) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        let formatted = formatter.string(from: NSNumber(value: amount)) ?? "\(amount)"
-        return "\(formatted) sats"
     }
 }
 
-// MARK: - Payment Row
+// MARK: - Transaction Row
 
-struct PaymentRow: View {
+struct SparkTransactionRow: View {
     let payment: SparkPayment
+    let walletManager: SparkWalletManager
+    @State private var isExpanded = false
 
-    @State private var showDetails = false
+    private var isReceive: Bool { payment.type == .receive }
 
     var body: some View {
         Button {
-            showDetails = true
+            withAnimation(.spring(duration: 0.3, bounce: 0.2)) {
+                isExpanded.toggle()
+            }
         } label: {
-            HStack(spacing: 12) {
-                // Icon
-                Circle()
-                    .fill(payment.type == .receive ? Color.green.opacity(0.15) : Color.orange.opacity(0.15))
-                    .frame(width: 40, height: 40)
-                    .overlay {
-                        Image(systemName: payment.type == .receive ? "arrow.down" : "arrow.up")
+            VStack(spacing: 0) {
+                HStack(spacing: 14) {
+                    ZStack {
+                        Circle()
+                            .fill(isReceive ? Color.green.opacity(0.12) : Color.orange.opacity(0.12))
+                            .frame(width: 44, height: 44)
+                        Image(systemName: isReceive ? "arrow.down.left" : "arrow.up.right")
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(payment.type == .receive ? .green : .orange)
+                            .foregroundStyle(isReceive ? .green : .orange)
                     }
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(payment.description ?? (payment.type == .receive ? "Received" : "Sent"))
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(payment.description ?? (isReceive ? "Received" : "Sent"))
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
 
-                    HStack(spacing: 6) {
-                        PaymentStatusBadge(status: payment.status)
-                        Text(payment.timestamp.formatted(.relative(presentation: .named)))
+                        Text(formatRelativeTime(payment.timestamp))
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.tertiary)
+                    }
+
+                    Spacer()
+
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("\(isReceive ? "+" : "-")\(walletManager.formatSats(payment.amountSats))")
+                            .font(.subheadline.weight(.semibold).monospacedDigit())
+                            .foregroundStyle(isReceive ? .green : .primary)
+
+                        if let fiat = walletManager.satsToFiat(payment.amountSats) {
+                            Text(walletManager.formatFiat(fiat))
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
                     }
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
 
-                Spacer()
+                if isExpanded {
+                    VStack(spacing: 0) {
+                        Divider().padding(.leading, 74)
 
-                Text("\(payment.type == .receive ? "+" : "-")\(formatSats(payment.amountSats))")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(payment.type == .receive ? .green : .primary)
+                        VStack(spacing: 10) {
+                            if payment.feeSats > 0 {
+                                detailRow("Fee", "\(payment.feeSats) sats")
+                            }
+                            detailRow("Status", payment.status.displayName)
+                            detailRow("Time", payment.timestamp.formatted(.dateTime.month().day().hour().minute()))
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .padding(.leading, 58)
+                    }
+                    .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
+                }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .sheet(isPresented: $showDetails) {
-            PaymentDetailView(payment: payment)
+    }
+
+    private func detailRow(_ label: String, _ value: String) -> some View {
+        HStack {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(value)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.primary)
         }
     }
 
-    private func formatSats(_ amount: Int64) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        return "\(formatter.string(from: NSNumber(value: amount)) ?? "\(amount)") sats"
+    private func formatRelativeTime(_ date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: date, relativeTo: Date())
     }
 }
 
-// MARK: - Payment Status Badge
-
-struct PaymentStatusBadge: View {
-    let status: SparkPaymentStatus
-
-    var body: some View {
-        HStack(spacing: 4) {
-            Circle()
-                .fill(statusColor)
-                .frame(width: 6, height: 6)
-            Text(statusText)
-                .font(.caption2)
-                .foregroundStyle(statusColor)
-        }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 2)
-        .background(statusColor.opacity(0.1))
-        .cornerRadius(4)
-    }
-
-    private var statusColor: Color {
-        switch status {
-        case .pending: return .orange
-        case .completed: return .green
-        case .failed: return .red
-        }
-    }
-
-    private var statusText: String {
-        switch status {
+extension SparkPaymentStatus {
+    var displayName: String {
+        switch self {
         case .pending: return "Pending"
         case .completed: return "Complete"
         case .failed: return "Failed"
@@ -347,130 +397,7 @@ struct PaymentStatusBadge: View {
     }
 }
 
-// MARK: - Payment Detail View
-
-struct PaymentDetailView: View {
-    let payment: SparkPayment
-    @Environment(\.dismiss) private var dismiss
-
-    @State private var showFullDetails = false
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 24) {
-                    // Amount header
-                    VStack(spacing: 8) {
-                        Image(systemName: payment.type == .receive ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
-                            .font(.system(size: 48))
-                            .foregroundStyle(payment.type == .receive ? .green : OlasTheme.Colors.zapGold)
-
-                        Text("\(payment.type == .receive ? "+" : "-")\(formatSats(payment.amountSats))")
-                            .font(.system(size: 32, weight: .bold, design: .rounded))
-
-                        if payment.feeSats > 0 {
-                            Text("Fee: \(formatSats(payment.feeSats))")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        PaymentStatusBadge(status: payment.status)
-                    }
-                    .padding(.top, 20)
-
-                    // Details section
-                    VStack(alignment: .leading, spacing: 16) {
-                        if let description = payment.description {
-                            DetailRow(label: "Description", value: description)
-                        }
-
-                        DetailRow(label: "Date", value: payment.timestamp.formatted(date: .abbreviated, time: .shortened))
-
-                        if let destination = payment.destination {
-                            DetailRow(label: payment.type == .send ? "To" : "From", value: destination, isMonospace: true)
-                        }
-                    }
-                    .padding()
-                    .background(Color(.systemGray6))
-                    .cornerRadius(12)
-
-                    // Technical details (expandable)
-                    DisclosureGroup("Technical Details", isExpanded: $showFullDetails) {
-                        VStack(alignment: .leading, spacing: 12) {
-                            DetailRow(label: "Payment ID", value: payment.id, isMonospace: true, isCopyable: true)
-
-                            if let preimage = payment.preimage {
-                                DetailRow(label: "Preimage", value: preimage, isMonospace: true, isCopyable: true)
-                            }
-                        }
-                        .padding(.top, 12)
-                    }
-                    .padding()
-                    .background(Color(.systemGray6))
-                    .cornerRadius(12)
-
-                    Spacer()
-                }
-                .padding()
-            }
-            .navigationTitle(payment.type == .receive ? "Received Payment" : "Sent Payment")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
-        }
-    }
-
-    private func formatSats(_ amount: Int64) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        return "\(formatter.string(from: NSNumber(value: amount)) ?? "\(amount)") sats"
-    }
-}
-
-struct DetailRow: View {
-    let label: String
-    let value: String
-    var isMonospace: Bool = false
-    var isCopyable: Bool = false
-
-    @State private var copied = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            HStack {
-                Text(value)
-                    .font(isMonospace ? .caption.monospaced() : .body)
-                    .foregroundStyle(.primary)
-                    .lineLimit(isMonospace ? 2 : nil)
-
-                if isCopyable {
-                    Spacer()
-                    Button {
-                        UIPasteboard.general.string = value
-                        copied = true
-                        Task {
-                            try? await Task.sleep(for: .seconds(2))
-                            copied = false
-                        }
-                    } label: {
-                        Image(systemName: copied ? "checkmark" : "doc.on.doc")
-                            .font(.caption)
-                            .foregroundStyle(copied ? .green : .secondary)
-                    }
-                }
-            }
-        }
-    }
-}
-
-// MARK: - QR Code Generator
+// MARK: - QR Code View
 
 struct QRCodeView: View {
     let content: String
@@ -483,15 +410,14 @@ struct QRCodeView: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: size, height: size)
-                .cornerRadius(12)
         } else {
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: 8)
                 .fill(Color(.systemGray6))
                 .frame(width: size, height: size)
                 .overlay {
                     Image(systemName: "qrcode")
-                        .font(.system(size: size * 0.4))
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: size * 0.3))
+                        .foregroundStyle(.tertiary)
                 }
         }
     }
@@ -499,794 +425,730 @@ struct QRCodeView: View {
     private func generateQRCode(from string: String) -> UIImage? {
         let context = CIContext()
         let filter = CIFilter.qrCodeGenerator()
-
         filter.message = Data(string.utf8)
         filter.correctionLevel = "M"
 
         guard let outputImage = filter.outputImage else { return nil }
 
-        // Scale up for crisp rendering
         let scale = size / outputImage.extent.size.width * UIScreen.main.scale
         let scaledImage = outputImage.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
 
         guard let cgImage = context.createCGImage(scaledImage, from: scaledImage.extent) else { return nil }
-
         return UIImage(cgImage: cgImage)
     }
 }
 
-// MARK: - Receive View (Lightning Address First per UX Guidelines)
+// MARK: - Receive View
 
 struct ReceiveView: View {
-    @ObservedObject var walletManager: SparkWalletManager
+    var walletManager: SparkWalletManager
     @Environment(\.dismiss) private var dismiss
 
-    @State private var selectedTab = 0
+    @State private var amount = ""
     @State private var invoice: String?
-    @State private var amount: String = ""
     @State private var isGenerating = false
     @State private var error: String?
     @State private var copied = false
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                // Tab selector
-                Picker("Receive Method", selection: $selectedTab) {
-                    Text("Lightning Address").tag(0)
-                    Text("Invoice").tag(1)
-                }
-                .pickerStyle(.segmented)
-                .padding()
+        ZStack {
+            Color(.systemBackground).ignoresSafeArea()
 
-                Divider()
-
-                ScrollView {
-                    if selectedTab == 0 {
-                        lightningAddressView
-                    } else {
-                        invoiceView
-                    }
-                }
-            }
-            .navigationTitle("Receive")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
-                }
+            if let invoiceString = invoice {
+                invoiceResultView(invoiceString)
+            } else {
+                amountEntryView
             }
         }
     }
 
-    // MARK: - Lightning Address View (Primary per UX guidelines)
-
-    private var lightningAddressView: some View {
-        VStack(spacing: 24) {
-            if let address = walletManager.lightningAddress {
-                // QR Code for LNURL-pay
-                QRCodeView(content: "lightning:\(address)", size: 220)
-                    .padding(.top, 20)
-
-                // Address display
-                VStack(spacing: 8) {
-                    HStack {
-                        Image(systemName: "bolt.fill")
-                            .foregroundStyle(OlasTheme.Colors.zapGold)
-                        Text(address)
-                            .font(.body.monospaced())
-                    }
-                    .padding()
-                    .background(Color(.systemGray6))
-                    .cornerRadius(12)
-
-                    Text("Share this address to receive payments")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                // Action buttons
-                HStack(spacing: 16) {
-                    Button {
-                        UIPasteboard.general.string = address
-                        copied = true
-                        Task {
-                            try? await Task.sleep(for: .seconds(2))
-                            copied = false
-                        }
-                    } label: {
-                        HStack {
-                            Image(systemName: copied ? "checkmark" : "doc.on.doc")
-                            Text(copied ? "Copied!" : "Copy")
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(OlasTheme.Colors.deepTeal)
-                        .foregroundStyle(.white)
-                        .cornerRadius(12)
-                    }
-
-                    ShareLink(item: address) {
-                        HStack {
-                            Image(systemName: "square.and.arrow.up")
-                            Text("Share")
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color(.systemGray5))
-                        .foregroundStyle(.primary)
-                        .cornerRadius(12)
-                    }
-                }
-                .padding(.top, 8)
-
-            } else {
-                // No lightning address setup
-                VStack(spacing: 16) {
-                    Image(systemName: "bolt.badge.clock")
-                        .font(.system(size: 60))
-                        .foregroundStyle(.secondary)
-
-                    Text("No Lightning Address")
-                        .font(.title3.bold())
-
-                    Text("Set up a Lightning Address in settings to receive payments easily.")
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-
-                    Text("You can still receive using invoices.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.top, 40)
-            }
+    private var amountEntryView: some View {
+        VStack(spacing: 0) {
+            header(title: "Receive", leadingAction: { dismiss() }, leadingIcon: "xmark")
 
             Spacer()
-        }
-        .padding()
-    }
 
-    // MARK: - Invoice View (Fallback)
+            VStack(spacing: 12) {
+                Text(amount.isEmpty ? "0" : formatWithCommas(amount))
+                    .font(.system(size: 72, weight: .bold, design: .rounded))
+                    .foregroundStyle(amount.isEmpty ? .quaternary : .primary)
+                    .contentTransition(.numericText())
+                    .animation(.spring(duration: 0.2), value: amount)
+                    .minimumScaleFactor(0.5)
+                    .lineLimit(1)
 
-    private var invoiceView: some View {
-        VStack(spacing: 24) {
-            if let invoiceString = invoice {
-                invoiceDisplay(invoiceString)
-            } else {
-                invoiceForm
-            }
-        }
-        .padding()
-    }
-
-    private var invoiceForm: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "doc.text.fill")
-                .font(.system(size: 48))
-                .foregroundStyle(OlasTheme.Colors.deepTeal)
-
-            Text("Create Invoice")
-                .font(.title2.bold())
-
-            Text("Generate a one-time invoice for a specific amount.")
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Amount (sats)")
-                    .font(.caption)
+                Text("sats")
+                    .font(.title2.weight(.medium))
                     .foregroundStyle(.secondary)
 
-                TextField("Enter amount", text: $amount)
-                    .textFieldStyle(.roundedBorder)
-                    .keyboardType(.numberPad)
+                // Show fiat equivalent
+                if let sats = Int64(amount), let fiat = walletManager.satsToFiat(sats) {
+                    Text(walletManager.formatFiat(fiat))
+                        .font(.subheadline)
+                        .foregroundStyle(.tertiary)
+                }
             }
+            .padding(.horizontal, 32)
 
             if let error = error {
                 Text(error)
                     .font(.caption)
                     .foregroundStyle(.red)
+                    .padding(.top, 16)
             }
+
+            Spacer()
+
+            numpadView { key in handleKey(key) }
+                .padding(.horizontal, 24)
 
             Button {
                 Task { await generateInvoice() }
             } label: {
-                HStack {
-                    if isGenerating {
-                        ProgressView()
-                            .tint(.white)
-                    }
-                    Text("Generate Invoice")
+                HStack(spacing: 10) {
+                    if isGenerating { ProgressView().tint(.white) }
+                    Text("Create Invoice")
+                        .font(.body.weight(.semibold))
                 }
                 .frame(maxWidth: .infinity)
-                .padding()
-                .background(OlasTheme.Colors.deepTeal)
+                .padding(.vertical, 18)
+                .background(amount.isEmpty ? Color(.systemGray3) : OlasTheme.Colors.success)
                 .foregroundStyle(.white)
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
-            .disabled(isGenerating)
-
-            Spacer()
+            .disabled(amount.isEmpty || isGenerating)
+            .padding(.horizontal, 24)
+            .padding(.top, 24)
+            .padding(.bottom, 48)
         }
     }
 
-    private func invoiceDisplay(_ invoiceString: String) -> some View {
-        VStack(spacing: 20) {
-            Text("Lightning Invoice")
-                .font(.title2.bold())
-
-            QRCodeView(content: invoiceString, size: 220)
-
-            Text(invoiceString)
-                .font(.caption.monospaced())
-                .lineLimit(3)
-                .truncationMode(.middle)
-                .padding()
-                .background(Color(.systemGray6))
-                .cornerRadius(8)
-
-            HStack(spacing: 16) {
-                Button {
-                    UIPasteboard.general.string = invoiceString
-                } label: {
-                    HStack {
-                        Image(systemName: "doc.on.doc")
-                        Text("Copy")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(OlasTheme.Colors.deepTeal)
-                    .foregroundStyle(.white)
-                    .cornerRadius(12)
-                }
-
-                ShareLink(item: invoiceString) {
-                    HStack {
-                        Image(systemName: "square.and.arrow.up")
-                        Text("Share")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color(.systemGray5))
-                    .foregroundStyle(.primary)
-                    .cornerRadius(12)
-                }
-            }
-
-            Button("Generate New Invoice") {
-                self.invoice = nil
-            }
-            .foregroundStyle(OlasTheme.Colors.deepTeal)
-
-            Spacer()
+    private func handleKey(_ key: String) {
+        if key == "delete" {
+            if !amount.isEmpty { amount.removeLast() }
+        } else if amount.count < 10 {
+            if amount == "0" { amount = key }
+            else { amount += key }
         }
+    }
+
+    private func invoiceResultView(_ invoiceString: String) -> some View {
+        VStack(spacing: 0) {
+            header(
+                title: "Invoice Ready",
+                leadingAction: { invoice = nil; amount = "" },
+                leadingIcon: "chevron.left",
+                trailingAction: { dismiss() },
+                trailingLabel: "Done"
+            )
+
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 24) {
+                    VStack(spacing: 4) {
+                        Text(formatWithCommas(amount))
+                            .font(.system(size: 48, weight: .bold, design: .rounded))
+                        Text("sats")
+                            .font(.title3)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.top, 24)
+
+                    VStack(spacing: 16) {
+                        QRCodeView(content: invoiceString, size: 200)
+
+                        Button {
+                            UIPasteboard.general.string = invoiceString
+                            copied = true
+                            Task {
+                                try? await Task.sleep(for: .seconds(2))
+                                copied = false
+                            }
+                        } label: {
+                            HStack(spacing: 8) {
+                                Text(String(invoiceString.prefix(24)) + "...")
+                                    .font(.caption.monospaced())
+                                    .foregroundStyle(.secondary)
+                                Image(systemName: copied ? "checkmark.circle.fill" : "doc.on.doc")
+                                    .font(.caption)
+                                    .foregroundStyle(copied ? .green : .secondary)
+                            }
+                        }
+                    }
+                    .padding(24)
+                    .background(Color(.secondarySystemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .padding(.horizontal, 24)
+
+                    ShareLink(item: invoiceString) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.body.weight(.medium))
+                            Text("Share Invoice")
+                                .font(.body.weight(.semibold))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 18)
+                        .background(OlasTheme.Colors.brandPrimary)
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                    .padding(.horizontal, 24)
+                }
+                .padding(.bottom, 32)
+            }
+        }
+    }
+
+    private func formatWithCommas(_ str: String) -> String {
+        guard let value = Int64(str) else { return str }
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        return formatter.string(from: NSNumber(value: value)) ?? str
     }
 
     private func generateInvoice() async {
         isGenerating = true
+        error = nil
         defer { isGenerating = false }
 
-        let amountSats: Int64? = Int64(amount)
+        guard let amountSats = Int64(amount) else { return }
 
         do {
-            let newInvoice = try await walletManager.createInvoice(amountSats: amountSats, description: nil)
-            invoice = newInvoice
+            invoice = try await walletManager.createInvoice(amountSats: amountSats, description: nil)
         } catch {
             self.error = error.localizedDescription
         }
     }
 }
 
-// MARK: - Send View (with parsing, fees, and scanner)
+// MARK: - Send View (Scanner First)
 
 struct SparkSendView: View {
-    @ObservedObject var walletManager: SparkWalletManager
+    var walletManager: SparkWalletManager
     @Environment(\.dismiss) private var dismiss
 
-    enum SendState {
-        case input
-        case parsed(SparkParsedInput)
+    enum SendStep: Equatable {
+        case scan
+        case manualEntry
+        case amount(SparkParsedInput)
         case confirm(SparkPreparedPayment)
-        case sending
+        case processing
         case success
+
+        static func == (lhs: SendStep, rhs: SendStep) -> Bool {
+            switch (lhs, rhs) {
+            case (.scan, .scan), (.manualEntry, .manualEntry),
+                 (.processing, .processing), (.success, .success):
+                return true
+            case (.amount, .amount), (.confirm, .confirm):
+                return true
+            default:
+                return false
+            }
+        }
     }
 
-    @State private var state: SendState = .input
-    @State private var inputText: String = ""
-    @State private var customAmount: String = ""
+    @State private var step: SendStep = .scan
+    @State private var destination = ""
+    @State private var amount = ""
     @State private var error: String?
-    @State private var showScanner = false
+    @State private var isParsing = false
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 24) {
-                switch state {
-                case .input:
-                    inputView
-                case .parsed(let parsed):
-                    parsedView(parsed)
-                case .confirm(let prepared):
-                    confirmView(prepared)
-                case .sending:
-                    sendingView
-                case .success:
-                    successView
-                }
-            }
-            .padding()
-            .navigationTitle("Send")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
-                }
-            }
-            .sheet(isPresented: $showScanner) {
-                QRScannerView { scannedCode in
-                    inputText = scannedCode
-                    showScanner = false
-                    Task { await parseInput() }
-                }
+        ZStack {
+            switch step {
+            case .scan:
+                scannerView
+            case .manualEntry:
+                manualEntryView
+            case .amount(let parsed):
+                amountView(parsed)
+            case .confirm(let prepared):
+                confirmView(prepared)
+            case .processing:
+                processingView
+            case .success:
+                successView
             }
         }
     }
 
-    // MARK: - Input View
+    // MARK: - Scanner View (Primary)
 
-    private var inputView: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "arrow.up.circle.fill")
-                .font(.system(size: 60))
-                .foregroundStyle(OlasTheme.Colors.zapGold)
+    private var scannerView: some View {
+        ZStack {
+            NDKUIQRScanner(
+                onScan: { code in
+                    destination = code
+                    Task { await parseDestination() }
+                },
+                onDismiss: { dismiss() }
+            )
+            .ignoresSafeArea()
 
-            Text("Send Payment")
-                .font(.title2.bold())
+            // Bottom button for manual entry
+            VStack {
+                Spacer()
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Invoice, Address, or Lightning Address")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Button {
+                    step = .manualEntry
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "keyboard")
+                            .font(.body.weight(.medium))
+                        Text("Enter Manually")
+                            .font(.body.weight(.semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 14)
+                    .background(.ultraThinMaterial.opacity(0.8))
+                    .clipShape(Capsule())
+                }
+                .padding(.bottom, 60)
+            }
+        }
+    }
 
-                HStack {
-                    TextEditor(text: $inputText)
-                        .font(.body.monospaced())
-                        .frame(minHeight: 80)
-                        .padding(8)
-                        .background(Color(.systemGray6))
-                        .cornerRadius(12)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
+    // MARK: - Manual Entry View
 
-                    VStack(spacing: 8) {
-                        Button {
-                            showScanner = true
-                        } label: {
-                            Image(systemName: "qrcode.viewfinder")
-                                .font(.title2)
-                                .frame(width: 44, height: 44)
-                                .background(Color(.systemGray5))
-                                .cornerRadius(8)
-                        }
+    private var manualEntryView: some View {
+        ZStack {
+            Color(.systemBackground).ignoresSafeArea()
 
+            VStack(spacing: 0) {
+                header(title: "Send", leadingAction: { step = .scan }, leadingIcon: "chevron.left")
+
+                VStack(spacing: 24) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("To")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.secondary)
+
+                        TextField("Invoice, address, or Lightning address", text: $destination, axis: .vertical)
+                            .font(.body)
+                            .lineLimit(3...6)
+                            .padding(16)
+                            .background(Color(.secondarySystemBackground))
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+
+                        // Paste button
                         Button {
                             if let pasted = UIPasteboard.general.string {
-                                inputText = pasted
+                                destination = pasted
                             }
                         } label: {
-                            Image(systemName: "doc.on.clipboard")
-                                .font(.title2)
-                                .frame(width: 44, height: 44)
-                                .background(Color(.systemGray5))
-                                .cornerRadius(8)
+                            HStack(spacing: 8) {
+                                Image(systemName: "doc.on.clipboard")
+                                    .font(.system(size: 16, weight: .medium))
+                                Text("Paste from Clipboard")
+                                    .font(.subheadline.weight(.medium))
+                            }
+                            .foregroundStyle(.primary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Color(.secondarySystemBackground))
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                         }
                     }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 24)
+
+                    if let error = error {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .padding(.horizontal, 24)
+                    }
                 }
-            }
 
-            if let error = error {
-                Text(error)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-            }
+                Spacer()
 
-            Button {
-                Task { await parseInput() }
-            } label: {
-                Text("Continue")
+                Button {
+                    Task { await parseDestination() }
+                } label: {
+                    HStack(spacing: 10) {
+                        if isParsing { ProgressView().tint(.white) }
+                        Text("Continue")
+                            .font(.body.weight(.semibold))
+                    }
                     .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(inputText.isEmpty ? .gray : OlasTheme.Colors.zapGold)
+                    .padding(.vertical, 18)
+                    .background(destination.isEmpty ? Color(.systemGray3) : OlasTheme.Colors.brandPrimary)
                     .foregroundStyle(.white)
-                    .cornerRadius(12)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+                .disabled(destination.isEmpty || isParsing)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 48)
             }
-            .disabled(inputText.isEmpty)
-
-            Spacer()
         }
     }
 
-    // MARK: - Parsed View (amount entry if needed)
+    // MARK: - Amount View
 
-    private func parsedView(_ parsed: SparkParsedInput) -> some View {
-        VStack(spacing: 20) {
-            // Type indicator
-            HStack {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-                Text(parsed.typeDescription)
-                    .font(.subheadline.weight(.medium))
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(Color.green.opacity(0.1))
-            .cornerRadius(8)
+    private func amountView(_ parsed: SparkParsedInput) -> some View {
+        ZStack {
+            Color(.systemBackground).ignoresSafeArea()
 
-            // Details based on type
-            switch parsed {
-            case .bolt11Invoice(let details):
-                invoiceDetails(details)
-            case .lnurlPay(let details):
-                lnurlPayDetails(details)
-            case .bitcoinAddress(let details):
-                bitcoinDetails(details)
-            case .sparkAddress(let details):
-                sparkAddressDetails(details)
-            default:
-                Text("Ready to send")
-            }
+            VStack(spacing: 0) {
+                header(title: "Amount", leadingAction: { step = .scan; error = nil }, leadingIcon: "chevron.left")
 
-            // Amount input if needed
-            if parsed.requiresAmount {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Amount (sats)")
-                        .font(.caption)
+                Spacer()
+
+                VStack(spacing: 12) {
+                    if let embedded = parsed.embeddedAmountSats {
+                        Text(walletManager.formatSats(embedded))
+                            .font(.system(size: 72, weight: .bold, design: .rounded))
+                    } else {
+                        Text(amount.isEmpty ? "0" : formatWithCommas(Int64(amount) ?? 0))
+                            .font(.system(size: 72, weight: .bold, design: .rounded))
+                            .foregroundStyle(amount.isEmpty ? .quaternary : .primary)
+                            .contentTransition(.numericText())
+                            .animation(.spring(duration: 0.2), value: amount)
+                    }
+
+                    Text("sats")
+                        .font(.title2.weight(.medium))
                         .foregroundStyle(.secondary)
 
-                    HStack {
-                        TextField("Enter amount", text: $customAmount)
-                            .textFieldStyle(.roundedBorder)
-                            .keyboardType(.numberPad)
-
-                        Button {
-                            customAmount = "\(walletManager.balance)"
-                        } label: {
-                            Text("Max")
-                                .font(.caption.weight(.semibold))
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(Color(.systemGray5))
-                                .cornerRadius(6)
-                        }
+                    HStack(spacing: 4) {
+                        Text("Available:")
+                            .foregroundStyle(.tertiary)
+                        Text("\(walletManager.formatSats(walletManager.balance)) sats")
+                            .foregroundStyle(.secondary)
                     }
-                }
-            }
-
-            if let error = error {
-                Text(error)
                     .font(.caption)
-                    .foregroundStyle(.red)
-            }
+                    .padding(.top, 8)
+                }
+                .padding(.horizontal, 32)
 
-            HStack(spacing: 12) {
-                Button {
-                    state = .input
-                    error = nil
-                } label: {
-                    Text("Back")
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color(.systemGray5))
-                        .foregroundStyle(.primary)
-                        .cornerRadius(12)
+                if let error = error {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .padding(.top, 16)
+                }
+
+                Spacer()
+
+                if parsed.embeddedAmountSats == nil {
+                    numpadView { key in handleAmountKey(key) }
+                        .padding(.horizontal, 24)
                 }
 
                 Button {
                     Task { await preparePayment(parsed) }
                 } label: {
-                    Text("Review Payment")
+                    Text("Review")
+                        .font(.body.weight(.semibold))
                         .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(canProceed(parsed) ? OlasTheme.Colors.zapGold : .gray)
+                        .padding(.vertical, 18)
+                        .background(canContinue(parsed) ? OlasTheme.Colors.brandPrimary : Color(.systemGray3))
                         .foregroundStyle(.white)
-                        .cornerRadius(12)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
-                .disabled(!canProceed(parsed))
-            }
-
-            Spacer()
-        }
-    }
-
-    private func invoiceDetails(_ details: SparkBolt11Details) -> some View {
-        VStack(spacing: 12) {
-            if let amount = details.amountSats {
-                Text("\(formatSats(amount))")
-                    .font(.system(size: 32, weight: .bold, design: .rounded))
-            }
-
-            if let description = details.description, !description.isEmpty {
-                Text(description)
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
+                .disabled(!canContinue(parsed))
+                .padding(.horizontal, 24)
+                .padding(.top, 24)
+                .padding(.bottom, 48)
             }
         }
     }
 
-    private func lnurlPayDetails(_ details: SparkLnurlPayDetails) -> some View {
-        VStack(spacing: 12) {
-            if let address = details.lightningAddress {
-                HStack {
-                    Image(systemName: "bolt.fill")
-                        .foregroundStyle(OlasTheme.Colors.zapGold)
-                    Text(address)
-                        .font(.body.monospaced())
-                }
-            }
-
-            Text("Min: \(formatSats(details.minSendableSats)) • Max: \(formatSats(details.maxSendableSats))")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+    private func handleAmountKey(_ key: String) {
+        if key == "delete" {
+            if !amount.isEmpty { amount.removeLast() }
+        } else if amount.count < 10 {
+            if amount == "0" { amount = key }
+            else { amount += key }
         }
     }
 
-    private func bitcoinDetails(_ details: SparkBitcoinAddressDetails) -> some View {
-        VStack(spacing: 8) {
-            Text(details.address)
-                .font(.caption.monospaced())
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-
-            if let amount = details.amountSats {
-                Text("\(formatSats(amount))")
-                    .font(.title2.bold())
-            }
-        }
-    }
-
-    private func sparkAddressDetails(_ details: SparkAddressDetails) -> some View {
-        Text(details.address)
-            .font(.caption.monospaced())
-            .lineLimit(2)
-    }
-
-    // MARK: - Confirm View (shows fees)
+    // MARK: - Confirm View
 
     private func confirmView(_ prepared: SparkPreparedPayment) -> some View {
-        VStack(spacing: 24) {
-            Image(systemName: "arrow.up.circle.fill")
-                .font(.system(size: 60))
-                .foregroundStyle(OlasTheme.Colors.zapGold)
+        ZStack {
+            Color(.systemBackground).ignoresSafeArea()
 
-            Text("Confirm Payment")
-                .font(.title2.bold())
+            VStack(spacing: 0) {
+                header(title: "Confirm", leadingAction: { step = .scan; error = nil }, leadingIcon: "chevron.left")
 
-            VStack(spacing: 16) {
-                // Amount breakdown
-                VStack(spacing: 8) {
-                    HStack {
-                        Text("Amount")
-                        Spacer()
-                        Text(formatSats(prepared.amountSats))
-                            .fontWeight(.medium)
-                    }
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 24) {
+                        VStack(spacing: 4) {
+                            Text(walletManager.formatSats(prepared.amountSats))
+                                .font(.system(size: 56, weight: .bold, design: .rounded))
+                            Text("sats")
+                                .font(.title3)
+                                .foregroundStyle(.secondary)
+                            if let fiat = walletManager.satsToFiat(prepared.amountSats) {
+                                Text(walletManager.formatFiat(fiat))
+                                    .font(.subheadline)
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                        .padding(.top, 32)
 
-                    HStack {
-                        Text("Network Fee")
-                        Spacer()
-                        Text(formatSats(prepared.feeSats))
-                            .fontWeight(.medium)
-                    }
+                        VStack(spacing: 0) {
+                            detailRow(label: "Amount", value: "\(walletManager.formatSats(prepared.amountSats)) sats")
+                            Divider().padding(.leading, 16)
+                            detailRow(label: "Network fee", value: "\(walletManager.formatSats(prepared.feeSats)) sats")
+                            Divider().padding(.leading, 16)
+                            detailRow(label: "Total", value: "\(walletManager.formatSats(prepared.totalSats)) sats", highlight: true)
+                        }
+                        .background(Color(.secondarySystemBackground))
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .padding(.horizontal, 24)
 
-                    Divider()
-
-                    HStack {
-                        Text("Total")
-                            .fontWeight(.semibold)
-                        Spacer()
-                        Text(formatSats(prepared.totalSats))
-                            .font(.title3.bold())
-                            .foregroundStyle(OlasTheme.Colors.zapGold)
-                    }
-                }
-                .padding()
-                .background(Color(.systemGray6))
-                .cornerRadius(12)
-
-                // Balance after
-                HStack {
-                    Text("Balance after")
+                        HStack {
+                            Text("Balance after")
+                            Spacer()
+                            Text("\(walletManager.formatSats(walletManager.balance - prepared.totalSats)) sats")
+                        }
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
-                    Spacer()
-                    Text(formatSats(walletManager.balance - prepared.totalSats))
-                        .foregroundStyle(.secondary)
-                }
-                .font(.caption)
-            }
+                        .padding(.horizontal, 24)
 
-            if let error = error {
-                Text(error)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-            }
-
-            HStack(spacing: 12) {
-                Button {
-                    state = .input
-                    error = nil
-                } label: {
-                    Text("Cancel")
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color(.systemGray5))
-                        .foregroundStyle(.primary)
-                        .cornerRadius(12)
+                        if let error = error {
+                            Text(error)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
+                    }
                 }
 
                 Button {
                     Task { await sendPayment(prepared) }
                 } label: {
-                    Text("Send Payment")
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(OlasTheme.Colors.zapGold)
-                        .foregroundStyle(.white)
-                        .cornerRadius(12)
+                    HStack(spacing: 10) {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.body.weight(.medium))
+                        Text("Send \(walletManager.formatSats(prepared.totalSats)) sats")
+                            .font(.body.weight(.semibold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 18)
+                    .background(OlasTheme.Colors.brandPrimary)
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 48)
             }
-
-            Spacer()
         }
     }
 
-    // MARK: - Sending View
-
-    private var sendingView: some View {
-        VStack(spacing: 24) {
+    private func detailRow(label: String, value: String, highlight: Bool = false) -> some View {
+        HStack {
+            Text(label)
+                .font(.subheadline)
+                .foregroundStyle(highlight ? .primary : .secondary)
             Spacer()
-
-            ProgressView()
-                .scaleEffect(1.5)
-
-            Text("Sending Payment...")
-                .font(.title2.bold())
-
-            Text("Please wait while we process your payment.")
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-
-            Spacer()
+            Text(value)
+                .font(.subheadline.weight(highlight ? .semibold : .regular))
+                .foregroundStyle(highlight ? .primary : .secondary)
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
     }
 
-    // MARK: - Success View
+    // MARK: - Processing & Success Views
+
+    private var processingView: some View {
+        ZStack {
+            Color(.systemBackground).ignoresSafeArea()
+
+            VStack(spacing: 24) {
+                Spacer()
+                ProgressView().scaleEffect(1.5)
+                VStack(spacing: 8) {
+                    Text("Sending...")
+                        .font(.title2.weight(.semibold))
+                    Text("This should only take a moment")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+        }
+    }
 
     private var successView: some View {
-        VStack(spacing: 20) {
-            Spacer()
+        ZStack {
+            Color(.systemBackground).ignoresSafeArea()
 
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 80))
-                .foregroundStyle(.green)
+            VStack(spacing: 24) {
+                Spacer()
 
-            Text("Payment Sent!")
-                .font(.title.bold())
+                ZStack {
+                    Circle()
+                        .fill(Color.green.opacity(0.15))
+                        .frame(width: 120, height: 120)
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 48, weight: .semibold))
+                        .foregroundStyle(.green)
+                }
 
-            Button {
-                dismiss()
-            } label: {
-                Text("Done")
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(OlasTheme.Colors.deepTeal)
-                    .foregroundStyle(.white)
-                    .cornerRadius(12)
+                VStack(spacing: 8) {
+                    Text("Sent!")
+                        .font(.title.bold())
+                    Text("Your payment was successful")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Button { dismiss() } label: {
+                    Text("Done")
+                        .font(.body.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 18)
+                        .background(OlasTheme.Colors.brandPrimary)
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 48)
             }
-
-            Spacer()
         }
     }
 
     // MARK: - Actions
 
-    private func parseInput() async {
+    private func parseDestination() async {
+        isParsing = true
         error = nil
-        let trimmed = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        defer { isParsing = false }
+
+        let trimmed = destination.trimmingCharacters(in: .whitespacesAndNewlines)
 
         do {
             let parsed = try await walletManager.parseInput(trimmed)
-            state = .parsed(parsed)
+            step = .amount(parsed)
         } catch {
-            self.error = "Could not parse input: \(error.localizedDescription)"
+            self.error = "Invalid destination"
+            if step == .scan {
+                step = .manualEntry
+            }
         }
     }
 
     private func preparePayment(_ parsed: SparkParsedInput) async {
         error = nil
 
-        let amount: Int64?
-        if parsed.requiresAmount {
-            guard let parsedAmount = Int64(customAmount), parsedAmount > 0 else {
-                error = "Please enter a valid amount"
-                return
-            }
-            amount = parsedAmount
+        let amountSats: Int64?
+        if let embedded = parsed.embeddedAmountSats {
+            amountSats = embedded
+        } else if let amt = Int64(amount), amt > 0 {
+            amountSats = amt
         } else {
-            amount = parsed.embeddedAmountSats
+            error = "Enter an amount"
+            return
         }
 
         do {
-            let prepared = try await walletManager.preparePayment(input: inputText.trimmingCharacters(in: .whitespacesAndNewlines), amount: amount)
-            state = .confirm(prepared)
+            let prepared = try await walletManager.preparePayment(
+                input: destination.trimmingCharacters(in: .whitespacesAndNewlines),
+                amount: amountSats
+            )
+            step = .confirm(prepared)
         } catch {
             self.error = error.localizedDescription
         }
     }
 
     private func sendPayment(_ prepared: SparkPreparedPayment) async {
-        state = .sending
+        step = .processing
         error = nil
 
         do {
             try await walletManager.sendPreparedPayment(prepared)
-            state = .success
+            step = .success
         } catch {
             self.error = error.localizedDescription
-            state = .confirm(prepared)
+            step = .confirm(prepared)
         }
     }
 
-    private func canProceed(_ parsed: SparkParsedInput) -> Bool {
-        if parsed.requiresAmount {
-            return Int64(customAmount) ?? 0 > 0
-        }
-        return true
+    private func canContinue(_ parsed: SparkParsedInput) -> Bool {
+        if parsed.embeddedAmountSats != nil { return true }
+        return (Int64(amount) ?? 0) > 0
     }
 
-    private func formatSats(_ amount: Int64) -> String {
+    private func formatWithCommas(_ amount: Int64) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
-        return "\(formatter.string(from: NSNumber(value: amount)) ?? "\(amount)") sats"
+        return formatter.string(from: NSNumber(value: amount)) ?? "\(amount)"
     }
 }
 
-// MARK: - QR Scanner View
+// MARK: - Shared Components
 
-struct QRScannerView: View {
-    let onScan: (String) -> Void
-    @Environment(\.dismiss) private var dismiss
+private func header(
+    title: String,
+    leadingAction: @escaping () -> Void,
+    leadingIcon: String,
+    trailingAction: (() -> Void)? = nil,
+    trailingLabel: String? = nil
+) -> some View {
+    HStack {
+        Button(action: leadingAction) {
+            Image(systemName: leadingIcon)
+                .font(.body.weight(.medium))
+                .foregroundStyle(.primary)
+                .frame(width: 44, height: 44)
+        }
 
-    var body: some View {
-        NavigationStack {
-            VStack {
-                // Placeholder for actual camera scanner
-                // In a real implementation, use AVFoundation or a library like CodeScanner
-                VStack(spacing: 20) {
-                    Image(systemName: "qrcode.viewfinder")
-                        .font(.system(size: 100))
-                        .foregroundStyle(.secondary)
+        Spacer()
 
-                    Text("Point camera at QR code")
-                        .font(.body)
-                        .foregroundStyle(.secondary)
+        Text(title)
+            .font(.headline)
 
-                    Text("Camera access required")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.black.opacity(0.9))
+        Spacer()
+
+        if let action = trailingAction, let label = trailingLabel {
+            Button(action: action) {
+                Text(label)
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(OlasTheme.Colors.brandPrimary)
             }
-            .navigationTitle("Scan QR Code")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                        .foregroundStyle(.white)
+        } else {
+            Color.clear.frame(width: 44, height: 44)
+        }
+    }
+    .padding(.horizontal, 8)
+}
+
+private func numpadView(onKey: @escaping (String) -> Void) -> some View {
+    let keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "delete"]
+
+    return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 3), spacing: 8) {
+        ForEach(keys, id: \.self) { key in
+            if key.isEmpty {
+                Color.clear.frame(height: 56)
+            } else {
+                Button {
+                    onKey(key)
+                } label: {
+                    Group {
+                        if key == "delete" {
+                            Image(systemName: "delete.left")
+                                .font(.title3)
+                        } else {
+                            Text(key)
+                                .font(.title.weight(.medium))
+                        }
+                    }
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+                    .background(Color.clear)
                 }
+                .buttonStyle(.plain)
             }
         }
     }

@@ -2,13 +2,11 @@ import SwiftUI
 import NDKSwift
 import NDKSwiftUI
 
-extension NDKEvent: @retroactive Identifiable {}
-
 struct ExploreView: View {
     let ndk: NDK
 
-    @EnvironmentObject private var authViewModel: AuthViewModel
-    @EnvironmentObject private var muteListManager: MuteListManager
+    @Environment(AuthViewModel.self) private var authViewModel
+    @Environment(MuteListManager.self) private var muteListManager
     @State private var searchText = ""
     @State private var searchResults: [NDKEvent] = []
     @State private var userResults: [SearchUserResult] = []

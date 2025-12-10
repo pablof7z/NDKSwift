@@ -8,7 +8,7 @@ struct ProfileView: View {
     let currentUserPubkey: String?
     var sparkWalletManager: SparkWalletManager?
 
-    @EnvironmentObject private var muteListManager: MuteListManager
+    @Environment(MuteListManager.self) private var muteListManager
     @State private var profile: NDKUserMetadata?
     @State private var posts: [NDKEvent] = []
     @State private var followingCount = 0
@@ -57,7 +57,7 @@ struct ProfileView: View {
                 )
 
                 // Collections
-                ProfileCollectionsSection(isOwnProfile: isOwnProfile)
+                ProfileCollectionsSection(ndk: ndk, pubkey: pubkey, isOwnProfile: isOwnProfile)
 
                 // Tabs
                 ProfileTabsBar(selectedTab: $selectedTab)
@@ -474,16 +474,19 @@ struct ProfileBioSection: View {
 // MARK: - Collections Section
 
 struct ProfileCollectionsSection: View {
+    let ndk: NDK
+    let pubkey: String
     let isOwnProfile: Bool
 
-    // Placeholder collections - these would come from actual data
-    private let collections = [
-        ("Surf", "🏄"),
-        ("Travel", "✈️"),
-        ("Sunsets", "🌅"),
-        ("Food", "🍜"),
-        ("Code", "💻")
-    ]
+    @Environment(CollectionsManager.self) private var collectionsManager
+    @State private var userCollections: [NDKPictureCurationSet] = []
+    @State private var showCreateSheet = false
+    @State private var showAllCollections = false
+
+    // For own profile, use manager. For other profiles, use local state
+    private var displayedCollections: [NDKPictureCurationSet] {
+        isOwnProfile ? collectionsManager.collections : userCollections
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -496,10 +499,14 @@ struct ProfileCollectionsSection: View {
 
                 Spacer()
 
-                Button(action: {}) {
-                    Text("See All")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(OlasTheme.Colors.oceanBlue)
+                if !displayedCollections.isEmpty {
+                    Button {
+                        showAllCollections = true
+                    } label: {
+                        Text("See All")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(OlasTheme.Colors.oceanBlue)
+                    }
                 }
             }
             .padding(.horizontal, 20)
@@ -509,12 +516,26 @@ struct ProfileCollectionsSection: View {
                 HStack(spacing: 14) {
                     // Add new collection (only for own profile)
                     if isOwnProfile {
-                        CollectionItem(name: "New", isAddButton: true)
+                        Button {
+                            showCreateSheet = true
+                        } label: {
+                            CollectionItem(name: "New", isAddButton: true)
+                        }
+                        .buttonStyle(.plain)
                     }
 
                     // Collection items
-                    ForEach(collections, id: \.0) { name, emoji in
-                        CollectionItem(name: name, emoji: emoji)
+                    ForEach(displayedCollections.prefix(8), id: \.identifier) { collection in
+                        NavigationLink {
+                            CollectionDetailView(collection: collection, ndk: ndk)
+                        } label: {
+                            CollectionItem(
+                                name: collection.title ?? "Untitled",
+                                coverImageUrl: collection.image,
+                                count: collection.count
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -524,12 +545,26 @@ struct ProfileCollectionsSection: View {
         .overlay(alignment: .bottom) {
             Divider().opacity(0.3)
         }
+        .task {
+            if !isOwnProfile {
+                for await collections in collectionsManager.subscribeToCollections(for: pubkey) {
+                    userCollections = collections
+                }
+            }
+        }
+        .sheet(isPresented: $showCreateSheet) {
+            CreateCollectionSheet()
+        }
+        .sheet(isPresented: $showAllCollections) {
+            AllCollectionsSheet(collections: displayedCollections, ndk: ndk)
+        }
     }
 }
 
 struct CollectionItem: View {
     let name: String
-    var emoji: String? = nil
+    var coverImageUrl: String? = nil
+    var count: Int = 0
     var isAddButton: Bool = false
 
     var body: some View {
@@ -560,19 +595,118 @@ struct CollectionItem: View {
                         )
                         .frame(width: 72, height: 72)
 
-                    // Inner circle with emoji placeholder
-                    Circle()
-                        .fill(Color(white: 0.15))
+                    // Inner circle with cover or placeholder
+                    if let urlString = coverImageUrl, let url = URL(string: urlString) {
+                        AsyncImage(url: url) { image in
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        } placeholder: {
+                            placeholderContent
+                        }
                         .frame(width: 64, height: 64)
-                        .overlay(
-                            Text(emoji ?? "📷")
-                                .font(.system(size: 28))
-                        )
+                        .clipShape(Circle())
+                    } else {
+                        placeholderContent
+                            .frame(width: 64, height: 64)
+                            .clipShape(Circle())
+                    }
                 }
             }
 
             Text(name)
                 .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .frame(width: 80)
+    }
+
+    private var placeholderContent: some View {
+        Circle()
+            .fill(Color(white: 0.15))
+            .overlay(
+                Image(systemName: "photo.on.rectangle")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.secondary)
+            )
+    }
+}
+
+// MARK: - All Collections Sheet
+
+private struct AllCollectionsSheet: View {
+    let collections: [NDKPictureCurationSet]
+    let ndk: NDK
+
+    @Environment(\.dismiss) private var dismiss
+
+    private let columns = [
+        GridItem(.flexible(), spacing: 16),
+        GridItem(.flexible(), spacing: 16)
+    ]
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                LazyVGrid(columns: columns, spacing: 16) {
+                    ForEach(collections, id: \.identifier) { collection in
+                        NavigationLink {
+                            CollectionDetailView(collection: collection, ndk: ndk)
+                        } label: {
+                            CollectionGridItem(collection: collection)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding()
+            }
+            .background(Color.black)
+            .navigationTitle("Collections")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+private struct CollectionGridItem: View {
+    let collection: NDKPictureCurationSet
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Cover image
+            if let urlString = collection.image, let url = URL(string: urlString) {
+                AsyncImage(url: url) { image in
+                    image
+                        .resizable()
+                        .scaledToFill()
+                } placeholder: {
+                    Rectangle().fill(Color(white: 0.15))
+                }
+                .frame(height: 140)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            } else {
+                Rectangle()
+                    .fill(Color(white: 0.15))
+                    .frame(height: 140)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        Image(systemName: "photo.on.rectangle")
+                            .font(.title)
+                            .foregroundStyle(.secondary)
+                    )
+            }
+
+            Text(collection.title ?? "Untitled")
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+
+            Text("\(collection.count) photos")
+                .font(.caption)
                 .foregroundStyle(.secondary)
         }
     }

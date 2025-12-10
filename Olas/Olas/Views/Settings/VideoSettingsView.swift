@@ -1,11 +1,12 @@
 import SwiftUI
 
 struct VideoSettingsView: View {
-    @StateObject private var settings = SettingsManager.shared
+    @State private var settings = SettingsManager.shared
 
     var body: some View {
         List {
             Section {
+                @Bindable var settings = settings
                 Toggle("Show videos in feed", isOn: $settings.showVideos)
 
                 Toggle("Autoplay videos", isOn: $settings.autoplayVideos)

@@ -6,6 +6,7 @@ import UnifiedBlurHash
 struct CreatePostView: View {
     @Environment(\.dismiss) private var dismiss
     let ndk: NDK
+    var blossomManager: NDKBlossomServerManager
 
     @State private var selectedImage: UIImage?
     @State private var editedImage: UIImage?
@@ -26,8 +27,9 @@ struct CreatePostView: View {
         case publishing
     }
 
-    public init(ndk: NDK) {
+    public init(ndk: NDK, blossomManager: NDKBlossomServerManager) {
         self.ndk = ndk
+        self.blossomManager = blossomManager
     }
 
     public var body: some View {
@@ -217,61 +219,22 @@ struct CreatePostView: View {
     }
 
     private func uploadImage(_ image: UIImage) async throws -> String {
-        // Compress image
         guard let imageData = image.jpegData(compressionQuality: 0.8) else {
             throw PostError.imageCompressionFailed
         }
 
-        // Upload to Blossom server (using nostr.build as fallback)
-        let uploadUrl = URL(string: "https://nostr.build/api/v2/upload/files")!
-        var request = URLRequest(url: uploadUrl)
-        request.httpMethod = "POST"
-
-        let boundary = UUID().uuidString
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-
-        var body = Data()
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"image.jpg\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
-        body.append(imageData)
-        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
-
-        request.httpBody = body
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
-            throw PostError.uploadFailed
-        }
-
-        // Parse response to get URL
-        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        guard let status = json?["status"] as? String, status == "success",
-              let dataArray = json?["data"] as? [[String: Any]],
-              let firstItem = dataArray.first,
-              let url = firstItem["url"] as? String else {
-            throw PostError.invalidUploadResponse
-        }
-
-        return url
+        let blob = try await blossomManager.uploadToUserServers(data: imageData, mimeType: "image/jpeg")
+        return blob.url
     }
 }
 
 enum PostError: LocalizedError {
     case imageCompressionFailed
-    case uploadFailed
-    case invalidUploadResponse
 
     var errorDescription: String? {
         switch self {
         case .imageCompressionFailed:
             return "Failed to compress image"
-        case .uploadFailed:
-            return "Failed to upload image"
-        case .invalidUploadResponse:
-            return "Invalid response from upload server"
         }
     }
 }

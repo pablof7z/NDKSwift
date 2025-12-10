@@ -3,7 +3,7 @@ import NDKSwift
 
 @main
 struct OlasApp: App {
-    @StateObject private var authViewModel = AuthViewModel()
+    @State private var authViewModel = AuthViewModel()
     @State private var ndk: NDK?
     @State private var isInitialized = false
 
@@ -19,7 +19,7 @@ struct OlasApp: App {
                     OnboardingView(authViewModel: authViewModel)
                 } else if let ndk = ndk {
                     MainTabView(ndk: ndk)
-                        .environmentObject(authViewModel)
+                        .environment(authViewModel)
                 }
             }
             .onChange(of: authViewModel.isLoggedIn) { _, isLoggedIn in

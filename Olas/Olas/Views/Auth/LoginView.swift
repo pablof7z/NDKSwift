@@ -6,7 +6,7 @@ import AppKit
 #endif
 
 struct LoginView: View {
-    @ObservedObject var authViewModel: AuthViewModel
+    var authViewModel: AuthViewModel
     @Environment(\.dismiss) private var dismiss
 
     @State private var nsec = ""
