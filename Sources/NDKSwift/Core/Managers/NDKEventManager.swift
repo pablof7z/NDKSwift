@@ -99,8 +99,11 @@ public actor NDKEventManager {
         }
 
         if logRawJSON {
-            if let jsonString = try? JSONCoding.encodeToString(event) {
+            do {
+                let jsonString = try JSONCoding.encodeToString(event)
                 NDKLogger.log(.debug, category: .event, "Publishing event JSON: \(jsonString)")
+            } catch {
+                NDKLogger.log(.warning, category: .event, "Failed to encode event to JSON for logging: \(error.localizedDescription)")
             }
         }
 

@@ -273,9 +273,13 @@ public actor WalletEventManager {
 
         for tag in event.tags {
             if tag.count >= 2 && tag[0] == NostrConstants.TagName.proof {
-                if let proofData = tag[1].data(using: .utf8),
-                   let proof = try? JSONCoding.decode(CashuSwift.Proof.self, from: proofData) {
-                    totalAmount += Int64(proof.amount)
+                if let proofData = tag[1].data(using: .utf8) {
+                    do {
+                        let proof = try JSONCoding.decode(CashuSwift.Proof.self, from: proofData)
+                        totalAmount += Int64(proof.amount)
+                    } catch {
+                        NDKLogger.log(.warning, category: .wallet, "Failed to parse proof from nutzap event \(event.id): \(error.localizedDescription)")
+                    }
                 }
             }
             // Extract mint from tags

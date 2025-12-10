@@ -39,7 +39,11 @@ public actor CachedMintLoader {
 
         // Force refresh if requested
         if forceRefresh {
-            try? await cache.invalidateMintCache(url: urlString)
+            do {
+                try await cache.invalidateMintCache(url: urlString)
+            } catch {
+                NDKLogger.log(.warning, category: .cache, "Failed to invalidate mint cache for \(urlString): \(error.localizedDescription)")
+            }
         }
 
         // Check if we have cached keysets that are still fresh
@@ -66,7 +70,11 @@ public actor CachedMintLoader {
 
         // Force refresh if requested
         if forceRefresh {
-            try? await cache.invalidateMintCache(url: urlString)
+            do {
+                try await cache.invalidateMintCache(url: urlString)
+            } catch {
+                NDKLogger.log(.warning, category: .cache, "Failed to invalidate mint info cache for \(urlString): \(error.localizedDescription)")
+            }
         }
 
         // Check cache first

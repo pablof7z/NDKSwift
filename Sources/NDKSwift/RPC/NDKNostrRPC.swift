@@ -73,10 +73,13 @@ public actor NDKNostrRPC {
             encryptionScheme = otherScheme
         }
 
-        let json = try GuardHelpers.unwrap(
-            try? JSONCoding.parseDictionary(from: decryptedContent),
-            error: NDKError.invalidMessage(ErrorMessageConstants.failedTo("parse RPC content"))
-        )
+        let json: [String: Any]
+        do {
+            json = try JSONCoding.parseDictionary(from: decryptedContent)
+        } catch {
+            NDKLogger.log(.error, category: .relay, "Failed to parse RPC content from event \(event.id): \(error.localizedDescription)")
+            throw NDKError.invalidMessage(ErrorMessageConstants.failedTo("parse RPC content"))
+        }
 
         let id = json["id"] as? String ?? ""
 
