@@ -1,11 +1,27 @@
 import SwiftUI
 
 @MainActor
-final class SettingsManager: ObservableObject {
+@Observable
+final class SettingsManager {
     public static let shared = SettingsManager()
 
-    @AppStorage("showVideos") public var showVideos: Bool = true
-    @AppStorage("autoplayVideos") public var autoplayVideos: Bool = true
+    public var showVideos: Bool {
+        get { UserDefaults.standard.bool(forKey: "showVideos") }
+        set { UserDefaults.standard.set(newValue, forKey: "showVideos") }
+    }
 
-    private init() {}
+    public var autoplayVideos: Bool {
+        get { UserDefaults.standard.bool(forKey: "autoplayVideos") }
+        set { UserDefaults.standard.set(newValue, forKey: "autoplayVideos") }
+    }
+
+    private init() {
+        // Set defaults if not already set
+        if UserDefaults.standard.object(forKey: "showVideos") == nil {
+            UserDefaults.standard.set(true, forKey: "showVideos")
+        }
+        if UserDefaults.standard.object(forKey: "autoplayVideos") == nil {
+            UserDefaults.standard.set(true, forKey: "autoplayVideos")
+        }
+    }
 }

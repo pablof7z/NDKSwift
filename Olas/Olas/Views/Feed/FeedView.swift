@@ -3,17 +3,17 @@ import SwiftUI
 import NDKSwift
 
 struct FeedView: View {
-    @StateObject private var viewModel: FeedViewModel
-    @StateObject private var relayMetadataCache = RelayMetadataCache.shared
-    @EnvironmentObject private var authViewModel: AuthViewModel
-    @EnvironmentObject private var muteListManager: MuteListManager
+    @State private var viewModel: FeedViewModel
+    @State private var relayMetadataCache = RelayMetadataCache.shared
+    @Environment(AuthViewModel.self) private var authViewModel
+    @Environment(MuteListManager.self) private var muteListManager
     private let ndk: NDK
 
     @State private var navigationPath = NavigationPath()
 
     public init(ndk: NDK) {
         self.ndk = ndk
-        _viewModel = StateObject(wrappedValue: FeedViewModel(ndk: ndk))
+        _viewModel = State(wrappedValue: FeedViewModel(ndk: ndk))
     }
 
     private var currentFeedDisplayName: String {

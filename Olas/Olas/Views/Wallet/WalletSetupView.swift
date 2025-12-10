@@ -4,9 +4,9 @@ import NDKSwift
 
 struct WalletSetupView: View {
     let ndk: NDK
-    @ObservedObject var walletViewModel: WalletViewModel
+    var walletViewModel: WalletViewModel
 
-    @StateObject private var mintDiscovery: MintDiscoveryViewModel
+    @State private var mintDiscovery: MintDiscoveryViewModel
     @State private var currentStep: SetupStep = .welcome
     @State private var isSettingUp = false
     @State private var setupError: Error?
@@ -21,7 +21,7 @@ struct WalletSetupView: View {
     init(ndk: NDK, walletViewModel: WalletViewModel) {
         self.ndk = ndk
         self.walletViewModel = walletViewModel
-        self._mintDiscovery = StateObject(wrappedValue: MintDiscoveryViewModel(ndk: ndk))
+        self._mintDiscovery = State(wrappedValue: MintDiscoveryViewModel(ndk: ndk))
     }
 
     var body: some View {

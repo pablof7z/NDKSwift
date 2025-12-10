@@ -6,7 +6,7 @@ struct CommentsSheet: View {
     let event: NDKEvent
     let ndk: NDK
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var muteListManager: MuteListManager
+    @Environment(MuteListManager.self) private var muteListManager
 
     @State private var comments: [NDKEvent] = []
     @State private var newComment = ""

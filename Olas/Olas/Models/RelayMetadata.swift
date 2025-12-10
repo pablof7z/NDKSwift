@@ -21,11 +21,12 @@ struct RelayMetadata: Codable {
 }
 
 @MainActor
-final class RelayMetadataCache: ObservableObject {
+@Observable
+final class RelayMetadataCache {
     public static let shared = RelayMetadataCache()
 
-    @Published public private(set) var metadata: [String: RelayMetadata] = [:]
-    @Published public private(set) var loading: Set<String> = []
+    public private(set) var metadata: [String: RelayMetadata] = [:]
+    public private(set) var loading: Set<String> = []
 
     private init() {}
 

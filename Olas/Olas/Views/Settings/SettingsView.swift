@@ -3,13 +3,13 @@ import NDKSwift
 
 struct SettingsView: View {
     let ndk: NDK
-    @EnvironmentObject private var authViewModel: AuthViewModel
-    @StateObject private var blossomManager: NDKBlossomServerManager
-    @ObservedObject var sparkWalletManager: SparkWalletManager
+    @Environment(AuthViewModel.self) private var authViewModel
+    @State private var blossomManager: NDKBlossomServerManager
+    var sparkWalletManager: SparkWalletManager
 
     public init(ndk: NDK, sparkWalletManager: SparkWalletManager) {
         self.ndk = ndk
-        self._blossomManager = StateObject(wrappedValue: NDKBlossomServerManager(ndk: ndk))
+        self._blossomManager = State(wrappedValue: NDKBlossomServerManager(ndk: ndk))
         self.sparkWalletManager = sparkWalletManager
     }
 
@@ -55,6 +55,12 @@ struct SettingsView: View {
                 }
             }
 
+            Section("Developer") {
+                NavigationLink(destination: DeveloperToolsView(ndk: ndk)) {
+                    SettingsRow(icon: "hammer.fill", title: "Developer Tools", color: .gray)
+                }
+            }
+
             Section {
                 Button(role: .destructive) {
                     Task { await authViewModel.logout() }
@@ -64,6 +70,7 @@ struct SettingsView: View {
                         Text("Logout")
                     }
                 }
+                .accessibilityIdentifier("logoutButton")
             }
         }
         .navigationTitle("Settings")

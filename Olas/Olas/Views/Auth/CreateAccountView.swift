@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct CreateAccountView: View {
-    @ObservedObject var authViewModel: AuthViewModel
+    var authViewModel: AuthViewModel
     @Environment(\.dismiss) private var dismiss
 
     @State private var showError = false

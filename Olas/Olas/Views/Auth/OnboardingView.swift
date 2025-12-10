@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct OnboardingView: View {
-    @ObservedObject var authViewModel: AuthViewModel
+    var authViewModel: AuthViewModel
     @State private var showLogin = false
     @State private var showCreateAccount = false
 
@@ -14,15 +14,7 @@ struct OnboardingView: View {
             Spacer()
 
             // Logo
-            Image(systemName: "water.waves")
-                .font(.system(size: 80))
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [OlasTheme.Colors.deepTeal, OlasTheme.Colors.oceanBlue],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+            OlasLogo(size: 100)
 
             Text("Olas")
                 .font(.system(size: 48, weight: .bold, design: .rounded))
@@ -55,6 +47,7 @@ struct OnboardingView: View {
                         .foregroundStyle(.white)
                         .cornerRadius(14)
                 }
+                .accessibilityIdentifier("createAccountButton")
 
                 Button {
                     showLogin = true
@@ -66,6 +59,7 @@ struct OnboardingView: View {
                         .background(.ultraThinMaterial)
                         .cornerRadius(14)
                 }
+                .accessibilityIdentifier("loginButton")
             }
             .padding(.horizontal, 30)
             .padding(.bottom, 40)

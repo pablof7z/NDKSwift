@@ -4,15 +4,17 @@ import NDKSwift
 
 struct WalletView: View {
     let ndk: NDK
-    @ObservedObject var walletViewModel: WalletViewModel
+    var walletViewModel: WalletViewModel
+    var sparkWalletManager: SparkWalletManager
 
     @State private var showDeposit = false
     @State private var showSend = false
     @State private var showSettings = false
 
-    public init(ndk: NDK, walletViewModel: WalletViewModel) {
+    public init(ndk: NDK, walletViewModel: WalletViewModel, sparkWalletManager: SparkWalletManager) {
         self.ndk = ndk
         self.walletViewModel = walletViewModel
+        self.sparkWalletManager = sparkWalletManager
     }
 
     public var body: some View {
@@ -45,7 +47,7 @@ struct WalletView: View {
                 SendView(ndk: ndk, walletViewModel: walletViewModel)
             }
             .sheet(isPresented: $showSettings) {
-                WalletSettingsView(walletViewModel: walletViewModel)
+                WalletSettingsView(walletViewModel: walletViewModel, sparkWalletManager: sparkWalletManager)
             }
         }
     }
@@ -146,8 +148,10 @@ struct WalletView: View {
 // MARK: - Wallet Settings View
 
 struct WalletSettingsView: View {
-    @ObservedObject var walletViewModel: WalletViewModel
+    var walletViewModel: WalletViewModel
+    var sparkWalletManager: SparkWalletManager
     @Environment(\.dismiss) private var dismiss
+    @State private var showSparkSetup = false
 
     var body: some View {
         NavigationStack {
@@ -177,11 +181,27 @@ struct WalletSettingsView: View {
                 }
 
                 Section {
-                    Button(role: .destructive) {
-                        // Future: Add mint removal functionality
+                    Button {
+                        // Future: Add mint functionality
                     } label: {
                         Label("Add Mint", systemImage: "plus.circle")
                     }
+                }
+
+                Section {
+                    Button {
+                        showSparkSetup = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "bolt.fill")
+                                .foregroundStyle(OlasTheme.Colors.zapGold)
+                            Text("Switch to Spark Wallet")
+                        }
+                    }
+                } header: {
+                    Text("Lightning Wallet")
+                } footer: {
+                    Text("Spark is a self-custodial Bitcoin Lightning wallet.")
                 }
             }
             .navigationTitle("Wallet Settings")
@@ -191,6 +211,11 @@ struct WalletSettingsView: View {
                     Button("Done") {
                         dismiss()
                     }
+                }
+            }
+            .sheet(isPresented: $showSparkSetup) {
+                NavigationStack {
+                    SparkWalletSettingsView(walletManager: sparkWalletManager)
                 }
             }
         }

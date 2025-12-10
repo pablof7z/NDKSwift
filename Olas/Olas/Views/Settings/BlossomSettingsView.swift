@@ -2,7 +2,7 @@ import SwiftUI
 import NDKSwift
 
 struct BlossomSettingsView: View {
-    @ObservedObject var manager: NDKBlossomServerManager
+    var manager: NDKBlossomServerManager
     @State private var showAddServer = false
     @State private var editMode: EditMode = .active
 
