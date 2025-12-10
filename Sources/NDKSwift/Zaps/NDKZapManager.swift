@@ -455,10 +455,11 @@ public actor NDKZapManager {
                         if eventKind == EventKind.zapReceipt {
                             let receipt = NDKZapReceipt(event: event)
                             do {
-                                let zapInfo = try await self.validateAndParseZapReceipt(receipt)
-                                continuation.yield(zapInfo)
+                                if let zapInfo = try await self.validateAndParseZapReceipt(receipt) {
+                                    continuation.yield(zapInfo)
+                                }
                             } catch {
-                                NDKLogger.log(.warning, category: .wallet, "Failed to validate zap receipt \(receipt.id ?? "unknown"): \(error.localizedDescription)")
+                                NDKLogger.log(.warning, category: .wallet, "Failed to validate zap receipt \(receipt.event.id): \(error.localizedDescription)")
                             }
                         } else if eventKind == EventKind.nutzap {
                             let nutzap = NDKNutzap(event: event)
