@@ -186,9 +186,11 @@ final class SparkWalletManager {
 
     private func startFiatRefreshTask() {
         fiatRefreshTask?.cancel()
+        fiatRefreshTask = nil
         fiatRefreshTask = Task {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(300)) // 5 minutes
+                guard !Task.isCancelled else { break }
                 await refreshFiatRate()
             }
         }
@@ -196,8 +198,10 @@ final class SparkWalletManager {
 
     private func startEventListener(_ wallet: SparkWallet) {
         eventTask?.cancel()
+        eventTask = nil
         eventTask = Task {
             for await event in wallet.events {
+                guard !Task.isCancelled else { break }
                 await handleEvent(event)
             }
         }
