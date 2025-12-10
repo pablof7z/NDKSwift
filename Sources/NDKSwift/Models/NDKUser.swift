@@ -2,8 +2,12 @@ import Foundation
 
 /// Actor for thread-safe user state management
 actor UserStateActor {
+    weak var ndk: NDK?
     var relayList: [NDKRelayInfo] = []
     var nip46Urls: [String]?
+
+    func getNdk() -> NDK? { ndk }
+    func setNdk(_ newNdk: NDK?) { ndk = newNdk }
 
     func getRelayList() -> [NDKRelayInfo] { relayList }
     func setRelayList(_ newList: [NDKRelayInfo]) { relayList = newList }
@@ -17,11 +21,18 @@ public final class NDKUser: Equatable, Hashable, Sendable {
     /// User's public key
     public let pubkey: PublicKey
 
-    /// Reference to NDK instance
-    public nonisolated(unsafe) weak var ndk: NDK?
-
     /// Internal state actor that manages all mutable state
     private let stateActor = UserStateActor()
+
+    /// Reference to NDK instance (thread-safe via actor)
+    public var ndk: NDK? {
+        get async { await stateActor.getNdk() }
+    }
+
+    /// Set the NDK instance (thread-safe via actor)
+    public func setNdk(_ ndk: NDK?) async {
+        await stateActor.setNdk(ndk)
+    }
 
 
     /// Relay list (NIP-65)
@@ -78,7 +89,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
     @discardableResult
     public func fetchRelayList() async throws -> [NDKRelayInfo] {
         let ndk = try GuardHelpers.unwrap(
-            self.ndk,
+            await self.ndk,
             error: NDKError.configurationError(ErrorMessageConstants.Messages.ndkInstanceNotSet)
         )
 
@@ -125,7 +136,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
     /// Get users this user follows
     public func follows() async throws -> Set<NDKUser> {
         let ndk = try GuardHelpers.unwrap(
-            self.ndk,
+            await self.ndk,
             error: NDKError.configurationError(ErrorMessageConstants.Messages.ndkInstanceNotSet)
         )
 
@@ -152,10 +163,11 @@ public final class NDKUser: Equatable, Hashable, Sendable {
                 .compactMap { $0[safe: 1] }
 
             // Create NDKUser instances for each followed pubkey
-            let users = followedPubkeys.map { pubkey in
+            var users: [NDKUser] = []
+            for pubkey in followedPubkeys {
                 let user = NDKUser(pubkey: pubkey)
-                user.ndk = ndk
-                return user
+                await user.setNdk(ndk)
+                users.append(user)
             }
 
             return Set(users)
@@ -207,7 +219,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
     /// - Returns: True if the NIP-05 is verified and belongs to this user
     public func verifyNIP05(maxAge: TimeInterval = TimeConstants.day) async throws -> Bool {
         let ndk = try GuardHelpers.unwrap(
-            self.ndk,
+            await self.ndk,
             error: NDKError.configurationError(ErrorMessageConstants.Messages.ndkInstanceNotSet)
         )
 
@@ -223,7 +235,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
     ///   - tags: Optional additional tags
     /// - Returns: Payment confirmation
     public func pay(amount: Int64, comment: String? = nil, tags: [[String]]? = nil) async throws -> PaymentConfirmation {
-        guard ndk != nil else {
+        guard await ndk != nil else {
             throw NDKError.configurationError(ErrorMessageConstants.Messages.ndkInstanceNotSet)
         }
 

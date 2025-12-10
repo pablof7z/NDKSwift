@@ -496,7 +496,7 @@ struct Example09_NutzapsAndHistory {
             do {
                 let recipientPubkey = try await receiverKey.pubkey
                 let recipientUser = NDKUser(pubkey: recipientPubkey)
-                recipientUser.ndk = senderNDK
+                await recipientUser.setNdk(senderNDK)
                 
                 let zapManager = NDKZapManager(ndk: senderNDK)
                 await zapManager.register(provider: senderWallet)

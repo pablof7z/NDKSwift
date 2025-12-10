@@ -27,7 +27,12 @@ public final class NDK {
     public var activeUser: NDKUser? {
         get async {
             guard let signer = signer else { return nil }
-            return try? await signer.user()
+            do {
+                return try await signer.user()
+            } catch {
+                NDKLogger.log(.warning, category: .signer, "Failed to get active user from signer: \(error.localizedDescription)")
+                return nil
+            }
         }
     }
 
@@ -582,9 +587,9 @@ public final class NDK {
     ///
     /// - Parameter pubkey: The user's public key (hex format)
     /// - Returns: An NDKUser instance
-    public func getUser(_ pubkey: PublicKey) -> NDKUser {
+    public func getUser(_ pubkey: PublicKey) async -> NDKUser {
         let user = NDKUser(pubkey: pubkey)
-        user.ndk = self
+        await user.setNdk(self)
         return user
     }
 
@@ -592,12 +597,20 @@ public final class NDK {
     ///
     /// - Parameter npub: The user's public key in bech32 format
     /// - Returns: An NDKUser instance if the npub is valid, nil otherwise
-    public func getUser(npub: String) -> NDKUser? {
-        guard let pubkey = try? PublicKey.fromNpub(npub) else {
+    public func getUser(npub: String) async -> NDKUser? {
+        let pubkey: PublicKey
+        do {
+            guard let pk = try PublicKey.fromNpub(npub) else {
+                NDKLogger.log(.warning, category: .event, "Failed to parse npub \(npub.prefix(16)): returned nil")
+                return nil
+            }
+            pubkey = pk
+        } catch {
+            NDKLogger.log(.warning, category: .event, "Failed to parse npub \(npub.prefix(16)): \(error.localizedDescription)")
             return nil
         }
         let user = NDKUser(pubkey: pubkey)
-        user.ndk = self
+        await user.setNdk(self)
         return user
     }
 
@@ -860,11 +873,13 @@ public final class NDK {
     public func searchNIP05(_ query: String, limit: Int = 10) async -> [(user: NDKUser, nip05: String, status: NIP05VerificationStatus)] {
         let entries = await nip05Manager.search(query, limit: limit)
 
-        return entries.map { entry in
+        var results: [(user: NDKUser, nip05: String, status: NIP05VerificationStatus)] = []
+        for entry in entries {
             let user = NDKUser(pubkey: entry.pubkey)
-            user.ndk = self
-            return (user: user, nip05: entry.identifier, status: entry.status)
+            await user.setNdk(self)
+            results.append((user: user, nip05: entry.identifier, status: entry.status))
         }
+        return results
     }
     
 

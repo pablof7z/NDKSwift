@@ -549,7 +549,7 @@ public actor NDKZapManager {
         }
 
         let recipient = NDKUser(pubkey: recipientPubkey)
-        recipient.ndk = ndk
+        await recipient.setNdk(ndk)
 
         // Try to get provider pubkey from recipient's profile
         var providerPubkey: String?
@@ -640,7 +640,7 @@ extension NDKUser {
         comment: String? = nil,
         preferredType: ZapType? = nil
     ) async throws -> ZapResult {
-        guard let ndk = self.ndk else {
+        guard let ndk = await self.ndk else {
             throw NDKError.notConfigured(ErrorMessageConstants.Messages.ndkNotAvailable)
         }
 
