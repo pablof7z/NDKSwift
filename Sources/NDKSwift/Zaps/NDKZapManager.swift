@@ -167,10 +167,18 @@ public actor NDKZapManager {
 
         NDKLogger.log(.debug, category: .wallet, "// 3. Try to find a provider that can directly fulfill the request")
         // 3. Try to find a provider that can directly fulfill the request
-        if let provider = try? await selectPaymentProvider(
-            for: prepared.paymentRequest,
-            preferredId: preferredProvider
-        ) {
+        let provider: (any NDKPaymentProvider)?
+        do {
+            provider = try await selectPaymentProvider(
+                for: prepared.paymentRequest,
+                preferredId: preferredProvider
+            )
+        } catch {
+            NDKLogger.log(.warning, category: .wallet, "Failed to select payment provider for direct zap: \(error.localizedDescription)")
+            provider = nil
+        }
+
+        if let provider = provider {
             NDKLogger.log(.debug, category: .wallet, "// Direct fulfillment path")
             // Direct fulfillment path
             let confirmation = try await provider.fulfill(prepared.paymentRequest)
@@ -237,10 +245,19 @@ public actor NDKZapManager {
                 )
 
                 // Find a Lightning provider
-                guard let lightningProvider = try? await selectPaymentProvider(
-                    for: lightningRequest,
-                    preferredId: preferredProvider
-                ) else {
+                let lightningProvider: (any NDKPaymentProvider)?
+                do {
+                    lightningProvider = try await selectPaymentProvider(
+                        for: lightningRequest,
+                        preferredId: preferredProvider
+                    )
+                } catch {
+                    NDKLogger.log(.warning, category: .wallet, "Failed to select Lightning provider for mint quote: \(error.localizedDescription)")
+                    lastError = ZapError.noWalletConfigured
+                    continue
+                }
+
+                guard let lightningProvider = lightningProvider else {
                     lastError = ZapError.noWalletConfigured
                     continue
                 }
@@ -437,8 +454,11 @@ public actor NDKZapManager {
                         let eventKind = event.kind
                         if eventKind == EventKind.zapReceipt {
                             let receipt = NDKZapReceipt(event: event)
-                            if let zapInfo = try? await self.validateAndParseZapReceipt(receipt) {
+                            do {
+                                let zapInfo = try await self.validateAndParseZapReceipt(receipt)
                                 continuation.yield(zapInfo)
+                            } catch {
+                                NDKLogger.log(.warning, category: .wallet, "Failed to validate zap receipt \(receipt.id ?? "unknown"): \(error.localizedDescription)")
                             }
                         } else if eventKind == EventKind.nutzap {
                             let nutzap = NDKNutzap(event: event)

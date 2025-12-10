@@ -722,10 +722,13 @@ public actor WalletTransactionHistory {
         if let token = historyData.token {
             // Parse token to get actual proof count
             var proofCount = 0
-            if let cashuToken = try? token.deserializeToken() {
+            do {
+                let cashuToken = try token.deserializeToken()
                 for (_, proofs) in cashuToken.proofsByMint {
                     proofCount += proofs.count
                 }
+            } catch {
+                NDKLogger.log(.warning, category: .wallet, "Failed to deserialize ecash token for transaction history: \(error.localizedDescription)")
             }
 
             ecashTokenData = EcashTokenData(

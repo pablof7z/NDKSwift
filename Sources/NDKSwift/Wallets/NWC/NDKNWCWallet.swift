@@ -308,12 +308,18 @@ public actor NDKNWCWallet: NDKPaymentProvider {
         }
 
         // Check balance if we can
-        if let balance = try? await getBalance() {
-            return balance >= request.amountSats
+        do {
+            if let balance = try await getBalance() {
+                return balance >= request.amountSats
+            } else {
+                // Balance unavailable, assume we can pay
+                return true
+            }
+        } catch {
+            NDKLogger.log(.warning, category: .wallet, "Failed to check NWC balance for canFulfill check: \(error.localizedDescription)")
+            // If we can't check balance, assume we can pay
+            return true
         }
-
-        // If we can't check balance, assume we can pay
-        return true
     }
 
     /// Fulfill a payment request using NWC
@@ -324,12 +330,21 @@ public actor NDKNWCWallet: NDKPaymentProvider {
         }
 
         // Check balance if needed
-        if let balance = try? await getBalance(),
-           balance < lightningRequest.amountSats {
-            throw PaymentError.insufficientBalance(
-                available: balance,
-                required: lightningRequest.amountSats
-            )
+        do {
+            if let balance = try await getBalance() {
+                if balance < lightningRequest.amountSats {
+                    throw PaymentError.insufficientBalance(
+                        available: balance,
+                        required: lightningRequest.amountSats
+                    )
+                }
+            }
+            // If balance is nil, continue with payment attempt
+        } catch let error as PaymentError {
+            throw error
+        } catch {
+            NDKLogger.log(.warning, category: .wallet, "Failed to check NWC balance before payment: \(error.localizedDescription)")
+            // Continue with payment attempt even if balance check fails
         }
 
         // Pay the invoice using NWC

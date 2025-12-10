@@ -443,11 +443,21 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         )
 
         guard let response = response,
-              response.error == nil,
-              let json = try? JSONCoding.parseDictionary(from: response.result),
-              let sig = json["sig"] as? String
-        else {
+              response.error == nil else {
             throw NDKError.failedTo("sign event", message: response?.error)
+        }
+
+        let json: [String: Any]
+        do {
+            json = try JSONCoding.parseDictionary(from: response.result)
+        } catch {
+            NDKLogger.log(.error, category: .signer, "Failed to parse bunker sign response: \(error.localizedDescription)")
+            throw NDKError.failedTo("sign event", message: "Invalid response format")
+        }
+
+        guard let sig = json["sig"] as? String else {
+            NDKLogger.log(.error, category: .signer, "Bunker response missing 'sig' field")
+            throw NDKError.failedTo("sign event", message: "Missing signature in response")
         }
 
         return sig

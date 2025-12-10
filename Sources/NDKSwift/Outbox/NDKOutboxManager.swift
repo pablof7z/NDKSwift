@@ -859,14 +859,18 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         let writeRelays = item?.writeRelays.map { $0.url }
         let readRelays = item?.readRelays.map { $0.url }
 
-        try? await ndk.cache.saveRelayPreferences(
-            pubkey: pubkey,
-            writeRelays: writeRelays,
-            readRelays: readRelays,
-            fetchedAt: now,
-            expiresAt: expiresAt,
-            checkedRelays: item == nil ? eoseRelays : nil
-        )
+        do {
+            try await ndk.cache.saveRelayPreferences(
+                pubkey: pubkey,
+                writeRelays: writeRelays,
+                readRelays: readRelays,
+                fetchedAt: now,
+                expiresAt: expiresAt,
+                checkedRelays: item == nil ? eoseRelays : nil
+            )
+        } catch {
+            NDKLogger.log(.warning, category: .cache, "Failed to save relay preferences for \(pubkey): \(error.localizedDescription)")
+        }
     }
 
     private func fetchRelayListFromNetwork(for pubkey: String) async throws -> (item: NDKOutboxItem?, eoseRelays: Set<String>) {

@@ -939,13 +939,21 @@ public actor NIP60Wallet: NDKPaymentProvider {
                         await self.notifyBalanceChangeIfNeeded()
 
                         // Resolve relays for wallet operations
-                        try? await self.resolveWalletRelays()
-                        
+                        do {
+                            try await self.resolveWalletRelays()
+                        } catch {
+                            NDKLogger.log(.warning, category: .wallet, "Failed to resolve wallet relays during initialization: \(error.localizedDescription)")
+                        }
+
                         // Update transaction history with resolved relays
                         await self.transactionHistory.updateRelays(self.resolvedWalletRelays)
 
                         // Start transaction history observation
-                        try? await self.transactionHistory.startObserving()
+                        do {
+                            try await self.transactionHistory.startObserving()
+                        } catch {
+                            NDKLogger.log(.warning, category: .wallet, "Failed to start transaction history observation: \(error.localizedDescription)")
+                        }
 
                         // Start wallet event subscription with proper relays
                         await self.startWalletEventSubscription()
@@ -1024,7 +1032,11 @@ public actor NIP60Wallet: NDKPaymentProvider {
                     case .minted:
                         // Success - delete the quote event
                         NDKLogger.log(.debug, category: .wallet, LoggingConstants.Messages.success("Quote successfully minted - deleting quote event", details: quote.quoteId))
-                        try? await self.eventManager.deleteQuoteEvent(eventId: event.id, signer: self.signer)
+                        do {
+                            try await self.eventManager.deleteQuoteEvent(eventId: event.id, signer: self.signer)
+                        } catch {
+                            NDKLogger.log(.warning, category: .wallet, "Failed to delete quote event after minting: \(error.localizedDescription)")
+                        }
                         await self.clearQuoteMonitor(quoteId: quote.quoteId)
                         return
 

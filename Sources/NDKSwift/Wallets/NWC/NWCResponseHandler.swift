@@ -294,9 +294,17 @@ public struct NWCResponseHandler {
                         )
 
                         // Parse as notification
-                        guard let json = try? JSONCoding.parseDictionary(from: decrypted),
-                              let notificationType = json["notification_type"] as? String,
+                        let json: [String: Any]
+                        do {
+                            json = try JSONCoding.parseDictionary(from: decrypted)
+                        } catch {
+                            NDKLogger.log(.warning, category: .wallet, "Failed to parse NWC notification JSON from event \(event.id): \(error.localizedDescription)")
+                            continue
+                        }
+
+                        guard let notificationType = json["notification_type"] as? String,
                               let notificationData = json["notification"] as? [String: Any] else {
+                            NDKLogger.log(.warning, category: .wallet, "NWC notification missing required fields")
                             continue
                         }
 
