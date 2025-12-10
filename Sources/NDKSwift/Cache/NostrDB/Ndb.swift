@@ -24,6 +24,118 @@ enum NdbSearchOrder {
     case newest_first
 }
 
+// MARK: - NostrDB Statistics
+
+/// Database index names for stats reporting
+public enum NdbDatabase: Int, CaseIterable, Sendable {
+    case note = 0
+    case meta = 1
+    case profile = 2
+    case noteId = 3
+    case profilePk = 4
+    case ndbMeta = 5
+    case profileSearch = 6
+    case profileLastFetch = 7
+    case noteKind = 8
+    case noteText = 9
+    case noteBlocks = 10
+    case noteTags = 11
+    case notePubkey = 12
+    case notePubkeyKind = 13
+    case noteRelayKind = 14
+    case noteRelays = 15
+
+    public var name: String {
+        switch self {
+        case .note: return "Notes"
+        case .meta: return "Metadata"
+        case .profile: return "Profiles"
+        case .noteId: return "Note ID Index"
+        case .profilePk: return "Profile PK Index"
+        case .ndbMeta: return "NDB Meta"
+        case .profileSearch: return "Profile Search"
+        case .profileLastFetch: return "Profile Last Fetch"
+        case .noteKind: return "Note Kind Index"
+        case .noteText: return "Full-Text Index"
+        case .noteBlocks: return "Note Blocks"
+        case .noteTags: return "Note Tags Index"
+        case .notePubkey: return "Note Pubkey Index"
+        case .notePubkeyKind: return "Note Pubkey+Kind"
+        case .noteRelayKind: return "Relay+Kind Index"
+        case .noteRelays: return "Note Relays"
+        }
+    }
+}
+
+/// Common event kinds tracked by NostrDB stats
+public enum NdbCommonKind: Int, CaseIterable, Sendable {
+    case profile = 0
+    case text = 1
+    case contacts = 2
+    case dm = 3
+    case delete = 4
+    case repost = 5
+    case reaction = 6
+    case zap = 7
+    case zapRequest = 8
+    case nwcRequest = 9
+    case nwcResponse = 10
+    case httpAuth = 11
+    case list = 12
+    case longform = 13
+    case status = 14
+
+    public var name: String {
+        switch self {
+        case .profile: return "Profile (0)"
+        case .text: return "Text (1)"
+        case .contacts: return "Contacts (3)"
+        case .dm: return "DM (4)"
+        case .delete: return "Delete (5)"
+        case .repost: return "Repost (6)"
+        case .reaction: return "Reaction (7)"
+        case .zap: return "Zap (9735)"
+        case .zapRequest: return "Zap Request (9734)"
+        case .nwcRequest: return "NWC Request"
+        case .nwcResponse: return "NWC Response"
+        case .httpAuth: return "HTTP Auth"
+        case .list: return "List (30000)"
+        case .longform: return "Longform (30023)"
+        case .status: return "Status (30315)"
+        }
+    }
+}
+
+/// Statistics counts for a single database or kind
+public struct NdbStatCounts: Sendable {
+    public let keySize: Int
+    public let valueSize: Int
+    public let count: Int
+
+    public var totalSize: Int { keySize + valueSize }
+}
+
+/// Complete NostrDB statistics
+public struct NdbStat: Sendable {
+    /// Per-database statistics
+    public let databases: [NdbDatabase: NdbStatCounts]
+    /// Per-kind statistics for common event kinds
+    public let commonKinds: [NdbCommonKind: NdbStatCounts]
+    /// Statistics for all other (uncommon) kinds
+    public let otherKinds: NdbStatCounts
+
+    /// Total number of events across all kinds
+    public var totalEvents: Int {
+        let commonTotal = commonKinds.values.reduce(0) { $0 + $1.count }
+        return commonTotal + otherKinds.count
+    }
+
+    /// Total storage size in bytes
+    public var totalStorageSize: Int {
+        databases.values.reduce(0) { $0 + $1.totalSize }
+    }
+}
+
 
 enum DatabaseError: Error {
     case failed_open
@@ -605,6 +717,62 @@ class Ndb {
         return str.withCString { cstr in
             return ndb_process_events(ndb.ndb, cstr, str.utf8.count) != 0
         }
+    }
+
+    // MARK: - Statistics
+
+    /// Get comprehensive statistics about the NostrDB database
+    /// - Returns: NdbStat containing per-database and per-kind statistics, or nil if stats cannot be retrieved
+    func stat() -> NdbStat? {
+        guard !is_closed else { return nil }
+
+        var cStat = ndb_stat()
+        let result = ndb_stat(self.ndb.ndb, &cStat)
+        guard result == 1 else { return nil }
+
+        // Convert C struct to Swift types
+        var databases: [NdbDatabase: NdbStatCounts] = [:]
+        for db in NdbDatabase.allCases {
+            let dbIndex = db.rawValue
+            // Access the tuple elements using withUnsafePointer
+            let counts = withUnsafePointer(to: &cStat.dbs) { ptr -> ndb_stat_counts in
+                ptr.withMemoryRebound(to: ndb_stat_counts.self, capacity: 16) { arrayPtr in
+                    arrayPtr[dbIndex]
+                }
+            }
+            databases[db] = NdbStatCounts(
+                keySize: counts.key_size,
+                valueSize: counts.value_size,
+                count: counts.count
+            )
+        }
+
+        var commonKinds: [NdbCommonKind: NdbStatCounts] = [:]
+        for kind in NdbCommonKind.allCases {
+            let kindIndex = kind.rawValue
+            let counts = withUnsafePointer(to: &cStat.common_kinds) { ptr -> ndb_stat_counts in
+                ptr.withMemoryRebound(to: ndb_stat_counts.self, capacity: 15) { arrayPtr in
+                    arrayPtr[kindIndex]
+                }
+            }
+            commonKinds[kind] = NdbStatCounts(
+                keySize: counts.key_size,
+                valueSize: counts.value_size,
+                count: counts.count
+            )
+        }
+
+        let otherKinds = NdbStatCounts(
+            keySize: cStat.other_kinds.key_size,
+            valueSize: cStat.other_kinds.value_size,
+            count: cStat.other_kinds.count
+        )
+
+        return NdbStat(
+            databases: databases,
+            commonKinds: commonKinds,
+            otherKinds: otherKinds
+        )
     }
 
     func search_profile<Y>(_ search: String, limit: Int, txn: NdbTxn<Y>) -> [Pubkey] {

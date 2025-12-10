@@ -195,18 +195,11 @@ actor SparkWallet: NDKPaymentProvider {
             throw SparkWalletError.notConnected
         }
 
-        let paymentMethod: ReceivePaymentMethod
-        if let amount = amountSats {
-            paymentMethod = .sparkInvoice(
-                amount: U128(amount),
-                tokenIdentifier: nil,
-                expiryTime: nil,
-                description: description,
-                senderPublicKey: nil
-            )
-        } else {
-            paymentMethod = .sparkAddress
-        }
+        // Use bolt11Invoice for standard Lightning invoices
+        let paymentMethod: ReceivePaymentMethod = .bolt11Invoice(
+            description: description ?? "",
+            amountSats: amountSats.map { UInt64($0) }
+        )
 
         let request = ReceivePaymentRequest(paymentMethod: paymentMethod)
         let response = try await sdk.receivePayment(request: request)
@@ -260,6 +253,36 @@ actor SparkWallet: NDKPaymentProvider {
 
         // Use getInfo with ensureSynced: true to trigger sync
         _ = try await sdk.getInfo(request: BreezSdkSpark.GetInfoRequest(ensureSynced: true))
+    }
+
+    // MARK: - Fiat Rates
+
+    /// Get fiat exchange rates for all supported currencies
+    public func listFiatRates() async throws -> [SparkFiatRate] {
+        guard let sdk = sdk else {
+            throw SparkWalletError.notConnected
+        }
+
+        let response = try await sdk.listFiatRates()
+        return response.rates.map { rate in
+            SparkFiatRate(currency: rate.coin, rate: rate.value)
+        }
+    }
+
+    /// Get the rate for a specific currency
+    public func getFiatRate(currency: String) async throws -> Double? {
+        let rates = try await listFiatRates()
+        return rates.first { $0.currency.uppercased() == currency.uppercased() }?.rate
+    }
+
+    /// Convert sats to fiat
+    public func satsToFiat(sats: Int64, rate: Double) -> Double {
+        SatsConverter.satsToFiat(sats, btcRate: rate)
+    }
+
+    /// Convert fiat to sats
+    public func fiatToSats(fiat: Double, rate: Double) -> Int64 {
+        SatsConverter.fiatToSats(fiat, btcRate: rate)
     }
 
     // MARK: - Transaction History
@@ -473,6 +496,11 @@ struct SparkWalletInfo: Sendable {
     public let pendingReceiveSats: Int64
     public let pendingSendSats: Int64
     public let sparkAddress: String?
+}
+
+struct SparkFiatRate: Sendable {
+    public let currency: String
+    public let rate: Double  // BTC price in this currency
 }
 
 enum SparkWalletEvent: Sendable {

@@ -4,12 +4,20 @@ import SwiftUI
 enum OlasTheme {
     // MARK: - Colors
     public enum Colors {
-        // Primary accent - neutral black/white (adapts to light/dark mode)
-        public static let accent = Color.primary
+        // Primary brand colors - Sunset orange palette
+        public static let brandPrimary = Color(hex: "F97316") // Vibrant orange
+        public static let brandSecondary = Color(hex: "EA580C") // Deeper orange
 
-        // Legacy aliases - now neutral
-        public static let deepTeal = Color.primary
-        public static let oceanBlue = Color.primary
+        // Accent color
+        public static let accent = Color(hex: "F97316")
+
+        // Semantic aliases for gradients
+        public static let gradientStart = Color(hex: "F97316")
+        public static let gradientEnd = Color(hex: "EA580C")
+
+        // Legacy aliases - mapped to new brand colors
+        public static let deepTeal = Color(hex: "F97316")
+        public static let oceanBlue = Color(hex: "EA580C")
         public static let seafoam = Color.secondary
 
         // Feedback colors

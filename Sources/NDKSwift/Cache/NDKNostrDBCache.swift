@@ -49,15 +49,55 @@ import Foundation
 public actor NDKNostrDBCache: NDKCache {
     private var ndb: Ndb?
     private var events: [String: NDKEvent] = [:]
+    private let cachePath: String?
 
     /// Initialize a new NostrDB cache
     /// - Parameter path: Optional path to the database directory. If nil, uses the default location.
     /// - Throws: NDKNostrDBCacheError if the database cannot be opened
     public init(path: String? = nil) async throws {
+        self.cachePath = path
         self.ndb = Ndb(path: path)
         if self.ndb == nil {
             throw NDKNostrDBCacheError.failedToOpen
         }
+    }
+
+    // MARK: - Statistics & Developer Tools
+
+    /// Get comprehensive statistics about the cache
+    /// - Returns: NdbStat containing per-database and per-kind statistics
+    public func getStats() -> NdbStat? {
+        return ndb?.stat()
+    }
+
+    /// Get the path where the cache database is stored
+    /// - Returns: The cache directory path, or nil if using default location
+    public func getCachePath() -> String? {
+        return cachePath ?? Ndb.db_path()
+    }
+
+    /// Get the total size of the database files on disk
+    /// - Returns: Total size in bytes
+    public func getDatabaseSize() -> Int64 {
+        guard let path = getCachePath() else { return 0 }
+
+        let fileManager = FileManager.default
+        var totalSize: Int64 = 0
+
+        for file in ["data.mdb", "lock.mdb"] {
+            let filePath = "\(path)/\(file)"
+            if let attrs = try? fileManager.attributesOfItem(atPath: filePath),
+               let size = attrs[.size] as? Int64 {
+                totalSize += size
+            }
+        }
+
+        return totalSize
+    }
+
+    /// Get the count of events currently in the in-memory cache
+    public var inMemoryEventCount: Int {
+        return events.count
     }
 
     // MARK: - Event Operations

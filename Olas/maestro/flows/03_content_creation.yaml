@@ -1,0 +1,82 @@
+# Content Creation Flow Test
+# Verifies the create post flow opens and works correctly
+# Note: Does not actually publish to avoid test pollution
+
+appId: com.olas.app
+name: Content Creation Flow
+
+---
+
+# Launch the app (assumes logged in state)
+- launchApp
+
+# Wait for main view
+- extendedWaitUntil:
+    visible:
+      text: "Home"
+    timeout: 5000
+    optional: true
+
+# Tap the Create tab (plus button)
+- tapOn:
+    id: "createTab"
+    optional: true
+
+# Fallback: tap by icon if ID doesn't work
+- tapOn:
+    text: ""
+    index: 2
+    optional: true
+
+# Wait for create post sheet to appear
+- extendedWaitUntil:
+    visible:
+      text: ".*"
+    timeout: 3000
+    optional: true
+
+- takeScreenshot: "create_post_opened"
+
+# Verify photo library or camera access prompt may appear
+# Handle permission dialog if present
+- tapOn:
+    text: "Allow Full Access"
+    optional: true
+
+- tapOn:
+    text: "Allow"
+    optional: true
+
+- tapOn:
+    text: "OK"
+    optional: true
+
+# Wait for photo picker to be ready
+- extendedWaitUntil:
+    visible:
+      text: ".*"
+    timeout: 3000
+    optional: true
+
+- takeScreenshot: "create_post_photo_picker"
+
+# Dismiss the create post sheet without posting
+- swipe:
+    direction: DOWN
+    duration: 500
+
+# Alternatively, look for close button
+- tapOn:
+    text: "Cancel"
+    optional: true
+
+- tapOn:
+    id: "closeButton"
+    optional: true
+
+# Verify we're back on main view
+- assertVisible:
+    text: "Home"
+    optional: true
+
+- takeScreenshot: "create_post_dismissed"

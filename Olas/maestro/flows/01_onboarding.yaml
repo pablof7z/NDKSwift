@@ -1,0 +1,65 @@
+# Onboarding Flow Test
+# Verifies the app launches correctly and shows onboarding for new users
+
+appId: com.olas.app
+name: Onboarding Flow
+
+---
+
+# Launch the app
+- launchApp
+
+# Wait for onboarding screen to appear
+- assertVisible:
+    text: "Olas"
+
+- assertVisible:
+    text: "Share moments. Ride the wave."
+
+# Verify both auth buttons are present
+- assertVisible:
+    text: "Create Account"
+
+- assertVisible:
+    text: "I have a Nostr account"
+
+# Take screenshot of onboarding
+- takeScreenshot: "onboarding_screen"
+
+# Test tapping Create Account opens sheet
+- tapOn:
+    text: "Create Account"
+
+# Wait for create account sheet
+- assertVisible:
+    text: "Create Account"
+    optional: true
+
+# Dismiss sheet by swiping down or tapping outside
+- swipe:
+    direction: DOWN
+    duration: 500
+
+# Wait for onboarding to reappear
+- assertVisible:
+    text: "Olas"
+
+# Test tapping Login opens sheet
+- tapOn:
+    text: "I have a Nostr account"
+
+# Wait for login sheet (should show nsec input)
+- assertVisible:
+    text: "nsec"
+    optional: true
+
+# Dismiss login sheet
+- swipe:
+    direction: DOWN
+    duration: 500
+
+# Final verification - back on onboarding
+- assertVisible:
+    text: "Create Account"
+
+- takeScreenshot: "onboarding_complete"
