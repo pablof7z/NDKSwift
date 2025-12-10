@@ -1,13 +1,13 @@
-// MuteListManager.swift
 import SwiftUI
 import NDKSwift
-import Combine
 
 @MainActor
-final class MuteListManager: ObservableObject {
-    @Published public private(set) var mutedPubkeys: Set<String> = []
+@Observable
+final class MuteListManager {
+    public private(set) var mutedPubkeys: Set<String> = []
 
     private let ndk: NDK
+    @ObservationIgnored
     private var subscriptionTask: Task<Void, Never>?
 
     public init(ndk: NDK) {

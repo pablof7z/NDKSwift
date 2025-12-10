@@ -1,43 +1,72 @@
 import Foundation
 import SwiftUI
 import NDKSwift
-import Security
 
 @MainActor
-final class SparkWalletManager: ObservableObject {
-    @Published public private(set) var connectionStatus: SparkConnectionStatus = .disconnected
-    @Published public private(set) var balance: Int64 = 0
-    @Published public private(set) var lightningAddress: String?
-    @Published public private(set) var isLoading = false
-    @Published public private(set) var payments: [SparkPayment] = []
-    @Published public var error: String?
+@Observable
+final class SparkWalletManager {
+    public private(set) var connectionStatus: SparkConnectionStatus = .disconnected
+    public private(set) var balance: Int64 = 0
+    public private(set) var lightningAddress: String?
+    public private(set) var isLoading = false
+    public private(set) var payments: [SparkPayment] = []
+    public var error: String?
 
+    // Fiat conversion
+    public private(set) var fiatRate: Double?
+    public var preferredCurrency: String {
+        didSet {
+            UserDefaults.standard.set(preferredCurrency, forKey: "spark_fiat_currency")
+            Task { await refreshFiatRate() }
+        }
+    }
+    public var showFiatAsPrimary: Bool {
+        didSet {
+            UserDefaults.standard.set(showFiatAsPrimary, forKey: "spark_show_fiat_primary")
+        }
+    }
+
+    @ObservationIgnored
     private var wallet: SparkWallet?
+    @ObservationIgnored
     private var eventTask: Task<Void, Never>?
+    @ObservationIgnored
+    private var fiatRefreshTask: Task<Void, Never>?
+    @ObservationIgnored
     private let ndk: NDK
 
-    private let keychainService = "com.olas.spark"
-    private let mnemonicAccount = "spark_mnemonic"
+    // Cached formatters
+    @ObservationIgnored
+    private let satsFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        return formatter
+    }()
+    @ObservationIgnored
+    private let fiatFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.maximumFractionDigits = 2
+        return formatter
+    }()
 
     public init(ndk: NDK) {
         self.ndk = ndk
-    }
-
-    deinit {
-        eventTask?.cancel()
+        self.preferredCurrency = UserDefaults.standard.string(forKey: "spark_fiat_currency") ?? "USD"
+        self.showFiatAsPrimary = UserDefaults.standard.bool(forKey: "spark_show_fiat_primary")
     }
 
     // MARK: - Public Methods
 
     /// Attempt to restore wallet from keychain on app launch
     public func restoreWalletIfExists() async {
-        guard let mnemonic = loadMnemonicFromKeychain() else { return }
+        guard let mnemonic = KeychainService.load(for: .sparkMnemonic) else { return }
 
         do {
             try await connect(mnemonic: mnemonic)
         } catch {
             // Mnemonic was invalid or connection failed - clear it
-            deleteMnemonicFromKeychain()
+            KeychainService.delete(for: .sparkMnemonic)
             self.error = error.localizedDescription
         }
     }
@@ -57,7 +86,7 @@ final class SparkWalletManager: ObservableObject {
         let mnemonic = try await newWallet.createWallet()
 
         // Save mnemonic to keychain
-        try saveMnemonicToKeychain(mnemonic)
+        try KeychainService.save(mnemonic, for: .sparkMnemonic)
 
         wallet = newWallet
         await setupWallet(newWallet)
@@ -79,7 +108,7 @@ final class SparkWalletManager: ObservableObject {
         try await newWallet.connect(mnemonic: mnemonic)
 
         // Save mnemonic to keychain
-        try saveMnemonicToKeychain(mnemonic)
+        try KeychainService.save(mnemonic, for: .sparkMnemonic)
 
         wallet = newWallet
         await setupWallet(newWallet)
@@ -107,6 +136,8 @@ final class SparkWalletManager: ObservableObject {
 
         eventTask?.cancel()
         eventTask = nil
+        fiatRefreshTask?.cancel()
+        fiatRefreshTask = nil
 
         if let wallet = wallet {
             try? await wallet.disconnect()
@@ -117,11 +148,12 @@ final class SparkWalletManager: ObservableObject {
 
         wallet = nil
         connectionStatus = .disconnected
+        fiatRate = nil
         balance = 0
         lightningAddress = nil
 
         if clearMnemonic {
-            deleteMnemonicFromKeychain()
+            KeychainService.delete(for: .sparkMnemonic)
         }
     }
 
@@ -220,7 +252,52 @@ final class SparkWalletManager: ObservableObject {
 
     /// Check if wallet has stored mnemonic (can restore)
     public var hasSavedWallet: Bool {
-        loadMnemonicFromKeychain() != nil
+        KeychainService.exists(for: .sparkMnemonic)
+    }
+
+    /// Get the stored mnemonic for backup purposes
+    public func getMnemonic() -> String? {
+        KeychainService.load(for: .sparkMnemonic)
+    }
+
+    // MARK: - Fiat Conversion
+
+    /// Refresh the fiat exchange rate
+    public func refreshFiatRate() async {
+        guard let wallet = wallet else { return }
+
+        do {
+            fiatRate = try await wallet.getFiatRate(currency: preferredCurrency)
+        } catch {
+            // Silent fail - fiat display is optional
+        }
+    }
+
+    /// Convert sats to fiat value
+    public func satsToFiat(_ sats: Int64) -> Double? {
+        guard let rate = fiatRate else { return nil }
+        return SatsConverter.satsToFiat(sats, btcRate: rate)
+    }
+
+    /// Convert fiat to sats
+    public func fiatToSats(_ fiat: Double) -> Int64? {
+        guard let rate = fiatRate, rate > 0 else { return nil }
+        return SatsConverter.fiatToSats(fiat, btcRate: rate)
+    }
+
+    /// Format sats with commas
+    public func formatSats(_ sats: Int64) -> String {
+        SatsConverter.formatSats(sats, formatter: satsFormatter)
+    }
+
+    /// Format fiat value with currency symbol
+    public func formatFiat(_ value: Double) -> String {
+        SatsConverter.formatFiat(value, currencyCode: preferredCurrency, formatter: fiatFormatter)
+    }
+
+    /// Toggle between sats and fiat as primary display
+    public func togglePrimaryDisplay() {
+        showFiatAsPrimary.toggle()
     }
 
     // MARK: - Private Helpers
@@ -231,11 +308,25 @@ final class SparkWalletManager: ObservableObject {
         // Register with ZapManager for payments
         await ndk.zapManager.register(provider: wallet)
 
-        // Fetch initial info
+        // Fetch initial info and fiat rate
         await refreshInfo()
+        await refreshFiatRate()
 
         // Start listening for events
         startEventListener(wallet)
+
+        // Start periodic fiat rate refresh (every 5 minutes)
+        startFiatRefreshTask()
+    }
+
+    private func startFiatRefreshTask() {
+        fiatRefreshTask?.cancel()
+        fiatRefreshTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(300)) // 5 minutes
+                await refreshFiatRate()
+            }
+        }
     }
 
     private func startEventListener(_ wallet: SparkWallet) {
@@ -263,60 +354,6 @@ final class SparkWalletManager: ObservableObject {
         case .paymentPending(let amount):
             print("[Spark] Payment pending: \(amount) sats")
         }
-    }
-
-    // MARK: - Keychain
-
-    private func saveMnemonicToKeychain(_ mnemonic: String) throws {
-        guard let data = mnemonic.data(using: .utf8) else {
-            throw SparkWalletError.invalidMnemonic
-        }
-
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: keychainService,
-            kSecAttrAccount as String: mnemonicAccount,
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-        ]
-
-        // Delete existing item first
-        SecItemDelete(query as CFDictionary)
-
-        let status = SecItemAdd(query as CFDictionary, nil)
-        guard status == errSecSuccess else {
-            throw SparkWalletError.connectionFailed("Failed to save to keychain: \(status)")
-        }
-    }
-
-    private func loadMnemonicFromKeychain() -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: keychainService,
-            kSecAttrAccount as String: mnemonicAccount,
-            kSecReturnData as String: true
-        ]
-
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-
-        guard status == errSecSuccess,
-              let data = result as? Data,
-              let mnemonic = String(data: data, encoding: .utf8) else {
-            return nil
-        }
-
-        return mnemonic
-    }
-
-    private func deleteMnemonicFromKeychain() {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: keychainService,
-            kSecAttrAccount as String: mnemonicAccount
-        ]
-
-        SecItemDelete(query as CFDictionary)
     }
 }
 

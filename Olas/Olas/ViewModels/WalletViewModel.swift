@@ -4,26 +4,24 @@ import NDKSwift
 import CashuSwift
 
 @MainActor
-class WalletViewModel: ObservableObject {
+@Observable
+final class WalletViewModel {
     let ndk: NDK
 
-    @Published public private(set) var wallet: NIP60Wallet?
-    @Published public private(set) var balance: Int64 = 0
-    @Published public private(set) var balancesByMint: [String: Int64] = [:]
-    @Published public private(set) var isLoading = false
-    @Published public private(set) var isSetup = false
-    @Published public private(set) var transactions: [WalletTransaction] = []
-    @Published public private(set) var configuredMints: [String] = []
-    @Published public private(set) var error: Error?
+    public private(set) var wallet: NIP60Wallet?
+    public private(set) var balance: Int64 = 0
+    public private(set) var balancesByMint: [String: Int64] = [:]
+    public private(set) var isLoading = false
+    public private(set) var isSetup = false
+    public private(set) var transactions: [WalletTransaction] = []
+    public private(set) var configuredMints: [String] = []
+    public private(set) var error: Error?
 
+    @ObservationIgnored
     private var eventObservationTask: Task<Void, Never>?
 
     public init(ndk: NDK) {
         self.ndk = ndk
-    }
-
-    deinit {
-        eventObservationTask?.cancel()
     }
 
     // MARK: - Wallet Lifecycle
