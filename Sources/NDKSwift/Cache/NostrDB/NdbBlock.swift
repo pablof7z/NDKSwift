@@ -37,11 +37,76 @@ enum NdbBech32Type: UInt32 {
     }
 }
 
+// Extension for converting ndb_str_block to Swift String
+extension ndb_str_block {
+    func as_str() -> String {
+        let buf = UnsafeBufferPointer(start: self.str, count: Int(self.len))
+        let uint8Buf = buf.map { UInt8(bitPattern: $0) }
+        return String(decoding: uint8Buf, as: UTF8.self)
+    }
+}
+
+// Extension for accessing union members and converting to String
+extension ndb_block_ptr {
+    func as_str() -> String {
+        guard let str_block = ndb_block_str(self.ptr) else {
+            return ""
+        }
+        return str_block.pointee.as_str()
+    }
+
+    var block: ndb_block.__Unnamed_union_block {
+        self.ptr.pointee.block
+    }
+}
+
+// Invoice-related types for block parsing
+enum ParsedInvoiceDescription {
+    case text(String)
+    case hash(Data)
+}
+
+enum ParsedInvoiceAmount: Equatable {
+    case any
+    case specific(Int64)
+}
+
+struct ParsedLightningInvoice {
+    let description: ParsedInvoiceDescription
+    let amount: ParsedInvoiceAmount
+    let string: String
+    let expiry: UInt64
+    let created_at: UInt64
+}
+
+func parse_invoice_description(b11: ndb_invoice) -> ParsedInvoiceDescription? {
+    if let desc = b11.description {
+        return .text(String(cString: desc))
+    }
+    if let descHash = b11.description_hash {
+        return .hash(Data(bytes: descHash, count: 32))
+    }
+    return nil
+}
+
 extension ndb_invoice_block {
-    func as_invoice() -> Invoice? {
-        // TODO: Implement invoice conversion
-        // This requires additional C struct extensions that are not yet implemented
-        return nil
+    func as_invoice() -> ParsedLightningInvoice? {
+        let b11 = self.invoice
+        let invstr = self.invstr.as_str()
+
+        guard let description = parse_invoice_description(b11: b11) else {
+            return nil
+        }
+
+        let amount: ParsedInvoiceAmount = b11.amount == 0 ? .any : .specific(Int64(b11.amount))
+
+        return ParsedLightningInvoice(
+            description: description,
+            amount: amount,
+            string: invstr,
+            expiry: b11.expiry,
+            created_at: b11.timestamp
+        )
     }
 }
 
@@ -54,9 +119,17 @@ enum NdbBlock: ~Copyable {
     case mention_index(UInt32)
 
     init?(_ ptr: ndb_block_ptr) {
-        // TODO: Implement block parsing
-        // This requires accessing union members through proper C interop
-        return nil
+        guard let type = NdbBlockType(rawValue: ndb_get_block_type(ptr.ptr).rawValue) else {
+            return nil
+        }
+        switch type {
+        case .hashtag:       self = .hashtag(ptr.block.str)
+        case .text:          self = .text(ptr.block.str)
+        case .invoice:       self = .invoice(ptr.block.invoice)
+        case .url:           self = .url(ptr.block.str)
+        case .mention_bech32: self = .mention(ptr.block.mention_bech32)
+        case .mention_index: self = .mention_index(ptr.block.mention_index)
+        }
     }
     
     var is_previewable: Bool {
@@ -210,12 +283,12 @@ extension NdbBlockGroup {
                 free(buffer)
                 return nil
             }
-            
-            // TODO: We should set the owned flag as in the C code.
-            // However, There does not seem to be a way to set this from Swift code. The code shown below does not work.
-            // blocks!.pointee.flags |= NDB_BLOCK_FLAG_OWNED
-            // But perhaps this is not necessary because `NdbBlockGroup` is non-copyable
-            
+
+            // Note: The owned flag (NDB_BLOCK_FLAG_OWNED) is not set here because Swift's
+            // ~Copyable semantics on BlocksMetadata handle memory management via deinit.
+            // The C code uses the flag to determine if ndb_blocks_free() should call free(),
+            // but we handle that directly in deinit by freeing the buffer ourselves.
+
             return BlocksMetadata(ptr: blocks, buffer: buffer)
         }
         

@@ -88,10 +88,9 @@ class NdbFilter {
     static func create(from nostrFilters: [NostrFilter]) throws -> [NdbFilter] {
         return try nostrFilters.map { try NdbFilter(from: $0) }
     }
-    
+
     // MARK: - Conversion to/from ndb_filter
-    
-    // TODO: This function is long and repetitive, refactor it into something cleaner.
+
     private static func from(nostrFilter: NostrFilter) throws(NdbFilterConversionError) -> UnsafeMutablePointer<ndb_filter> {
         let filterPointer = UnsafeMutablePointer<ndb_filter>.allocate(capacity: 1)
 
