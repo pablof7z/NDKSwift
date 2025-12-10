@@ -200,16 +200,64 @@ struct ImageEditorView: View {
     private var imagePreview: some View {
         GeometryReader { geometry in
             let displayImage = processedImage ?? image
+            let imageSize = displayImage.size
+
+            // Calculate the frame size based on aspect ratio
+            let frameSize = calculatePreviewFrame(
+                containerSize: geometry.size,
+                imageSize: imageSize,
+                aspectRatio: selectedAspectRatio,
+                rotation: rotation
+            )
+
             Image(uiImage: displayImage)
                 .resizable()
-                .scaledToFit()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .scaledToFill()
+                .frame(width: frameSize.width, height: frameSize.height)
+                .clipped()
                 .rotationEffect(.degrees(rotation))
                 .scaleEffect(x: isFlipped ? -1 : 1, y: 1)
-                .clipped()
                 .cornerRadius(8)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(maxHeight: UIScreen.main.bounds.height * 0.45)
+    }
+
+    private func calculatePreviewFrame(containerSize: CGSize, imageSize: CGSize, aspectRatio: AspectRatio, rotation: Double) -> CGSize {
+        // Determine the target aspect ratio
+        let targetRatio: CGFloat
+        if let ratio = aspectRatio.ratio {
+            // Account for rotation - swap ratio for 90° or 270° rotations
+            let normalizedRotation = Int(rotation.truncatingRemainder(dividingBy: 360) + 360) % 360
+            if normalizedRotation == 90 || normalizedRotation == 270 {
+                targetRatio = 1.0 / ratio
+            } else {
+                targetRatio = ratio
+            }
+        } else {
+            // Free aspect ratio - use image's natural aspect ratio
+            let normalizedRotation = Int(rotation.truncatingRemainder(dividingBy: 360) + 360) % 360
+            if normalizedRotation == 90 || normalizedRotation == 270 {
+                targetRatio = imageSize.height / imageSize.width
+            } else {
+                targetRatio = imageSize.width / imageSize.height
+            }
+        }
+
+        // Calculate frame that fits within container while maintaining target aspect ratio
+        let containerRatio = containerSize.width / containerSize.height
+
+        if targetRatio > containerRatio {
+            // Width-constrained
+            let width = containerSize.width
+            let height = width / targetRatio
+            return CGSize(width: width, height: height)
+        } else {
+            // Height-constrained
+            let height = containerSize.height
+            let width = height * targetRatio
+            return CGSize(width: width, height: height)
+        }
     }
 
     private var editorToolbar: some View {
@@ -451,8 +499,14 @@ struct ImageEditorView: View {
         let sourceImage = image
         let currentRotation = rotation
         let flipped = isFlipped
+        let cropRatio = selectedAspectRatio
 
         var processed = applyEdits(to: sourceImage, filter: filter, intensity: intensity, adjustments: currentAdjustments)
+
+        // Apply crop based on aspect ratio
+        if let ratio = cropRatio.ratio {
+            processed = applyCrop(to: processed ?? sourceImage, aspectRatio: ratio)
+        }
 
         // Apply rotation and flip
         if currentRotation != 0 || flipped {
@@ -460,6 +514,30 @@ struct ImageEditorView: View {
         }
 
         onComplete(processed ?? image)
+    }
+
+    private func applyCrop(to image: UIImage, aspectRatio: CGFloat) -> UIImage? {
+        let imageSize = image.size
+        let imageRatio = imageSize.width / imageSize.height
+
+        let cropRect: CGRect
+        if imageRatio > aspectRatio {
+            // Image is wider than target - crop width
+            let newWidth = imageSize.height * aspectRatio
+            let xOffset = (imageSize.width - newWidth) / 2
+            cropRect = CGRect(x: xOffset, y: 0, width: newWidth, height: imageSize.height)
+        } else {
+            // Image is taller than target - crop height
+            let newHeight = imageSize.width / aspectRatio
+            let yOffset = (imageSize.height - newHeight) / 2
+            cropRect = CGRect(x: 0, y: yOffset, width: imageSize.width, height: newHeight)
+        }
+
+        guard let cgImage = image.cgImage?.cropping(to: cropRect) else {
+            return image
+        }
+
+        return UIImage(cgImage: cgImage, scale: image.scale, orientation: image.imageOrientation)
     }
 
     private func applyEdits(to image: UIImage, filter: ImageFilter, intensity: Double, adjustments: [ImageAdjustment: Double]) -> UIImage? {
