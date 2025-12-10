@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 /// Basic tests for NDKRelaySubscriptionManager focusing on core functionality
 /// Note: Full testing is limited due to missing properties in NDKSubscriptionCoordinator

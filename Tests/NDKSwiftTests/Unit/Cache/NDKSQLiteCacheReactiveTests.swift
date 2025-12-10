@@ -1,5 +1,6 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
+import NDKSwiftSQLite
 import GRDB
 
 final class NDKSQLiteCacheReactiveTests: XCTestCase {

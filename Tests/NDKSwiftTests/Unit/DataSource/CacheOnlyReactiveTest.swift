@@ -1,5 +1,6 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
+import NDKSwiftSQLite
 
 /// Tests that verify cache-only subscriptions participate in the reactive system
 /// and receive events from network subscriptions with the same fingerprint

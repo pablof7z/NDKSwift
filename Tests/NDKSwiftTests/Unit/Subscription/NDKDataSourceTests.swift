@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 /// Tests for NDKSubscription (modern subscription API)
 final class NDKSubscriptionTests: NDKTestCase {

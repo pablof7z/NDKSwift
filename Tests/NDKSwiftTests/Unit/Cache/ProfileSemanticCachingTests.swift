@@ -1,5 +1,6 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
+import NDKSwiftSQLite
 
 final class ProfileSemanticCachingTests: XCTestCase {
     var cache: NDKSQLiteCache!

@@ -1,6 +1,6 @@
 import XCTest
 import CashuSwift
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 /// Tests for event ID filter optimization in NDKSubscriptionManager
 /// 

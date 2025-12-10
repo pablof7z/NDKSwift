@@ -1,5 +1,6 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
+@testable import NDKSwiftSQLite
 
 /// Performance tests for SQLite cache filtering optimization
 final class SQLiteCachePerformanceTests: XCTestCase {

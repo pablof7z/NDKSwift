@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 /// End-to-end tests for zap functionality
 final class ZapFlowE2ETests: XCTestCase {

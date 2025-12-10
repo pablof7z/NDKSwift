@@ -1,5 +1,5 @@
 import Foundation
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 /// Mock signer for testing authentication flows
 final class MockNDKSigner: NDKSigner {

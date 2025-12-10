@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 /// Tests for OK message handling, especially auth-required scenarios
 final class NDKRelayOKMessageTests: XCTestCase {

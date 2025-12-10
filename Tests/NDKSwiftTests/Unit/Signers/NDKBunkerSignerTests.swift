@@ -1,6 +1,6 @@
 import XCTest
 import Combine
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 @MainActor
 final class NDKBunkerSignerTests: XCTestCase {

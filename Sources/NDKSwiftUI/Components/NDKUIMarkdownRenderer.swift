@@ -1,5 +1,5 @@
 import SwiftUI
-import NDKSwift
+import NDKSwiftCore
 
 /// A SwiftUI component that renders markdown content with Nostr entity parsing.
 ///

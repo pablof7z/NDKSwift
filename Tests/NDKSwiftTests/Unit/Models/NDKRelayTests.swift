@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 // Helper actor for thread-safe state collection
 private actor StateCollector {

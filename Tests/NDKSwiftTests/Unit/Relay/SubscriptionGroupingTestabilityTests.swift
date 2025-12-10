@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 /// Tests demonstrating the improved testability features for subscription grouping
 @MainActor

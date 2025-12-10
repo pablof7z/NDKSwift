@@ -1,6 +1,6 @@
 import Foundation
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 // MARK: - Common Test Helpers
 

@@ -1,5 +1,6 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
+@testable import NDKSwiftSQLite
 
 /// Tests to ensure filtering logic consistency between SQL queries and in-memory checks
 final class SQLiteCacheFilteringConsistencyTests: XCTestCase {

@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 /// Simple test to verify NIP-17 works without dependencies on broken test infrastructure
 final class NIP17SimpleTest: XCTestCase {

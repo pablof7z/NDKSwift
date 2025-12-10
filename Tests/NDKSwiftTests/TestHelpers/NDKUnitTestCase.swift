@@ -1,5 +1,6 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
+import NDKSwiftSQLite
 
 /// Enhanced base class for NDKSwift unit tests with common setup
 /// Provides pre-configured NDK instance, signer, and cache

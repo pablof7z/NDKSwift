@@ -1,5 +1,5 @@
 import SwiftUI
-import NDKSwift
+import NDKSwiftCore
 
 // MARK: - NDKUIConnectionStatusBadge
 /// A reusable view that displays relay connection status with both visual indicator and text

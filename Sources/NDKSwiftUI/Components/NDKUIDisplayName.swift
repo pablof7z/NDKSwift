@@ -1,5 +1,5 @@
 import SwiftUI
-import NDKSwift
+import NDKSwiftCore
 import os.log
 
 // MARK: - NDKUIDisplayName

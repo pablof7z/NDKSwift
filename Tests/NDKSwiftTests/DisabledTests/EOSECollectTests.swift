@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 /// Tests for EOSE (End of Stored Events) handling
 final class EOSECollectTests: NDKTestCase {

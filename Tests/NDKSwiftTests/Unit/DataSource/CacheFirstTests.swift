@@ -1,5 +1,6 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
+import NDKSwiftSQLite
 
 /// Tests for cache-first behavior in NDKSubscriptionManager
 class CacheFirstTests: XCTestCase {

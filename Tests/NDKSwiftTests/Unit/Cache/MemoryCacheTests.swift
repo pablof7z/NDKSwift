@@ -1,6 +1,5 @@
 import XCTest
-@testable import NDKSwift
-import CashuSwift
+@testable import NDKSwiftCore
 
 final class MemoryCacheTests: NDKTestCase {
     
@@ -349,185 +348,96 @@ final class MemoryCacheTests: NDKTestCase {
         XCTAssertEqual(count, 2)
     }
     
-    // MARK: - Mint Cache Tests
-    
-    func testSaveAndGetMintInfo() async throws {
+    // MARK: - Key-Value Store Tests
+
+    func testSetAndGetValue() async throws {
         // Given
-        let mintInfo = NDKMintInfo(
-            name: "Test Mint",
-            pubkey: "mint_pubkey",
-            version: "1.0",
-            description: "Test mint"
-        )
-        let url = "https://mint.example.com"
-        
+        let testData = "test value".data(using: .utf8)!
+        let key = "testKey"
+        let namespace = "testNamespace"
+
         // When
-        try await cache.saveMintInfo(mintInfo, url: url)
-        let retrieved = await cache.getMintInfo(url: url)
-        
+        try await cache.setValue(testData, forKey: key, namespace: namespace)
+        let retrieved = await cache.getValue(forKey: key, namespace: namespace)
+
         // Then
         XCTAssertNotNil(retrieved)
-        XCTAssertEqual(retrieved?.name, mintInfo.name)
-        XCTAssertEqual(retrieved?.pubkey, mintInfo.pubkey)
+        XCTAssertEqual(retrieved, testData)
     }
-    
-    func testMintInfoStaleness() async throws {
-        // Given
-        let mintInfo = NDKMintInfo(
-            name: "Test Mint",
-            pubkey: "mint_pubkey",
-            version: "1.0"
-        )
-        let url = "https://mint.example.com"
-        
-        try await cache.saveMintInfo(mintInfo, url: url)
-        
-        // When/Then
-        let isStaleImmediate = await cache.isMintInfoStale(url: url, maxAge: 1000)
-        XCTAssertFalse(isStaleImmediate)
-        
-        let isStaleShort = await cache.isMintInfoStale(url: url, maxAge: 0)
-        XCTAssertTrue(isStaleShort)
-    }
-    
-    func testInvalidateMintCache() async throws {
-        // Given
-        let mintInfo = NDKMintInfo(name: "Test Mint", pubkey: "pubkey", version: "1.0")
-        let url = "https://mint.example.com"
-        
-        try await cache.saveMintInfo(mintInfo, url: url)
-        
+
+    func testGetValueReturnsNilForNonexistent() async throws {
         // When
-        try await cache.invalidateMintCache(url: url)
-        
+        let retrieved = await cache.getValue(forKey: "nonexistent", namespace: "test")
+
         // Then
-        let retrieved = await cache.getMintInfo(url: url)
         XCTAssertNil(retrieved)
     }
-    
-    func testSaveAndGetKeyset() async throws {
+
+    func testDeleteValue() async throws {
         // Given
-        let keysetJSON = """
-        {
-            "id": "test_keyset_id",
-            "unit": "sat",
-            "active": true,
-            "keys": {},
-            "input_fee_ppk": 0
-        }
-        """
-        let keyset = try JSONCoding.decode(CashuSwift.Keyset.self, from: keysetJSON)
-        let mintUrl = "https://mint.example.com"
-        
+        let testData = "test value".data(using: .utf8)!
+        let key = "testKey"
+        let namespace = "testNamespace"
+
+        try await cache.setValue(testData, forKey: key, namespace: namespace)
+
         // When
-        try await cache.saveKeyset(keyset, mintUrl: mintUrl)
-        let retrieved = await cache.getKeyset(id: keyset.keysetID)
-        
+        try await cache.deleteValue(forKey: key, namespace: namespace)
+
         // Then
-        XCTAssertNotNil(retrieved)
-        XCTAssertEqual(retrieved?.keysetID, keyset.keysetID)
-        XCTAssertEqual(retrieved?.unit, keyset.unit)
+        let retrieved = await cache.getValue(forKey: key, namespace: namespace)
+        XCTAssertNil(retrieved)
     }
-    
-    func testGetKeysets() async throws {
+
+    func testGetValuesInNamespace() async throws {
         // Given
-        let keyset1JSON = """
-        {"id": "keyset1", "unit": "sat", "active": true, "keys": {}, "input_fee_ppk": 0}
-        """
-        let keyset2JSON = """
-        {"id": "keyset2", "unit": "sat", "active": true, "keys": {}, "input_fee_ppk": 0}
-        """
-        let keyset1 = try JSONCoding.decode(CashuSwift.Keyset.self, from: keyset1JSON)
-        let keyset2 = try JSONCoding.decode(CashuSwift.Keyset.self, from: keyset2JSON)
-        let mintUrl = "https://mint.example.com"
-        
+        let namespace = "testNamespace"
+        try await cache.setValue("value1".data(using: .utf8)!, forKey: "key1", namespace: namespace)
+        try await cache.setValue("value2".data(using: .utf8)!, forKey: "key2", namespace: namespace)
+        try await cache.setValue("other".data(using: .utf8)!, forKey: "key3", namespace: "otherNamespace")
+
         // When
-        try await cache.saveKeysets([keyset1, keyset2], mintUrl: mintUrl)
-        let retrieved = await cache.getKeysets(mintUrl: mintUrl)
-        
+        let values = await cache.getValues(namespace: namespace, keyPrefix: nil)
+
         // Then
-        XCTAssertEqual(retrieved.count, 2)
-        let keysetIds = retrieved.map { $0.keysetID }
-        XCTAssertTrue(keysetIds.contains(keyset1.keysetID))
-        XCTAssertTrue(keysetIds.contains(keyset2.keysetID))
+        XCTAssertEqual(values.count, 2)
+        XCTAssertNotNil(values["key1"])
+        XCTAssertNotNil(values["key2"])
     }
-    
-    func testGetActiveKeysets() async throws {
+
+    func testGetValuesWithPrefix() async throws {
         // Given
-        // Create active keyset
-        let activeKeysetJSON = """
-        {
-            "id": "active",
-            "unit": "sat",
-            "active": true,
-            "keys": {"1": "03a2a1f3f3e3c3d3c3b3a393837363534333231302f2e2d2c2b2a292827262524"},
-            "input_fee_ppk": 0
-        }
-        """
-        let activeKeyset = try JSONCoding.decode(CashuSwift.Keyset.self, from: activeKeysetJSON)
-        
-        // Create inactive keyset
-        let inactiveKeysetJSON = """
-        {
-            "id": "inactive",
-            "unit": "sat",
-            "active": false,
-            "keys": {},
-            "input_fee_ppk": 0
-        }
-        """
-        let inactiveKeyset = try JSONCoding.decode(CashuSwift.Keyset.self, from: inactiveKeysetJSON)
-        
-        // Create USD keyset
-        let usdKeysetJSON = """
-        {
-            "id": "usd",
-            "unit": "usd",
-            "active": true,
-            "keys": {"1": "03a2a1f3f3e3c3d3c3b3a393837363534333231302f2e2d2c2b2a292827262524"},
-            "input_fee_ppk": 0
-        }
-        """
-        let usdKeyset = try JSONCoding.decode(CashuSwift.Keyset.self, from: usdKeysetJSON)
-        let mintUrl = "https://mint.example.com"
-        
-        try await cache.saveKeysets([activeKeyset, inactiveKeyset, usdKeyset], mintUrl: mintUrl)
-        
+        let namespace = "testNamespace"
+        try await cache.setValue("value1".data(using: .utf8)!, forKey: "prefix:key1", namespace: namespace)
+        try await cache.setValue("value2".data(using: .utf8)!, forKey: "prefix:key2", namespace: namespace)
+        try await cache.setValue("other".data(using: .utf8)!, forKey: "other:key3", namespace: namespace)
+
         // When
-        let activeSatKeysets = await cache.getActiveKeysets(mintUrl: mintUrl, unit: "sat")
-        
+        let values = await cache.getValues(namespace: namespace, keyPrefix: "prefix:")
+
         // Then
-        XCTAssertEqual(activeSatKeysets.count, 1)
-        XCTAssertEqual(activeSatKeysets.count, 1)
-        XCTAssertEqual(activeSatKeysets.first?.keysetID, "active")
+        XCTAssertEqual(values.count, 2)
+        XCTAssertNotNil(values["prefix:key1"])
+        XCTAssertNotNil(values["prefix:key2"])
+        XCTAssertNil(values["other:key3"])
     }
-    
-    func testKeysetsStale() async throws {
+
+    func testNamespacesAreIsolated() async throws {
         // Given
-        let keysetJSON = """
-        {
-            "id": "test",
-            "unit": "sat",
-            "active": true,
-            "keys": {},
-            "input_fee_ppk": 0
-        }
-        """
-        let keyset = try JSONCoding.decode(CashuSwift.Keyset.self, from: keysetJSON)
-        let mintUrl = "https://mint.example.com"
-        
-        // When - no keysets
-        let staleWhenEmpty = await cache.areKeysetsStale(mintUrl: mintUrl, maxAge: 1000)
-        XCTAssertTrue(staleWhenEmpty)
-        
-        // When - fresh keysets
-        try await cache.saveKeyset(keyset, mintUrl: mintUrl)
-        let freshKeysets = await cache.areKeysetsStale(mintUrl: mintUrl, maxAge: 1000)
-        XCTAssertFalse(freshKeysets)
-        
-        // When - stale keysets
-        let staleKeysets = await cache.areKeysetsStale(mintUrl: mintUrl, maxAge: 0)
-        XCTAssertTrue(staleKeysets)
+        let key = "sameKey"
+        let data1 = "value1".data(using: .utf8)!
+        let data2 = "value2".data(using: .utf8)!
+
+        try await cache.setValue(data1, forKey: key, namespace: "namespace1")
+        try await cache.setValue(data2, forKey: key, namespace: "namespace2")
+
+        // When
+        let retrieved1 = await cache.getValue(forKey: key, namespace: "namespace1")
+        let retrieved2 = await cache.getValue(forKey: key, namespace: "namespace2")
+
+        // Then
+        XCTAssertEqual(retrieved1, data1)
+        XCTAssertEqual(retrieved2, data2)
     }
     
     // MARK: - Negentropy Support Tests

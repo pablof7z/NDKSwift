@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 final class NDKOutboxManagerTests: NDKUnitTestCase {
     var outboxManager: NDKOutboxManager!

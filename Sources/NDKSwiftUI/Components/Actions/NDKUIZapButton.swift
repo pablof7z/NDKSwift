@@ -1,5 +1,6 @@
 import SwiftUI
-import NDKSwift
+import NDKSwiftCore
+import NDKSwiftCashu
 
 #if canImport(UIKit)
 import UIKit

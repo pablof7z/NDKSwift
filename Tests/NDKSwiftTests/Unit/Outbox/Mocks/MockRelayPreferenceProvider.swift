@@ -1,5 +1,5 @@
 import Foundation
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 /// Mock implementation of RelayPreferenceProvider for testing
 final class MockRelayPreferenceProvider: RelayPreferenceProvider {

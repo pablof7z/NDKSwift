@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 /// Comprehensive tests for NDKSubscription
 final class NDKSubscriptionComprehensiveTests: NDKTestCase {
