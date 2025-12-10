@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 final class NIP92MediaExtractionTests: XCTestCase {
     var ndk: NDK!

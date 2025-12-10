@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 /// Performance tests for large subscription handling
 final class LargeSubscriptionPerformanceTests: XCTestCase {

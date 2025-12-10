@@ -1,6 +1,6 @@
 import XCTest
 import Foundation
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 final class NDKListTests: XCTestCase {
     var ndk: NDK!

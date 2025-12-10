@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 final class InternalSubscriptionO1Test: XCTestCase {
     func testRelayConnectionUsesO1Lookup() async throws {

@@ -1,7 +1,7 @@
 import SwiftUI
 import CoreImage
 import CoreImage.CIFilterBuiltins
-import NDKSwift
+import NDKSwiftCore
 #if os(iOS)
 import UIKit
 #elseif os(macOS)

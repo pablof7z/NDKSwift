@@ -2,7 +2,7 @@
 // Would require refactoring production code to use protocols
 /*
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 // Mock event type for testing
 struct MockPublishableEvent: NDKPublishableEvent {

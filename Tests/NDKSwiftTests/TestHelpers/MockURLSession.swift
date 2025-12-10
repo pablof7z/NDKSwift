@@ -1,5 +1,5 @@
 import Foundation
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 /// Mock URLSession for testing network requests
 class MockURLSession: URLProtocol {

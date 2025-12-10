@@ -1,5 +1,5 @@
 import Foundation
-import NDKSwift
+import NDKSwiftCore
 
 // Test harness for Negentropy protocol conformance
 // Compatible with hoytech/negentropy test suite

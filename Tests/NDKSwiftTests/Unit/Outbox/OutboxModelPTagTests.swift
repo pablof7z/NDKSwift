@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 /// Focused tests for NIP-65 outbox model p-tag publishing behavior
 final class OutboxModelPTagTests: XCTestCase {

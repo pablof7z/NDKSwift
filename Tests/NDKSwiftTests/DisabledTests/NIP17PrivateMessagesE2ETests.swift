@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 /// End-to-end tests for NIP-17 Private Direct Messages
 final class NIP17PrivateMessagesE2ETests: XCTestCase {

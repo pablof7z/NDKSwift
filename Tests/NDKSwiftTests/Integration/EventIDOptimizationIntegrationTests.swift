@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 /// Integration test for event ID filter optimization
 final class EventIDOptimizationIntegrationTest: XCTestCase {

@@ -1,5 +1,6 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
+import NDKSwiftCashu
 import CashuSwift
 
 final class CashuDepositTests: XCTestCase {

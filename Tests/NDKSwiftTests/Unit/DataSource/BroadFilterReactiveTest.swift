@@ -1,5 +1,6 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
+import NDKSwiftSQLite
 
 /// Tests that verify broader filters receive events from more specific subscriptions
 final class BroadFilterReactiveTest: XCTestCase {

@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 final class NDKBlossomExtensionsTests: XCTestCase {
     var ndk: NDK!

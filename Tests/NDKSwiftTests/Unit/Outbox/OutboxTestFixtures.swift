@@ -1,5 +1,5 @@
 import Foundation
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 /// Test fixtures for outbox-related tests
 struct OutboxTestFixtures {
