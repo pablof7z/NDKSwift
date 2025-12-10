@@ -88,6 +88,9 @@ public actor MemoryCache: NDKCache {
         }
 
         events[event.id] = event
+
+        // Notify observers about the saved event
+        notifyEventObservers(for: event)
     }
 
     public func getEvent(id: String) async -> NDKEvent? {
@@ -382,11 +385,8 @@ public actor MemoryCache: NDKCache {
             await processDeletionEvent(event)
         }
 
-        // Save the event
+        // Save the event (this will also notify observers)
         try await saveEvent(event)
-        
-        // Notify observers about the new event
-        notifyEventObservers(for: event)
     }
 
     /// Process a kind:5 deletion event according to NIP-09
