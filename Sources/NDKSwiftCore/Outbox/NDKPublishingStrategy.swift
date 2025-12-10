@@ -281,7 +281,11 @@ actor NDKPublishingStrategy {
         // Try to connect
         let relay = await ndk.pool.addRelay(normalizedUrl)
         relay.ndk = ndk
-        try? await relay.connect()
+        do {
+            try await relay.connect()
+        } catch {
+            NDKLogger.log(.warning, category: .outbox, "Failed to connect to relay \(normalizedUrl): \(error)")
+        }
         return relay
     }
 

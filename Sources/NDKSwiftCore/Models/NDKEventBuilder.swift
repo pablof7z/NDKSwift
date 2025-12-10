@@ -517,8 +517,15 @@ public final class NDKEventBuilder {
             // Determine the type by prefix
             if bech32String.hasPrefix(NostrConstants.npubPrefix) {
                 // Decode npub to get public key
-                if let pubkey = try? PublicKey.fromNpub(bech32String) {
+                do {
+                    guard let pubkey = try PublicKey.fromNpub(bech32String) else {
+                        NDKLogger.log(.warning, category: .event, "Failed to decode npub in tagBech32: nil result")
+                        return self
+                    }
                     return await self.tagUser(pubkey)
+                } catch {
+                    NDKLogger.log(.warning, category: .event, "Failed to decode npub in tagBech32: \(error)")
+                    return self
                 }
 
             } else if bech32String.hasPrefix(NostrConstants.notePrefix) {

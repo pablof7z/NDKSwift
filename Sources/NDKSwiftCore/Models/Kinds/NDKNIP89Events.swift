@@ -124,7 +124,22 @@ extension NDKEvent {
         // Parse metadata from content if present
         let metadata: NIP89HandlerMetadata?
         if !content.isEmpty {
-            metadata = try? JSONCoding.decode(NIP89HandlerMetadata.self, from: content.data(using: .utf8) ?? Data())
+            do {
+                guard let data = content.data(using: .utf8) else {
+                    NDKLogger.log(.warning, category: .event, "Failed to convert NIP-89 handler content to UTF-8")
+                    metadata = nil
+                    return NIP89HandlerInfo(
+                        supportedKinds: supportedKinds,
+                        handlerURLs: handlerURLs,
+                        metadata: metadata,
+                        identifier: identifier
+                    )
+                }
+                metadata = try JSONCoding.decode(NIP89HandlerMetadata.self, from: data)
+            } catch {
+                NDKLogger.log(.warning, category: .event, "Failed to parse NIP-89 handler metadata: \(error)")
+                metadata = nil
+            }
         } else {
             metadata = nil
         }
@@ -230,6 +245,11 @@ extension NDKEventBuilder {
 extension NIP89HandlerMetadata {
     /// Convert to JSON string
     func toJSON() -> String {
-        return (try? JSONCoding.encodeToString(self)) ?? ""
+        do {
+            return try JSONCoding.encodeToString(self)
+        } catch {
+            NDKLogger.log(.warning, category: .event, "Failed to encode NIP-89 handler metadata to JSON: \(error)")
+            return ""
+        }
     }
 }
