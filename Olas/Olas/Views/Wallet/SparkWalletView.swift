@@ -13,6 +13,8 @@ struct SparkWalletView: View {
     @State private var showReceive = false
     @State private var showSend = false
     @State private var showSettings = false
+    @State private var balance: Int64 = 0
+    @State private var payments: [SparkPayment] = []
 
     var body: some View {
         NavigationStack {
@@ -72,31 +74,47 @@ struct SparkWalletView: View {
                     .padding(.horizontal, 20)
 
                 // Activity (only if not empty)
-                if !walletManager.payments.isEmpty {
+                if !payments.isEmpty {
                     activityList
                         .padding(.top, 40)
                 }
             }
             .padding(.bottom, 32)
         }
+        .task {
+            await loadData()
+        }
         .refreshable {
-            await walletManager.sync()
+            await loadData()
+        }
+    }
+
+    private func loadData() async {
+        guard let wallet = walletManager.sparkWallet else { return }
+
+        do {
+            let info = try await wallet.getInfo()
+            balance = info.balanceSats
+            payments = try await wallet.listPayments(limit: 20)
+        } catch {
+            print("[Spark] Failed to load data: \(error)")
         }
     }
 
     private var balanceDisplay: some View {
         Button {
-            walletManager.togglePrimaryDisplay()
+            walletManager.showFiatAsPrimary.toggle()
         } label: {
             VStack(spacing: 6) {
                 // Primary amount
-                if walletManager.showFiatAsPrimary, let fiat = walletManager.satsToFiat(walletManager.balance) {
-                    Text(walletManager.formatFiat(fiat))
+                if walletManager.showFiatAsPrimary, let rate = walletManager.fiatRate {
+                    let fiat = SatsConverter.satsToFiat(balance, btcRate: rate)
+                    Text(SatsConverter.formatFiat(fiat, currencyCode: walletManager.preferredCurrency))
                         .font(.system(size: 56, weight: .bold, design: .rounded))
                         .foregroundStyle(.primary)
                 } else {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text(walletManager.formatSats(walletManager.balance))
+                        Text(SatsConverter.formatSats(balance))
                             .font(.system(size: 56, weight: .bold, design: .rounded))
                         Text("sats")
                             .font(.system(size: 18, weight: .medium, design: .rounded))
@@ -106,16 +124,17 @@ struct SparkWalletView: View {
 
                 // Secondary amount
                 if walletManager.showFiatAsPrimary {
-                    Text("\(walletManager.formatSats(walletManager.balance)) sats")
+                    Text("\(SatsConverter.formatSats(balance)) sats")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                } else if let fiat = walletManager.satsToFiat(walletManager.balance) {
-                    Text(walletManager.formatFiat(fiat))
+                } else if let rate = walletManager.fiatRate {
+                    let fiat = SatsConverter.satsToFiat(balance, btcRate: rate)
+                    Text(SatsConverter.formatFiat(fiat, currencyCode: walletManager.preferredCurrency))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
 
-                // Loading or lightning address
+                // Loading indicator
                 if walletManager.isLoading {
                     HStack(spacing: 6) {
                         ProgressView()
@@ -128,59 +147,47 @@ struct SparkWalletView: View {
                 }
             }
             .contentTransition(.numericText())
-            .animation(.spring(duration: 0.3), value: walletManager.balance)
+            .animation(.spring(duration: 0.3), value: balance)
             .animation(.spring(duration: 0.2), value: walletManager.showFiatAsPrimary)
         }
         .buttonStyle(.plain)
     }
 
     private var actionButtons: some View {
-        HStack(spacing: 12) {
-            // Receive
+        HStack(spacing: 10) {
+            // Receive - pill button
             Button {
                 showReceive = true
             } label: {
-                VStack(spacing: 10) {
-                    ZStack {
-                        Circle()
-                            .fill(OlasTheme.Colors.success)
-                            .frame(width: 56, height: 56)
-                        Image(systemName: "arrow.down")
-                            .font(.system(size: 22, weight: .semibold))
-                            .foregroundStyle(.white)
-                    }
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.down")
+                        .font(.system(size: 14, weight: .bold))
                     Text("Receive")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.primary)
+                        .font(.subheadline.weight(.semibold))
                 }
+                .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 20)
-                .background(Color(.secondarySystemBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .padding(.vertical, 14)
+                .background(OlasTheme.Colors.success)
+                .clipShape(Capsule())
             }
             .buttonStyle(.plain)
 
-            // Send
+            // Send - pill button
             Button {
                 showSend = true
             } label: {
-                VStack(spacing: 10) {
-                    ZStack {
-                        Circle()
-                            .fill(OlasTheme.Colors.brandPrimary)
-                            .frame(width: 56, height: 56)
-                        Image(systemName: "arrow.up")
-                            .font(.system(size: 22, weight: .semibold))
-                            .foregroundStyle(.white)
-                    }
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.up")
+                        .font(.system(size: 14, weight: .bold))
                     Text("Send")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.primary)
+                        .font(.subheadline.weight(.semibold))
                 }
+                .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 20)
-                .background(Color(.secondarySystemBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .padding(.vertical, 14)
+                .background(OlasTheme.Colors.brandPrimary)
+                .clipShape(Capsule())
             }
             .buttonStyle(.plain)
         }
@@ -189,22 +196,24 @@ struct SparkWalletView: View {
     private var activityList: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Activity")
-                .font(.title3.weight(.semibold))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
                 .padding(.horizontal, 20)
-                .padding(.bottom, 16)
+                .padding(.bottom, 12)
 
             VStack(spacing: 0) {
-                ForEach(Array(walletManager.payments.enumerated()), id: \.element.id) { index, payment in
-                    SparkTransactionRow(payment: payment, walletManager: walletManager)
+                ForEach(Array(payments.enumerated()), id: \.element.id) { index, payment in
+                    SparkTransactionRow(payment: payment, fiatRate: walletManager.fiatRate, preferredCurrency: walletManager.preferredCurrency)
 
-                    if index < walletManager.payments.count - 1 {
+                    if index < payments.count - 1 {
                         Divider()
-                            .padding(.leading, 68)
+                            .padding(.leading, 62)
                     }
                 }
             }
             .background(Color(.secondarySystemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .padding(.horizontal, 20)
         }
     }
@@ -295,7 +304,8 @@ struct SparkWalletView: View {
 
 struct SparkTransactionRow: View {
     let payment: SparkPayment
-    let walletManager: SparkWalletManager
+    let fiatRate: Double?
+    let preferredCurrency: String
     @State private var isExpanded = false
 
     private var isReceive: Bool { payment.type == .receive }
@@ -307,58 +317,55 @@ struct SparkTransactionRow: View {
             }
         } label: {
             VStack(spacing: 0) {
-                HStack(spacing: 14) {
+                HStack(spacing: 12) {
+                    // Smaller, cleaner icon
                     ZStack {
                         Circle()
-                            .fill(isReceive ? Color.green.opacity(0.12) : Color.orange.opacity(0.12))
-                            .frame(width: 44, height: 44)
+                            .fill(isReceive ? Color.green.opacity(0.15) : Color.orange.opacity(0.15))
+                            .frame(width: 36, height: 36)
                         Image(systemName: isReceive ? "arrow.down.left" : "arrow.up.right")
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(isReceive ? .green : .orange)
                     }
 
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(payment.description ?? (isReceive ? "Received" : "Sent"))
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
-
-                        Text(formatRelativeTime(payment.timestamp))
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
+                    // Timestamp only - cleaner
+                    Text(formatRelativeTime(payment.timestamp))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
 
                     Spacer()
 
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("\(isReceive ? "+" : "-")\(walletManager.formatSats(payment.amountSats))")
+                    // Amount and fiat stacked right
+                    VStack(alignment: .trailing, spacing: 1) {
+                        Text("\(isReceive ? "+" : "")\(SatsConverter.formatSats(payment.amountSats))")
                             .font(.subheadline.weight(.semibold).monospacedDigit())
                             .foregroundStyle(isReceive ? .green : .primary)
 
-                        if let fiat = walletManager.satsToFiat(payment.amountSats) {
-                            Text(walletManager.formatFiat(fiat))
+                        if let rate = fiatRate {
+                            let fiat = SatsConverter.satsToFiat(payment.amountSats, btcRate: rate)
+                            Text(SatsConverter.formatFiat(fiat, currencyCode: preferredCurrency))
                                 .font(.caption)
                                 .foregroundStyle(.tertiary)
                         }
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
 
                 if isExpanded {
                     VStack(spacing: 0) {
-                        Divider().padding(.leading, 74)
+                        Divider().padding(.leading, 62)
 
-                        VStack(spacing: 10) {
+                        VStack(spacing: 8) {
+                            detailRow("Status", payment.status.displayName)
+                            detailRow("Time", payment.timestamp.formatted(.dateTime.month().day().hour().minute()))
                             if payment.feeSats > 0 {
                                 detailRow("Fee", "\(payment.feeSats) sats")
                             }
-                            detailRow("Status", payment.status.displayName)
-                            detailRow("Time", payment.timestamp.formatted(.dateTime.month().day().hour().minute()))
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .padding(.leading, 58)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .padding(.leading, 48)
                     }
                     .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
                 }
@@ -450,6 +457,11 @@ struct ReceiveView: View {
     @State private var error: String?
     @State private var copied = false
 
+    private var fiatValue: Double? {
+        guard let sats = Int64(amount), let rate = walletManager.fiatRate else { return nil }
+        return SatsConverter.satsToFiat(sats, btcRate: rate)
+    }
+
     var body: some View {
         ZStack {
             Color(.systemBackground).ignoresSafeArea()
@@ -482,8 +494,8 @@ struct ReceiveView: View {
                     .foregroundStyle(.secondary)
 
                 // Show fiat equivalent
-                if let sats = Int64(amount), let fiat = walletManager.satsToFiat(sats) {
-                    Text(walletManager.formatFiat(fiat))
+                if let fiat = fiatValue {
+                    Text(SatsConverter.formatFiat(fiat, currencyCode: walletManager.preferredCurrency))
                         .font(.subheadline)
                         .foregroundStyle(.tertiary)
                 }
@@ -607,6 +619,11 @@ struct ReceiveView: View {
     }
 
     private func generateInvoice() async {
+        guard let wallet = walletManager.sparkWallet else {
+            error = "Wallet not connected"
+            return
+        }
+
         isGenerating = true
         error = nil
         defer { isGenerating = false }
@@ -614,7 +631,7 @@ struct ReceiveView: View {
         guard let amountSats = Int64(amount) else { return }
 
         do {
-            invoice = try await walletManager.createInvoice(amountSats: amountSats, description: nil)
+            invoice = try await wallet.createInvoice(amountSats: amountSats, description: nil)
         } catch {
             self.error = error.localizedDescription
         }
@@ -653,6 +670,7 @@ struct SparkSendView: View {
     @State private var amount = ""
     @State private var error: String?
     @State private var isParsing = false
+    @State private var balance: Int64 = 0
 
     var body: some View {
         ZStack {
@@ -670,6 +688,20 @@ struct SparkSendView: View {
             case .success:
                 successView
             }
+        }
+        .task {
+            await loadBalance()
+        }
+    }
+
+    private func loadBalance() async {
+        guard let wallet = walletManager.sparkWallet else { return }
+
+        do {
+            let info = try await wallet.getInfo()
+            balance = info.balanceSats
+        } catch {
+            print("[Spark] Failed to load balance: \(error)")
         }
     }
 
@@ -800,7 +832,7 @@ struct SparkSendView: View {
 
                 VStack(spacing: 12) {
                     if let embedded = parsed.embeddedAmountSats {
-                        Text(walletManager.formatSats(embedded))
+                        Text(SatsConverter.formatSats(embedded))
                             .font(.system(size: 72, weight: .bold, design: .rounded))
                     } else {
                         Text(amount.isEmpty ? "0" : formatWithCommas(Int64(amount) ?? 0))
@@ -817,7 +849,7 @@ struct SparkSendView: View {
                     HStack(spacing: 4) {
                         Text("Available:")
                             .foregroundStyle(.tertiary)
-                        Text("\(walletManager.formatSats(walletManager.balance)) sats")
+                        Text("\(SatsConverter.formatSats(balance)) sats")
                             .foregroundStyle(.secondary)
                     }
                     .font(.caption)
@@ -879,13 +911,14 @@ struct SparkSendView: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 24) {
                         VStack(spacing: 4) {
-                            Text(walletManager.formatSats(prepared.amountSats))
+                            Text(SatsConverter.formatSats(prepared.amountSats))
                                 .font(.system(size: 56, weight: .bold, design: .rounded))
                             Text("sats")
                                 .font(.title3)
                                 .foregroundStyle(.secondary)
-                            if let fiat = walletManager.satsToFiat(prepared.amountSats) {
-                                Text(walletManager.formatFiat(fiat))
+                            if let rate = walletManager.fiatRate {
+                                let fiat = SatsConverter.satsToFiat(prepared.amountSats, btcRate: rate)
+                                Text(SatsConverter.formatFiat(fiat, currencyCode: walletManager.preferredCurrency))
                                     .font(.subheadline)
                                     .foregroundStyle(.tertiary)
                             }
@@ -893,11 +926,11 @@ struct SparkSendView: View {
                         .padding(.top, 32)
 
                         VStack(spacing: 0) {
-                            detailRow(label: "Amount", value: "\(walletManager.formatSats(prepared.amountSats)) sats")
+                            detailRow(label: "Amount", value: "\(SatsConverter.formatSats(prepared.amountSats)) sats")
                             Divider().padding(.leading, 16)
-                            detailRow(label: "Network fee", value: "\(walletManager.formatSats(prepared.feeSats)) sats")
+                            detailRow(label: "Network fee", value: "\(SatsConverter.formatSats(prepared.feeSats)) sats")
                             Divider().padding(.leading, 16)
-                            detailRow(label: "Total", value: "\(walletManager.formatSats(prepared.totalSats)) sats", highlight: true)
+                            detailRow(label: "Total", value: "\(SatsConverter.formatSats(prepared.totalSats)) sats", highlight: true)
                         }
                         .background(Color(.secondarySystemBackground))
                         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -906,7 +939,7 @@ struct SparkSendView: View {
                         HStack {
                             Text("Balance after")
                             Spacer()
-                            Text("\(walletManager.formatSats(walletManager.balance - prepared.totalSats)) sats")
+                            Text("\(SatsConverter.formatSats(balance - prepared.totalSats)) sats")
                         }
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -926,7 +959,7 @@ struct SparkSendView: View {
                     HStack(spacing: 10) {
                         Image(systemName: "arrow.up.circle.fill")
                             .font(.body.weight(.medium))
-                        Text("Send \(walletManager.formatSats(prepared.totalSats)) sats")
+                        Text("Send \(SatsConverter.formatSats(prepared.totalSats)) sats")
                             .font(.body.weight(.semibold))
                     }
                     .frame(maxWidth: .infinity)
@@ -1020,6 +1053,11 @@ struct SparkSendView: View {
     // MARK: - Actions
 
     private func parseDestination() async {
+        guard let wallet = walletManager.sparkWallet else {
+            error = "Wallet not connected"
+            return
+        }
+
         isParsing = true
         error = nil
         defer { isParsing = false }
@@ -1027,7 +1065,7 @@ struct SparkSendView: View {
         let trimmed = destination.trimmingCharacters(in: .whitespacesAndNewlines)
 
         do {
-            let parsed = try await walletManager.parseInput(trimmed)
+            let parsed = try await wallet.parseInput(trimmed)
             step = .amount(parsed)
         } catch {
             self.error = "Invalid destination"
@@ -1038,6 +1076,11 @@ struct SparkSendView: View {
     }
 
     private func preparePayment(_ parsed: SparkParsedInput) async {
+        guard let wallet = walletManager.sparkWallet else {
+            error = "Wallet not connected"
+            return
+        }
+
         error = nil
 
         let amountSats: Int64?
@@ -1051,7 +1094,7 @@ struct SparkSendView: View {
         }
 
         do {
-            let prepared = try await walletManager.preparePayment(
+            let prepared = try await wallet.preparePayment(
                 input: destination.trimmingCharacters(in: .whitespacesAndNewlines),
                 amount: amountSats
             )
@@ -1062,11 +1105,18 @@ struct SparkSendView: View {
     }
 
     private func sendPayment(_ prepared: SparkPreparedPayment) async {
+        guard let wallet = walletManager.sparkWallet else {
+            error = "Wallet not connected"
+            step = .confirm(prepared)
+            return
+        }
+
         step = .processing
         error = nil
 
         do {
-            try await walletManager.sendPreparedPayment(prepared)
+            _ = try await wallet.sendPreparedPayment(prepared)
+            await loadBalance()
             step = .success
         } catch {
             self.error = error.localizedDescription

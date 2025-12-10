@@ -10,6 +10,8 @@ struct SparkWalletSettingsView: View {
     @State private var showDisconnectAlert = false
     @State private var showLightningAddressSetup = false
     @State private var showBackupPhrase = false
+    @State private var balance: Int64 = 0
+    @State private var lightningAddress: String?
 
     public var body: some View {
         List {
@@ -57,6 +59,21 @@ struct SparkWalletSettingsView: View {
         } message: {
             Text("This will disconnect your Spark wallet. You can reconnect later using your mnemonic.")
         }
+        .task {
+            await loadData()
+        }
+    }
+
+    private func loadData() async {
+        guard let wallet = walletManager.sparkWallet else { return }
+
+        do {
+            let info = try await wallet.getInfo()
+            balance = info.balanceSats
+            lightningAddress = try? await wallet.getLightningAddress()
+        } catch {
+            print("[Spark] Failed to load data: \(error)")
+        }
     }
 
     // MARK: - Sections
@@ -83,7 +100,7 @@ struct SparkWalletSettingsView: View {
                 Text("Balance")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Text(formatSats(walletManager.balance))
+                Text(formatSats(balance))
                     .font(.title.bold())
             }
             .padding(.vertical, 8)
@@ -114,7 +131,7 @@ struct SparkWalletSettingsView: View {
 
     private var addressSection: some View {
         Section {
-            if let address = walletManager.lightningAddress {
+            if let address = lightningAddress {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Lightning Address")
                         .font(.caption)
@@ -145,7 +162,7 @@ struct SparkWalletSettingsView: View {
     private var actionsSection: some View {
         Section {
             Button {
-                Task { await walletManager.sync() }
+                Task { await syncWallet() }
             } label: {
                 HStack {
                     Image(systemName: "arrow.triangle.2.circlepath")
@@ -222,6 +239,17 @@ struct SparkWalletSettingsView: View {
     }
 
     // MARK: - Helpers
+
+    private func syncWallet() async {
+        guard let wallet = walletManager.sparkWallet else { return }
+
+        do {
+            try await wallet.sync()
+            await loadData()
+        } catch {
+            print("[Spark] Failed to sync: \(error)")
+        }
+    }
 
     private func formatSats(_ amount: Int64) -> String {
         let formatter = NumberFormatter()
@@ -487,13 +515,18 @@ struct LightningAddressSetupView: View {
     }
 
     private func registerAddress() async {
+        guard let wallet = walletManager.sparkWallet else {
+            error = "Wallet not connected"
+            return
+        }
+
         isRegistering = true
         defer { isRegistering = false }
 
         let cleanedUsername = username.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
 
         do {
-            try await walletManager.registerLightningAddress(cleanedUsername)
+            try await wallet.registerLightningAddress(cleanedUsername)
             dismiss()
         } catch {
             self.error = error.localizedDescription
