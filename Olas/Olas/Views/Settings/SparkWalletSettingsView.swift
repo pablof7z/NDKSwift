@@ -2,16 +2,14 @@ import SwiftUI
 import NDKSwift
 
 struct SparkWalletSettingsView: View {
-    @ObservedObject var walletManager: SparkWalletManager
+    @Bindable var walletManager: SparkWalletManager
+    @Environment(\.dismiss) private var dismiss
 
     @State private var showCreateWallet = false
     @State private var showImportWallet = false
     @State private var showDisconnectAlert = false
     @State private var showLightningAddressSetup = false
-
-    public init(walletManager: SparkWalletManager) {
-        self.walletManager = walletManager
-    }
+    @State private var showBackupPhrase = false
 
     public var body: some View {
         List {
@@ -19,8 +17,10 @@ struct SparkWalletSettingsView: View {
 
             if walletManager.connectionStatus == .connected {
                 balanceSection
+                currencySection
                 addressSection
                 actionsSection
+                switchWalletSection
             } else {
                 setupSection
             }
@@ -45,6 +45,9 @@ struct SparkWalletSettingsView: View {
         }
         .sheet(isPresented: $showLightningAddressSetup) {
             LightningAddressSetupView(walletManager: walletManager)
+        }
+        .sheet(isPresented: $showBackupPhrase) {
+            BackupPhraseView(walletManager: walletManager)
         }
         .alert("Disconnect Wallet", isPresented: $showDisconnectAlert) {
             Button("Cancel", role: .cancel) {}
@@ -84,6 +87,28 @@ struct SparkWalletSettingsView: View {
                     .font(.title.bold())
             }
             .padding(.vertical, 8)
+        }
+    }
+
+    private var currencySection: some View {
+        Section {
+            Picker("Currency", selection: $walletManager.preferredCurrency) {
+                Text("USD").tag("USD")
+                Text("EUR").tag("EUR")
+                Text("GBP").tag("GBP")
+                Text("JPY").tag("JPY")
+                Text("CHF").tag("CHF")
+                Text("CAD").tag("CAD")
+                Text("AUD").tag("AUD")
+                Text("BRL").tag("BRL")
+                Text("MXN").tag("MXN")
+            }
+
+            Toggle("Show Fiat as Primary", isOn: $walletManager.showFiatAsPrimary)
+        } header: {
+            Text("Display Currency")
+        } footer: {
+            Text("Choose how your balance is displayed. Tap the balance to quickly switch between sats and fiat.")
         }
     }
 
@@ -128,6 +153,15 @@ struct SparkWalletSettingsView: View {
                 }
             }
 
+            Button {
+                showBackupPhrase = true
+            } label: {
+                HStack {
+                    Image(systemName: "key.fill")
+                    Text("Backup Recovery Phrase")
+                }
+            }
+
             Button(role: .destructive) {
                 showDisconnectAlert = true
             } label: {
@@ -136,6 +170,26 @@ struct SparkWalletSettingsView: View {
                     Text("Disconnect Wallet")
                 }
             }
+        }
+    }
+
+    private var switchWalletSection: some View {
+        Section {
+            Button {
+                Task {
+                    await walletManager.disconnect(clearMnemonic: false)
+                    dismiss()
+                }
+            } label: {
+                HStack {
+                    Image(systemName: "arrow.left.arrow.right")
+                    Text("Switch to Cashu Wallet")
+                }
+            }
+        } header: {
+            Text("Switch Wallet")
+        } footer: {
+            Text("Your Spark wallet will remain available. You can switch back anytime.")
         }
     }
 
@@ -180,34 +234,52 @@ struct SparkWalletSettingsView: View {
 // MARK: - Create Wallet View
 
 struct CreateSparkWalletView: View {
-    @ObservedObject var walletManager: SparkWalletManager
+    var walletManager: SparkWalletManager
 
     @Environment(\.dismiss) private var dismiss
 
-    enum CreationStep {
-        case prompt
-        case showMnemonic(String)
-        case verify(String, [Int])
-    }
-
-    @State private var step: CreationStep = .prompt
     @State private var isCreating = false
     @State private var error: String?
-    @State private var verificationInputs: [String] = ["", "", ""]
-    @State private var verificationError: String?
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
-                    switch step {
-                    case .prompt:
-                        createPrompt
-                    case .showMnemonic(let mnemonic):
-                        mnemonicDisplay(mnemonic)
-                    case .verify(let mnemonic, let indices):
-                        verificationView(mnemonic: mnemonic, indices: indices)
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: 60))
+                        .foregroundStyle(OlasTheme.Colors.zapGold)
+
+                    Text("Create Your Wallet")
+                        .font(.title2.bold())
+
+                    Text("A new self-custodial Bitcoin wallet will be created. You can backup your recovery phrase later from the wallet settings.")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+
+                    if let error = error {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.red)
                     }
+
+                    Button {
+                        Task { await createWallet() }
+                    } label: {
+                        HStack {
+                            if isCreating {
+                                ProgressView()
+                                    .tint(.white)
+                            }
+                            Text("Create Wallet")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(OlasTheme.Colors.deepTeal)
+                        .foregroundStyle(.white)
+                        .cornerRadius(12)
+                    }
+                    .disabled(isCreating)
                 }
                 .padding()
             }
@@ -221,195 +293,13 @@ struct CreateSparkWalletView: View {
         }
     }
 
-    private var createPrompt: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "key.fill")
-                .font(.system(size: 60))
-                .foregroundStyle(OlasTheme.Colors.deepTeal)
-
-            Text("Create Your Wallet")
-                .font(.title2.bold())
-
-            Text("A new 12-word recovery phrase will be generated. Write it down and store it safely - this is the only way to recover your funds.")
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-
-            if let error = error {
-                Text(error)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-            }
-
-            Button {
-                Task { await createWallet() }
-            } label: {
-                HStack {
-                    if isCreating {
-                        ProgressView()
-                            .tint(.white)
-                    }
-                    Text("Generate Wallet")
-                }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(OlasTheme.Colors.deepTeal)
-                .foregroundStyle(.white)
-                .cornerRadius(12)
-            }
-            .disabled(isCreating)
-        }
-    }
-
-    private func mnemonicDisplay(_ mnemonic: String) -> some View {
-        VStack(spacing: 20) {
-            Image(systemName: "shield.checkered")
-                .font(.system(size: 60))
-                .foregroundStyle(OlasTheme.Colors.zapGold)
-
-            Text("Your Recovery Phrase")
-                .font(.title2.bold())
-
-            Text("Write these words down in order. Never share them with anyone. You'll need to verify a few words on the next screen.")
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                let words = mnemonic.split(separator: " ")
-                ForEach(Array(words.enumerated()), id: \.offset) { index, word in
-                    HStack {
-                        Text("\(index + 1).")
-                            .foregroundStyle(.secondary)
-                            .frame(width: 24, alignment: .trailing)
-                        Text(String(word))
-                            .font(.body.monospaced())
-                        Spacer()
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color(.systemGray6))
-                    .cornerRadius(6)
-                }
-            }
-            .padding()
-
-            Button {
-                // Generate 3 random word indices to verify
-                let words = mnemonic.split(separator: " ")
-                var indices = Set<Int>()
-                while indices.count < 3 {
-                    indices.insert(Int.random(in: 0..<words.count))
-                }
-                verificationInputs = ["", "", ""]
-                step = .verify(mnemonic, Array(indices).sorted())
-            } label: {
-                Text("I've Written It Down")
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(OlasTheme.Colors.deepTeal)
-                    .foregroundStyle(.white)
-                    .cornerRadius(12)
-            }
-
-            Button {
-                dismiss()
-            } label: {
-                Text("Skip Verification (Not Recommended)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private func verificationView(mnemonic: String, indices: [Int]) -> some View {
-        let words = mnemonic.split(separator: " ").map(String.init)
-
-        return VStack(spacing: 20) {
-            Image(systemName: "checkmark.shield")
-                .font(.system(size: 60))
-                .foregroundStyle(OlasTheme.Colors.deepTeal)
-
-            Text("Verify Your Phrase")
-                .font(.title2.bold())
-
-            Text("Enter the following words from your recovery phrase to confirm you've written it down correctly.")
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-
-            VStack(spacing: 16) {
-                ForEach(Array(indices.enumerated()), id: \.offset) { arrayIndex, wordIndex in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Word #\(wordIndex + 1)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                        TextField("Enter word \(wordIndex + 1)", text: $verificationInputs[arrayIndex])
-                            .textFieldStyle(.roundedBorder)
-                            .autocorrectionDisabled()
-                            .textInputAutocapitalization(.never)
-                    }
-                }
-            }
-            .padding()
-            .background(Color(.systemGray6))
-            .cornerRadius(12)
-
-            if let error = verificationError {
-                Text(error)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-            }
-
-            Button {
-                verifyWords(mnemonic: mnemonic, indices: indices, words: words)
-            } label: {
-                Text("Verify & Complete")
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(allFieldsFilled ? OlasTheme.Colors.deepTeal : .gray)
-                    .foregroundStyle(.white)
-                    .cornerRadius(12)
-            }
-            .disabled(!allFieldsFilled)
-
-            Button {
-                step = .showMnemonic(mnemonic)
-            } label: {
-                Text("Go Back")
-                    .foregroundStyle(OlasTheme.Colors.deepTeal)
-            }
-        }
-    }
-
-    private var allFieldsFilled: Bool {
-        verificationInputs.allSatisfy { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
-    }
-
-    private func verifyWords(mnemonic: String, indices: [Int], words: [String]) {
-        for (arrayIndex, wordIndex) in indices.enumerated() {
-            let input = verificationInputs[arrayIndex].trimmingCharacters(in: .whitespaces).lowercased()
-            let expected = words[wordIndex].lowercased()
-
-            if input != expected {
-                verificationError = "Word #\(wordIndex + 1) is incorrect. Please check your recovery phrase and try again."
-                return
-            }
-        }
-
-        // All words verified correctly
-        verificationError = nil
-        dismiss()
-    }
-
     private func createWallet() async {
         isCreating = true
         defer { isCreating = false }
 
         do {
-            let newMnemonic = try await walletManager.createWallet()
-            step = .showMnemonic(newMnemonic)
+            _ = try await walletManager.createWallet()
+            dismiss()
         } catch {
             self.error = error.localizedDescription
         }
@@ -419,7 +309,7 @@ struct CreateSparkWalletView: View {
 // MARK: - Import Wallet View
 
 struct ImportSparkWalletView: View {
-    @ObservedObject var walletManager: SparkWalletManager
+    var walletManager: SparkWalletManager
 
     @Environment(\.dismiss) private var dismiss
     @State private var mnemonic = ""
@@ -517,7 +407,7 @@ struct ImportSparkWalletView: View {
 // MARK: - Lightning Address Setup View
 
 struct LightningAddressSetupView: View {
-    @ObservedObject var walletManager: SparkWalletManager
+    var walletManager: SparkWalletManager
 
     @Environment(\.dismiss) private var dismiss
     @State private var username = ""
@@ -607,6 +497,88 @@ struct LightningAddressSetupView: View {
             dismiss()
         } catch {
             self.error = error.localizedDescription
+        }
+    }
+}
+
+// MARK: - Backup Phrase View
+
+struct BackupPhraseView: View {
+    var walletManager: SparkWalletManager
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var mnemonic: String?
+    @State private var copied = false
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 24) {
+                    Image(systemName: "key.fill")
+                        .font(.system(size: 60))
+                        .foregroundStyle(OlasTheme.Colors.zapGold)
+
+                    Text("Recovery Phrase")
+                        .font(.title2.bold())
+
+                    Text("Write these words down and store them safely. Anyone with this phrase can access your funds.")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+
+                    if let mnemonic = mnemonic {
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                            let words = mnemonic.split(separator: " ")
+                            ForEach(Array(words.enumerated()), id: \.offset) { index, word in
+                                HStack {
+                                    Text("\(index + 1).")
+                                        .foregroundStyle(.secondary)
+                                        .frame(width: 24, alignment: .trailing)
+                                    Text(String(word))
+                                        .font(.body.monospaced())
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color(.systemGray6))
+                                .cornerRadius(6)
+                            }
+                        }
+                        .padding()
+
+                        Button {
+                            #if os(iOS)
+                            UIPasteboard.general.string = mnemonic
+                            #endif
+                            copied = true
+                        } label: {
+                            HStack {
+                                Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                                Text(copied ? "Copied!" : "Copy to Clipboard")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color(.systemGray5))
+                            .foregroundStyle(.primary)
+                            .cornerRadius(12)
+                        }
+                    } else {
+                        Text("Unable to retrieve recovery phrase")
+                            .foregroundStyle(.red)
+                    }
+                }
+                .padding()
+            }
+            .navigationTitle("Backup")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+            .onAppear {
+                mnemonic = walletManager.getMnemonic()
+            }
         }
     }
 }
