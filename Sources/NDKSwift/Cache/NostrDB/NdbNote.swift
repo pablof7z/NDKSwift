@@ -13,7 +13,7 @@ import NostrDB
 
 // Stub types for Damus dependencies - will be replaced by NDK layer
 // These are internal to avoid conflicts with NDKSwift types
-internal struct NdbPubkey: Equatable, Codable {
+internal struct NdbPubkey: Equatable, Hashable, Codable {
     let data: Data
     init(_ data: Data) { self.data = data }
 
@@ -96,33 +96,112 @@ struct ThreadReply {
 struct ReplyRef {
     let note_id: NoteId
 }
-struct CommentItem {
-    let content: String
+/// Protocol for types that can be extracted from nostr event tags
+protocol TagConvertible {
+    static func from_tag(tag: TagSequence) -> Self?
 }
-struct References<T>: Collection {
+
+struct References<T: TagConvertible>: Sequence, IteratorProtocol {
     let tags: TagsSequence
+    var tags_iter: TagsIterator
 
-    var startIndex: Int { 0 }
-    var endIndex: Int { 0 }
-
-    func index(after i: Int) -> Int { i + 1 }
-
-    subscript(position: Int) -> T {
-        fatalError("References subscript not implemented")
+    init(tags: TagsSequence) {
+        self.tags = tags
+        self.tags_iter = tags.makeIterator()
     }
 
-    var first: T? { nil }
-    var last: T? { nil }
+    mutating func next() -> T? {
+        while let tag = tags_iter.next() {
+            guard let evref = T.from_tag(tag: tag) else { continue }
+            return evref
+        }
+        return nil
+    }
 }
-struct QuoteId {
-    var note_id: NoteId { NoteId(Data()) }
+
+extension References {
+    var first: T? {
+        let copy = self
+        return copy.first(where: { _ in true })
+    }
+
+    var last: T? {
+        var copy = self
+        var last: T? = nil
+        while let t = copy.next() {
+            last = t
+        }
+        return last
+    }
 }
-struct NoteRef {}
-struct FollowRef {}
-struct Hashtag {}
-struct ReplaceableParam {}
-struct MuteItem {}
-struct RefId {}
+
+// TagConvertible conformance for Pubkey - matches "p" tags
+extension NdbPubkey: TagConvertible {
+    static func from_tag(tag: TagSequence) -> NdbPubkey? {
+        var i = tag.makeIterator()
+        guard tag.count >= 2,
+              let t0 = i.next(),
+              let key = t0.single_char,
+              key == AsciiCharacter("p"),
+              let t1 = i.next(),
+              let id = t1.id()
+        else { return nil }
+        return NdbPubkey(id)
+    }
+}
+
+// TagConvertible conformance for NoteId - matches "e" tags
+extension NdbNoteId: TagConvertible {
+    static func from_tag(tag: TagSequence) -> NdbNoteId? {
+        var i = tag.makeIterator()
+        guard tag.count >= 2,
+              let t0 = i.next(),
+              let key = t0.single_char,
+              key == AsciiCharacter("e"),
+              let t1 = i.next(),
+              let id = t1.id()
+        else { return nil }
+        return NdbNoteId(id)
+    }
+}
+struct QuoteId: TagConvertible {
+    let id: Data
+    var note_id: NoteId { NoteId(id) }
+
+    static func from_tag(tag: TagSequence) -> QuoteId? {
+        var i = tag.makeIterator()
+        guard tag.count >= 2,
+              let t0 = i.next(),
+              let key = t0.single_char,
+              key == AsciiCharacter("q"),
+              let t1 = i.next(),
+              let id = t1.id()
+        else { return nil }
+        return QuoteId(id: id)
+    }
+}
+struct NoteRef: TagConvertible {
+    static func from_tag(tag: TagSequence) -> NoteRef? { nil }
+}
+struct FollowRef: TagConvertible {
+    static func from_tag(tag: TagSequence) -> FollowRef? { nil }
+}
+struct Hashtag: TagConvertible {
+    static func from_tag(tag: TagSequence) -> Hashtag? { nil }
+}
+struct ReplaceableParam: TagConvertible {
+    static func from_tag(tag: TagSequence) -> ReplaceableParam? { nil }
+}
+struct MuteItem: TagConvertible {
+    static func from_tag(tag: TagSequence) -> MuteItem? { nil }
+}
+struct RefId: TagConvertible {
+    static func from_tag(tag: TagSequence) -> RefId? { nil }
+}
+struct CommentItemRef: TagConvertible {
+    let content: String
+    static func from_tag(tag: TagSequence) -> CommentItemRef? { nil }
+}
 
 enum DmEncoding {
     case base64
@@ -205,8 +284,6 @@ class NdbNote: Codable, Equatable, Hashable {
     let key: NoteKey?
     let note: ndb_note_ptr
 
-    // cached stuff (TODO: remove these)
-    var decrypted_content: String? = nil
     
     private var inner_event: NdbNote? {
         get {
@@ -258,7 +335,6 @@ class NdbNote: Codable, Equatable, Hashable {
         ndb_note_content_length(note.ptr)
     }
 
-    /// NDBTODO: make this into data
     var id: NoteId {
         .init(Data(bytes: ndb_note_id(note.ptr), count: 32))
     }
@@ -275,7 +351,6 @@ class NdbNote: Codable, Equatable, Hashable {
         .init(Data(bytes: ndb_note_sig(note.ptr), count: 64))
     }
     
-    /// NDBTODO: make this into data
     var pubkey: Pubkey {
         .init(Data(bytes: ndb_note_pubkey(note.ptr), count: 32))
     }
@@ -422,9 +497,9 @@ class NdbNote: Codable, Equatable, Hashable {
         var len: Int32 = 0
         
         switch noteConstructionMaterial {
-        case .keypair(let keypair):
+        case .keypair:
             var the_kp: ndb_keypair? = nil
-            
+
             if let sec = noteConstructionMaterial.privkey {
                 var kp = ndb_keypair()
                 memcpy(&kp.secret.0, sec.id.bytes, 32);
@@ -459,17 +534,7 @@ class NdbNote: Codable, Equatable, Hashable {
 
                 // SECURITY WARNING: Signature verification disabled - secp256k1 not available
                 // This note is NOT verified and should be treated as untrusted
-                // TODO: Re-enable signature verification after secp256k1 is available from NDK layer
-                /*
-                let scratch_buf_len = MAX_NOTE_SIZE
-                let scratch_buf = malloc(scratch_buf_len)
-                defer { free(scratch_buf) }  // Ensure we deallocate as soon as we leave this scope, regardless of the outcome
-
-                // Verify the signature against the pubkey and the computed ID, to verify the validity of the whole note
-                var ctx = secp256k1_context_create(UInt32(SECP256K1_CONTEXT_VERIFY))
-
-                guard ndb_note_verify(&ctx, scratch_buf, scratch_buf_len, n.ptr) == 1 else { throw InitError.generic }
-                */
+                // Signature verification requires secp256k1 integration from NDK layer
             }
             catch {
                 free(buf)
@@ -507,23 +572,12 @@ class NdbNote: Codable, Equatable, Hashable {
         }
     }
     
-    // TODO: Re-enable signature verification after secp256k1 is available from NDK layer
     func verify() -> Bool {
         // SECURITY: Signature verification disabled - secp256k1 not available
         // Return false to indicate verification cannot be performed
         // Events using this should handle unverified state appropriately
+        // Signature verification requires secp256k1 integration from NDK layer
         return false
-        /*
-        let scratch_buf_len = MAX_NOTE_SIZE
-        let scratch_buf = malloc(scratch_buf_len)
-        defer { free(scratch_buf) }  // Ensure we deallocate as soon as we leave this scope, regardless of the outcome
-
-        // Verify the signature against the pubkey and the computed ID, to verify the validity of the whole note
-        var ctx = secp256k1_context_create(UInt32(SECP256K1_CONTEXT_VERIFY))
-        guard ndb_note_verify(&ctx, scratch_buf, scratch_buf_len, self.note.ptr) == 1 else { return false }
-
-        return true
-        */
     }
 
     static func owned_from_json_cstr(json: UnsafePointer<CChar>, json_len: UInt32, bufsize: Int = 2 << 18) -> NdbNote? {
@@ -584,14 +638,12 @@ extension NdbNote {
     func is_hellthread(max_pubkeys: Int) -> Bool {
         switch known_kind {
         case .text, .boost, .like, .zap:
-            // TODO: Implement proper set counting from References
-            return false
+            return Set(referenced_pubkeys).count > max_pubkeys
         default:
             return false
         }
     }
 
-    // TODO: References iterator
     public var referenced_ids: References<NoteId> {
         References<NoteId>(tags: self.tags)
     }
@@ -624,8 +676,8 @@ extension NdbNote {
         References<MuteItem>(tags: self.tags)
     }
     
-    public var referenced_comment_items: References<CommentItem> {
-        References<CommentItem>(tags: self.tags)
+    public var referenced_comment_items: References<CommentItemRef> {
+        References<CommentItemRef>(tags: self.tags)
     }
 
     public var references: References<RefId> {
@@ -682,34 +734,23 @@ extension NdbNote {
         return content
     }
 
-    // NDBTODO: switch this to operating on bytes not strings
+    // Decryption is computed on-demand, not cached
     func decrypted(keypair: Keypair) -> String? {
-        if let decrypted_content {
-            return decrypted_content
-        }
-
         let our_pubkey = keypair.pubkey
 
-        // NDBTODO: don't hex encode
         var pubkey = self.pubkey
         // This is our DM, we need to use the pubkey of the person we're talking to instead
-
         if our_pubkey == pubkey, let pk = self.referenced_pubkeys.first {
             pubkey = pk
         }
 
-        // NDBTODO: pass data to pubkey
-        let dec = decrypt_dm(keypair.privkey, pubkey: pubkey, content: self.content, encoding: .base64)
-        self.decrypted_content = dec
-
-        return dec
+        return decrypt_dm(keypair.privkey, pubkey: pubkey, content: self.content, encoding: .base64)
     }
 
     public func direct_replies() -> NoteId? {
         return thread_reply()?.reply.note_id
     }
 
-    // NDBTODO: just use Id
     public func thread_id() -> NoteId {
         guard let root = self.thread_reply()?.root else {
             return self.id

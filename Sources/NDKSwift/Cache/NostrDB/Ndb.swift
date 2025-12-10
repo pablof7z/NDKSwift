@@ -537,6 +537,22 @@ class Ndb {
         return note_ids
     }
 
+    // MARK: - Query API
+
+    /// Execute a nostrdb query using filters and return matching note keys
+    /// - Parameters:
+    ///   - filters: Array of NdbFilter to query with
+    ///   - maxResults: Maximum number of results to return (default: 500)
+    /// - Returns: Array of NoteKey references for matching events
+    /// - Throws: NdbStreamError if transaction or query fails
+    func query(filters: [NdbFilter], maxResults: Int = 500) throws -> [NoteKey] {
+        guard let txn = NdbTxn<Void>(ndb: self) else {
+            throw NdbStreamError.ndbClosed
+        }
+
+        return try query(with: txn, filters: filters, maxResults: maxResults)
+    }
+
     func lookup_note_by_key(_ key: NoteKey) -> NdbTxn<NdbNote?>? {
         return NdbTxn(ndb: self) { txn in
             lookup_note_by_key_with_txn(key, txn: txn)
@@ -942,79 +958,6 @@ class Ndb {
         }
     }
     
-    // TODO: Re-enable this after NostrFilter is available from NDK layer
-    /*
-    private func waitWithoutTimeout(for noteId: NdbNoteId) async throws(NdbLookupError) -> NdbTxn<NdbNote>? {
-        do {
-            for try await item in try self.subscribe(filters: [NostrFilter(ids: [noteId])]) {
-                switch item {
-                case .eose:
-                    continue
-                case .event(let noteKey):
-                    guard let txn = NdbTxn(ndb: self) else { throw NdbLookupError.cannotOpenTransaction }
-                    guard let note = self.lookup_note_by_key_with_txn(noteKey, txn: txn) else { throw NdbLookupError.internalInconsistency }
-                    if note.id == noteId {
-                        Log.debug("ndb wait: %d has matching id %s. Returning transaction", for: .ndb, noteKey, noteId.hex())
-                        return NdbTxn<NdbNote>.pure(ndb: self, val: note)
-                    }
-                }
-            }
-        }
-        catch {
-            if let error = error as? NdbStreamError { throw NdbLookupError.streamError(error) }
-            else if let error = error as? NdbLookupError { throw error }
-            else { throw .internalInconsistency }
-        }
-        return nil
-    }
-    */
-    
-    // TODO: Re-enable this after NostrFilter is available from NDK layer
-    /*
-    func waitFor(noteId: NdbNoteId, timeout: TimeInterval = 10) async throws(NdbLookupError) -> NdbTxn<NdbNote>? {
-        do {
-            return try await withCheckedThrowingContinuation({ continuation in
-                var done = false
-                let waitTask = Task {
-                    do {
-                        Log.debug("ndb_wait: Waiting for %s", for: .ndb, noteId.hex())
-                        let result = try await self.waitWithoutTimeout(for: noteId)
-                        if !done {
-                            Log.debug("ndb_wait: Found %s", for: .ndb, noteId.hex())
-                            continuation.resume(returning: result)
-                            done = true
-                        }
-                    }
-                    catch {
-                        if Task.isCancelled {
-                            return  // the timeout task will handle throwing the timeout error
-                        }
-                        if !done {
-                            Log.debug("ndb_wait: Error on %s: %s", for: .ndb, noteId.hex(), error.localizedDescription)
-                            continuation.resume(throwing: error)
-                            done = true
-                        }
-                    }
-                }
-
-                let timeoutTask = Task {
-                    try await Task.sleep(for: .seconds(Int(timeout)))
-                    if !done {
-                        Log.debug("ndb_wait: Timeout on %s. Cancelling wait task…", for: .ndb, noteId.hex())
-                        done = true
-                        print("ndb_wait: throwing timeout error")
-                        continuation.resume(throwing: NdbLookupError.timeout)
-                    }
-                    waitTask.cancel()
-                }
-            })
-        }
-        catch {
-            if let error = error as? NdbLookupError { throw error }
-            else { throw .internalInconsistency }
-        }
-    }
-    */
     
     /// Determines if a given note was seen on a specific relay URL
     func was(noteKey: NoteKey, seenOn relayUrl: String, txn: SafeNdbTxn<()>? = nil) throws -> Bool {

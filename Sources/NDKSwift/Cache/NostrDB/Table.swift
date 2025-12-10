@@ -77,9 +77,13 @@ public struct Table {
   /// - Parameter offset: Offset of the string
   public func directString(at offset: Int32) -> String? {
     var offset = offset
+    guard offset >= 0, offset < bb.capacity else { return nil }
     offset += bb.read(def: Int32.self, position: Int(offset))
+    guard offset >= 0, offset < bb.capacity else { return nil }
     let count = bb.read(def: Int32.self, position: Int(offset))
+    guard count >= 0 else { return nil }
     let position = Int(offset) + MemoryLayout<Int32>.size
+    guard position >= 0, position + Int(count) <= bb.capacity else { return nil }
     return bb.readString(at: position, count: Int(count))
   }
 
