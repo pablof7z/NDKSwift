@@ -56,12 +56,12 @@ struct WalletSetupView: View {
             // Icon
             ZStack {
                 Circle()
-                    .fill(OlasTheme.Colors.deepTeal.opacity(0.1))
+                    .fill(OlasTheme.Colors.brandPrimary.opacity(0.1))
                     .frame(width: 120, height: 120)
 
                 Image(systemName: "creditcard.fill")
                     .font(.system(size: 48))
-                    .foregroundStyle(OlasTheme.Colors.deepTeal)
+                    .foregroundStyle(OlasTheme.Colors.brandPrimary)
             }
 
             // Title
@@ -115,7 +115,7 @@ struct WalletSetupView: View {
                     .padding(.vertical, 16)
             }
             .buttonStyle(.borderedProminent)
-            .tint(OlasTheme.Colors.deepTeal)
+            .tint(OlasTheme.Colors.brandPrimary)
             .padding(.horizontal, 24)
             .padding(.bottom, 32)
         }
@@ -292,7 +292,7 @@ struct WalletSetupView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(OlasTheme.Colors.deepTeal)
+                .tint(OlasTheme.Colors.brandPrimary)
                 .disabled(isSettingUp)
 
                 Button {
@@ -345,7 +345,7 @@ private struct FeatureRow: View {
         HStack(spacing: 16) {
             Image(systemName: icon)
                 .font(.title2)
-                .foregroundStyle(OlasTheme.Colors.deepTeal)
+                .foregroundStyle(OlasTheme.Colors.brandPrimary)
                 .frame(width: 32)
 
             VStack(alignment: .leading, spacing: 2) {

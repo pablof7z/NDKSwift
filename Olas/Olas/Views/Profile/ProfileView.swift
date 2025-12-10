@@ -271,7 +271,7 @@ struct ProfileHeroSection: View {
 
     private var defaultBannerGradient: some View {
         LinearGradient(
-            colors: [OlasTheme.Colors.deepTeal, OlasTheme.Colors.oceanBlue],
+            colors: [OlasTheme.Colors.gradientStart, OlasTheme.Colors.gradientEnd],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
@@ -403,12 +403,12 @@ struct ProfileBioSection: View {
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(.white)
                         .frame(width: 16, height: 16)
-                        .background(OlasTheme.Colors.oceanBlue)
+                        .background(OlasTheme.Colors.brandSecondary)
                         .clipShape(Circle())
 
                     Text(nip05)
                         .font(.system(size: 14))
-                        .foregroundStyle(OlasTheme.Colors.oceanBlue)
+                        .foregroundStyle(OlasTheme.Colors.brandSecondary)
                 }
             }
 
@@ -420,7 +420,7 @@ struct ProfileBioSection: View {
                             .font(.system(size: 14, weight: .semibold))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
-                            .background(OlasTheme.Colors.oceanBlue)
+                            .background(OlasTheme.Colors.brandSecondary)
                             .foregroundStyle(.white)
                             .cornerRadius(12)
                     }
@@ -456,9 +456,9 @@ struct ProfileBioSection: View {
                             .frame(width: 44, height: 44)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
-                                    .stroke(isMuted ? OlasTheme.Colors.oceanBlue : .secondary.opacity(0.3), lineWidth: 1.5)
+                                    .stroke(isMuted ? OlasTheme.Colors.brandSecondary : .secondary.opacity(0.3), lineWidth: 1.5)
                             )
-                            .foregroundStyle(isMuted ? OlasTheme.Colors.oceanBlue : .primary)
+                            .foregroundStyle(isMuted ? OlasTheme.Colors.brandSecondary : .primary)
                     }
                 }
             }
@@ -505,7 +505,7 @@ struct ProfileCollectionsSection: View {
                     } label: {
                         Text("See All")
                             .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(OlasTheme.Colors.oceanBlue)
+                            .foregroundStyle(OlasTheme.Colors.brandSecondary)
                     }
                 }
             }
@@ -587,7 +587,7 @@ struct CollectionItem: View {
                     Circle()
                         .stroke(
                             LinearGradient(
-                                colors: [OlasTheme.Colors.oceanBlue, OlasTheme.Colors.seafoam],
+                                colors: [OlasTheme.Colors.gradientEnd, Color.secondary],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             ),
@@ -730,7 +730,7 @@ struct ProfileTabsBar: View {
 
                         // Underline indicator
                         Rectangle()
-                            .fill(selectedTab == tab ? OlasTheme.Colors.oceanBlue : .clear)
+                            .fill(selectedTab == tab ? OlasTheme.Colors.brandSecondary : .clear)
                             .frame(height: 2)
                             .padding(.horizontal, 20)
                     }
@@ -835,7 +835,7 @@ struct PostGridCell: View {
                 } else if isVideo {
                     // Video without thumbnail - show gradient with play icon
                     LinearGradient(
-                        colors: [OlasTheme.Colors.deepTeal.opacity(0.8), OlasTheme.Colors.oceanBlue.opacity(0.8)],
+                        colors: [OlasTheme.Colors.gradientStart.opacity(0.8), OlasTheme.Colors.gradientEnd.opacity(0.8)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )

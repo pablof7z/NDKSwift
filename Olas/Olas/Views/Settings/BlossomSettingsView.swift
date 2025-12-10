@@ -20,7 +20,7 @@ struct BlossomSettingsView: View {
                     Spacer()
                     Image(systemName: "externaldrive.badge.icloud")
                         .font(.title2)
-                        .foregroundStyle(OlasTheme.Colors.deepTeal)
+                        .foregroundStyle(OlasTheme.Colors.brandPrimary)
                 }
             }
 
@@ -43,7 +43,7 @@ struct BlossomSettingsView: View {
                 } label: {
                     HStack {
                         Image(systemName: "plus.circle.fill")
-                            .foregroundStyle(OlasTheme.Colors.deepTeal)
+                            .foregroundStyle(OlasTheme.Colors.brandPrimary)
                         Text("Add Server")
                     }
                 }
@@ -98,7 +98,7 @@ struct BlossomServerRow: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(OlasTheme.Colors.deepTeal)
+                        .background(OlasTheme.Colors.brandPrimary)
                         .cornerRadius(4)
                 }
             }
@@ -186,7 +186,7 @@ struct AddBlossomServerSheet: View {
                                     Spacer()
                                     if normalizedUrl == server {
                                         Image(systemName: "checkmark")
-                                            .foregroundStyle(OlasTheme.Colors.deepTeal)
+                                            .foregroundStyle(OlasTheme.Colors.brandPrimary)
                                     }
                                 }
                             }

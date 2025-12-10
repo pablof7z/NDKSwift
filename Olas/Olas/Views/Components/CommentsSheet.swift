@@ -72,7 +72,7 @@ struct CommentsSheet: View {
                 Image(systemName: "arrow.up.circle.fill")
                     .font(.system(size: 32))
                     .foregroundStyle(
-                        newComment.isEmpty ? .secondary : OlasTheme.Colors.deepTeal
+                        newComment.isEmpty ? .secondary : OlasTheme.Colors.brandPrimary
                     )
             }
             .disabled(newComment.isEmpty || isSending)

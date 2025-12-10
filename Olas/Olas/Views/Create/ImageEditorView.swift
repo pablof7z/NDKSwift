@@ -175,7 +175,7 @@ struct ImageEditorView: View {
                     .fontWeight(.semibold)
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [OlasTheme.Colors.deepTeal, OlasTheme.Colors.oceanBlue],
+                            colors: [OlasTheme.Colors.gradientStart, OlasTheme.Colors.gradientEnd],
                             startPoint: .leading,
                             endPoint: .trailing
                         )
@@ -405,7 +405,7 @@ struct ImageEditorView: View {
                     }
 
                     Slider(value: $filterIntensity, in: 0...1)
-                        .tint(OlasTheme.Colors.deepTeal)
+                        .tint(OlasTheme.Colors.brandPrimary)
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
@@ -453,7 +453,7 @@ struct ImageEditorView: View {
                     ),
                     in: selectedAdjustment.range
                 )
-                .tint(OlasTheme.Colors.deepTeal)
+                .tint(OlasTheme.Colors.brandPrimary)
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
@@ -800,7 +800,7 @@ private struct AspectRatioButton: View {
         Button(action: onTap) {
             VStack(spacing: 8) {
                 RoundedRectangle(cornerRadius: 4)
-                    .stroke(isSelected ? OlasTheme.Colors.deepTeal : Color.secondary, lineWidth: 2)
+                    .stroke(isSelected ? OlasTheme.Colors.brandPrimary : Color.secondary, lineWidth: 2)
                     .frame(width: ratioWidth, height: ratioHeight)
 
                 Text(ratio.rawValue)
@@ -811,13 +811,13 @@ private struct AspectRatioButton: View {
             .padding(.vertical, 12)
             .background(
                 isSelected
-                    ? OlasTheme.Colors.deepTeal.opacity(0.15)
+                    ? OlasTheme.Colors.brandPrimary.opacity(0.15)
                     : Color(white: 0.15)
             )
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? OlasTheme.Colors.deepTeal : Color.clear, lineWidth: 2)
+                    .stroke(isSelected ? OlasTheme.Colors.brandPrimary : Color.clear, lineWidth: 2)
             )
         }
     }
@@ -868,7 +868,7 @@ private struct FilterThumbnail: View {
                 .cornerRadius(12)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(isSelected ? OlasTheme.Colors.deepTeal : Color.clear, lineWidth: 3)
+                        .stroke(isSelected ? OlasTheme.Colors.brandPrimary : Color.clear, lineWidth: 3)
                 )
 
                 Text(filter.rawValue)
@@ -986,11 +986,11 @@ private struct AdjustmentButton: View {
                 ZStack {
                     Image(systemName: adjustment.icon)
                         .font(.system(size: 20))
-                        .foregroundStyle(isSelected ? OlasTheme.Colors.deepTeal : .secondary)
+                        .foregroundStyle(isSelected ? OlasTheme.Colors.brandPrimary : .secondary)
 
                     if hasValue {
                         Circle()
-                            .fill(OlasTheme.Colors.deepTeal)
+                            .fill(OlasTheme.Colors.brandPrimary)
                             .frame(width: 6, height: 6)
                             .offset(x: 12, y: -10)
                     }
@@ -1005,13 +1005,13 @@ private struct AdjustmentButton: View {
             .padding(.vertical, 12)
             .background(
                 isSelected
-                    ? OlasTheme.Colors.deepTeal.opacity(0.15)
+                    ? OlasTheme.Colors.brandPrimary.opacity(0.15)
                     : Color(white: 0.15)
             )
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? OlasTheme.Colors.deepTeal : Color.clear, lineWidth: 2)
+                    .stroke(isSelected ? OlasTheme.Colors.brandPrimary : Color.clear, lineWidth: 2)
             )
         }
     }

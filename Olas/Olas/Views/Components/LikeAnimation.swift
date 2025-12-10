@@ -215,7 +215,7 @@ struct ZapButton: View {
                             .padding(.vertical, 14)
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(OlasTheme.Colors.deepTeal)
+                    .tint(OlasTheme.Colors.brandPrimary)
                     .padding(.horizontal)
                     .padding(.bottom, 32)
                 } else {

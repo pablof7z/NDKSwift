@@ -200,7 +200,7 @@ struct SparkWalletSettingsView: View {
             } label: {
                 HStack {
                     Image(systemName: "plus.circle.fill")
-                        .foregroundStyle(OlasTheme.Colors.deepTeal)
+                        .foregroundStyle(OlasTheme.Colors.brandPrimary)
                     Text("Create New Wallet")
                 }
             }
@@ -275,7 +275,7 @@ struct CreateSparkWalletView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(OlasTheme.Colors.deepTeal)
+                        .background(OlasTheme.Colors.brandPrimary)
                         .foregroundStyle(.white)
                         .cornerRadius(12)
                     }

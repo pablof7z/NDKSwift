@@ -33,7 +33,7 @@ struct AppearanceSettingsView: View {
                             Spacer()
                             if theme == themeOption {
                                 Image(systemName: "checkmark")
-                                    .foregroundStyle(OlasTheme.Colors.deepTeal)
+                                    .foregroundStyle(OlasTheme.Colors.brandPrimary)
                             }
                         }
                     }
@@ -86,7 +86,7 @@ struct ThemePreviewCard: View {
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(isSelected ? OlasTheme.Colors.deepTeal : .gray.opacity(0.3), lineWidth: 2)
+                        .stroke(isSelected ? OlasTheme.Colors.brandPrimary : .gray.opacity(0.3), lineWidth: 2)
                 )
                 .shadow(radius: 2)
 

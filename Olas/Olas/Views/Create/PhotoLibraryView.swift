@@ -37,7 +37,7 @@ struct PhotoLibraryView: View {
                 .fontWeight(.semibold)
                 .foregroundStyle(
                     LinearGradient(
-                        colors: [OlasTheme.Colors.deepTeal, OlasTheme.Colors.oceanBlue],
+                        colors: [OlasTheme.Colors.gradientStart, OlasTheme.Colors.gradientEnd],
                         startPoint: .leading,
                         endPoint: .trailing
                     )
@@ -221,7 +221,7 @@ private struct PhotoGridItem: View {
 
                 if isSelected {
                     Rectangle()
-                        .stroke(OlasTheme.Colors.deepTeal, lineWidth: 3)
+                        .stroke(OlasTheme.Colors.brandPrimary, lineWidth: 3)
 
                     VStack {
                         HStack {
@@ -232,7 +232,7 @@ private struct PhotoGridItem: View {
                                 .frame(width: 22, height: 22)
                                 .background(
                                     LinearGradient(
-                                        colors: [OlasTheme.Colors.deepTeal, OlasTheme.Colors.oceanBlue],
+                                        colors: [OlasTheme.Colors.gradientStart, OlasTheme.Colors.gradientEnd],
                                         startPoint: .topLeading,
                                         endPoint: .bottomTrailing
                                     )

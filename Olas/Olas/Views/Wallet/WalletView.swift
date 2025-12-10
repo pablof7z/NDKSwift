@@ -89,7 +89,7 @@ struct WalletView: View {
                             } label: {
                                 Text("See All")
                                     .font(.subheadline)
-                                    .foregroundStyle(OlasTheme.Colors.deepTeal)
+                                    .foregroundStyle(OlasTheme.Colors.brandPrimary)
                             }
                         }
                     }

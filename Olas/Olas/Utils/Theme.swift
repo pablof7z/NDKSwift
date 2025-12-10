@@ -15,11 +15,6 @@ enum OlasTheme {
         public static let gradientStart = Color(hex: "F97316")
         public static let gradientEnd = Color(hex: "EA580C")
 
-        // Legacy aliases - mapped to new brand colors
-        public static let deepTeal = Color(hex: "F97316")
-        public static let oceanBlue = Color(hex: "EA580C")
-        public static let seafoam = Color.secondary
-
         // Feedback colors
         public static let zapGold = Color(hex: "FFB800")
         public static let heartRed = Color(hex: "FF4757")
