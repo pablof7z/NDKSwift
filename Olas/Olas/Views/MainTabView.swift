@@ -12,6 +12,7 @@ struct MainTabView: View {
     @State private var selectedTab = 0
     @State private var hasNotifications = false
     @State private var showCreatePost = false
+    @State private var sparkBalance: Int64 = 0
 
     private let ndk: NDK
 
@@ -57,10 +58,18 @@ struct MainTabView: View {
                 }
             }
             .tabItem {
-                Label("Wallet", systemImage: selectedTab == 3 ? "creditcard.fill" : "creditcard")
+                WalletTabLabel(
+                    sparkBalance: sparkBalance,
+                    cashuBalance: walletViewModel.balance,
+                    isSparkConnected: sparkWalletManager.connectionStatus == .connected,
+                    isSelected: selectedTab == 3
+                )
             }
             .tag(3)
             .accessibilityIdentifier("walletTab")
+            .task {
+                await loadSparkBalance()
+            }
 
             // Profile
             NavigationStack {
@@ -95,5 +104,58 @@ struct MainTabView: View {
         .environment(walletViewModel)
         .environment(muteListManager)
         .environment(collectionsManager)
+    }
+
+    private func loadSparkBalance() async {
+        guard let wallet = sparkWalletManager.sparkWallet else {
+            sparkBalance = 0
+            return
+        }
+
+        do {
+            let info = try await wallet.getInfo()
+            sparkBalance = info.balanceSats
+        } catch {
+            print("[Spark] Failed to load balance: \(error)")
+            sparkBalance = 0
+        }
+    }
+}
+
+// MARK: - Wallet Tab Label
+
+/// Shows balance instead of wallet icon when user has funds (like Cash App)
+private struct WalletTabLabel: View {
+    let sparkBalance: Int64
+    let cashuBalance: Int64
+    let isSparkConnected: Bool
+    let isSelected: Bool
+
+    private var totalBalance: Int64 {
+        isSparkConnected ? sparkBalance : cashuBalance
+    }
+
+    private var formattedBalance: String {
+        let sats = totalBalance
+        if sats >= 1_000_000 {
+            return String(format: "%.1fM", Double(sats) / 1_000_000)
+        } else if sats >= 10_000 {
+            return String(format: "%.0fK", Double(sats) / 1_000)
+        } else if sats >= 1_000 {
+            return String(format: "%.1fK", Double(sats) / 1_000)
+        }
+        return "\(sats)"
+    }
+
+    var body: some View {
+        if totalBalance > 0 {
+            Label {
+                Text(formattedBalance)
+            } icon: {
+                Image(systemName: "bitcoinsign.circle.fill")
+            }
+        } else {
+            Label("Wallet", systemImage: isSelected ? "creditcard.fill" : "creditcard")
+        }
     }
 }

@@ -37,13 +37,14 @@ struct OlasApp: App {
         let newNDK = NDK(relayUrls: relayUrls)
 
         // Initialize NostrDB cache
-        let cachePath = FileManager.default
+        let cacheURL = FileManager.default
             .urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("olas_cache")
-            .path
 
         do {
-            let cache = try await NDKNostrDBCache(path: cachePath)
+            // Create cache directory if it doesn't exist
+            try FileManager.default.createDirectory(at: cacheURL, withIntermediateDirectories: true)
+            let cache = try await NDKNostrDBCache(path: cacheURL.path)
             newNDK.cache = cache
         } catch {
             print("Failed to initialize cache: \(error)")

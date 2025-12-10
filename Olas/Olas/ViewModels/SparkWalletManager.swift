@@ -6,13 +6,10 @@ import NDKSwift
 @Observable
 final class SparkWalletManager {
     public private(set) var connectionStatus: SparkConnectionStatus = .disconnected
-    public private(set) var balance: Int64 = 0
-    public private(set) var lightningAddress: String?
     public private(set) var isLoading = false
-    public private(set) var payments: [SparkPayment] = []
     public var error: String?
 
-    // Fiat conversion
+    // Fiat display preferences
     public private(set) var fiatRate: Double?
     public var preferredCurrency: String {
         didSet {
@@ -35,28 +32,19 @@ final class SparkWalletManager {
     @ObservationIgnored
     private let ndk: NDK
 
-    // Cached formatters
-    @ObservationIgnored
-    private let satsFormatter: NumberFormatter = {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        return formatter
-    }()
-    @ObservationIgnored
-    private let fiatFormatter: NumberFormatter = {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.maximumFractionDigits = 2
-        return formatter
-    }()
-
     public init(ndk: NDK) {
         self.ndk = ndk
         self.preferredCurrency = UserDefaults.standard.string(forKey: "spark_fiat_currency") ?? "USD"
         self.showFiatAsPrimary = UserDefaults.standard.bool(forKey: "spark_show_fiat_primary")
     }
 
-    // MARK: - Public Methods
+    // MARK: - Wallet Access
+
+    public var sparkWallet: SparkWallet? {
+        wallet
+    }
+
+    // MARK: - Connection Management
 
     /// Attempt to restore wallet from keychain on app launch
     public func restoreWalletIfExists() async {
@@ -149,105 +137,10 @@ final class SparkWalletManager {
         wallet = nil
         connectionStatus = .disconnected
         fiatRate = nil
-        balance = 0
-        lightningAddress = nil
 
         if clearMnemonic {
             KeychainService.delete(for: .sparkMnemonic)
         }
-    }
-
-    /// Sync wallet with network
-    public func sync() async {
-        guard let wallet = wallet else { return }
-
-        isLoading = true
-        defer { isLoading = false }
-
-        do {
-            try await wallet.sync()
-            await refreshInfo()
-        } catch {
-            self.error = error.localizedDescription
-        }
-    }
-
-    /// Refresh balance, info, and payments
-    public func refreshInfo() async {
-        guard let wallet = wallet else { return }
-
-        do {
-            let info = try await wallet.getInfo()
-            balance = info.balanceSats
-            lightningAddress = try? await wallet.getLightningAddress()
-
-            // Fetch recent payments
-            payments = try await wallet.listPayments(limit: 20)
-        } catch {
-            self.error = error.localizedDescription
-        }
-    }
-
-    /// Parse a payment input (invoice, address, etc.)
-    public func parseInput(_ input: String) async throws -> SparkParsedInput {
-        guard let wallet = wallet else {
-            throw SparkWalletError.notConnected
-        }
-        return try await wallet.parseInput(input)
-    }
-
-    /// Prepare a payment to see fees before sending
-    public func preparePayment(input: String, amount: Int64?) async throws -> SparkPreparedPayment {
-        guard let wallet = wallet else {
-            throw SparkWalletError.notConnected
-        }
-        return try await wallet.preparePayment(input: input, amount: amount)
-    }
-
-    /// Send a prepared payment
-    public func sendPreparedPayment(_ prepared: SparkPreparedPayment) async throws {
-        guard let wallet = wallet else {
-            throw SparkWalletError.notConnected
-        }
-
-        isLoading = true
-        defer { isLoading = false }
-
-        _ = try await wallet.sendPreparedPayment(prepared)
-        await refreshInfo()
-    }
-
-    /// Register a lightning address
-    public func registerLightningAddress(_ address: String) async throws {
-        guard let wallet = wallet else {
-            throw SparkWalletError.notConnected
-        }
-
-        try await wallet.registerLightningAddress(address)
-        lightningAddress = "\(address)@spark.money"
-    }
-
-    /// Create a Lightning invoice to receive payment
-    public func createInvoice(amountSats: Int64?, description: String?) async throws -> String {
-        guard let wallet = wallet else {
-            throw SparkWalletError.notConnected
-        }
-
-        return try await wallet.createInvoice(amountSats: amountSats, description: description)
-    }
-
-    /// Pay a Lightning invoice
-    public func pay(invoice: String) async throws {
-        guard let wallet = wallet else {
-            throw SparkWalletError.notConnected
-        }
-
-        isLoading = true
-        defer { isLoading = false }
-
-        let request = LightningInvoiceRequest(invoice: invoice, amountSats: 0, recipient: "unknown")
-        _ = try await wallet.fulfill(request)
-        await refreshInfo()
     }
 
     /// Check if wallet has stored mnemonic (can restore)
@@ -260,10 +153,10 @@ final class SparkWalletManager {
         KeychainService.load(for: .sparkMnemonic)
     }
 
-    // MARK: - Fiat Conversion
+    // MARK: - Fiat Rate
 
     /// Refresh the fiat exchange rate
-    public func refreshFiatRate() async {
+    private func refreshFiatRate() async {
         guard let wallet = wallet else { return }
 
         do {
@@ -271,33 +164,6 @@ final class SparkWalletManager {
         } catch {
             // Silent fail - fiat display is optional
         }
-    }
-
-    /// Convert sats to fiat value
-    public func satsToFiat(_ sats: Int64) -> Double? {
-        guard let rate = fiatRate else { return nil }
-        return SatsConverter.satsToFiat(sats, btcRate: rate)
-    }
-
-    /// Convert fiat to sats
-    public func fiatToSats(_ fiat: Double) -> Int64? {
-        guard let rate = fiatRate, rate > 0 else { return nil }
-        return SatsConverter.fiatToSats(fiat, btcRate: rate)
-    }
-
-    /// Format sats with commas
-    public func formatSats(_ sats: Int64) -> String {
-        SatsConverter.formatSats(sats, formatter: satsFormatter)
-    }
-
-    /// Format fiat value with currency symbol
-    public func formatFiat(_ value: Double) -> String {
-        SatsConverter.formatFiat(value, currencyCode: preferredCurrency, formatter: fiatFormatter)
-    }
-
-    /// Toggle between sats and fiat as primary display
-    public func togglePrimaryDisplay() {
-        showFiatAsPrimary.toggle()
     }
 
     // MARK: - Private Helpers
@@ -308,8 +174,7 @@ final class SparkWalletManager {
         // Register with ZapManager for payments
         await ndk.zapManager.register(provider: wallet)
 
-        // Fetch initial info and fiat rate
-        await refreshInfo()
+        // Fetch initial fiat rate
         await refreshFiatRate()
 
         // Start listening for events
@@ -345,9 +210,8 @@ final class SparkWalletManager {
         case .disconnected:
             connectionStatus = .disconnected
         case .synced:
-            await refreshInfo()
+            break
         case .paymentSucceeded(let amount):
-            await refreshInfo()
             print("[Spark] Payment succeeded: \(amount) sats")
         case .paymentFailed(let reason):
             error = "Payment failed: \(reason)"
