@@ -86,7 +86,7 @@ struct DepositView: View {
                             .background(
                                 RoundedRectangle(cornerRadius: 20)
                                     .fill(amount == "\(suggestedAmount)"
-                                          ? OlasTheme.Colors.deepTeal
+                                          ? OlasTheme.Colors.brandPrimary
                                           : Color.secondary.opacity(0.1))
                             )
                             .foregroundStyle(amount == "\(suggestedAmount)" ? .white : .primary)
@@ -131,7 +131,7 @@ struct DepositView: View {
                 }
             }
             .buttonStyle(.borderedProminent)
-            .tint(OlasTheme.Colors.deepTeal)
+            .tint(OlasTheme.Colors.brandPrimary)
             .disabled(!isValidAmount || isGeneratingInvoice)
             .padding(.horizontal, 24)
             .padding(.bottom, 32)
@@ -181,7 +181,7 @@ struct DepositView: View {
                         .padding(.vertical, 16)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(OlasTheme.Colors.deepTeal)
+                .tint(OlasTheme.Colors.brandPrimary)
                 .padding(.horizontal, 24)
             } else {
                 // QR Code

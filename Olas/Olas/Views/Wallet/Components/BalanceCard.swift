@@ -75,7 +75,7 @@ struct BalanceCard: View {
                     Label("Deposit", systemImage: "arrow.down.circle.fill")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(WalletActionButtonStyle(color: OlasTheme.Colors.deepTeal))
+                .buttonStyle(WalletActionButtonStyle(color: OlasTheme.Colors.brandPrimary))
 
                 Button(action: onSend) {
                     Label("Send", systemImage: "arrow.up.circle.fill")

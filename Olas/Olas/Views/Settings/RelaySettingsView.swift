@@ -44,7 +44,7 @@ struct RelaySettingsView: View {
                     } label: {
                         HStack {
                             Image(systemName: "plus.circle.fill")
-                                .foregroundStyle(OlasTheme.Colors.deepTeal)
+                                .foregroundStyle(OlasTheme.Colors.brandPrimary)
                             Text("Add Relay")
                         }
                     }
@@ -158,7 +158,7 @@ struct AddRelayView: View {
                                 Spacer()
                                 if relayUrl == relay {
                                     Image(systemName: "checkmark")
-                                        .foregroundStyle(OlasTheme.Colors.deepTeal)
+                                        .foregroundStyle(OlasTheme.Colors.brandPrimary)
                                 }
                             }
                         }

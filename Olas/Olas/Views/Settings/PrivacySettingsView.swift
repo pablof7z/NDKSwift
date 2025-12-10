@@ -45,7 +45,7 @@ struct ComingSoonView: View {
         VStack(spacing: 16) {
             Image(systemName: "hammer.fill")
                 .font(.system(size: 60))
-                .foregroundStyle(OlasTheme.Colors.deepTeal)
+                .foregroundStyle(OlasTheme.Colors.brandPrimary)
 
             Text("\(feature)")
                 .font(.title2.bold())

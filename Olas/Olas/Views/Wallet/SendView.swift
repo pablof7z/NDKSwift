@@ -293,7 +293,7 @@ struct SendView: View {
                     .padding(.vertical, 16)
             }
             .buttonStyle(.borderedProminent)
-            .tint(OlasTheme.Colors.deepTeal)
+            .tint(OlasTheme.Colors.brandPrimary)
             .padding(.horizontal, 24)
             .padding(.bottom, 32)
         }

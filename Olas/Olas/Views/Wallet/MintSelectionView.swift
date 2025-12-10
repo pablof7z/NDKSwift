@@ -74,8 +74,8 @@ private struct MintRow: View {
                                 .font(.caption2.weight(.medium))
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(OlasTheme.Colors.deepTeal.opacity(0.1))
-                                .foregroundStyle(OlasTheme.Colors.deepTeal)
+                                .background(OlasTheme.Colors.brandPrimary.opacity(0.1))
+                                .foregroundStyle(OlasTheme.Colors.brandPrimary)
                                 .clipShape(Capsule())
                         }
 
@@ -97,7 +97,7 @@ private struct MintRow: View {
                 // Selection indicator
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.title2)
-                    .foregroundStyle(isSelected ? OlasTheme.Colors.deepTeal : Color.secondary)
+                    .foregroundStyle(isSelected ? OlasTheme.Colors.brandPrimary : Color.secondary)
             }
             .padding(.vertical, 8)
         }

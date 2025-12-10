@@ -18,7 +18,7 @@ struct OnboardingView: View {
 
             Text("Olas")
                 .font(.system(size: 48, weight: .bold, design: .rounded))
-                .foregroundStyle(OlasTheme.Colors.deepTeal)
+                .foregroundStyle(OlasTheme.Colors.brandPrimary)
                 .padding(.top, 16)
 
             Text("Share moments. Ride the wave.")
@@ -39,7 +39,7 @@ struct OnboardingView: View {
                         .padding()
                         .background(
                             LinearGradient(
-                                colors: [OlasTheme.Colors.deepTeal, OlasTheme.Colors.oceanBlue],
+                                colors: [OlasTheme.Colors.gradientStart, OlasTheme.Colors.gradientEnd],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )

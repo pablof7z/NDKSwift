@@ -108,7 +108,7 @@ struct CreatePostView: View {
                 Circle()
                     .fill(
                         LinearGradient(
-                            colors: [OlasTheme.Colors.deepTeal, OlasTheme.Colors.oceanBlue],
+                            colors: [OlasTheme.Colors.gradientStart, OlasTheme.Colors.gradientEnd],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -138,7 +138,7 @@ struct CreatePostView: View {
                         .trim(from: 0, to: publishingProgress)
                         .stroke(
                             LinearGradient(
-                                colors: [OlasTheme.Colors.deepTeal, OlasTheme.Colors.oceanBlue],
+                                colors: [OlasTheme.Colors.gradientStart, OlasTheme.Colors.gradientEnd],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             ),
