@@ -1,7 +1,7 @@
 import Foundation
 import NDKSwift
 import SwiftUI
-import Combine
+import Observation
 
 // MARK: - NDKProfileDataSource
 
@@ -16,7 +16,7 @@ import Combine
 /// ## Usage
 ///
 /// ```swift
-/// @StateObject private var profileDataSource = NDKProfileDataSource(
+/// @State private var profileDataSource = NDKProfileDataSource(
 ///     ndk: ndk,
 ///     pubkey: "npub1..."
 /// )
@@ -31,26 +31,27 @@ import Combine
 ///     }
 /// }
 /// ```
+@Observable
 @MainActor
-public final class NDKProfileDataSource: ObservableObject, @preconcurrency NDKSubscriptionProtocol {
+public final class NDKProfileDataSource: @preconcurrency NDKSubscriptionProtocol {
 
     // MARK: - Published Properties
 
     /// The user profile metadata, if available
-    @Published public private(set) var metadata: NDKUserMetadata?
+    public private(set) var metadata: NDKUserMetadata?
 
     /// Whether the data source is currently loading
-    @Published public private(set) var isLoading = false
+    public private(set) var isLoading = false
 
     /// Any error that occurred during loading
-    @Published public private(set) var error: Error?
+    public private(set) var error: Error?
 
     // MARK: - Private Properties
 
     private let ndk: NDK
     private let pubkey: String
     private let dataSource: NDKSubscription<NDKEvent>
-    private var cancellables = Set<AnyCancellable>()
+    @ObservationIgnored private var observationTask: Task<Void, Never>?
 
     // MARK: - Initialization
 
@@ -77,33 +78,30 @@ public final class NDKProfileDataSource: ObservableObject, @preconcurrency NDKSu
         observeProfileData()
     }
 
+    deinit {
+        observationTask?.cancel()
+    }
+
     // MARK: - Private Methods
 
     private func observeProfileData() {
-        // Map events to profile
-        dataSource.$data
-            .compactMap { events in
-                // Get the most recent profile event
-                events
-                    .sorted { $0.createdAt > $1.createdAt }
-                    .first
+        observationTask = Task { @MainActor in
+            for await event in dataSource.events {
+                // Update with the most recent profile event
+                if metadata == nil || event.createdAt > (metadata?.updatedAt ?? 0) {
+                    metadata = NDKUserMetadata(event: event)
+                }
             }
-            .compactMap { event in
-                // Create metadata wrapper
-                NDKUserMetadata(event: event)
+        }
+
+        // Observe loading and error states
+        Task { @MainActor in
+            while !Task.isCancelled {
+                isLoading = dataSource.isLoading
+                error = dataSource.error
+                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
             }
-            .receive(on: DispatchQueue.main)
-            .assign(to: &$metadata)
-
-        // Map loading state
-        dataSource.$isLoading
-            .receive(on: DispatchQueue.main)
-            .assign(to: &$isLoading)
-
-        // Map error state
-        dataSource.$error
-            .receive(on: DispatchQueue.main)
-            .assign(to: &$error)
+        }
     }
 
     // MARK: - Public Methods

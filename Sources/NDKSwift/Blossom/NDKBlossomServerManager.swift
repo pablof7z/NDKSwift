@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 
 /// Standard Blossom server information for discovery (kind 36363)
 public struct NDKBlossomServerInfo: Identifiable, Equatable, Hashable {
@@ -120,15 +121,17 @@ public struct NDKBlossomServerInfo: Identifiable, Equatable, Hashable {
 }
 
 /// Manages Blossom server lists for the current user and discovers public servers
-public class NDKBlossomServerManager: ObservableObject {
-    @Published public private(set) var userServers: [String] = []
-    @Published public private(set) var discoveredServers: [NDKBlossomServerInfo] = []
-    @Published public private(set) var isLoading = false
-    
+@Observable
+public class NDKBlossomServerManager {
+    private static let defaultServer = "https://blossom.primal.net"
+
+    public private(set) var userServers: [String] = [NDKBlossomServerManager.defaultServer]
+    public private(set) var discoveredServers: [NDKBlossomServerInfo] = []
+    public private(set) var isLoading = false
+
     private let ndk: NDK
-    private let defaultServer = "https://blossom.primal.net"
     private var discoveryTask: Task<Void, Never>?
-    
+
     public init(ndk: NDK) {
         self.ndk = ndk
         Task {
@@ -147,7 +150,7 @@ public class NDKBlossomServerManager: ObservableObject {
     public func loadUserServers() async {
         guard let signer = ndk.signer else {
             // Fallback to default server
-            userServers = [defaultServer]
+            userServers = [Self.defaultServer]
             return
         }
         
@@ -176,11 +179,11 @@ public class NDKBlossomServerManager: ObservableObject {
             
             if !foundEvent {
                 // No server list found, use default
-                userServers = [defaultServer]
+                userServers = [Self.defaultServer]
             }
         } catch {
             NDKLogger.log(.error, category: .general, "NDKBlossomServerManager - Failed to fetch user server list: \(error)")
-            userServers = [defaultServer]
+            userServers = [Self.defaultServer]
         }
     }
     
@@ -198,7 +201,7 @@ public class NDKBlossomServerManager: ObservableObject {
         }
         
         // Update servers list
-        userServers = serverList.isEmpty ? [defaultServer] : serverList
+        userServers = serverList.isEmpty ? [Self.defaultServer] : serverList
     }
     
     /// Add a server to the user's list
@@ -214,7 +217,7 @@ public class NDKBlossomServerManager: ObservableObject {
     public func removeUserServer(_ serverUrl: String) {
         userServers.removeAll { $0 == serverUrl }
         if userServers.isEmpty {
-            userServers = [defaultServer]
+            userServers = [Self.defaultServer]
         }
         Task {
             await publishUserServerList()
@@ -375,7 +378,7 @@ public class NDKBlossomServerManager: ObservableObject {
     
     /// Get all user servers for fallback upload attempts
     public var allUserServers: [String] {
-        userServers.isEmpty ? [defaultServer] : userServers
+        userServers.isEmpty ? [Self.defaultServer] : userServers
     }
     
     /// Get discovered servers that are free to use

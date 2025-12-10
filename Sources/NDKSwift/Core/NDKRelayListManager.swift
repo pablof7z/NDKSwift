@@ -1,12 +1,14 @@
 import Foundation
+import Observation
 
 /// Manages user relay lists with automatic persistence to Nostr (NIP-65, kind 10002)
 /// and local storage for default relays
-public class NDKRelayListManager: ObservableObject {
-    @Published public private(set) var relayList: NDKRelayList?
-    @Published public private(set) var isLoading = false
-    @Published public private(set) var error: Error?
-    
+@Observable
+public class NDKRelayListManager {
+    public private(set) var relayList: NDKRelayList?
+    public private(set) var isLoading = false
+    public private(set) var error: Error?
+
     private let ndk: NDK
     private let defaultRelays: [String]
     private let userDefaultsKey: String

@@ -1,5 +1,5 @@
 import Foundation
-import Combine
+import Observation
 
 /// Defines how the cache should be used for data requests
 public enum CachePolicy {
@@ -25,10 +25,11 @@ public enum RelayUpdate {
 
 /// Primary API for declarative data access in NDKSwift
 /// Automatically manages subscriptions, caching, and lifecycle
-public final class NDKSubscription<T>: ObservableObject {
-    @Published public private(set) var data: [T] = []
-    @Published public private(set) var isLoading: Bool = false
-    @Published public private(set) var error: Error?
+@Observable
+public final class NDKSubscription<T> {
+    public private(set) var data: [T] = []
+    public private(set) var isLoading: Bool = false
+    public private(set) var error: Error?
 
     /// AsyncStream for consuming events as they arrive
     public let events: AsyncStream<T>

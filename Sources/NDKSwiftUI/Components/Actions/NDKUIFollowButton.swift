@@ -315,8 +315,8 @@ private class FollowState: ObservableObject {
         )
 
         // Process contact list events
-        for await events in dataSource.$data.values {
-            await updateFollowState(from: events)
+        for await _ in dataSource.events {
+            await updateFollowState(from: dataSource.data)
         }
     }
 
