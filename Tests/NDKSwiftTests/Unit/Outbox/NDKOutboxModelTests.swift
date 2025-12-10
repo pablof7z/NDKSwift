@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 final class NDKOutboxModelTests: XCTestCase {
     var ndk: NDK!

@@ -1,5 +1,5 @@
 import SwiftUI
-import NDKSwift
+import NDKSwiftCore
 
 /// A view that renders markdown content with inline images
 struct NDKUIMarkdownImageView: View {

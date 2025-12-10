@@ -2,7 +2,8 @@
 // This would require refactoring production code to use protocols instead
 /*
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
+import NDKSwiftCashu
 import CashuSwift
 
 final class CrossMintTransferTests: XCTestCase {

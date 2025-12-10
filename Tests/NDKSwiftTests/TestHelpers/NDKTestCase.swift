@@ -1,5 +1,6 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
+import NDKSwiftSQLite
 
 /// Base test case class for all NDKSwift tests
 /// Provides common setup/teardown and utility methods

@@ -1,5 +1,5 @@
 import Foundation
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 /// Mock relay with outbox-specific testing capabilities  
 /// Provides a testable relay implementation for outbox testing

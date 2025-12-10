@@ -1,6 +1,7 @@
 import XCTest
 import GRDB
-@testable import NDKSwift
+@testable import NDKSwiftCore
+import NDKSwiftSQLite
 
 /// Integration tests for the new AsyncThrowingStream-based cache observation
 /// Tests the GRDB reactive implementation and cross-fingerprint event delivery

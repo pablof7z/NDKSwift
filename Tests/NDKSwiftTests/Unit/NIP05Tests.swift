@@ -1,6 +1,5 @@
 import XCTest
-@testable import NDKSwift
-import CashuSwift
+@testable import NDKSwiftCore
 
 final class NIP05Tests: XCTestCase {
     var ndk: NDK!
@@ -282,44 +281,29 @@ actor TestableCache: NDKCache {
         // No-op for testing
     }
     
-    func saveMintInfo(_ info: NDKMintInfo, url: String) async throws {
-        // No-op for testing
+    // MARK: - Generic Key-Value Store
+
+    private var kvStore: [String: [String: Data]] = [:]
+
+    func setValue(_ value: Data, forKey key: String, namespace: String) async throws {
+        if kvStore[namespace] == nil { kvStore[namespace] = [:] }
+        kvStore[namespace]?[key] = value
     }
-    
-    func getMintInfo(url: String) async -> NDKMintInfo? {
-        return nil
+
+    func getValue(forKey key: String, namespace: String) async -> Data? {
+        return kvStore[namespace]?[key]
     }
-    
-    func isMintInfoStale(url: String, maxAge: TimeInterval) async -> Bool {
-        return true
+
+    func deleteValue(forKey key: String, namespace: String) async throws {
+        kvStore[namespace]?.removeValue(forKey: key)
     }
-    
-    func invalidateMintCache(url: String) async throws {
-        // No-op for testing
-    }
-    
-    func saveKeyset(_ keyset: CashuSwift.Keyset, mintUrl: String) async throws {
-        // No-op for testing
-    }
-    
-    func saveKeysets(_ keysets: [CashuSwift.Keyset], mintUrl: String) async throws {
-        // No-op for testing
-    }
-    
-    func getKeyset(id: String) async -> CashuSwift.Keyset? {
-        return nil
-    }
-    
-    func getKeysets(mintUrl: String) async -> [CashuSwift.Keyset] {
-        return []
-    }
-    
-    func getActiveKeysets(mintUrl: String, unit: String) async -> [CashuSwift.Keyset] {
-        return []
-    }
-    
-    func areKeysetsStale(mintUrl: String, maxAge: TimeInterval) async -> Bool {
-        return true
+
+    func getValues(namespace: String, keyPrefix: String?) async -> [String: Data] {
+        guard let namespaceStore = kvStore[namespace] else { return [:] }
+        if let prefix = keyPrefix {
+            return namespaceStore.filter { $0.key.hasPrefix(prefix) }
+        }
+        return namespaceStore
     }
     
     func getEventsByTimeRange(from: Timestamp, to: Timestamp, filter: NDKFilter?) async throws -> [NDKEvent] {

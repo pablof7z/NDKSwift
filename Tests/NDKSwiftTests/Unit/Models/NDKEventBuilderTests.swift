@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 final class NDKEventBuilderTests: XCTestCase {
     private var ndk: NDK!

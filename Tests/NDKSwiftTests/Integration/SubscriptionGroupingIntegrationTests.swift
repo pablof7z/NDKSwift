@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 /// Integration tests for subscription grouping API
 /// Note: Full REQ message batching tests would require mock relays

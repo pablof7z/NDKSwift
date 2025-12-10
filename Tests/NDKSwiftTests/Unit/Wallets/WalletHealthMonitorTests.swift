@@ -1,6 +1,8 @@
 import XCTest
 import CashuSwift
-@testable import NDKSwift
+@testable import NDKSwiftCore
+import NDKSwiftCashu
+import NDKSwiftSQLite
 
 final class WalletHealthMonitorTests: XCTestCase {
     var ndk: NDK!

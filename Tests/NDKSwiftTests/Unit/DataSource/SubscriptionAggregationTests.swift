@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 // Test stubs for signature types used in subscription aggregation tests
 struct AggregationSignature: Equatable {

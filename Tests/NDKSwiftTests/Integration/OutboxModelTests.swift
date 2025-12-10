@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 // DISABLED: This test file needs to be rewritten as it attempts to mock final classes and actors
 // which is not possible in Swift. The tests should be rewritten to use proper test doubles

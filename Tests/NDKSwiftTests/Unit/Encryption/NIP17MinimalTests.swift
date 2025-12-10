@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 /// Minimal test without any dependencies on broken test infrastructure
 final class NIP17MinimalTest: XCTestCase {

@@ -1,4 +1,5 @@
-import NDKSwift
+import Foundation
+import NDKSwiftCore
 
 /// UI-related constants for consistent layout and styling across NDKSwiftUI components
 public enum UIConstants {

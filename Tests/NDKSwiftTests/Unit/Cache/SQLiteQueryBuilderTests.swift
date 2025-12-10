@@ -1,6 +1,7 @@
 import XCTest
 import GRDB
-@testable import NDKSwift
+@testable import NDKSwiftCore
+@testable import NDKSwiftSQLite
 
 final class SQLiteQueryBuilderTests: XCTestCase {
     

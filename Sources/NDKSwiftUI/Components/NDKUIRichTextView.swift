@@ -1,5 +1,5 @@
 import SwiftUI
-import NDKSwift
+import NDKSwiftCore
 
 /// A comprehensive rich text view that renders parsed Nostr content with reactive profile loading and interactive elements
 public struct NDKUIRichTextView: View {

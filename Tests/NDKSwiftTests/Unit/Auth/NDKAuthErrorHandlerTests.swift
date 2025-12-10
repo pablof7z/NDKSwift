@@ -1,5 +1,5 @@
 import XCTest
-@testable import NDKSwift
+@testable import NDKSwiftCore
 import LocalAuthentication
 
 final class NDKAuthErrorHandlerTests: XCTestCase {

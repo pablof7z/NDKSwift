@@ -12,24 +12,19 @@ let package = Package(
         .watchOS(.v10),
     ],
     products: [
-        // Products define the executables and libraries a package produces, making them visible to other packages.
-        .library(
-            name: "NDKSwift",
-            targets: ["NDKSwift"]
-        ),
-        .library(
-            name: "NDKSwiftUI",
-            targets: ["NDKSwiftUI"]
-        ),
+        .library(name: "NDKSwiftCore", targets: ["NDKSwiftCore"]),
+        .library(name: "NDKSwiftSQLite", targets: ["NDKSwiftSQLite"]),
+        .library(name: "NDKSwiftNostrDB", targets: ["NDKSwiftNostrDB"]),
+        .library(name: "NDKSwiftCashu", targets: ["NDKSwiftCashu"]),
+        .library(name: "NDKSwiftUI", targets: ["NDKSwiftUI"]),
     ],
     dependencies: [
         .package(url: "https://github.com/krzyzanowskim/CryptoSwift.git", from: "1.8.0"),
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "6.29.3"),
         .package(url: "https://github.com/pablof7z/CashuSwift.git", branch: "main"),
+        .package(url: "https://github.com/21-DOT-DEV/swift-secp256k1", from: "0.19.0"),
     ],
     targets: [
-        // Targets are the basic building blocks of a package, defining a module or a test suite.
-        // Targets can depend on other targets in this package and products from dependencies.
         .target(
             name: "NostrDB",
             dependencies: [],
@@ -43,17 +38,14 @@ let package = Package(
                 // C sources - root level
                 "mdb.c",
                 "midl.c",
-                // "hex.c", // Excluded - using hex.h inline implementations
                 "bolt11.c",
                 "hash_u5.c",
-                // "talstr.c", // Excluded - duplicates ccan/ccan/tal/str/str.c
                 "utf8.c",
                 "bech32.c",
                 "bech32_util.c",
                 "amount.c",
                 "error.c",
                 "node_id.c",
-                // "ndb.c", // Excluded - CLI tool with main() function
                 // C sources - src/
                 "src/nostrdb.c",
                 "src/block.c",
@@ -90,28 +82,47 @@ let package = Package(
             ]
         ),
         .target(
-            name: "NDKSwift",
+            name: "NDKSwiftCore",
             dependencies: [
-                "NostrDB",
                 .product(name: "CryptoSwift", package: "CryptoSwift"),
+                .product(name: "secp256k1", package: "swift-secp256k1"),
+            ]
+        ),
+        .target(
+            name: "NDKSwiftSQLite",
+            dependencies: [
+                "NDKSwiftCore",
                 .product(name: "GRDB", package: "GRDB.swift"),
+            ]
+        ),
+        .target(
+            name: "NDKSwiftNostrDB",
+            dependencies: [
+                "NDKSwiftCore",
+                "NostrDB",
+            ]
+        ),
+        .target(
+            name: "NDKSwiftCashu",
+            dependencies: [
+                "NDKSwiftCore",
                 .product(name: "CashuSwift", package: "CashuSwift"),
-            ],
-            resources: [
-                .process("Wallets/Common/README.md")
             ]
         ),
         .target(
             name: "NDKSwiftUI",
             dependencies: [
-                "NDKSwift"
+                "NDKSwiftCore",
+                "NDKSwiftCashu",
             ]
         ),
         .testTarget(
             name: "NDKSwiftTests",
             dependencies: [
-                "NDKSwift",
-                .product(name: "CashuSwift", package: "CashuSwift"),
+                "NDKSwiftCore",
+                "NDKSwiftSQLite",
+                "NDKSwiftNostrDB",
+                "NDKSwiftCashu",
             ],
             exclude: ["DisabledTests"],
             resources: [

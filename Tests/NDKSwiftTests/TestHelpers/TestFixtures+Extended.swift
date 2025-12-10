@@ -1,5 +1,5 @@
 import Foundation
-@testable import NDKSwift
+@testable import NDKSwiftCore
 
 // MARK: - Extended Test Fixtures
 
