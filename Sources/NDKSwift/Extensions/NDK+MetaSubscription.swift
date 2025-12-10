@@ -27,6 +27,7 @@ public extension NDK {
     ///   - sort: How to sort the pointed-to events (default: .tagTime)
     ///   - options: Subscription options
     /// - Returns: A reactive NDKMetaSubscription
+    @MainActor
     func metaSubscribe(
         filter: NDKFilter,
         sort: NDKMetaSubscriptionSort = .tagTime,

@@ -13,6 +13,86 @@ public enum NDKMetaSubscriptionSort: Sendable {
     case uniqueAuthors
 }
 
+/// Actor that manages all mutable state for NDKMetaSubscription
+/// This provides thread-safe access to internal state and task lifecycle
+@available(iOS 17.0, macOS 14.0, *)
+private actor MetaSubscriptionStateManager {
+    var targetEvents: [String: NDKEvent] = [:]
+    var pointersByTarget: [String: [NDKEvent]] = [:]
+    var pendingReferences: Set<String> = []
+    var processingTask: Task<Void, Never>?
+    var fetchDebounceTask: Task<Void, Never>?
+    var pointerSubscription: NDKSubscription<NDKEvent>?
+
+    func getPointers(for tagAddress: String) -> [NDKEvent] {
+        pointersByTarget[tagAddress] ?? []
+    }
+
+    func addPointer(_ pointer: NDKEvent, for address: String) {
+        var pointers = pointersByTarget[address] ?? []
+        if !pointers.contains(where: { $0.id == pointer.id }) {
+            pointers.append(pointer)
+            pointersByTarget[address] = pointers
+        }
+    }
+
+    func hasTarget(_ address: String) -> Bool {
+        targetEvents[address] != nil
+    }
+
+    func addPendingReference(_ ref: String) {
+        pendingReferences.insert(ref)
+    }
+
+    func takePendingReferences() -> Set<String> {
+        let refs = pendingReferences
+        pendingReferences.removeAll()
+        return refs
+    }
+
+    func setTarget(_ event: NDKEvent, for address: String) {
+        targetEvents[address] = event
+    }
+
+    func getAllTargetEvents() -> [NDKEvent] {
+        Array(targetEvents.values)
+    }
+
+    func getAllPointers() -> [String: [NDKEvent]] {
+        pointersByTarget
+    }
+
+    func clear() {
+        targetEvents.removeAll()
+        pointersByTarget.removeAll()
+        pendingReferences.removeAll()
+    }
+
+    func setProcessingTask(_ task: Task<Void, Never>?) {
+        processingTask = task
+    }
+
+    func setFetchDebounceTask(_ task: Task<Void, Never>?) {
+        fetchDebounceTask = task
+    }
+
+    func cancelFetchDebounceTask() {
+        fetchDebounceTask?.cancel()
+    }
+
+    func setPointerSubscription(_ subscription: NDKSubscription<NDKEvent>?) {
+        pointerSubscription = subscription
+    }
+
+    func stop() {
+        processingTask?.cancel()
+        processingTask = nil
+        fetchDebounceTask?.cancel()
+        fetchDebounceTask = nil
+        pointerSubscription = nil
+    }
+}
+
 /// A reactive subscription that returns events pointed to by e-tags and a-tags,
 /// rather than the matching events themselves.
 ///
@@ -24,36 +104,41 @@ public enum NDKMetaSubscriptionSort: Sendable {
 /// ## Example
 /// ```swift
 /// // Show content reposted by people you follow
-/// let feed = ndk.metaSubscribe(
+/// let feed = await ndk.metaSubscribe(
 ///     filter: NDKFilter(kinds: [6, 16], authors: follows),
 ///     sort: .tagTime
 /// )
 ///
 /// // In SwiftUI
 /// ForEach(feed.events) { event in
-///     let reposters = feed.eventsTagging(event)
-///     PostCard(event: event, repostedBy: reposters.count)
+///     PostCard(event: event)
+///         .task {
+///             let reposters = await feed.eventsTagging(event)
+///             // Update repost count
+///         }
 /// }
 /// ```
 @available(iOS 17.0, macOS 14.0, *)
 @Observable
-public final class NDKMetaSubscription: @unchecked Sendable {
+public final class NDKMetaSubscription: Sendable {
     // MARK: - Public Properties
 
     /// The pointed-to events, sorted according to current sort mode
-    public private(set) var events: [NDKEvent] = []
+    @MainActor public private(set) var events: [NDKEvent] = []
 
     /// Whether EOSE has been received from the subscription
-    public private(set) var eosed: Bool = false
+    @MainActor public private(set) var eosed: Bool = false
 
     /// Number of pointed-to events
-    public var count: Int { events.count }
+    @MainActor public var count: Int { events.count }
 
     /// Current sort mode - changing this triggers an instant re-sort without refetching
-    public var sort: NDKMetaSubscriptionSort {
+    @MainActor public var sort: NDKMetaSubscriptionSort {
         didSet {
             if sort != oldValue {
-                updateSortedEvents()
+                Task {
+                    await updateSortedEvents()
+                }
             }
         }
     }
@@ -64,26 +149,8 @@ public final class NDKMetaSubscription: @unchecked Sendable {
     private let filter: NDKFilter
     private let options: NDKSubscriptionOptions
 
-    /// Map of tagAddress -> pointed-to event
-    private var targetEvents: [String: NDKEvent] = [:]
-
-    /// Map of tagAddress -> array of pointer events
-    private var pointersByTarget: [String: [NDKEvent]] = [:]
-
-    /// The underlying subscription to pointer events
-    private var pointerSubscription: NDKSubscription<NDKEvent>?
-
-    /// Task for processing events
-    private var processingTask: Task<Void, Never>?
-
-    /// Batch of references to fetch
-    private var pendingReferences: Set<String> = []
-
-    /// Debounce task for batching fetches
-    private var fetchDebounceTask: Task<Void, Never>?
-
-    /// Lock for thread-safe access to internal state
-    private let lock = NSLock()
+    /// Actor for thread-safe state management including task lifecycle
+    private let stateManager = MetaSubscriptionStateManager()
 
     // MARK: - Initialization
 
@@ -93,6 +160,7 @@ public final class NDKMetaSubscription: @unchecked Sendable {
     ///   - filter: Filter for pointer events (reposts, zaps, comments, etc.)
     ///   - sort: How to sort the pointed-to events
     ///   - options: Subscription options
+    @MainActor
     public init(
         ndk: NDK,
         filter: NDKFilter,
@@ -104,11 +172,16 @@ public final class NDKMetaSubscription: @unchecked Sendable {
         self.sort = sort
         self.options = options
 
-        start()
+        Task {
+            await self.start()
+        }
     }
 
     deinit {
-        stop()
+        let manager = stateManager
+        Task {
+            await manager.stop()
+        }
     }
 
     // MARK: - Public Methods
@@ -116,38 +189,27 @@ public final class NDKMetaSubscription: @unchecked Sendable {
     /// Get all interaction events pointing to a specific event
     /// - Parameter event: The event to get pointers for
     /// - Returns: Array of events that point to this event (via e-tag or a-tag)
-    public func eventsTagging(_ event: NDKEvent) -> [NDKEvent] {
-        lock.lock()
-        defer { lock.unlock() }
-        return pointersByTarget[event.tagAddress] ?? []
+    public func eventsTagging(_ event: NDKEvent) async -> [NDKEvent] {
+        await stateManager.getPointers(for: event.tagAddress)
     }
 
     /// Stop the subscription
-    public func stop() {
-        processingTask?.cancel()
-        processingTask = nil
-        fetchDebounceTask?.cancel()
-        fetchDebounceTask = nil
-        pointerSubscription = nil
+    public func stop() async {
+        await stateManager.stop()
     }
 
     /// Clear all data and reset state
-    public func clear() {
-        lock.lock()
-        targetEvents.removeAll()
-        pointersByTarget.removeAll()
-        pendingReferences.removeAll()
-        lock.unlock()
-
+    @MainActor
+    public func clear() async {
+        await stateManager.clear()
         events = []
         eosed = false
     }
 
     // MARK: - Private Methods
 
-    private func start() {
-        // Subscribe to pointer events
-        pointerSubscription = ndk.subscribe(
+    private func start() async {
+        let subscription = ndk.subscribe(
             filter: filter,
             maxAge: options.maxAge,
             cachePolicy: options.cachePolicy,
@@ -157,11 +219,9 @@ public final class NDKMetaSubscription: @unchecked Sendable {
             closeOnEose: options.closeOnEose
         )
 
-        guard let subscription = pointerSubscription else { return }
+        await stateManager.setPointerSubscription(subscription)
 
-        // Process events as they arrive
-        processingTask = Task { [weak self] in
-            // Monitor for EOSE
+        let processingTask = Task { [weak self] in
             Task { [weak self] in
                 for await update in subscription.relayUpdates {
                     guard let self = self else { return }
@@ -173,93 +233,69 @@ public final class NDKMetaSubscription: @unchecked Sendable {
                 }
             }
 
-            // Process pointer events
             for await pointerEvent in subscription.events {
                 guard let self = self else { return }
                 await self.handlePointerEvent(pointerEvent)
             }
         }
+
+        await stateManager.setProcessingTask(processingTask)
     }
 
     private func handlePointerEvent(_ pointerEvent: NDKEvent) async {
-        // Extract e-tags and a-tags
         let eTags = pointerEvent.tags(withName: "e")
         let aTags = pointerEvent.tags(withName: "a")
 
         var newReferences: [String] = []
 
-        lock.lock()
-
-        // Process e-tags
         for eTag in eTags {
             guard eTag.count > 1 else { continue }
             let eventId = eTag[1]
 
-            // Track the pointer relationship
-            var pointers = pointersByTarget[eventId] ?? []
-            if !pointers.contains(where: { $0.id == pointerEvent.id }) {
-                pointers.append(pointerEvent)
-                pointersByTarget[eventId] = pointers
-            }
+            await stateManager.addPointer(pointerEvent, for: eventId)
 
-            // Queue for fetching if we don't have the target event
-            if targetEvents[eventId] == nil {
-                pendingReferences.insert(eventId)
+            if await !stateManager.hasTarget(eventId) {
+                await stateManager.addPendingReference(eventId)
                 newReferences.append(eventId)
             }
         }
 
-        // Process a-tags
         for aTag in aTags {
             guard aTag.count > 1 else { continue }
             let address = aTag[1]
 
-            // Track the pointer relationship
-            var pointers = pointersByTarget[address] ?? []
-            if !pointers.contains(where: { $0.id == pointerEvent.id }) {
-                pointers.append(pointerEvent)
-                pointersByTarget[address] = pointers
-            }
+            await stateManager.addPointer(pointerEvent, for: address)
 
-            // Queue for fetching if we don't have the target event
-            if targetEvents[address] == nil {
-                pendingReferences.insert(address)
+            if await !stateManager.hasTarget(address) {
+                await stateManager.addPendingReference(address)
                 newReferences.append(address)
             }
         }
 
-        lock.unlock()
-
-        // If we already have the target events, just update the sort
         if newReferences.isEmpty {
-            await MainActor.run {
-                self.updateSortedEvents()
-            }
+            await updateSortedEvents()
         } else {
-            // Debounce and batch fetch
             scheduleFetch()
         }
     }
 
     private func scheduleFetch() {
-        fetchDebounceTask?.cancel()
-        fetchDebounceTask = Task { [weak self] in
-            // Small delay to batch multiple references
-            try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
-            guard let self = self, !Task.isCancelled else { return }
-            await self.fetchPendingReferences()
+        Task {
+            await stateManager.cancelFetchDebounceTask()
+            let task = Task { [weak self] in
+                try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
+                guard let self = self, !Task.isCancelled else { return }
+                await self.fetchPendingReferences()
+            }
+            await stateManager.setFetchDebounceTask(task)
         }
     }
 
     private func fetchPendingReferences() async {
-        lock.lock()
-        let references = pendingReferences
-        pendingReferences.removeAll()
-        lock.unlock()
+        let references = await stateManager.takePendingReferences()
 
         guard !references.isEmpty else { return }
 
-        // Separate event IDs from NIP-33 addresses
         var eventIds: [String] = []
         var addresses: [String] = []
 
@@ -271,14 +307,12 @@ public final class NDKMetaSubscription: @unchecked Sendable {
             }
         }
 
-        // Build filters
         var filters: [NDKFilter] = []
 
         if !eventIds.isEmpty {
             filters.append(NDKFilter(ids: eventIds))
         }
 
-        // Group addresses by author for efficient querying
         if !addresses.isEmpty {
             var byAuthor: [String: (kinds: Set<Int>, dTags: Set<String>)] = [:]
 
@@ -309,7 +343,6 @@ public final class NDKMetaSubscription: @unchecked Sendable {
 
         guard !filters.isEmpty else { return }
 
-        // Fetch all referenced events
         for filter in filters {
             let subscription = ndk.subscribe(
                 filter: filter,
@@ -318,31 +351,24 @@ public final class NDKMetaSubscription: @unchecked Sendable {
 
             let fetchedEvents = await subscription.collect(timeout: 5.0)
 
-            lock.lock()
             for event in fetchedEvents {
                 let tagAddr = event.tagAddress
-                targetEvents[tagAddr] = event
+                await stateManager.setTarget(event, for: tagAddr)
 
-                // Also store by event ID for e-tag lookups
                 if tagAddr != event.id {
-                    targetEvents[event.id] = event
+                    await stateManager.setTarget(event, for: event.id)
                 }
             }
-            lock.unlock()
         }
 
-        await MainActor.run {
-            self.updateSortedEvents()
-        }
+        await updateSortedEvents()
     }
 
-    private func updateSortedEvents() {
-        lock.lock()
-        var allEvents = Array(targetEvents.values)
-        let pointers = pointersByTarget
-        lock.unlock()
+    private func updateSortedEvents() async {
+        var allEvents = await stateManager.getAllTargetEvents()
+        let pointers = await stateManager.getAllPointers()
+        let currentSort = await MainActor.run { self.sort }
 
-        // Remove duplicates (same event might be stored by both ID and address)
         var seen = Set<String>()
         allEvents = allEvents.filter { event in
             if seen.contains(event.id) {
@@ -352,8 +378,7 @@ public final class NDKMetaSubscription: @unchecked Sendable {
             return true
         }
 
-        // Sort based on current mode
-        switch sort {
+        switch currentSort {
         case .time:
             allEvents.sort { $0.createdAt > $1.createdAt }
 
@@ -383,6 +408,9 @@ public final class NDKMetaSubscription: @unchecked Sendable {
             }
         }
 
-        events = allEvents
+        let sortedEvents = allEvents
+        await MainActor.run {
+            self.events = sortedEvents
+        }
     }
 }
