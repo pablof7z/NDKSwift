@@ -136,8 +136,13 @@ actor NDKRelaySelector {
         var allPubkeys: [String] = []
         
         // Add current user if signed in
-        if let userPubkey = try? await ndk.signer?.pubkey {
-            allPubkeys.append(userPubkey)
+        if let signer = ndk.signer {
+            do {
+                let userPubkey = try await signer.pubkey
+                allPubkeys.append(userPubkey)
+            } catch {
+                NDKLogger.log(.warning, category: .relay, "Failed to get user pubkey for relay selection: \(error.localizedDescription)")
+            }
         }
         
         // Add authors from filter
@@ -301,8 +306,14 @@ actor NDKRelaySelector {
         }
 
         // Check if user is signed in
-        guard let signer = ndk.signer,
-              let _ = try? await signer.pubkey else {
+        guard let signer = ndk.signer else {
+            return []
+        }
+
+        do {
+            _ = try await signer.pubkey
+        } catch {
+            NDKLogger.log(.warning, category: .relay, "Failed to get pubkey for blocked relays check: \(error.localizedDescription)")
             return []
         }
 

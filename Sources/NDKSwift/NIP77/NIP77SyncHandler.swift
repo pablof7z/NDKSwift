@@ -155,7 +155,11 @@ public actor NIP77SyncHandler {
                         subscriptionId: subscriptionId,
                         message: responseData.hexString
                     )
-                    try? await relay.send(nostrMessage.serialize())
+                    do {
+                        try await relay.send(nostrMessage.serialize())
+                    } catch {
+                        NDKLogger.log(.warning, category: .relay, "Failed to send NEG-MSG during NIP77 sync to \(session.relayURL): \(error.localizedDescription)")
+                    }
                 }
             } else {
                 // Reconciliation complete
@@ -192,7 +196,11 @@ public actor NIP77SyncHandler {
                     let closeMessage = try nostrMessage.serialize()
                     session.negentropyBytes += closeMessage.count
                     session.bytesTransferred += closeMessage.count
-                    try? await relay.send(closeMessage)
+                    do {
+                        try await relay.send(closeMessage)
+                    } catch {
+                        NDKLogger.log(.warning, category: .relay, "Failed to send NEG-CLOSE during NIP77 sync to \(session.relayURL): \(error.localizedDescription)")
+                    }
                 }
 
                 // Move to completed sessions
@@ -265,9 +273,19 @@ public actor NIP77SyncHandler {
         // Store events in cache and estimate bandwidth
         for event in events {
             // Use processEvent to ensure observers are notified
-            try? await cache.processEvent(event, from: relayURL, subscriptionId: "nip77-sync-\(relayURL)")
+            do {
+                try await cache.processEvent(event, from: relayURL, subscriptionId: "nip77-sync-\(relayURL)")
+            } catch {
+                NDKLogger.log(.warning, category: .cache, "Failed to process event \(event.id) during NIP77 sync: \(error.localizedDescription)")
+            }
             // Estimate EVENT message size
-            let eventJson = try? event.toJSON()
+            let eventJson: String?
+            do {
+                eventJson = try event.toJSON()
+            } catch {
+                NDKLogger.log(.warning, category: .cache, "Failed to serialize event \(event.id) to JSON during NIP77 sync: \(error.localizedDescription)")
+                eventJson = nil
+            }
             totalBytes += (eventJson?.count ?? 500) + 20 // +20 for ["EVENT","sub", wrapper]
         }
 
@@ -301,7 +319,13 @@ public actor NIP77SyncHandler {
             for event in eventsToSend {
                 _ = try await ndk.publish(event, to: [relayURL])
                 // Estimate EVENT message size
-                let eventJson = try? event.toJSON()
+                let eventJson: String?
+                do {
+                    eventJson = try event.toJSON()
+                } catch {
+                    NDKLogger.log(.warning, category: .cache, "Failed to serialize event \(event.id) to JSON during NIP77 send: \(error.localizedDescription)")
+                    eventJson = nil
+                }
                 totalBytes += (eventJson?.count ?? 500) + 10 // +10 for ["EVENT", wrapper]
             }
             NDKLogger.log(.info, category: .network, "\(logPrefix) Successfully sent \(eventsToSend.count) events (bandwidth: \(totalBytes) bytes)")

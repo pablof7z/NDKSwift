@@ -555,7 +555,11 @@ public actor NDKRelayConnection {
             Task { [weak self] in
                 guard let self = self else { return }
                 NDKLogger.log(.info, category: .connection, "🔄 Attempting reconnection to \(self.url)")
-                try? await self.connect()
+                do {
+                    try await self.connect()
+                } catch {
+                    NDKLogger.log(.warning, category: .connection, "Reconnection failed to \(self.url): \(error.localizedDescription)")
+                }
             }
         }
     }

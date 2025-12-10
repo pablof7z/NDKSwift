@@ -76,7 +76,13 @@ public actor BlossomClient {
         let sha256Hex = Crypto.sha256(data).hexString
 
         // Check if we need to discover the server first
-        let descriptor = try? await discoverServer(serverURL)
+        let descriptor: BlossomServerDescriptor?
+        do {
+            descriptor = try await discoverServer(serverURL)
+        } catch {
+            NDKLogger.log(.warning, category: .relay, "Failed to discover Blossom server at \(serverURL): \(error.localizedDescription)")
+            descriptor = nil
+        }
 
         // Validate file size if server has limits
         if let maxSize = descriptor?.maxUploadSize, data.count > maxSize {
@@ -160,7 +166,13 @@ public actor BlossomClient {
     ) async throws -> [BlossomBlob] {
         let baseURL = try URLUtils.validateURL(serverURL)
 
-        let descriptor = try? await discoverServer(serverURL)
+        let descriptor: BlossomServerDescriptor?
+        do {
+            descriptor = try await discoverServer(serverURL)
+        } catch {
+            NDKLogger.log(.warning, category: .relay, "Failed to discover Blossom server at \(serverURL): \(error.localizedDescription)")
+            descriptor = nil
+        }
         let listPath = descriptor?.listUrl ?? "/list"
 
         var urlComponents = URLComponents(url: baseURL.appendingPathComponent(listPath), resolvingAgainstBaseURL: true)!
