@@ -343,7 +343,8 @@ actor RelayStateActor {
 ///     print("Relay state: \(state)")
 /// }
 /// ```
-public final class NDKRelay: RelayProtocol, Hashable, Equatable, @unchecked Sendable {
+public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable, @unchecked Sendable {
+    public var id: String { url }
     /// Relay URL
     public let url: RelayURL
 

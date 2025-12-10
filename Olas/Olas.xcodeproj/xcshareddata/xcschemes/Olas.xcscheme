@@ -43,7 +43,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "8B41F65B2DEDD0D6001A66F9"
-               BuildableName = "Olas.xctest"
+               BuildableName = "OlasUITests.xctest"
                BlueprintName = "OlasUITests"
                ReferencedContainer = "container:Olas.xcodeproj">
             </BuildableReference>

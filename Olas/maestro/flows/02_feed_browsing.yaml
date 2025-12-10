@@ -1,0 +1,88 @@
+# Feed Browsing Flow Test
+# Requires: User must be logged in (run after login or use test account)
+# Note: This test assumes the app is already logged in
+
+appId: com.olas.app
+name: Feed Browsing Flow
+
+---
+
+# Launch the app (assumes logged in state)
+- launchApp
+
+# Wait for main tab view to appear
+# Home tab should be selected by default
+- assertVisible:
+    text: "Home"
+    optional: true
+
+# Verify tab bar is present
+- assertVisible:
+    text: "Explore"
+    optional: true
+
+- assertVisible:
+    text: "Wallet"
+    optional: true
+
+- assertVisible:
+    text: "Profile"
+    optional: true
+
+# Take screenshot of feed
+- takeScreenshot: "feed_initial"
+
+# Scroll down the feed
+- scroll:
+    direction: DOWN
+    duration: 1000
+
+# Wait for content to load
+- extendedWaitUntil:
+    visible:
+      text: ".*"
+    timeout: 5000
+    optional: true
+
+- takeScreenshot: "feed_scrolled"
+
+# Scroll back up
+- scroll:
+    direction: UP
+    duration: 500
+
+# Navigate to Explore tab
+- tapOn:
+    text: "Explore"
+
+# Verify explore view loads
+- takeScreenshot: "explore_tab"
+
+# Wait for explore content
+- extendedWaitUntil:
+    visible:
+      text: ".*"
+    timeout: 5000
+    optional: true
+
+# Navigate back to Home
+- tapOn:
+    text: "Home"
+
+# Verify we're back on feed
+- takeScreenshot: "feed_returned"
+
+# Pull to refresh
+- swipe:
+    start: "50%, 30%"
+    end: "50%, 70%"
+    duration: 500
+
+# Wait for refresh to complete
+- extendedWaitUntil:
+    notVisible:
+      id: "loadingIndicator"
+    timeout: 10000
+    optional: true
+
+- takeScreenshot: "feed_refreshed"

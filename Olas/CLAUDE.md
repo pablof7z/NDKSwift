@@ -296,6 +296,33 @@ struct ItemListView: View {
 - **Avoid Task { } in onAppear:** This doesn't cancel automatically and can cause memory leaks or crashes
 - No GCD usage - Swift Concurrency only
 
+### Nostr Event Subscriptions - IMPORTANT
+
+**NEVER wait for events to arrive in bulk.** Nostr is event-driven and streaming. Always update UI as events arrive:
+
+```swift
+// CORRECT - Stream events, update UI incrementally
+for await event in subscription.events {
+    guard !Task.isCancelled else { break }
+    pictures.append(event)  // UI updates immediately
+}
+
+// WRONG - Don't use timeouts or collect events before displaying
+let timeoutTask = Task { try? await Task.sleep(for: .seconds(3)) }
+for await event in subscription.events {
+    if timeoutTask.isCancelled { break }  // BAD: artificial timeout
+    results.append(event)
+}
+return results  // BAD: returning bulk results after "waiting"
+```
+
+**Key principles:**
+- Events stream in over time from multiple relays - there's no "done" signal to wait for
+- Update `@State` or `@Published` properties inside the `for await` loop so UI reflects each event
+- Use `.task { }` modifier which auto-cancels when view disappears
+- Never use `Task.sleep` timeouts to "wait" for events
+- For functions that fetch data for other users, return `AsyncStream` so caller can iterate and update UI
+
 ### Sendable Conformance
 
 Swift 6 enforces strict concurrency checking. All types that cross concurrency boundaries must be Sendable:

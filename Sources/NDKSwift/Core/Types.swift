@@ -210,6 +210,9 @@ public enum EventKind {
     public static let categorizedPeopleList = 30000
     public static let categorizedBookmarkList = 30001
     public static let relayListMetadata = 30002
+    public static let articleCurationSet = 30004
+    public static let videoCurationSet = 30005
+    public static let pictureCurationSet = 30006
     public static let profileBadges = 30008
     public static let badgeDefinition = 30009
     public static let longFormContent = 30023

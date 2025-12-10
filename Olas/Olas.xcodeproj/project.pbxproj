@@ -22,11 +22,19 @@
 			remoteGlobalIDString = 8B41F6442DEDD0D5001A66F9;
 			remoteInfo = Olas;
 		};
+		AABB00012DEADBEEF0001111 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8B41F63D2DEDD0D5001A66F9 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8B41F6442DEDD0D5001A66F9;
+			remoteInfo = Olas;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		8B41F6452DEDD0D5001A66F9 /* Olas.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Olas.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8B41F65C2DEDD0D6001A66F9 /* Olas.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Olas.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		AABB00022DEADBEEF0002222 /* OlasTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OlasTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -61,6 +69,11 @@
 			path = Config;
 			sourceTree = "<group>";
 		};
+		AABB00032DEADBEEF0003333 /* OlasTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = OlasTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -83,6 +96,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AABB00042DEADBEEF0004444 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -91,6 +111,7 @@
 			children = (
 				8BD71C052DEE41D800CEDD92 /* Config */,
 				8B41F6472DEDD0D5001A66F9 /* Olas */,
+				AABB00032DEADBEEF0003333 /* OlasTests */,
 				8B41F65F2DEDD0D6001A66F9 /* OlasUITests */,
 				8B41F6812DEDD23B001A66F9 /* Frameworks */,
 				8B41F6462DEDD0D5001A66F9 /* Products */,
@@ -101,6 +122,7 @@
 			isa = PBXGroup;
 			children = (
 				8B41F6452DEDD0D5001A66F9 /* Olas.app */,
+				AABB00022DEADBEEF0002222 /* OlasTests.xctest */,
 				8B41F65C2DEDD0D6001A66F9 /* Olas.xctest */,
 			);
 			name = Products;
@@ -167,6 +189,29 @@
 			productReference = 8B41F65C2DEDD0D6001A66F9 /* Olas.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		AABB00052DEADBEEF0005555 /* OlasTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AABB00062DEADBEEF0006666 /* Build configuration list for PBXNativeTarget "OlasTests" */;
+			buildPhases = (
+				AABB00072DEADBEEF0007777 /* Sources */,
+				AABB00042DEADBEEF0004444 /* Frameworks */,
+				AABB00082DEADBEEF0008888 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AABB00092DEADBEEF0009999 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				AABB00032DEADBEEF0003333 /* OlasTests */,
+			);
+			name = OlasTests;
+			packageProductDependencies = (
+			);
+			productName = OlasTests;
+			productReference = AABB00022DEADBEEF0002222 /* OlasTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -181,6 +226,10 @@
 						CreatedOnToolsVersion = 16.3;
 					};
 					8B41F65B2DEDD0D6001A66F9 = {
+						CreatedOnToolsVersion = 16.3;
+						TestTargetID = 8B41F6442DEDD0D5001A66F9;
+					};
+					AABB00052DEADBEEF0005555 = {
 						CreatedOnToolsVersion = 16.3;
 						TestTargetID = 8B41F6442DEDD0D5001A66F9;
 					};
@@ -207,6 +256,7 @@
 			projectRoot = "";
 			targets = (
 				8B41F6442DEDD0D5001A66F9 /* Olas */,
+				AABB00052DEADBEEF0005555 /* OlasTests */,
 				8B41F65B2DEDD0D6001A66F9 /* OlasUITests */,
 			);
 		};
@@ -221,6 +271,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		8B41F65A2DEDD0D6001A66F9 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AABB00082DEADBEEF0008888 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -244,6 +301,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AABB00072DEADBEEF0007777 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -251,6 +315,11 @@
 			isa = PBXTargetDependency;
 			target = 8B41F6442DEDD0D5001A66F9 /* Olas */;
 			targetProxy = 8B41F65D2DEDD0D6001A66F9 /* PBXContainerItemProxy */;
+		};
+		AABB00092DEADBEEF0009999 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8B41F6442DEDD0D5001A66F9 /* Olas */;
+			targetProxy = AABB00012DEADBEEF0001111 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -435,6 +504,9 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.olas.app.uitests;
+				PRODUCT_MODULE_NAME = OlasUITests;
+				PRODUCT_NAME = OlasUITests;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -449,10 +521,49 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.olas.app.uitests;
+				PRODUCT_MODULE_NAME = OlasUITests;
+				PRODUCT_NAME = OlasUITests;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = Olas;
+			};
+			name = Release;
+		};
+		AABB000A2DEADBEEF000AAAA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 8BD71C052DEE41D800CEDD92 /* Config */;
+			baseConfigurationReferenceRelativePath = Tests.xcconfig;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.olas.app.tests;
+				PRODUCT_MODULE_NAME = OlasTests;
+				PRODUCT_NAME = OlasTests;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Olas.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Olas";
+			};
+			name = Debug;
+		};
+		AABB000B2DEADBEEF000BBBB /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 8BD71C052DEE41D800CEDD92 /* Config */;
+			baseConfigurationReferenceRelativePath = Tests.xcconfig;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.olas.app.tests;
+				PRODUCT_MODULE_NAME = OlasTests;
+				PRODUCT_NAME = OlasTests;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Olas.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Olas";
 			};
 			name = Release;
 		};
@@ -482,6 +593,15 @@
 			buildConfigurations = (
 				8B41F66D2DEDD0D6001A66F9 /* Debug */,
 				8B41F66E2DEDD0D6001A66F9 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AABB00062DEADBEEF0006666 /* Build configuration list for PBXNativeTarget "OlasTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AABB000A2DEADBEEF000AAAA /* Debug */,
+				AABB000B2DEADBEEF000BBBB /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

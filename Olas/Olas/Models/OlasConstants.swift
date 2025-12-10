@@ -16,7 +16,7 @@ enum OlasConstants {
 
     /// Breez API key for Spark wallet
     /// Request your own at https://breez.technology/request-api-key
-    public static let breezApiKey = "YOUR_BREEZ_API_KEY"
+    public static let breezApiKey = "MIIBbzCCASGgAwIBAgIHPrdM6+5v5zAFBgMrZXAwEDEOMAwGA1UEAxMFQnJlZXowHhcNMjUxMjA5MTY0OTE1WhcNMzUxMjA3MTY0OTE1WjAyMRYwFAYDVQQKEw1TYW5pdHkgSXNsYW5kMRgwFgYDVQQDEw9QYWJsbyBGZXJuYW5kZXowKjAFBgMrZXADIQDQg/XL3yA8HKIgyimHU/Qbpxy0tvzris1fDUtEs6ldd6N4MHYwDgYDVR0PAQH/BAQDAgWgMAwGA1UdEwEB/wQCMAAwHQYDVR0OBBYEFNo5o+5ea0sNMlW/75VgGJCv2AcJMB8GA1UdIwQYMBaAFN6q1pJW843ndJIW/Ey2ILJrKJhrMBYGA1UdEQQPMA2BC3BmZXJAbWUuY29tMAUGAytlcANBAIXuxPsRXhdsnJGuzTHBu/5+gKlspwkCmUa0LUNvasjMRf6kpHkEUEL+4LptlVcVhz5kB+TRpDbHJhaYQu0dEAI="
 
     public enum EventKinds {
         public static let image: Kind = 20
@@ -25,6 +25,7 @@ enum OlasConstants {
         public static let comment: Kind = 1111
         public static let report: Kind = 1984
         public static let muteList: Kind = 10000
+        public static let pictureCurationSet: Kind = 30006  // NIP-51 picture curation set
     }
 
     public enum ReportType: String, CaseIterable, Identifiable {
