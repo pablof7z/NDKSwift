@@ -47,11 +47,13 @@ final class MintDiscoveryViewModel {
 
     deinit {
         discoveryTask?.cancel()
+        discoveryTask = nil
     }
 
     /// Discover Cashu mints via NIP-87 - streams mints as they arrive
     public func discoverMints() async {
         discoveryTask?.cancel()
+        discoveryTask = nil
         error = nil
         discoveredMints = []
         seenMintIds = []

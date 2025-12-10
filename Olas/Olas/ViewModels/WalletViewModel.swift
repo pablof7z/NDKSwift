@@ -167,10 +167,12 @@ final class WalletViewModel {
         guard let wallet = wallet else { return }
 
         eventObservationTask?.cancel()
+        eventObservationTask = nil
         eventObservationTask = Task { [weak self] in
             let events = await wallet.events
             for await event in events {
                 guard let self = self else { break }
+                guard !Task.isCancelled else { break }
 
                 await MainActor.run {
                     self.handleWalletEvent(event)

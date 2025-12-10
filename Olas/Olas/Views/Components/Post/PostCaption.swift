@@ -49,7 +49,10 @@ private struct CaptionText: View {
         (Text(displayName).fontWeight(.semibold) + Text(" ") + Text(content))
             .font(.subheadline)
             .onAppear { loadProfile() }
-            .onDisappear { profileTask?.cancel() }
+            .onDisappear {
+                profileTask?.cancel()
+                profileTask = nil
+            }
     }
 
     private var displayName: String {
@@ -65,8 +68,10 @@ private struct CaptionText: View {
 
     private func loadProfile() {
         profileTask?.cancel()
+        profileTask = nil
         profileTask = Task {
             for await metadata in await ndk.profileManager.subscribe(for: pubkey) {
+                guard !Task.isCancelled else { break }
                 await MainActor.run {
                     self.metadata = metadata
                 }
