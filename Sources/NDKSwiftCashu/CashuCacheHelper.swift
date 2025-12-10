@@ -20,19 +20,31 @@ public struct CashuCacheHelper: Sendable {
     }
 
     public func getMintInfo(url: String) async -> NDKMintInfo? {
-        guard let data = await cache.getValue(forKey: "mint:\(url)", namespace: namespace),
-              let wrapper = try? JSONDecoder().decode(MintInfoWrapper.self, from: data) else {
+        guard let data = await cache.getValue(forKey: "mint:\(url)", namespace: namespace) else {
             return nil
         }
-        return wrapper.info
+
+        do {
+            let wrapper = try JSONDecoder().decode(MintInfoWrapper.self, from: data)
+            return wrapper.info
+        } catch {
+            NDKLogger.log(.warning, category: .wallet, "Failed to decode mint info for \(url): \(error.localizedDescription)")
+            return nil
+        }
     }
 
     public func isMintInfoStale(url: String, maxAge: TimeInterval) async -> Bool {
-        guard let data = await cache.getValue(forKey: "mint:\(url)", namespace: namespace),
-              let wrapper = try? JSONDecoder().decode(MintInfoWrapper.self, from: data) else {
+        guard let data = await cache.getValue(forKey: "mint:\(url)", namespace: namespace) else {
             return true
         }
-        return Date().timeIntervalSince(wrapper.timestamp) > maxAge
+
+        do {
+            let wrapper = try JSONDecoder().decode(MintInfoWrapper.self, from: data)
+            return Date().timeIntervalSince(wrapper.timestamp) > maxAge
+        } catch {
+            NDKLogger.log(.warning, category: .wallet, "Failed to decode mint info for staleness check \(url): \(error.localizedDescription)")
+            return true
+        }
     }
 
     public func invalidateMintCache(url: String) async throws {
@@ -64,10 +76,15 @@ public struct CashuCacheHelper: Sendable {
     public func getKeyset(id: String) async -> CashuSwift.Keyset? {
         // Need to search all keysets since we don't know the mintUrl
         let allKeysets = await cache.getValues(namespace: namespace, keyPrefix: "keyset:")
-        for (_, data) in allKeysets {
-            if let wrapper = try? JSONDecoder().decode(KeysetWrapper.self, from: data),
-               wrapper.keyset.keysetID == id {
-                return wrapper.keyset
+        for (key, data) in allKeysets {
+            do {
+                let wrapper = try JSONDecoder().decode(KeysetWrapper.self, from: data)
+                if wrapper.keyset.keysetID == id {
+                    return wrapper.keyset
+                }
+            } catch {
+                NDKLogger.log(.warning, category: .wallet, "Failed to decode keyset \(key): \(error.localizedDescription)")
+                continue
             }
         }
         return nil
@@ -75,8 +92,14 @@ public struct CashuCacheHelper: Sendable {
 
     public func getKeysets(mintUrl: String) async -> [CashuSwift.Keyset] {
         let keysets = await cache.getValues(namespace: namespace, keyPrefix: "keyset:\(mintUrl):")
-        return keysets.values.compactMap { data in
-            try? JSONDecoder().decode(KeysetWrapper.self, from: data).keyset
+        return keysets.compactMap { (key, data) in
+            do {
+                let wrapper = try JSONDecoder().decode(KeysetWrapper.self, from: data)
+                return wrapper.keyset
+            } catch {
+                NDKLogger.log(.warning, category: .wallet, "Failed to decode keyset \(key): \(error.localizedDescription)")
+                return nil
+            }
         }
     }
 
@@ -90,11 +113,15 @@ public struct CashuCacheHelper: Sendable {
         guard !keysets.isEmpty else { return true }
 
         var oldestTimestamp: Date?
-        for (_, data) in keysets {
-            if let wrapper = try? JSONDecoder().decode(KeysetWrapper.self, from: data) {
+        for (key, data) in keysets {
+            do {
+                let wrapper = try JSONDecoder().decode(KeysetWrapper.self, from: data)
                 if oldestTimestamp == nil || wrapper.timestamp < oldestTimestamp! {
                     oldestTimestamp = wrapper.timestamp
                 }
+            } catch {
+                NDKLogger.log(.warning, category: .wallet, "Failed to decode keyset \(key) for staleness check: \(error.localizedDescription)")
+                continue
             }
         }
 

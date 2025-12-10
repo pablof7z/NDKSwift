@@ -78,7 +78,13 @@ public enum ContentParser {
                     if let index = Int(indexString) {
                         // Check if it's a user mention
                         if let pubkey = mentionMap[index] {
-                            let npub = (try? String.toNpub(pubkey)) ?? pubkey
+                            let npub: String
+                            do {
+                                npub = try String.toNpub(pubkey)
+                            } catch {
+                                NDKLogger.log(.warning, category: .event, "Failed to convert pubkey to npub in #[index] mention: \(error)")
+                                npub = pubkey
+                            }
                             entities.append(.userMention(pubkey: pubkey, npub: npub))
                             components.append(.userMention(pubkey: pubkey, npub: npub))
                             replacements.append((range: range, replacement: "@\(npub)"))
@@ -170,8 +176,14 @@ public enum ContentParser {
                 if bech32.hasPrefix(NostrConstants.npubPrefix) {
                     entities.append(.npub(bech32))
                     components.append(.npubMention(bech32))
-                    if let pubkey = try? String.fromNpub(bech32) {
+                    do {
+                        guard let pubkey = try String.fromNpub(bech32) else {
+                            NDKLogger.log(.warning, category: .event, "Failed to decode npub: nil result")
+                            continue
+                        }
                         components.append(.userMention(pubkey: pubkey, npub: bech32))
+                    } catch {
+                        NDKLogger.log(.warning, category: .event, "Failed to decode npub: \(error)")
                     }
                 } else if bech32.hasPrefix(NostrConstants.nprofilePrefix) {
                     entities.append(.nprofile(bech32))
@@ -179,8 +191,11 @@ public enum ContentParser {
                 } else if bech32.hasPrefix(NostrConstants.notePrefix) {
                     entities.append(.note(bech32))
                     components.append(.noteMention(bech32))
-                    if let eventId = try? Bech32.eventId(from: bech32) {
+                    do {
+                        let eventId = try Bech32.eventId(from: bech32)
                         components.append(.eventMention(eventId))
+                    } catch {
+                        NDKLogger.log(.warning, category: .event, "Failed to decode note: \(error)")
                     }
                 } else if bech32.hasPrefix(NostrConstants.neventPrefix) {
                     entities.append(.nevent(bech32))
@@ -238,10 +253,16 @@ public enum ContentParser {
                 case .userMention(let pubkey, _):
                     return pubkey == user.pubkey
                 case .npub(let npub):
-                    if let pubkey = try? String.fromNpub(npub) {
+                    do {
+                        guard let pubkey = try String.fromNpub(npub) else {
+                            NDKLogger.log(.warning, category: .event, "Failed to decode npub for current user check: nil result")
+                            return false
+                        }
                         return pubkey == user.pubkey
+                    } catch {
+                        NDKLogger.log(.warning, category: .event, "Failed to decode npub for current user check: \(error)")
+                        return false
                     }
-                    return false
                 default:
                     return false
                 }

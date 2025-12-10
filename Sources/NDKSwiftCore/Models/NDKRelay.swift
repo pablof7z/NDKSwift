@@ -592,7 +592,11 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable, @
         let reconnectTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(actualDelay * Double(TimeConstants.nanosecondsPerSecond)))
             guard let self = self, !Task.isCancelled else { return }
-            try? await self.connect()
+            do {
+                try await self.connect()
+            } catch {
+                NDKLogger.log(.warning, category: .relay, "Reconnection attempt failed for \(self.url): \(error)")
+            }
         }
 
         await stateActor.scheduleReconnectTask(reconnectTask)
