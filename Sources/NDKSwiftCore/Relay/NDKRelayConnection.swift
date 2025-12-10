@@ -335,8 +335,13 @@ public actor NDKRelayConnection {
         }
 
         // Log network traffic
-        let parsed = try? NostrMessage.parse(from: json)
-        NDKNetworkLogger.logNetworkSend(to: url, message: json, parsed: parsed)
+        do {
+            let parsed = try NostrMessage.parse(from: json)
+            NDKNetworkLogger.logNetworkSend(to: url, message: json, parsed: parsed)
+        } catch {
+            NDKLogger.log(.warning, category: .network, "Failed to parse outgoing message for logging: \(error)")
+            NDKNetworkLogger.logNetworkSend(to: url, message: json, parsed: nil)
+        }
 
         #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
             guard let task = webSocketTask else {
