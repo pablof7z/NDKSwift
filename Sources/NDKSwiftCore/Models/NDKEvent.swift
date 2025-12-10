@@ -232,11 +232,30 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
     /// - Returns: true if the signature is valid, false otherwise
     public func verifySignature() -> Bool {
         // Calculate ID (needed for the comparison)
-        guard (try? calculateID()) == id else { return false }
+        do {
+            let calculatedID = try calculateID()
+            guard calculatedID == id else {
+                NDKLogger.log(.warning, category: .event, "Event ID mismatch during signature verification")
+                return false
+            }
+        } catch {
+            NDKLogger.log(.warning, category: .event, "Failed to calculate event ID for signature verification: \(error)")
+            return false
+        }
+
         // Convert hex string to Data
-        guard let messageData = id.hexDecoded() else { return false }
-        // Directly call Crypto.verify and handle its throwing nature
-        return (try? Crypto.verify(signature: sig, message: messageData, pubkey: pubkey)) ?? false
+        guard let messageData = id.hexDecoded() else {
+            NDKLogger.log(.warning, category: .event, "Failed to decode event ID hex for signature verification")
+            return false
+        }
+
+        // Verify signature
+        do {
+            return try Crypto.verify(signature: sig, message: messageData, pubkey: pubkey)
+        } catch {
+            NDKLogger.log(.warning, category: .event, "Signature verification failed: \(error)")
+            return false
+        }
     }
 
 
