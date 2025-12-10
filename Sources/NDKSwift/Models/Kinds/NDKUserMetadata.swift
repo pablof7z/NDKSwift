@@ -29,9 +29,13 @@ public class NDKUserMetadata {
         self.ndk = ndk
         
         // Parse the metadata immediately
-        if let data = event.content.data(using: .utf8),
-           let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            self.parsedMetadata = parsed
+        if let data = event.content.data(using: .utf8) {
+            do {
+                self.parsedMetadata = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+            } catch {
+                NDKLogger.log(.warning, category: .event, "Failed to parse user metadata JSON for \(pubkey.prefix(8)): \(error.localizedDescription)")
+                self.parsedMetadata = nil
+            }
         }
     }
     

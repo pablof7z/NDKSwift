@@ -148,7 +148,11 @@ public actor NIP05Manager {
 
         // Save to both caches
         await memoryCache.set(normalizedNip05, value: entry)
-        try? await cache.saveNIP05Claim(normalizedNip05, pubkey: event.pubkey, retrievedAt: Date())
+        do {
+            try await cache.saveNIP05Claim(normalizedNip05, pubkey: event.pubkey, retrievedAt: Date())
+        } catch {
+            NDKLogger.log(.warning, category: .cache, "Failed to save NIP-05 claim for \(normalizedNip05): \(error.localizedDescription)")
+        }
 
         NDKLogger.log(.debug, category: .network, "📝 NIP-05: Cached unverified entry for \(normalizedNip05)")
     }
@@ -223,7 +227,7 @@ public actor NIP05Manager {
         // Step 1: Check memory cache
         if !forceVerify {
             if let cached = await checkMemoryCache(identifier: identifier, maxAge: maxAge) {
-                if cached.status == .verified, let user = cached.toUser(ndk: ndk) {
+                if cached.status == .verified, let user = await cached.toUser(ndk: ndk) {
                     NDKLogger.log(.debug, category: .network, "✅ NIP-05: Memory cache hit for \(identifier)")
                     return user
                 } else if cached.status == .invalid || cached.status == .failed {
@@ -239,7 +243,7 @@ public actor NIP05Manager {
                 // Update memory cache
                 await memoryCache.set(identifier, value: cached)
 
-                if cached.status == .verified, let user = cached.toUser(ndk: ndk) {
+                if cached.status == .verified, let user = await cached.toUser(ndk: ndk) {
                     NDKLogger.log(.debug, category: .network, "✅ NIP-05: Database cache hit for \(identifier)")
                     return user
                 } else if cached.status == .invalid || cached.status == .failed {
@@ -324,8 +328,31 @@ public actor NIP05Manager {
         }
 
         // Parse JSON response
-        guard let json = try? JSONCoding.parseDictionary(from: data),
-              let names = json["names"] as? [String: String],
+        let json: [String: Any]
+        do {
+            json = try JSONCoding.parseDictionary(from: data)
+        } catch {
+            NDKLogger.log(.warning, category: .network, "Failed to parse NIP-05 JSON for \(identifier): \(error.localizedDescription)")
+            let invalidEntry = NIP05CacheEntry(
+                identifier: identifier,
+                pubkey: "",
+                status: .invalid,
+                nip46Relays: nil,
+                claimedAt: Date(),
+                verifiedAt: nil,
+                lastCheckAt: Date(),
+                errorMessage: ErrorMessageConstants.invalid("JSON format")
+            )
+            await memoryCache.set(identifier, value: invalidEntry)
+            do {
+                try await cache.saveNIP05Resolution(invalidEntry)
+            } catch {
+                NDKLogger.log(.warning, category: .cache, "Failed to save invalid NIP-05 entry for \(identifier): \(error.localizedDescription)")
+            }
+            throw NDKError.invalidResponse(from: NostrConstants.NIP05.nameNotFound)
+        }
+
+        guard let names = json["names"] as? [String: String],
               let pubkey = names[name] else {
             // Cache invalid format
             let invalidEntry = NIP05CacheEntry(
@@ -339,8 +366,11 @@ public actor NIP05Manager {
                 errorMessage: ErrorMessageConstants.invalid("JSON format")
             )
             await memoryCache.set(identifier, value: invalidEntry)
-            try? await cache.saveNIP05Resolution(invalidEntry)
-
+            do {
+                try await cache.saveNIP05Resolution(invalidEntry)
+            } catch {
+                NDKLogger.log(.warning, category: .cache, "Failed to save invalid NIP-05 entry for \(identifier): \(error.localizedDescription)")
+            }
             throw NDKError.invalidResponse(from: NostrConstants.NIP05.nameNotFound)
         }
 
@@ -360,13 +390,17 @@ public actor NIP05Manager {
 
         // Save to both caches
         await memoryCache.set(identifier, value: verifiedEntry)
-        try? await cache.saveNIP05Resolution(verifiedEntry)
+        do {
+            try await cache.saveNIP05Resolution(verifiedEntry)
+        } catch {
+            NDKLogger.log(.warning, category: .cache, "Failed to save NIP-05 resolution for \(identifier): \(error.localizedDescription)")
+        }
 
         NDKLogger.log(.info, category: .network, "✅ NIP-05: Verified \(identifier) -> \(pubkey)")
 
         // Create and return user
         let user = NDKUser(pubkey: pubkey)
-        user.ndk = ndk
+        await user.setNdk(ndk)
         return user
     }
 }
@@ -383,10 +417,10 @@ public struct NIP05CacheStatistics {
 }
 
 extension NIP05CacheEntry {
-    func toUser(ndk: NDK) -> NDKUser? {
+    func toUser(ndk: NDK) async -> NDKUser? {
         guard status == .verified, !pubkey.isEmpty else { return nil }
         let user = NDKUser(pubkey: pubkey)
-        user.ndk = ndk
+        await user.setNdk(ndk)
         return user
     }
 }

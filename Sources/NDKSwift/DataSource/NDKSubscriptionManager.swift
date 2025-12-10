@@ -430,22 +430,38 @@ actor NDKSubscriptionManager {
 
 // MARK: - Requirement Handle
 
-/// Handle for managing a data requirement lifecycle
-public final class NDKSubscriptionRequirementHandle: Sendable {
-    let id: RequirementID
-    nonisolated(unsafe) private weak var manager: NDKSubscriptionManager?
-    nonisolated(unsafe) private weak var requirement: NDKSubscriptionRequirement?
+/// Actor to store weak references thread-safely
+private actor HandleStateActor {
+    weak var manager: NDKSubscriptionManager?
+    weak var requirement: NDKSubscriptionRequirement?
 
-    init(id: RequirementID, manager: NDKSubscriptionManager?, requirement: NDKSubscriptionRequirement? = nil) {
-        self.id = id
+    init(manager: NDKSubscriptionManager?, requirement: NDKSubscriptionRequirement?) {
         self.manager = manager
         self.requirement = requirement
     }
 
+    func getManager() -> NDKSubscriptionManager? { manager }
+    func getRequirement() -> NDKSubscriptionRequirement? { requirement }
+}
+
+/// Handle for managing a data requirement lifecycle
+public final class NDKSubscriptionRequirementHandle: Sendable {
+    let id: RequirementID
+    private let state: HandleStateActor
+
+    init(id: RequirementID, manager: NDKSubscriptionManager?, requirement: NDKSubscriptionRequirement? = nil) {
+        self.id = id
+        self.state = HandleStateActor(manager: manager, requirement: requirement)
+    }
+
     /// Cancel this requirement
     public func cancel() async {
-        await manager?.cancelRequirement(id: id)
-        await requirement?.cancel()
+        if let manager = await state.getManager() {
+            await manager.cancelRequirement(id: id)
+        }
+        if let requirement = await state.getRequirement() {
+            await requirement.cancel()
+        }
     }
 }
 

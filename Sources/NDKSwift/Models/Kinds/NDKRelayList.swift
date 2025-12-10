@@ -308,8 +308,8 @@ public extension NDK {
 
 public extension NDKUser {
     /// Fetch this user's relay list
-    func fetchRelayList() async throws -> NDKRelayList? {
-        guard let ndk = ndk else { return nil }
+    func fetchRelayListEvent() async throws -> NDKRelayList? {
+        guard let ndk = await ndk else { return nil }
         return try await ndk.fetchRelayList(for: self)
     }
 }

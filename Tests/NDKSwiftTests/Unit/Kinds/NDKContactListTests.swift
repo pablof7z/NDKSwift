@@ -152,18 +152,19 @@ final class NDKContactListTests: XCTestCase {
     
     // MARK: - Contact Query Tests
     
-    func testContactQueries() {
+    func testContactQueries() async {
         let contactList = NDKContactList(ndk: ndk)
-        
+
         // Add various contacts
         contactList.addContact(pubkey: "pubkey1", relayURL: "wss://relay1.com", petname: "Alice")
         contactList.addContact(pubkey: "pubkey2", petname: "Bob")
         contactList.addContact(pubkey: "pubkey3", relayURL: "wss://relay3.com")
         contactList.addContact(pubkey: "pubkey4")
-        
+
         // Test contact queries
         XCTAssertEqual(contactList.contactPubkeys.sorted(), ["pubkey1", "pubkey2", "pubkey3", "pubkey4"])
-        XCTAssertEqual(contactList.contactUsers.count, 4)
+        let users = await contactList.contactUsers()
+        XCTAssertEqual(users.count, 4)
         
         // Test filtered queries
         let withPetnames = contactList.contactsWithPetnames
