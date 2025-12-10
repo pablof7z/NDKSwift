@@ -86,8 +86,14 @@ public actor NDKNostrDBCache: NDKCache {
 
         for file in ["data.mdb", "lock.mdb"] {
             let filePath = "\(path)/\(file)"
-            if let attrs = try? fileManager.attributesOfItem(atPath: filePath),
-               let size = attrs[.size] as? Int64 {
+            let attrs: [FileAttributeKey: Any]?
+            do {
+                attrs = try fileManager.attributesOfItem(atPath: filePath)
+            } catch {
+                NDKLogger.log(.warning, category: .cache, "Failed to get file attributes for \(filePath): \(error.localizedDescription)")
+                attrs = nil
+            }
+            if let attrs = attrs, let size = attrs[.size] as? Int64 {
                 totalSize += size
             }
         }
@@ -406,24 +412,32 @@ public actor NDKNostrDBCache: NDKCache {
                                let event = self.convertToNDKEvent(note) {
 
                                 // Parse metadata from event content
-                                if let data = event.content.data(using: .utf8),
-                                   let parsedMetadata = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                                if let data = event.content.data(using: .utf8) {
+                                    let parsedMetadata: [String: Any]?
+                                    do {
+                                        parsedMetadata = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                                    } catch {
+                                        NDKLogger.log(.warning, category: .cache, "Failed to parse metadata JSON for pubkey \(pubkey): \(error.localizedDescription)")
+                                        parsedMetadata = nil
+                                    }
 
-                                    let metadata = NDKUserMetadata(
-                                        pubkey: pubkey,
-                                        parsedMetadata: parsedMetadata,
-                                        updatedAt: event.createdAt,
-                                        eventId: event.id
-                                    )
+                                    if let parsedMetadata = parsedMetadata {
+                                        let metadata = NDKUserMetadata(
+                                            pubkey: pubkey,
+                                            parsedMetadata: parsedMetadata,
+                                            updatedAt: event.createdAt,
+                                            eventId: event.id
+                                        )
 
-                                    if !seenEOSE {
-                                        // Before EOSE: track latest (by timestamp)
-                                        if latestMetadata == nil || event.createdAt > (latestMetadata?.updatedAt ?? 0) {
-                                            latestMetadata = metadata
+                                        if !seenEOSE {
+                                            // Before EOSE: track latest (by timestamp)
+                                            if latestMetadata == nil || event.createdAt > (latestMetadata?.updatedAt ?? 0) {
+                                                latestMetadata = metadata
+                                            }
+                                        } else {
+                                            // After EOSE: yield new profiles immediately
+                                            continuation.yield(metadata)
                                         }
-                                    } else {
-                                        // After EOSE: yield new profiles immediately
-                                        continuation.yield(metadata)
                                     }
                                 }
                             }
@@ -510,8 +524,19 @@ public actor NDKNostrDBCache: NDKCache {
         }
 
         // Parse metadata from JSON content
-        guard let data = latestEvent.content.data(using: .utf8),
-              let metadata = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+        guard let data = latestEvent.content.data(using: .utf8) else {
+            return nil
+        }
+
+        let metadata: [String: Any]?
+        do {
+            metadata = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        } catch {
+            NDKLogger.log(.warning, category: .cache, "Failed to parse metadata JSON for pubkey \(pubkey): \(error.localizedDescription)")
+            return nil
+        }
+
+        guard let metadata = metadata else {
             return nil
         }
 

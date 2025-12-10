@@ -137,7 +137,15 @@ public class NDKSessionData {
             )
 
             // Get the latest event from cache
-            if let cachedEvents = try? await ndk.cache.queryEvents(cacheFilter),
+            let cachedEvents: [NDKEvent]?
+            do {
+                cachedEvents = try await ndk.cache.queryEvents(cacheFilter)
+            } catch {
+                NDKLogger.log(.warning, category: .cache, "Failed to query cache for session data (kind \(kind)): \(error.localizedDescription)")
+                cachedEvents = nil
+            }
+
+            if let cachedEvents = cachedEvents,
                let cachedEvent = cachedEvents.first {
                 latestTimestamps[kind] = cachedEvent.createdAt
 

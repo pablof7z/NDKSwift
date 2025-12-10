@@ -116,12 +116,16 @@ public actor NDKProfileManager {
 
                     // Save parsed metadata to SQLite cache
                     if let parsedData = metadata.metadata {
-                        try? await ndk.cache.saveProfileMetadata(
-                            pubkey: pubkey,
-                            metadata: parsedData,
-                            updatedAt: event.createdAt,
-                            eventId: event.id
-                        )
+                        do {
+                            try await ndk.cache.saveProfileMetadata(
+                                pubkey: pubkey,
+                                metadata: parsedData,
+                                updatedAt: event.createdAt,
+                                eventId: event.id
+                            )
+                        } catch {
+                            NDKLogger.log(.warning, category: .cache, "Failed to save profile metadata for \(pubkey.prefix(8)): \(error.localizedDescription)")
+                        }
                     }
 
                     // Notify all observers for this pubkey
@@ -130,7 +134,11 @@ public actor NDKProfileManager {
                     }
 
                     // Save event to persistent cache
-                    try? await ndk.cache.saveEvent(event)
+                    do {
+                        try await ndk.cache.saveEvent(event)
+                    } catch {
+                        NDKLogger.log(.warning, category: .cache, "Failed to save profile event \(event.id.prefix(8)) to cache: \(error.localizedDescription)")
+                    }
                 }
 
                 // Clean up when done
@@ -200,12 +208,16 @@ public actor NDKProfileManager {
         
         // Save parsed metadata to SQLite cache
         if let ndk = ndk, let parsedData = metadata.metadata {
-            try? await ndk.cache.saveProfileMetadata(
-                pubkey: pubkey,
-                metadata: parsedData,
-                updatedAt: metadata.updatedAt,
-                eventId: metadata.eventId
-            )
+            do {
+                try await ndk.cache.saveProfileMetadata(
+                    pubkey: pubkey,
+                    metadata: parsedData,
+                    updatedAt: metadata.updatedAt,
+                    eventId: metadata.eventId
+                )
+            } catch {
+                NDKLogger.log(.warning, category: .cache, "Failed to save profile metadata for \(pubkey.prefix(8)): \(error.localizedDescription)")
+            }
         }
     }
     

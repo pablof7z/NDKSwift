@@ -205,6 +205,7 @@ public actor NDKSQLiteCache: NDKCache {
     /// Reconstruct profile metadata from database row
     private nonisolated func reconstructProfileMetadata(from row: Row) -> [String: Any] {
         var metadata: [String: Any] = [:]
+        let pubkey = row["pubkey"] as? String ?? "unknown"
 
         // Check if we have semantic fields populated
         let hasSemanticFields = row["name"] as? String != nil ||
@@ -224,18 +225,34 @@ public actor NDKSQLiteCache: NDKCache {
             if let lud16 = row["lud16"] as? String { metadata["lud16"] = lud16 }
 
             // Add additional fields if present
-            if let additionalFieldsData = row["additional_fields"] as? Data,
-               let additionalFields = try? PropertyListSerialization.propertyList(from: additionalFieldsData, format: nil) as? [String: String] {
-                for (key, value) in additionalFields {
-                    metadata[key] = value
+            if let additionalFieldsData = row["additional_fields"] as? Data {
+                let additionalFields: [String: String]?
+                do {
+                    additionalFields = try PropertyListSerialization.propertyList(from: additionalFieldsData, format: nil) as? [String: String]
+                } catch {
+                    NDKLogger.log(.warning, category: .cache, "Failed to deserialize additional fields for profile \(pubkey): \(error.localizedDescription)")
+                    additionalFields = nil
+                }
+                if let additionalFields = additionalFields {
+                    for (key, value) in additionalFields {
+                        metadata[key] = value
+                    }
                 }
             }
         } else {
             // Fallback to JSON parsing for backward compatibility
             if let jsonString = row["json"] as? String,
-               let jsonData = jsonString.data(using: .utf8),
-               let jsonDict = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] {
-                metadata = jsonDict
+               let jsonData = jsonString.data(using: .utf8) {
+                let jsonDict: [String: Any]?
+                do {
+                    jsonDict = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any]
+                } catch {
+                    NDKLogger.log(.warning, category: .cache, "Failed to parse JSON for profile \(pubkey): \(error.localizedDescription)")
+                    jsonDict = nil
+                }
+                if let jsonDict = jsonDict {
+                    metadata = jsonDict
+                }
             }
         }
 
@@ -267,7 +284,12 @@ public actor NDKSQLiteCache: NDKCache {
         // Encode additional fields as property list data
         let additionalFieldsData: Data?
         if !additionalFields.isEmpty {
-            additionalFieldsData = try? PropertyListSerialization.data(fromPropertyList: additionalFields, format: .binary, options: 0)
+            do {
+                additionalFieldsData = try PropertyListSerialization.data(fromPropertyList: additionalFields, format: .binary, options: 0)
+            } catch {
+                NDKLogger.log(.warning, category: .cache, "Failed to encode additional fields for profile \(pubkey): \(error.localizedDescription)")
+                additionalFieldsData = nil
+            }
         } else {
             additionalFieldsData = nil
         }
@@ -512,12 +534,19 @@ public actor NDKSQLiteCache: NDKCache {
 
     public func isMintInfoStale(url: String, maxAge: TimeInterval = TimeConstants.day) async -> Bool {
         let staleThreshold = Timestamp.now - Timestamp(maxAge)
-        return (try? await dbQueue.read { db in
-            if let lastUpdated = try Int64.fetchOne(db, sql: "SELECT last_updated FROM mint_info WHERE url = ?", arguments: [url]) {
-                return lastUpdated < staleThreshold
+        let result: Bool
+        do {
+            result = try await dbQueue.read { db in
+                if let lastUpdated = try Int64.fetchOne(db, sql: "SELECT last_updated FROM mint_info WHERE url = ?", arguments: [url]) {
+                    return lastUpdated < staleThreshold
+                }
+                return true // If not found, consider it stale
             }
-            return true // If not found, consider it stale
-        }) ?? true
+        } catch {
+            NDKLogger.log(.warning, category: .cache, "Failed to check mint info staleness for \(url): \(error.localizedDescription)")
+            result = true
+        }
+        return result
     }
 
     public func invalidateMintCache(url: String) async throws {
@@ -616,16 +645,23 @@ public actor NDKSQLiteCache: NDKCache {
 
     public func areKeysetsStale(mintUrl: String, maxAge: TimeInterval = TimeConstants.hour) async -> Bool {
         let staleThreshold = Timestamp.now - Timestamp(maxAge)
-        return (try? await dbQueue.read { db in
-            if let oldestUpdate = try Int64.fetchOne(
-                db,
-                sql: "SELECT MIN(last_updated) FROM keysets WHERE mint_url = ?",
-                arguments: [mintUrl]
-            ) {
-                return oldestUpdate < staleThreshold
+        let result: Bool
+        do {
+            result = try await dbQueue.read { db in
+                if let oldestUpdate = try Int64.fetchOne(
+                    db,
+                    sql: "SELECT MIN(last_updated) FROM keysets WHERE mint_url = ?",
+                    arguments: [mintUrl]
+                ) {
+                    return oldestUpdate < staleThreshold
+                }
+                return true // If no keysets found, consider it stale
             }
-            return true // If no keysets found, consider it stale
-        }) ?? true
+        } catch {
+            NDKLogger.log(.warning, category: .cache, "Failed to check keysets staleness for \(mintUrl): \(error.localizedDescription)")
+            result = true
+        }
+        return result
     }
 
     public func deleteKeysets(mintUrl: String) async throws {
@@ -778,8 +814,19 @@ public actor NDKSQLiteCache: NDKCache {
                           let jsonData = jsonString.data(using: .utf8),
                           let event = JSONCoding.safeDecode(NDKEvent.self, from: jsonData),
                           let targetRelaysJson = row["target_relays"] as? String,
-                          let targetRelaysData = targetRelaysJson.data(using: .utf8),
-                          let targetRelaysArray = try? JSONCoding.decode([String].self, from: targetRelaysData) else {
+                          let targetRelaysData = targetRelaysJson.data(using: .utf8) else {
+                        return nil
+                    }
+
+                    let targetRelaysArray: [String]?
+                    do {
+                        targetRelaysArray = try JSONCoding.decode([String].self, from: targetRelaysData)
+                    } catch {
+                        NDKLogger.log(.warning, category: .cache, "Failed to decode target relays for event \(event.id): \(error.localizedDescription)")
+                        return nil
+                    }
+
+                    guard let targetRelaysArray = targetRelaysArray else {
                         return nil
                     }
 
@@ -936,7 +983,17 @@ public actor NDKSQLiteCache: NDKCache {
         let claimedAt = Timestamp.from(entry.claimedAt)
         let verifiedAt = entry.verifiedAt.map { Timestamp.from($0) }
         let lastCheckAt = entry.lastCheckAt.map { Timestamp.from($0) }
-        let nip46RelaysJSON = entry.nip46Relays.flatMap { try? JSONCoding.encodeToString($0) }
+        let nip46RelaysJSON: String?
+        if let relays = entry.nip46Relays {
+            do {
+                nip46RelaysJSON = try JSONCoding.encodeToString(relays)
+            } catch {
+                NDKLogger.log(.warning, category: .cache, "Failed to encode NIP-46 relays for \(entry.identifier): \(error.localizedDescription)")
+                nip46RelaysJSON = nil
+            }
+        } else {
+            nip46RelaysJSON = nil
+        }
 
         do {
             try await dbQueue.write { [debugMode] db in
@@ -1138,9 +1195,41 @@ public actor NDKSQLiteCache: NDKCache {
         let fetchedAtInt = Timestamp.from(fetchedAt)
         let expiresAtInt = Timestamp.from(expiresAt)
 
-        let writeRelaysJSON = writeRelays != nil ? try? JSONCoding.encodeToString(writeRelays!) : nil
-        let readRelaysJSON = readRelays != nil ? try? JSONCoding.encodeToString(readRelays!) : nil
-        let checkedRelaysJSON = checkedRelays != nil ? try? JSONCoding.encodeToString(Array(checkedRelays!)) : nil
+        let writeRelaysJSON: String?
+        if let writeRelays = writeRelays {
+            do {
+                writeRelaysJSON = try JSONCoding.encodeToString(writeRelays)
+            } catch {
+                NDKLogger.log(.warning, category: .cache, "Failed to encode write relays for \(pubkey): \(error.localizedDescription)")
+                writeRelaysJSON = nil
+            }
+        } else {
+            writeRelaysJSON = nil
+        }
+
+        let readRelaysJSON: String?
+        if let readRelays = readRelays {
+            do {
+                readRelaysJSON = try JSONCoding.encodeToString(readRelays)
+            } catch {
+                NDKLogger.log(.warning, category: .cache, "Failed to encode read relays for \(pubkey): \(error.localizedDescription)")
+                readRelaysJSON = nil
+            }
+        } else {
+            readRelaysJSON = nil
+        }
+
+        let checkedRelaysJSON: String?
+        if let checkedRelays = checkedRelays {
+            do {
+                checkedRelaysJSON = try JSONCoding.encodeToString(Array(checkedRelays))
+            } catch {
+                NDKLogger.log(.warning, category: .cache, "Failed to encode checked relays for \(pubkey): \(error.localizedDescription)")
+                checkedRelaysJSON = nil
+            }
+        } else {
+            checkedRelaysJSON = nil
+        }
 
         do {
             try await dbQueue.write { [debugMode] db in

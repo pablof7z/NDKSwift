@@ -203,7 +203,11 @@ public class NDKAuthManager {
                 } catch {
                     NDKLogger.log(.error, category: .auth, "Failed to load session \(sessionId): \(error)")
                     // Clean up corrupted session
-                    try? await keychainManager.deleteSessionMetadata(identifier: sessionId)
+                    do {
+                        try await keychainManager.deleteSessionMetadata(identifier: sessionId)
+                    } catch {
+                        NDKLogger.log(.warning, category: .auth, "Failed to delete corrupted session metadata for \(sessionId): \(error.localizedDescription)")
+                    }
                 }
             }
 

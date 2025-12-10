@@ -17,7 +17,12 @@ public extension NDK {
     var currentUser: NDKUser? {
         get async {
             guard let signer = signer else { return nil }
-            return try? await signer.asUser()
+            do {
+                return try await signer.asUser()
+            } catch {
+                NDKLogger.log(.warning, category: .signer, "Failed to get current user from signer: \(error.localizedDescription)")
+                return nil
+            }
         }
     }
     

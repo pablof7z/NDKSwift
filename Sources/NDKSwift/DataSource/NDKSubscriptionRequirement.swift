@@ -245,9 +245,13 @@ actor NDKSubscriptionRequirement {
         
         guard !seenEventIds.contains(event.id) else { return }
         seenEventIds.insert(event.id)
-        
+
         // Store in cache
-        try? await cache.saveEvent(event)
+        do {
+            try await cache.saveEvent(event)
+        } catch {
+            NDKLogger.log(.warning, category: .cache, "Failed to save event \(event.id.prefix(8)) to cache: \(error.localizedDescription)")
+        }
         
         // Notify relay update observers if we have relay info
         if let relay = relay {
