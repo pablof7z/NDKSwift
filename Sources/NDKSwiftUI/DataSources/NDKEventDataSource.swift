@@ -1,7 +1,7 @@
 import Foundation
 import NDKSwift
 import SwiftUI
-import Combine
+import Observation
 
 // MARK: - NDKEventDataSource
 
@@ -18,30 +18,31 @@ import Combine
 ///
 /// ```swift
 /// // Feed of text notes
-/// @StateObject private var feedDataSource = NDKEventDataSource(
+/// @State private var feedDataSource = NDKEventDataSource(
 ///     ndk: ndk,
 ///     filter: NDKFilter(kinds: [1], limit: 20)
 /// )
 ///
 /// // User's posts
-/// @StateObject private var userPostsDataSource = NDKEventDataSource(
+/// @State private var userPostsDataSource = NDKEventDataSource(
 ///     ndk: ndk,
 ///     filter: NDKFilter(authors: [pubkey], kinds: [1])
 /// )
 /// ```
+@Observable
 @MainActor
-public final class NDKEventDataSource: ObservableObject, @preconcurrency NDKSubscriptionProtocol {
+public final class NDKEventDataSource: @preconcurrency NDKSubscriptionProtocol {
 
     // MARK: - Published Properties
 
     /// Array of events matching the filter, sorted by creation time
-    @Published public private(set) var events: [NDKEvent] = []
+    public private(set) var events: [NDKEvent] = []
 
     /// Whether the data source is currently loading
-    @Published public private(set) var isLoading = false
+    public private(set) var isLoading = false
 
     /// Any error that occurred during loading
-    @Published public private(set) var error: Error?
+    public private(set) var error: Error?
 
     // MARK: - Private Properties
 
@@ -49,7 +50,7 @@ public final class NDKEventDataSource: ObservableObject, @preconcurrency NDKSubs
     private let filter: NDKFilter
     private let sortDescending: Bool
     private let dataSource: NDKSubscription<NDKEvent>
-    private var cancellables = Set<AnyCancellable>()
+    @ObservationIgnored private var observationTask: Task<Void, Never>?
 
     // MARK: - Initialization
 
@@ -80,28 +81,34 @@ public final class NDKEventDataSource: ObservableObject, @preconcurrency NDKSubs
         observeEventData()
     }
 
+    deinit {
+        observationTask?.cancel()
+    }
+
     // MARK: - Private Methods
 
     private func observeEventData() {
-        // Map and sort events
-        dataSource.$data
-            .map { [sortDescending] events in
-                sortDescending
-                    ? events.sorted { $0.createdAt > $1.createdAt }
-                    : events.sorted { $0.createdAt < $1.createdAt }
+        observationTask = Task { @MainActor in
+            var eventList: [NDKEvent] = []
+
+            for await event in dataSource.events {
+                eventList.append(event)
+
+                // Sort events
+                events = sortDescending
+                    ? eventList.sorted { $0.createdAt > $1.createdAt }
+                    : eventList.sorted { $0.createdAt < $1.createdAt }
             }
-            .receive(on: DispatchQueue.main)
-            .assign(to: &$events)
+        }
 
-        // Map loading state
-        dataSource.$isLoading
-            .receive(on: DispatchQueue.main)
-            .assign(to: &$isLoading)
-
-        // Map error state
-        dataSource.$error
-            .receive(on: DispatchQueue.main)
-            .assign(to: &$error)
+        // Observe loading and error states
+        Task { @MainActor in
+            while !Task.isCancelled {
+                isLoading = dataSource.isLoading
+                error = dataSource.error
+                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
+            }
+        }
     }
 
     // MARK: - Public Methods

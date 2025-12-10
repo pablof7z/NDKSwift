@@ -1,5 +1,5 @@
 import Foundation
-import Combine
+import Observation
 
 /// Observable collection of relay states for SwiftUI integration.
 ///
@@ -27,8 +27,9 @@ import Combine
 /// ```
 ///
 /// - Note: This is a lightweight wrapper that provides reactive updates without modifying core relay architecture
+@Observable
 @MainActor
-public final class NDKRelayCollection: ObservableObject {
+public final class NDKRelayCollection {
     /// Relay information with observable state
     public struct RelayInfo: Identifiable {
         public let id: String
@@ -45,13 +46,13 @@ public final class NDKRelayCollection: ObservableObject {
         }
     }
 
-    @Published public private(set) var relays: [RelayInfo] = []
-    @Published public private(set) var connectedCount: Int = 0
-    @Published public private(set) var totalCount: Int = 0
+    public private(set) var relays: [RelayInfo] = []
+    public private(set) var connectedCount: Int = 0
+    public private(set) var totalCount: Int = 0
 
     private weak var ndk: NDK?
-    private var stateObservers: [String: Task<Void, Never>] = [:]
-    private var poolObserverTask: Task<Void, Never>?
+    @ObservationIgnored private var stateObservers: [String: Task<Void, Never>] = [:]
+    @ObservationIgnored private var poolObserverTask: Task<Void, Never>?
 
     public init(ndk: NDK? = nil) {
         self.ndk = ndk

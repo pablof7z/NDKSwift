@@ -271,8 +271,8 @@ private class ReactionState: ObservableObject {
         )
 
         // Process reaction events
-        for await events in dataSource.$data.values {
-            await updateReactionState(from: events, ndk: ndk)
+        for await _ in dataSource.events {
+            await updateReactionState(from: dataSource.data, ndk: ndk)
         }
     }
 
