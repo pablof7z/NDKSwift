@@ -32,31 +32,37 @@ struct Example08_PublishWithNIP46 {
         
         do {
             if connectionString.hasPrefix("bunker://") {
-                bunkerSigner = try NDKBunkerSigner.bunker(ndk: ndk, connectionToken: connectionString)
+                bunkerSigner = try await NDKBunkerSigner.bunker(ndk: ndk, connectionToken: connectionString)
                 print("✅ Created bunker signer")
             } else if connectionString.hasPrefix("nostrconnect://") {
-                // For nostrconnect, we need to extract the relay from the URL
+                // For nostrconnect, we need to extract relay(s) from the URL
                 if let url = URL(string: connectionString),
-                   let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-                   let relayItem = components.queryItems?.first(where: { $0.name == "relay" }),
-                   let relay = relayItem.value {
-                    
+                   let components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+
+                    // Extract all relay parameters (NIP-46 supports multiple relays)
+                    let relays = components.queryItems?.filter { $0.name == "relay" }.compactMap { $0.value } ?? []
+
+                    guard !relays.isEmpty else {
+                        print("❌ Invalid nostrconnect URL - missing relay parameter")
+                        return
+                    }
+
                     let options = NDKBunkerSigner.NostrConnectOptions(
                         name: "NDKSwift Example",
                         url: "https://github.com/nostr-dev-kit/ndk-swift",
                         perms: "sign_event:1"
                     )
-                    
-                    bunkerSigner = try NDKBunkerSigner.nostrConnect(
+
+                    bunkerSigner = try await NDKBunkerSigner.nostrConnect(
                         ndk: ndk,
-                        relay: relay,
+                        relays: relays,
                         options: options
                     )
-                    
+
                     print("✅ Created nostrconnect signer")
                     print("📋 Connection URI: \(await bunkerSigner.nostrConnectUri ?? "N/A")")
                 } else {
-                    print("❌ Invalid nostrconnect URL - missing relay parameter")
+                    print("❌ Invalid nostrconnect URL format")
                     return
                 }
             } else {

@@ -62,7 +62,7 @@ public class NDKSignerRegistry {
     ///   - ndk: Optional NDK instance for signers that need it
     /// - Returns: A reconstructed signer instance
     /// - Throws: Deserialization errors if the data is invalid or the signer type is not registered
-    public func createSigner(from data: Data, ndk: NDK? = nil) throws -> any NDKSigner {
+    public func createSigner(from data: Data, ndk: NDK? = nil) async throws -> any NDKSigner {
 
         // Parse the outer container to get the signer type
         let container: SignerContainer
@@ -83,7 +83,7 @@ public class NDKSignerRegistry {
         let payloadData = try JSONCoding.encode(container.payload)
 
         // Deserialize the signer
-        return try signerType.deserialize(payloadData, ndk: ndk)
+        return try await signerType.deserialize(payloadData, ndk: ndk)
     }
 
     /// Get all registered signer type identifiers

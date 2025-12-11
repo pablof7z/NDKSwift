@@ -35,7 +35,7 @@ public protocol NDKSigner: Sendable {
     func serialize() async throws -> Data
 
     /// Deserialize a signer from stored data
-    static func deserialize(_ data: Data, ndk: NDK?) throws -> Self
+    static func deserialize(_ data: Data, ndk: NDK?) async throws -> Self
 }
 
 /// Default implementations
