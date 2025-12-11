@@ -51,12 +51,13 @@ final class BroadFilterReactiveTest: XCTestCase {
         // Give broad subscription time to set up
         try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         
-        // Create specific network subscription (only author1's kind:1 events)
+        // Create specific subscription with default cache policy (author1's kind:1 events)
+        // This will observe both cache and network, allowing cross-subscription delivery
         let specificFilter = NDKFilter(authors: [author1], kinds: [1])
         let specificDataSource = ndk.subscribe(
             filter: specificFilter,
-            cachePolicy: .networkOnly,
-            subscriptionId: "specific-network-sub"
+            cachePolicy: .cacheWithNetwork,
+            subscriptionId: "specific-sub"
         )
         
         let specificTask = Task {
