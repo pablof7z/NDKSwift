@@ -11,7 +11,12 @@ public protocol NDKAuthenticationDelegate: AnyObject, Sendable {
 }
 
 /// Main entry point for NDKSwift
-public final class NDK {
+/// **Sendable Conformance**: Uses @unchecked Sendable because:
+/// - NDK is designed as a singleton-style coordinator accessed from multiple contexts
+/// - Internal state is protected by actors (PendingAuthEventsManager, etc.)
+/// - Mutable properties (signer, cache, pool) are thread-safe types or accessed via MainActor
+/// - Typical usage pattern: created once, configured early, then used read-only
+public final class NDK: @unchecked Sendable {
     // MARK: - Core Properties
 
     /// Active signer for this NDK instance
