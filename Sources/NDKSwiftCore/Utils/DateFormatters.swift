@@ -7,21 +7,36 @@ public enum DateFormatters {
     // MARK: - Standard Formatters
 
     /// ISO8601 formatter for timestamps
-    public static let iso8601: ISO8601DateFormatter = {
+    ///
+    /// **Concurrency Safety**: `nonisolated(unsafe)` is safe here because:
+    /// - Formatter is created once during lazy initialization
+    /// - Never modified after creation (immutable usage pattern)
+    /// - ISO8601DateFormatter is safe for concurrent reads
+    public nonisolated(unsafe) static let iso8601: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter
     }()
 
     /// ISO8601 formatter without fractional seconds
-    public static let iso8601Basic: ISO8601DateFormatter = {
+    ///
+    /// **Concurrency Safety**: `nonisolated(unsafe)` is safe here because:
+    /// - Formatter is created once during lazy initialization
+    /// - Never modified after creation (immutable usage pattern)
+    /// - ISO8601DateFormatter is safe for concurrent reads
+    public nonisolated(unsafe) static let iso8601Basic: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
         return formatter
     }()
 
     /// Standard date formatter for display
-    public static let display: DateFormatter = {
+    ///
+    /// **Concurrency Safety**: `nonisolated(unsafe)` is safe here because:
+    /// - Formatter is created once during lazy initialization
+    /// - Never modified after creation (immutable usage pattern)
+    /// - DateFormatter is safe for concurrent reads
+    public nonisolated(unsafe) static let display: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
@@ -29,7 +44,12 @@ public enum DateFormatters {
     }()
 
     /// Date-only formatter
-    public static let dateOnly: DateFormatter = {
+    ///
+    /// **Concurrency Safety**: `nonisolated(unsafe)` is safe here because:
+    /// - Formatter is created once during lazy initialization
+    /// - Never modified after creation (immutable usage pattern)
+    /// - DateFormatter is safe for concurrent reads
+    public nonisolated(unsafe) static let dateOnly: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
         formatter.timeStyle = .none
@@ -37,7 +57,12 @@ public enum DateFormatters {
     }()
 
     /// Time-only formatter
-    public static let timeOnly: DateFormatter = {
+    ///
+    /// **Concurrency Safety**: `nonisolated(unsafe)` is safe here because:
+    /// - Formatter is created once during lazy initialization
+    /// - Never modified after creation (immutable usage pattern)
+    /// - DateFormatter is safe for concurrent reads
+    public nonisolated(unsafe) static let timeOnly: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateStyle = .none
         formatter.timeStyle = .short
@@ -58,14 +83,24 @@ public enum DateFormatters {
     // MARK: - Relative Date Formatting
 
     /// Relative date formatter (e.g., "2 hours ago", "yesterday")
-    public static let relative: RelativeDateTimeFormatter = {
+    ///
+    /// **Concurrency Safety**: `nonisolated(unsafe)` is safe here because:
+    /// - Formatter is created once during lazy initialization
+    /// - Never modified after creation (immutable usage pattern)
+    /// - RelativeDateTimeFormatter is safe for concurrent reads
+    public nonisolated(unsafe) static let relative: RelativeDateTimeFormatter = {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .full
         return formatter
     }()
 
     /// Short relative date formatter (e.g., "2h ago", "1d ago")
-    public static let relativeShort: RelativeDateTimeFormatter = {
+    ///
+    /// **Concurrency Safety**: `nonisolated(unsafe)` is safe here because:
+    /// - Formatter is created once during lazy initialization
+    /// - Never modified after creation (immutable usage pattern)
+    /// - RelativeDateTimeFormatter is safe for concurrent reads
+    public nonisolated(unsafe) static let relativeShort: RelativeDateTimeFormatter = {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
         return formatter

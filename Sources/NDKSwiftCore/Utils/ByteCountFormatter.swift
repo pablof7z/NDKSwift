@@ -4,15 +4,25 @@ import Foundation
 public enum ByteCountFormatters {
     
     /// Shared byte count formatter instance
-    private static let formatter: ByteCountFormatter = {
+    ///
+    /// **Concurrency Safety**: `nonisolated(unsafe)` is safe here because:
+    /// - Formatter is created once during lazy initialization
+    /// - Never modified after creation (immutable usage pattern)
+    /// - ByteCountFormatter is safe for concurrent reads
+    private nonisolated(unsafe) static let formatter: ByteCountFormatter = {
         let formatter = ByteCountFormatter()
         formatter.allowedUnits = [.useBytes, .useKB, .useMB, .useGB]
         formatter.countStyle = .binary
         return formatter
     }()
-    
+
     /// Shared decimal style formatter (1000 instead of 1024)
-    private static let decimalFormatter: ByteCountFormatter = {
+    ///
+    /// **Concurrency Safety**: `nonisolated(unsafe)` is safe here because:
+    /// - Formatter is created once during lazy initialization
+    /// - Never modified after creation (immutable usage pattern)
+    /// - ByteCountFormatter is safe for concurrent reads
+    private nonisolated(unsafe) static let decimalFormatter: ByteCountFormatter = {
         let formatter = ByteCountFormatter()
         formatter.allowedUnits = [.useBytes, .useKB, .useMB, .useGB]
         formatter.countStyle = .decimal
