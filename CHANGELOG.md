@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Added `nonisolated(unsafe)` with safety documentation to static formatters and logger config
+  - ByteCountFormatter, DateFormatter instances are immutable after creation (safe)
+  - Logger config vars are set at startup (acceptable trade-off for logging)
+
 ## [0.13] - 2025-12-11
 
 ### Added

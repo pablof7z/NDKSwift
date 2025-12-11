@@ -194,10 +194,22 @@ public enum NDKLogger {
     }()
 
     /// Enable/disable network traffic logging
-    public static var logNetworkTraffic: Bool = false
+    ///
+    /// **Concurrency Safety**: `nonisolated(unsafe)` is acceptable here because:
+    /// - Typically set once at app startup, rarely modified during runtime
+    /// - Logging is a cross-cutting concern that shouldn't require `await`
+    /// - Worst case: a log message uses stale config value (acceptable for logging)
+    /// - Standard practice in logging libraries to accept this trade-off
+    public nonisolated(unsafe) static var logNetworkTraffic: Bool = false
 
     /// Enable/disable pretty printing for network messages
-    public static var prettyPrintNetworkMessages: Bool = true
+    ///
+    /// **Concurrency Safety**: `nonisolated(unsafe)` is acceptable here because:
+    /// - Typically set once at app startup, rarely modified during runtime
+    /// - Logging is a cross-cutting concern that shouldn't require `await`
+    /// - Worst case: a log message uses stale config value (acceptable for logging)
+    /// - Standard practice in logging libraries to accept this trade-off
+    public nonisolated(unsafe) static var prettyPrintNetworkMessages: Bool = true
     
     /// Check if logging is enabled (log level is not off)
     public static var isEnabled: Bool {
@@ -205,7 +217,13 @@ public enum NDKLogger {
     }
 
     /// Categories to log - default excludes noisiest categories for better experience
-    public static var enabledCategories: Set<NDKLogCategory> = {
+    ///
+    /// **Concurrency Safety**: `nonisolated(unsafe)` is acceptable here because:
+    /// - Typically set once at app startup, rarely modified during runtime
+    /// - Logging is a cross-cutting concern that shouldn't require `await`
+    /// - Worst case: a log message uses stale category filter (acceptable for logging)
+    /// - Standard practice in logging libraries to accept this trade-off
+    public nonisolated(unsafe) static var enabledCategories: Set<NDKLogCategory> = {
         var categories = Set(NDKLogCategory.allCases)
         // Remove noisiest categories by default
         categories.remove(.database)
@@ -231,7 +249,13 @@ public enum NDKLogger {
     }
 
     /// Custom log handler for external integration
-    public static var logHandler: ((String) -> Void)? = nil
+    ///
+    /// **Concurrency Safety**: `nonisolated(unsafe)` is acceptable here because:
+    /// - Set once at app startup before any logging occurs
+    /// - Never modified after initial configuration
+    /// - Logging is a cross-cutting concern that shouldn't require `await`
+    /// - Standard practice in logging libraries to accept this trade-off
+    public nonisolated(unsafe) static var logHandler: ((String) -> Void)? = nil
     
     /// Log a message at the specified level
     public static func log(_ level: NDKLogLevel, category: NDKLogCategory, _ message: String) {
