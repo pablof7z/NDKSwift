@@ -7,24 +7,14 @@ public enum DateFormatters {
     // MARK: - Standard Formatters
 
     /// ISO8601 formatter for timestamps
-    ///
-    /// **Concurrency Safety**: `nonisolated(unsafe)` is safe here because:
-    /// - Formatter is created once during lazy initialization
-    /// - Never modified after creation (immutable usage pattern)
-    /// - ISO8601DateFormatter is safe for concurrent reads
-    public nonisolated(unsafe) static let iso8601: ISO8601DateFormatter = {
+    public static let iso8601: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter
     }()
 
     /// ISO8601 formatter without fractional seconds
-    ///
-    /// **Concurrency Safety**: `nonisolated(unsafe)` is safe here because:
-    /// - Formatter is created once during lazy initialization
-    /// - Never modified after creation (immutable usage pattern)
-    /// - ISO8601DateFormatter is safe for concurrent reads
-    public nonisolated(unsafe) static let iso8601Basic: ISO8601DateFormatter = {
+    public static let iso8601Basic: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
         return formatter
