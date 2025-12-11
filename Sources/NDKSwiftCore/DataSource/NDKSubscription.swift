@@ -2,7 +2,7 @@ import Foundation
 import Observation
 
 /// Defines how the cache should be used for data requests
-public enum CachePolicy {
+public enum CachePolicy: Sendable {
     /// Return cached data if available and fresh, otherwise fetch from network
     case cacheWithNetwork
     /// Only return data from the cache; never hit the network

@@ -1,7 +1,7 @@
 import Foundation
 
 /// Represents the delay type for groupable subscriptions
-public enum NDKSubscriptionDelayType {
+public enum NDKSubscriptionDelayType: Sendable {
     case atLeast  // Wait at least this long before executing
     case atMost   // Execute within this time at most
 }
