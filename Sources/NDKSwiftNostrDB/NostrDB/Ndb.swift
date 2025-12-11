@@ -150,9 +150,10 @@ enum DatabaseError: Error {
 }
 
 /// **Sendable Conformance**: Uses @unchecked Sendable because:
-/// - Underlying ndb pointer is thread-safe C library
-/// - Actor-isolated continuations dictionary protects concurrent access
-/// - All mutable state managed through actors or atomic operations
+/// - Underlying ndb pointer is thread-safe C library (LMDB)
+/// - CallbackHandler actor protects subscription state and continuations
+/// - Typical usage: singleton-style object created once then used read-only
+/// - Mutable properties (generation, closed) are not hotly contended in normal usage
 class Ndb: @unchecked Sendable {
     var ndb: ndb_t
     let path: String?
@@ -858,7 +859,31 @@ class Ndb: @unchecked Sendable {
         
         return noteIds
     }
-    
+
+    /// Actor to manage subscription state for concurrent access
+    private actor SubscriptionState {
+        var streaming: Bool = true
+        var terminationStarted: Bool = false
+        var subid: UInt64 = 0
+
+        func setSubid(_ id: UInt64) {
+            subid = id
+        }
+
+        func markTerminated() -> Bool {
+            if terminationStarted {
+                return false  // Already terminated
+            }
+            terminationStarted = true
+            streaming = false
+            return true  // First termination
+        }
+
+        func getSubid() -> UInt64 {
+            return subid
+        }
+    }
+
     /// Safe wrapper around `ndb_subscribe` that handles all pointer management
     /// - Parameters:
     ///   - filters: Array of NdbFilter objects
@@ -871,50 +896,53 @@ class Ndb: @unchecked Sendable {
             for (index, ndbFilter) in filters.enumerated() {
                 filtersPointer.advanced(by: index).pointee = ndbFilter.ndbFilter
             }
-            
-            var streaming = true
-            var subid: UInt64 = 0
-            var terminationStarted = false
-            
+
+            let state = SubscriptionState()
+
             // Set up termination handler
             continuation.onTermination = { @Sendable _ in
-                guard !terminationStarted else { return }   // Avoid race conditions between two termination closures
-                terminationStarted = true
-                Log.debug("ndb_wait: stream: Terminated early", for: .ndb)
-                streaming = false
-                // Clean up resources on early termination
-                if subid != 0 {
-                    ndb_unsubscribe(self.ndb.ndb, subid)
-                    Task { await self.unsetContinuation(subscriptionId: subid) }
+                Task {
+                    guard await state.markTerminated() else { return }
+                    Log.debug("ndb_wait: stream: Terminated early", for: .ndb)
+                    let currentSubid = await state.getSubid()
+                    if currentSubid != 0 {
+                        ndb_unsubscribe(self.ndb.ndb, currentSubid)
+                        await self.unsetContinuation(subscriptionId: currentSubid)
+                    }
+                    filtersPointer.deallocate()
                 }
-                filtersPointer.deallocate()
             }
-            
-            if !streaming {
-                return
-            }
-            
-            // Set up subscription
-            subid = ndb_subscribe(self.ndb.ndb, filtersPointer, Int32(filters.count))
-            
-            // We are setting the continuation after issuing the subscription call.
-            // This won't cause lost notes because if any notes get issued before registering
-            // the continuation they will get queued by `Ndb.CallbackHandler`
-            let continuationSetupTask = Task {
-                await self.setContinuation(for: subid, continuation: continuation)
-            }
-            
-            // Update termination handler to include subscription cleanup
-            continuation.onTermination = { @Sendable _ in
-                guard !terminationStarted else { return }   // Avoid race conditions between two termination closures
-                terminationStarted = true
-                Log.debug("ndb_wait: stream: Terminated early", for: .ndb)
-                streaming = false
-                continuationSetupTask.cancel()
-                Task { await self.unsetContinuation(subscriptionId: subid) }
-                filtersPointer.deallocate()
-                guard !self.is_closed else { return }   // Double-check Ndb is open before sending unsubscribe
-                ndb_unsubscribe(self.ndb.ndb, subid)
+
+            Task {
+                if !(await state.streaming) {
+                    return
+                }
+
+                // Set up subscription
+                let newSubid = ndb_subscribe(self.ndb.ndb, filtersPointer, Int32(filters.count))
+                await state.setSubid(newSubid)
+
+                // We are setting the continuation after issuing the subscription call.
+                // This won't cause lost notes because if any notes get issued before registering
+                // the continuation they will get queued by `Ndb.CallbackHandler`
+                let continuationSetupTask = Task {
+                    let currentSubid = await state.getSubid()
+                    await self.setContinuation(for: currentSubid, continuation: continuation)
+                }
+
+                // Update termination handler to include subscription cleanup
+                continuation.onTermination = { @Sendable _ in
+                    Task {
+                        guard await state.markTerminated() else { return }
+                        Log.debug("ndb_wait: stream: Terminated early", for: .ndb)
+                        continuationSetupTask.cancel()
+                        let currentSubid = await state.getSubid()
+                        await self.unsetContinuation(subscriptionId: currentSubid)
+                        filtersPointer.deallocate()
+                        guard !self.is_closed else { return }
+                        ndb_unsubscribe(self.ndb.ndb, currentSubid)
+                    }
+                }
             }
         }
     }
