@@ -865,9 +865,14 @@ class Ndb: @unchecked Sendable {
         var streaming: Bool = true
         var terminationStarted: Bool = false
         var subid: UInt64 = 0
+        var filtersPointer: UnsafeMutablePointer<ndb_filter>?
 
         func setSubid(_ id: UInt64) {
             subid = id
+        }
+
+        func setFiltersPointer(_ pointer: UnsafeMutablePointer<ndb_filter>) {
+            filtersPointer = pointer
         }
 
         func markTerminated() -> Bool {
@@ -881,6 +886,13 @@ class Ndb: @unchecked Sendable {
 
         func getSubid() -> UInt64 {
             return subid
+        }
+
+        func deallocateFilters() {
+            if let pointer = filtersPointer {
+                pointer.deallocate()
+                filtersPointer = nil
+            }
         }
     }
 
@@ -899,6 +911,11 @@ class Ndb: @unchecked Sendable {
 
             let state = SubscriptionState()
 
+            // Store the pointer in the actor to avoid capturing non-Sendable type in @Sendable closure
+            Task {
+                await state.setFiltersPointer(filtersPointer)
+            }
+
             // Set up termination handler
             continuation.onTermination = { @Sendable _ in
                 Task {
@@ -909,7 +926,7 @@ class Ndb: @unchecked Sendable {
                         ndb_unsubscribe(self.ndb.ndb, currentSubid)
                         await self.unsetContinuation(subscriptionId: currentSubid)
                     }
-                    filtersPointer.deallocate()
+                    await state.deallocateFilters()
                 }
             }
 
@@ -938,7 +955,7 @@ class Ndb: @unchecked Sendable {
                         continuationSetupTask.cancel()
                         let currentSubid = await state.getSubid()
                         await self.unsetContinuation(subscriptionId: currentSubid)
-                        filtersPointer.deallocate()
+                        await state.deallocateFilters()
                         guard !self.is_closed else { return }
                         ndb_unsubscribe(self.ndb.ndb, currentSubid)
                     }
