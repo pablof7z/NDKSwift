@@ -149,7 +149,11 @@ enum DatabaseError: Error {
     }
 }
 
-class Ndb {
+/// **Sendable Conformance**: Uses @unchecked Sendable because:
+/// - Underlying ndb pointer is thread-safe C library
+/// - Actor-isolated continuations dictionary protects concurrent access
+/// - All mutable state managed through actors or atomic operations
+class Ndb: @unchecked Sendable {
     var ndb: ndb_t
     let path: String?
     let owns_db: Bool
