@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Unified Payment Types
 
 /// Payment request protocol - represents any payment request in the system
-public protocol PaymentRequest {
+public protocol PaymentRequest: Sendable {
     /// The amount in satoshis
     var amountSats: Int64 { get }
     /// Optional comment/message with the payment
@@ -11,7 +11,7 @@ public protocol PaymentRequest {
 }
 
 /// Lightning invoice payment request
-public struct LightningInvoiceRequest: PaymentRequest {
+public struct LightningInvoiceRequest: PaymentRequest, Sendable {
     public let invoice: String
     public let amountSats: Int64
     public let recipient: String // For display/logging
@@ -26,7 +26,7 @@ public struct LightningInvoiceRequest: PaymentRequest {
 }
 
 /// Payment confirmation protocol - represents confirmation of a completed payment
-public protocol PaymentConfirmation {
+public protocol PaymentConfirmation: Sendable {
     /// Amount paid in satoshis
     var amountSats: Int64 { get }
     /// Timestamp of the payment
@@ -34,7 +34,7 @@ public protocol PaymentConfirmation {
 }
 
 /// Lightning payment confirmation
-public struct LightningPaymentConfirmation: PaymentConfirmation {
+public struct LightningPaymentConfirmation: PaymentConfirmation, Sendable {
     public let amountSats: Int64
     public let timestamp: Date
     public let preimage: String
@@ -53,7 +53,7 @@ public struct LightningPaymentConfirmation: PaymentConfirmation {
 // MARK: - Payment Provider Protocol
 
 /// Handles the financial transaction (funding the payment)
-public protocol NDKPaymentProvider {
+public protocol NDKPaymentProvider: Sendable {
     /// A unique identifier for the provider (e.g., "nwc_wallet", "cashu_wallet", "qr_code")
     var id: String { get }
 
@@ -75,7 +75,7 @@ public protocol NDKPaymentProvider {
 
 // MARK: - Payment Errors
 
-public enum PaymentError: LocalizedError {
+public enum PaymentError: LocalizedError, Sendable {
     case providerNotAvailable
     case cannotFulfillRequest
     case insufficientBalance(available: Int64, required: Int64)

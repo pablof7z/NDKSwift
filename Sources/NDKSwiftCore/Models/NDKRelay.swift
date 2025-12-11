@@ -351,7 +351,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable, @
     // MARK: - State Management
 
     /// Unified state snapshot for reactive updates
-    public struct State: Equatable {
+    public struct State: Equatable, Sendable {
         public let connectionState: NDKRelayConnectionState
         public let stats: NDKRelayStats
         public let info: NDKRelayInformation?
