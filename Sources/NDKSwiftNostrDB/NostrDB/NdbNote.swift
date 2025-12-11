@@ -278,7 +278,11 @@ enum NdbData {
     }
 }
 
-class NdbNote: Codable, Equatable, Hashable {
+/// **Sendable Conformance**: Uses @unchecked Sendable because:
+/// - Wraps immutable note data from C library
+/// - All read operations are safe across isolation boundaries
+/// - Internal mutable state (owned flag) is not exposed or contended
+class NdbNote: Codable, Equatable, Hashable, @unchecked Sendable {
     // we can have owned notes, but we can also have lmdb virtual-memory mapped notes so its optional
     private(set) var owned: Bool
     let count: Int
