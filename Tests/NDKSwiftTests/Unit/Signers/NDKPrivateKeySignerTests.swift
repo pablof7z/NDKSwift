@@ -354,7 +354,7 @@ final class NDKPrivateKeySignerTests: XCTestCase {
         let payloadData = try JSONSerialization.data(withJSONObject: payload)
         
         // Deserialize
-        let deserializedSigner = try NDKPrivateKeySigner.deserialize(payloadData, ndk: nil)
+        let deserializedSigner = try await NDKPrivateKeySigner.deserialize(payloadData, ndk: nil)
         
         // Verify it matches
         XCTAssertEqual(deserializedSigner.privateKeyValue, testPrivateKey)
@@ -366,7 +366,7 @@ final class NDKPrivateKeySignerTests: XCTestCase {
         let invalidPayload: [String: Any] = [:]
         let payloadData = try JSONSerialization.data(withJSONObject: invalidPayload)
         
-        XCTAssertThrowsError(try NDKPrivateKeySigner.deserialize(payloadData, ndk: nil)) { error in
+        XCTAssertThrowsError(try await NDKPrivateKeySigner.deserialize(payloadData, ndk: nil)) { error in
             // Check for deserializationError
             XCTAssertTrue(error is NDKSignerRegistryError)
         }
@@ -391,7 +391,7 @@ final class NDKPrivateKeySignerTests: XCTestCase {
         let payloadData = try JSONSerialization.data(withJSONObject: payload)
         
         // Deserialize
-        let deserializedSigner = try NDKPrivateKeySigner.deserialize(payloadData, ndk: nil)
+        let deserializedSigner = try await NDKPrivateKeySigner.deserialize(payloadData, ndk: nil)
         let deserializedPubkey = try await deserializedSigner.pubkey
         
         // Verify they match

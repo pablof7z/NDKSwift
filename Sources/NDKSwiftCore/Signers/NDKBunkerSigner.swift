@@ -100,7 +100,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
 
     private enum ConnectionType {
         case bunker(String)
-        case nostrConnect(relay: String, options: NostrConnectOptions?)
+        case nostrConnect(relays: [String], options: NostrConnectOptions?)
         case nip05(String)
 
         var rawValue: String {
@@ -135,41 +135,45 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
     // MARK: - Static Factory Methods
 
     /// Create a bunker signer with bunker:// connection string
-    public static func bunker(ndk: NDK, connectionToken: String, localSigner: NDKPrivateKeySigner? = nil) throws -> NDKBunkerSigner {
+    public static func bunker(ndk: NDK, connectionToken: String, localSigner: NDKPrivateKeySigner? = nil) async throws -> NDKBunkerSigner {
         let signer = try localSigner ?? NDKPrivateKeySigner.generate()
-        return NDKBunkerSigner(ndk: ndk, connectionType: .bunker(connectionToken), localSigner: signer)
+        return try await NDKBunkerSigner(ndk: ndk, connectionType: .bunker(connectionToken), localSigner: signer)
     }
 
     /// Create a bunker signer with NIP-05
-    public static func nip05(ndk: NDK, nip05: String, localSigner: NDKPrivateKeySigner? = nil) throws -> NDKBunkerSigner {
+    public static func nip05(ndk: NDK, nip05: String, localSigner: NDKPrivateKeySigner? = nil) async throws -> NDKBunkerSigner {
         let signer = try localSigner ?? NDKPrivateKeySigner.generate()
-        return NDKBunkerSigner(ndk: ndk, connectionType: .nip05(nip05), localSigner: signer)
+        return try await NDKBunkerSigner(ndk: ndk, connectionType: .nip05(nip05), localSigner: signer)
     }
 
     /// Create a nostrconnect signer
-    public static func nostrConnect(ndk: NDK, relay: String, localSigner: NDKPrivateKeySigner? = nil, options: NostrConnectOptions? = nil) throws -> NDKBunkerSigner {
+    /// - Parameters:
+    ///   - ndk: NDK instance
+    ///   - relays: Relay URLs where the app will listen for signer responses
+    ///   - localSigner: Optional local signer (generated if not provided)
+    ///   - options: Optional metadata (name, url, image, permissions)
+    /// - Returns: Configured bunker signer with nostrconnect:// URI ready
+    public static func nostrConnect(ndk: NDK, relays: [String], localSigner: NDKPrivateKeySigner? = nil, options: NostrConnectOptions? = nil) async throws -> NDKBunkerSigner {
         let signer = try localSigner ?? NDKPrivateKeySigner.generate()
-        return NDKBunkerSigner(ndk: ndk, connectionType: .nostrConnect(relay: relay, options: options), localSigner: signer)
+        return try await NDKBunkerSigner(ndk: ndk, connectionType: .nostrConnect(relays: relays, options: options), localSigner: signer)
     }
 
     // MARK: - Initialization
 
-    private init(ndk: NDK, connectionType: ConnectionType, localSigner: NDKPrivateKeySigner) {
+    private init(ndk: NDK, connectionType: ConnectionType, localSigner: NDKPrivateKeySigner) async throws {
         self.ndk = ndk
         self.connectionType = connectionType
         self.localSigner = localSigner
         self.relayUrls = []
 
-        Task { @MainActor [weak self] in
-            guard let self = self else { return }
-            switch connectionType {
-            case let .bunker(token):
-                await self.parseBunkerUrl(token)
-            case let .nostrConnect(relay, options):
-                await self.initNostrConnect(relay: relay, options: options)
-            case .nip05:
-                break // Will be handled in connect()
-            }
+        switch connectionType {
+        case let .bunker(token):
+            parseBunkerUrl(token)
+        case let .nostrConnect(relays, options):
+            let pubkey = try await localSigner.pubkey
+            initNostrConnect(relays: relays, options: options, pubkey: pubkey)
+        case .nip05:
+            break // Will be handled in connect()
         }
     }
 
@@ -182,19 +186,13 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         self.secret = secret
     }
 
-    private func initNostrConnect(relay: String, options: NostrConnectOptions?) {
-        self.relayUrls = [relay]
+    private func initNostrConnect(relays: [String], options: NostrConnectOptions?, pubkey: String) {
+        self.relayUrls = relays
         self.nostrConnectSecret = generateNostrConnectSecret()
-
-        // Generate nostrconnect:// URI - Note: pubkey will be set later
-        Task { @MainActor [weak self] in
-            guard let self = self else { return }
-            let pubkey = try? await self.localSigner.pubkey
-            await self.generateNostrConnectUri(pubkey: pubkey ?? "", relay: relay, options: options)
-        }
+        self.nostrConnectUri = generateNostrConnectUri(pubkey: pubkey, relays: relays, options: options)
     }
 
-    private func generateNostrConnectUri(pubkey: String, relay: String, options: NostrConnectOptions?) {
+    private func generateNostrConnectUri(pubkey: String, relays: [String], options: NostrConnectOptions?) -> String {
         var uri = "nostrconnect://\(pubkey)"
         var params: [String] = []
 
@@ -213,13 +211,17 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         if let secret = nostrConnectSecret {
             params.append("secret=\(secret.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")
         }
-        params.append("relay=\(relay.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")
+
+        // Add all relays (NIP-46 supports multiple relay URLs)
+        for relay in relays {
+            params.append("relay=\(relay.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")
+        }
 
         if !params.isEmpty {
             uri += "?" + params.joined(separator: "&")
         }
 
-        self.nostrConnectUri = uri
+        return uri
     }
 
     private func generateNostrConnectSecret() -> String {
@@ -577,7 +579,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         return try NDKSignerSerialization.createContainer(type: Self.signerType, payload: payload)
     }
 
-    public static func deserialize(_ data: Data, ndk: NDK?) throws -> NDKBunkerSigner {
+    public static func deserialize(_ data: Data, ndk: NDK?) async throws -> NDKBunkerSigner {
         // The registry already extracted the payload, so we decode it directly
         let payload = try JSONCoding.parseDictionary(from: data)
 
@@ -595,7 +597,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         }
 
         // Deserialize local signer (it also expects just the payload data)
-        let localSigner = try NDKPrivateKeySigner.deserialize(localSignerData, ndk: ndk)
+        let localSigner = try await NDKPrivateKeySigner.deserialize(localSignerData, ndk: ndk)
 
         // Create appropriate connection type
         let connectionType: ConnectionType
@@ -606,13 +608,13 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
                            relayUrls.map { "&relay=\($0)" }.joined()
             connectionType = .bunker(bunkerUrl)
         case "nostrConnect":
-            connectionType = .nostrConnect(relay: relayUrls.first ?? "", options: nil)
+            connectionType = .nostrConnect(relays: relayUrls, options: nil)
         case "nip05":
             connectionType = .nip05(userPubkey)
         default:
             throw NDKSignerRegistryError.deserializationError("Unknown connection type: \(connectionTypeRaw)")
         }
 
-        return NDKBunkerSigner(ndk: ndk, connectionType: connectionType, localSigner: localSigner)
+        return try await NDKBunkerSigner(ndk: ndk, connectionType: connectionType, localSigner: localSigner)
     }
 }

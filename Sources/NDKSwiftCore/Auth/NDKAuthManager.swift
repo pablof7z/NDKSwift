@@ -285,7 +285,7 @@ public class NDKAuthManager {
             let signerData = try await keychainManager.retrieveSignerData(identifier: session.id)
 
             // Deserialize the signer
-            let signer = try signerRegistry.createSigner(from: signerData, ndk: ndk)
+            let signer = try await signerRegistry.createSigner(from: signerData, ndk: ndk)
 
             // Update state
             var updatedSession = session

@@ -27,7 +27,7 @@ final class NDKSignerRegistryTests: XCTestCase {
         let originalSigner = try NDKPrivateKeySigner(privateKey: privateKey)
         let signerData = try await originalSigner.serialize()
         
-        let signer = try registry.createSigner(from: signerData, ndk: nil)
+        let signer = try await registry.createSigner(from: signerData, ndk: nil)
         
         XCTAssertNotNil(signer)
         // Verify it's a private key signer by checking pubkey
@@ -51,7 +51,7 @@ final class NDKSignerRegistryTests: XCTestCase {
         ])
         
         do {
-            _ = try registry.createSigner(from: signerData)
+            _ = try await registry.createSigner(from: signerData)
             XCTFail("Should have thrown an error for unknown signer type")
         } catch {
             // Expected error for unknown type
@@ -82,7 +82,7 @@ final class NDKSignerRegistryTests: XCTestCase {
         let signerData = try! NDKSignerSerialization.createContainer(type: "unknown-type", payload: [:])
         
         do {
-            _ = try registry.createSigner(from: signerData)
+            _ = try await registry.createSigner(from: signerData)
             XCTFail("Should have thrown an error")
         } catch {
             // Expected error
@@ -94,7 +94,7 @@ final class NDKSignerRegistryTests: XCTestCase {
         let invalidData = "not json".data(using: .utf8)!
         
         do {
-            _ = try registry.createSigner(from: invalidData)
+            _ = try await registry.createSigner(from: invalidData)
             XCTFail("Should have thrown an error")
         } catch {
             // Expected error
@@ -105,7 +105,7 @@ final class NDKSignerRegistryTests: XCTestCase {
         let signerData = try! JSONSerialization.data(withJSONObject: [:])
         
         do {
-            _ = try registry.createSigner(from: signerData)
+            _ = try await registry.createSigner(from: signerData)
             XCTFail("Should have thrown an error")
         } catch {
             // Expected error
@@ -123,7 +123,7 @@ final class NDKSignerRegistryTests: XCTestCase {
         let serialized = try await originalSigner.serialize()
         
         // Deserialize
-        let recreatedSigner = try registry.createSigner(from: serialized)
+        let recreatedSigner = try await registry.createSigner(from: serialized)
         
         // Verify
         let recreatedPubkey = try await recreatedSigner.pubkey
@@ -165,7 +165,7 @@ final class NDKSignerRegistryTests: XCTestCase {
         await withTaskGroup(of: (any NDKSigner)?.self) { group in
             for _ in 0..<10 {
                 group.addTask {
-                    try? self.registry.createSigner(from: signerData)
+                    try? self.await registry.createSigner(from: signerData)
                 }
             }
             

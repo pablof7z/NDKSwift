@@ -135,7 +135,7 @@ public final class NDKPrivateKeySigner: NDKSigner {
         return try NDKSignerSerialization.createContainer(type: Self.signerType, payload: payload)
     }
 
-    public static func deserialize(_ data: Data, ndk: NDK?) throws -> NDKPrivateKeySigner {
+    public static func deserialize(_ data: Data, ndk: NDK?) async throws -> NDKPrivateKeySigner {
         // The registry already extracted the payload, so we just need to decode it directly
         let payload = try JSONCoding.decode([String: String].self, from: data)
 
