@@ -1,7 +1,7 @@
 import Foundation
 
 /// Protocol for signing Nostr events
-public protocol NDKSigner {
+public protocol NDKSigner: Sendable {
     /// The public key associated with this signer
     var pubkey: PublicKey { get async throws }
 
@@ -59,7 +59,7 @@ public extension NDKSigner {
 }
 
 /// Encryption schemes supported by signers
-public enum NDKEncryptionScheme: String, CaseIterable {
+public enum NDKEncryptionScheme: String, CaseIterable, Sendable {
     case nip04
     case nip44
 }

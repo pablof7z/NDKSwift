@@ -4,7 +4,7 @@ import Foundation
 #endif
 
 /// Delegate for relay connection events
-public protocol NDKRelayConnectionDelegate: AnyObject {
+public protocol NDKRelayConnectionDelegate: AnyObject, Sendable {
     func relayConnection(_ connection: NDKRelayConnection, didReceiveMessage message: NostrMessage)
     func relayConnectionDidConnect(_ connection: NDKRelayConnection)
     func relayConnectionDidDisconnect(_ connection: NDKRelayConnection, error: Error?)

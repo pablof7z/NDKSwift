@@ -24,7 +24,7 @@ import Foundation
 /// - Items are compared frequently during reconciliation
 /// - Use efficient timestamp-based filtering when possible
 /// - 32-byte IDs ensure cryptographic uniqueness
-public struct NegentropyItem: Comparable, Hashable {
+public struct NegentropyItem: Comparable, Hashable, Sendable {
     /// 32-byte identifier (typically event ID for Nostr)
     public let id: Data
 
@@ -103,7 +103,7 @@ public struct NegentropyItem: Comparable, Hashable {
 }
 
 /// Errors specific to Negentropy operations
-public enum NegentropyError: LocalizedError {
+public enum NegentropyError: LocalizedError, Sendable {
     case invalidItemId
     case invalidBounds
     case encodingError

@@ -147,7 +147,7 @@ public actor NDKLogBuffer {
 // MARK: - Log Levels
 
 /// Logging levels for NDK
-public enum NDKLogLevel: Int, Comparable {
+public enum NDKLogLevel: Int, Comparable, Sendable {
     case off = 0
     case error = 1
     case warning = 2
@@ -161,7 +161,7 @@ public enum NDKLogLevel: Int, Comparable {
 }
 
 /// Categories for NDK logging
-public enum NDKLogCategory: String, CaseIterable {
+public enum NDKLogCategory: String, CaseIterable, Sendable {
     case network = "NETWORK"
     case relay = "RELAY"
     case subscription = "SUBSCRIPTION"

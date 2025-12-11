@@ -103,7 +103,7 @@ public struct NDKFilter: Codable, Equatable, Sendable {
 
     // MARK: - Codable
 
-    private struct DynamicCodingKey: CodingKey {
+    private struct DynamicCodingKey: CodingKey, Sendable {
         var stringValue: String
         var intValue: Int?
 

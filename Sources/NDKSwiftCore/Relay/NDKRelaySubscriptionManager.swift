@@ -185,7 +185,7 @@ extension NDKRelaySubscriptionManager {
     }
     
     /// Debug information about a subscription group
-    struct GroupInspectionData {
+    struct GroupInspectionData: Sendable {
         public let fingerprint: String
         public let isGroupable: Bool
         public let itemCount: Int

@@ -112,7 +112,7 @@ public enum NDKSignatureVerificationResult: Sendable {
 ///     }
 /// }
 /// ```
-public protocol NDKSignatureVerificationDelegate: AnyObject {
+public protocol NDKSignatureVerificationDelegate: AnyObject, Sendable {
     /// Called when an invalid signature is detected
     /// 
     /// This method is called on the main thread when signature verification fails.

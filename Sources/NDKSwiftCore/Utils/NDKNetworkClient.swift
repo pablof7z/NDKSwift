@@ -1,7 +1,7 @@
 import Foundation
 
 /// Protocol for network data fetching
-public protocol NDKNetworkFetching {
+public protocol NDKNetworkFetching: Sendable {
     func data(from url: URL) async throws -> Data
     func data(for request: URLRequest) async throws -> (Data, URLResponse)
 }
@@ -15,7 +15,7 @@ extension URLSession: NDKNetworkFetching {
 }
 
 /// Centralized network client for NDKSwift
-public struct NDKNetworkClient {
+public struct NDKNetworkClient: Sendable {
     private let session: NDKNetworkFetching
     
     public init(session: NDKNetworkFetching = URLSession.shared) {

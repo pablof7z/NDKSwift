@@ -1,7 +1,7 @@
 import Foundation
 
 /// Protocol for handling relay authentication requests (NIP-42)
-public protocol NDKAuthenticationDelegate: AnyObject {
+public protocol NDKAuthenticationDelegate: AnyObject, Sendable {
     /// Called when a relay requires authentication
     /// - Parameters:
     ///   - relay: The relay requiring authentication
