@@ -2,19 +2,19 @@ import Foundation
 import NDKSwiftCore
 
 /// Payment provider that shows a QR code for manual payment
-public class QRCodePaymentProvider: NDKPaymentProvider {
+public final class QRCodePaymentProvider: NDKPaymentProvider {
     public let id = "qr_code"
     public let displayName = "QR Code (Manual)"
 
     /// Closure to display QR code to user
-    public var displayQRCode: ((String) async throws -> Void)?
+    public let displayQRCode: (@Sendable (String) async throws -> Void)?
 
     /// Closure to wait for payment confirmation from user
-    public var waitForConfirmation: (() async throws -> String)?
+    public let waitForConfirmation: (@Sendable () async throws -> String)?
 
     public init(
-        displayQRCode: ((String) async throws -> Void)? = nil,
-        waitForConfirmation: (() async throws -> String)? = nil
+        displayQRCode: (@Sendable (String) async throws -> Void)? = nil,
+        waitForConfirmation: (@Sendable () async throws -> String)? = nil
     ) {
         self.displayQRCode = displayQRCode
         self.waitForConfirmation = waitForConfirmation

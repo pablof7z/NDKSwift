@@ -7,7 +7,7 @@ import Foundation
 /// encryption standards.
 
 /// Protocol for Nostr encryption implementations
-public protocol NDKEncryption {
+public protocol NDKEncryption: Sendable {
     /// Encrypt a message
     /// - Parameters:
     ///   - message: The plaintext message to encrypt
@@ -26,7 +26,7 @@ public protocol NDKEncryption {
 }
 
 /// Encryption errors
-public enum NDKEncryptionError: LocalizedError {
+public enum NDKEncryptionError: LocalizedError, Sendable {
     case encryptionFailed(String)
     case decryptionFailed(String)
     case unsupportedVersion

@@ -1,7 +1,7 @@
 import Foundation
 
 /// Options for configuring NDKSubscription behavior
-public struct NDKSubscriptionOptions {
+public struct NDKSubscriptionOptions: Sendable {
     /// Maximum age of events to return from cache (0 = no limit)
     public var maxAge: TimeInterval
     
