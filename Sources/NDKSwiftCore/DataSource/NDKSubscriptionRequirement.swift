@@ -11,7 +11,8 @@ actor NDKSubscriptionRequirement {
     private let closeOnEose: Bool
     let relayStrategy: InternalRelaySelectionStrategy
     private let shouldFetchFromNetwork: Bool
-    
+    private let cachePolicy: CachePolicy
+
     // Event deduplication
     private var seenEventIds = Set<EventID>()
     
@@ -44,7 +45,8 @@ actor NDKSubscriptionRequirement {
         exclusiveRelays: Bool,
         closeOnEose: Bool,
         relayStrategy: InternalRelaySelectionStrategy,
-        shouldFetchFromNetwork: Bool = true
+        shouldFetchFromNetwork: Bool = true,
+        cachePolicy: CachePolicy
     ) {
         self.filter = filter
         self.subscriptionId = subscriptionId
@@ -54,6 +56,7 @@ actor NDKSubscriptionRequirement {
         self.closeOnEose = closeOnEose
         self.relayStrategy = relayStrategy
         self.shouldFetchFromNetwork = shouldFetchFromNetwork
+        self.cachePolicy = cachePolicy
         self.eoseTracker = EOSETracker(subscriptionId: subscriptionId)
     }
     
@@ -73,25 +76,27 @@ actor NDKSubscriptionRequirement {
     
     /// Start processing events
     func startProcessing() async {
-        // Set up cache observation using the new AsyncThrowingStream
-        Task { [weak self] in
-            guard let self = self else { return }
-            
-            let eventStream = await self.cache.observeEvents(
-                matching: self.filter,
-                includeExisting: true
-            )
-            
-            do {
-                for try await events in eventStream {
-                    // Process each batch of events
-                    for event in events {
-                        await self.handleCacheEvent(event)
+        // Set up cache observation only if policy allows it
+        if cachePolicy != .networkOnly {
+            Task { [weak self] in
+                guard let self = self else { return }
+
+                let eventStream = await self.cache.observeEvents(
+                    matching: self.filter,
+                    includeExisting: true
+                )
+
+                do {
+                    for try await events in eventStream {
+                        // Process each batch of events
+                        for event in events {
+                            await self.handleCacheEvent(event)
+                        }
                     }
+                } catch {
+                    NDKLogger.log(.error, category: .subscription,
+                                 "❌ Cache observation error for '\(self.subscriptionId)': \(error)")
                 }
-            } catch {
-                NDKLogger.log(.error, category: .subscription,
-                             "❌ Cache observation error for '\(self.subscriptionId)': \(error)")
             }
         }
         

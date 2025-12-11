@@ -184,7 +184,8 @@ actor NDKSubscriptionManager {
             exclusiveRelays: exclusiveRelays,
             closeOnEose: closeOnEose,
             relayStrategy: relayStrategy,
-            shouldFetchFromNetwork: shouldFetchFromNetwork
+            shouldFetchFromNetwork: shouldFetchFromNetwork,
+            cachePolicy: cachePolicy
         )
 
         // Add observer and get the event stream
