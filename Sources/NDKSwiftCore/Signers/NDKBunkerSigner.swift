@@ -388,16 +388,31 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         }
 
         // Handle nostrconnect flow
-        if let secret = nostrConnectSecret, response.result == secret {
-            let responsePubkey = response.event.pubkey
-            userPubkey = responsePubkey
-            bunkerPubkey = responsePubkey
-            isConnected = true
+        if let secret = nostrConnectSecret {
+            // Validate secret (NIP-46 allows either echoing the secret or returning "ack")
+            let isValidSecret = response.result == secret || response.result == "ack"
 
-            let user = NDKUser(pubkey: responsePubkey)
-            connectionContinuation?.resume(returning: user)
-            connectionContinuation = nil
-            return
+            if isValidSecret {
+                let responsePubkey = response.event.pubkey
+                bunkerPubkey = responsePubkey  // Store remote signer pubkey
+
+                // According to NIP-46, we must call get_public_key to learn the user's actual pubkey
+                Task {
+                    do {
+                        let userPubkey = try await getPublicKey()
+                        self.userPubkey = userPubkey
+                        self.isConnected = true
+
+                        let user = NDKUser(pubkey: userPubkey)
+                        connectionContinuation?.resume(returning: user)
+                        connectionContinuation = nil
+                    } catch {
+                        connectionContinuation?.resume(throwing: error)
+                        connectionContinuation = nil
+                    }
+                }
+                return
+            }
         }
 
         // Handle connect response
