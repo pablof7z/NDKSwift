@@ -42,6 +42,7 @@ public struct NDKZapButton: View {
     private let showCount: Bool
     private let customAmountEnabled: Bool
     private let defaultAmount: Int
+    private let preferredProvider: String?
     private var onZapSent: ((Int) -> Void)?
     private var onZapFailed: ((Error) -> Void)?
 
@@ -69,6 +70,7 @@ public struct NDKZapButton: View {
     ///   - defaultAmount: Default amount when tapped directly
     ///   - showCount: Whether to show total zap count
     ///   - customAmountEnabled: Whether to allow custom amounts
+    ///   - preferredProvider: Optional ID of the payment provider to use (e.g., "nwc_wallet", "nip60")
     public init(
         ndk: NDK,
         event: NDKEvent,
@@ -76,7 +78,8 @@ public struct NDKZapButton: View {
         amounts: [Int] = [21, 100, 1000],
         defaultAmount: Int = 21,
         showCount: Bool = true,
-        customAmountEnabled: Bool = true
+        customAmountEnabled: Bool = true,
+        preferredProvider: String? = nil
     ) {
         self.ndk = ndk
         self.event = event
@@ -85,6 +88,7 @@ public struct NDKZapButton: View {
         self.defaultAmount = defaultAmount
         self.showCount = showCount
         self.customAmountEnabled = customAmountEnabled
+        self.preferredProvider = preferredProvider
 
         // Initialize zap state
         self._zapState = StateObject(wrappedValue: ZapState(eventId: event.id))
@@ -189,7 +193,12 @@ public struct NDKZapButton: View {
 
     private func zapAmount(_ amount: Int) {
         Task {
-            await zapState.sendZap(ndk: ndk, event: event, amount: amount)
+            await zapState.sendZap(
+                ndk: ndk,
+                event: event,
+                amount: amount,
+                preferredProvider: preferredProvider
+            )
 
             if zapState.lastZapSucceeded {
                 onZapSent?(amount)
@@ -438,7 +447,7 @@ private class ZapState: ObservableObject {
         return nil
     }
 
-    func sendZap(ndk: NDK, event: NDKEvent, amount: Int) async {
+    func sendZap(ndk: NDK, event: NDKEvent, amount: Int, preferredProvider: String? = nil) async {
         let zapManager = ndk.zapManager
 
         isLoading = true
@@ -454,7 +463,8 @@ private class ZapState: ObservableObject {
                 event: event,
                 to: recipient,
                 amountSats: Int64(amount),
-                comment: nil // Could be made configurable
+                comment: nil, // Could be made configurable
+                preferredProvider: preferredProvider
             )
 
             lastZapSucceeded = true
