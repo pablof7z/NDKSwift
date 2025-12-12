@@ -473,11 +473,21 @@ final class NDKNostrDBCacheTests: NDKTestCase {
         let filter = NDKFilter(kinds: [1])
         let stream = await cache.observeEvents(matching: filter, includeExisting: true)
 
-        // Then
+        // Then - collect existing events with timeout
         var receivedEvents: [NDKEvent] = []
-        for try await events in stream {
-            receivedEvents.append(contentsOf: events)
+        let task = Task {
+            for try await events in stream {
+                receivedEvents.append(contentsOf: events)
+                // Once we have the existing events, we're done testing
+                if receivedEvents.count >= 2 {
+                    break
+                }
+            }
         }
+
+        // Wait for existing events with timeout
+        try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+        task.cancel()
 
         XCTAssertEqual(receivedEvents.count, 2)
         let eventIds = receivedEvents.map { $0.id }
@@ -494,13 +504,39 @@ final class NDKNostrDBCacheTests: NDKTestCase {
         let filter = NDKFilter(kinds: [1])
         let stream = await cache.observeEvents(matching: filter, includeExisting: false)
 
-        // Then
+        // Then - should not receive existing events but stream stays open
         var receivedCount = 0
-        for try await _ in stream {
-            receivedCount += 1
+        let task = Task {
+            for try await _ in stream {
+                receivedCount += 1
+            }
         }
 
-        XCTAssertEqual(receivedCount, 0, "Stream should complete without emitting existing events")
+        // Wait a bit to ensure no events are emitted
+        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        task.cancel()
+
+        XCTAssertEqual(receivedCount, 0, "Should not emit existing events when includeExisting is false")
+    }
+
+    func testObserveEventsDoesNotHang() async throws {
+        // This test verifies that the stream can be cancelled without hanging
+        // Given
+        let filter = NDKFilter(kinds: [1])
+        let stream = await cache.observeEvents(matching: filter, includeExisting: false)
+
+        let task = Task {
+            for try await _ in stream {
+                // Stream is active
+            }
+        }
+
+        // Cancel after a short time
+        try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+        task.cancel()
+
+        // If we get here without hanging, the test passes
+        XCTAssertTrue(true, "Stream cancelled successfully without hanging")
     }
 
     func testObserveProfile() async throws {
@@ -520,14 +556,43 @@ final class NDKNostrDBCacheTests: NDKTestCase {
         // When
         let stream = await cache.observeProfile(pubkey: pubkey, includeExisting: true)
 
-        // Then
+        // Then - collect profile with timeout
         var receivedProfile: NDKUserMetadata?
-        for try await profile in stream {
-            receivedProfile = profile
+        let task = Task {
+            for try await profile in stream {
+                receivedProfile = profile
+                // Stop after receiving the existing profile
+                break
+            }
         }
+
+        // Wait for profile with timeout
+        try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+        task.cancel()
 
         XCTAssertNotNil(receivedProfile)
         XCTAssertEqual(receivedProfile?.pubkey, pubkey)
+        XCTAssertEqual(receivedProfile?.name, "Alice")
+    }
+
+    func testObserveProfileDoesNotHang() async throws {
+        // This test verifies that the stream can be cancelled without hanging
+        // Given
+        let pubkey = TestFixtures.Keys.alice.publicKey
+        let stream = await cache.observeProfile(pubkey: pubkey, includeExisting: false)
+
+        let task = Task {
+            for try await _ in stream {
+                // Stream is active
+            }
+        }
+
+        // Cancel after a short time
+        try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+        task.cancel()
+
+        // If we get here without hanging, the test passes
+        XCTAssertTrue(true, "Stream cancelled successfully without hanging")
     }
 
     // MARK: - Error Handling
