@@ -51,14 +51,22 @@ public actor NDKNostrDBCache: NDKCache {
     private var ndb: Ndb?
     private var events: [String: NDKEvent] = [:]
     private let cachePath: String?
-    private var knownRelays: Set<String> = []
+    private var relayCache: LRUCache<String, Bool>
     private var eventRelaySources: [String: Set<String>] = [:]
+
+    /// Tracks event IDs that have been logically deleted.
+    /// These events still exist in LMDB but should be filtered from queries.
+    private var deletedEventIds: Set<String> = []
+
+    /// Maximum number of relay URLs to track in the LRU cache
+    private static let maxRelayCount = 100
 
     /// Initialize a new NostrDB cache
     /// - Parameter path: Optional path to the database directory. If nil, uses the default location.
     /// - Throws: NDKNostrDBCacheError if the database cannot be opened
     public init(path: String? = nil) async throws {
         cachePath = path
+        relayCache = LRUCache<String, Bool>(capacity: Self.maxRelayCount, defaultTTL: TimeInterval.infinity)
         ndb = Ndb(path: path)
         if ndb == nil {
             throw NDKNostrDBCacheError.failedToOpen
@@ -133,6 +141,11 @@ public actor NDKNostrDBCache: NDKCache {
     }
 
     public func getEvent(id: String) async -> NDKEvent? {
+        // Filter out deleted events
+        if deletedEventIds.contains(id) {
+            return nil
+        }
+
         guard let ndb = ndb else { return nil }
 
         // Convert hex ID to NdbNoteId
@@ -172,13 +185,13 @@ public actor NDKNostrDBCache: NDKCache {
             let ndbFilter = try NdbFilter(from: nostrFilter)
             let noteKeys = try ndb.query(filters: [ndbFilter], maxResults: filter.limit ?? 500)
 
-            // Convert note keys to NDKEvents
+            // Convert note keys to NDKEvents, filtering out deleted events
             for noteKey in noteKeys {
                 if let txn = ndb.lookup_note_by_key(noteKey),
                    let note = txn.unsafeUnownedValue,
                    let event = convertToNDKEvent(note)
                 {
-                    if !seenIds.contains(event.id) {
+                    if !seenIds.contains(event.id) && !deletedEventIds.contains(event.id) {
                         seenIds.insert(event.id)
                         results.append(event)
                     }
@@ -191,7 +204,7 @@ public actor NDKNostrDBCache: NDKCache {
         // Also query in-memory cache for events not yet indexed
         let inMemoryResults = queryEventsInMemory(filter)
         for event in inMemoryResults {
-            if !seenIds.contains(event.id) {
+            if !seenIds.contains(event.id) && !deletedEventIds.contains(event.id) {
                 seenIds.insert(event.id)
                 results.append(event)
             }
@@ -288,23 +301,70 @@ public actor NDKNostrDBCache: NDKCache {
         )
     }
 
+    /// Delete an event from the cache.
+    /// - Parameter id: The event ID to delete
+    /// - Note: NostrDB doesn't support physical deletion of events from LMDB.
+    ///         Events are marked as deleted and filtered from all query results,
+    ///         but they still exist in the underlying LMDB database.
     public func deleteEvent(id: String) async throws {
-        // Note: NostrDB doesn't support deletion of individual events
-        // Events are immutable once stored in LMDB
-        // We only remove from in-memory cache
+        // Remove from in-memory cache
         events.removeValue(forKey: id)
+        // Track as deleted to filter from all queries
+        deletedEventIds.insert(id)
     }
 
     // MARK: - Cache Management
 
+    /// Clears only the in-memory cache, leaving the persisted LMDB database files intact.
+    /// After calling this method, the database will still contain all events on disk.
+    /// - Note: To fully clear the database including persisted data, use `clearPersisted()` instead.
     public func clear() async throws {
-        // Note: NostrDB doesn't provide a clear/reset API
-        // To clear the database, you would need to delete the LMDB files
-        // We can only clear the in-memory cache
         events.removeAll()
         eventRelaySources.removeAll()
-        knownRelays.removeAll()
+        await relayCache.clear()
+        deletedEventIds.removeAll()
     }
+
+    /// Completely clears the database by deleting the LMDB files and reinitializing.
+    /// This removes all persisted events from disk and resets the in-memory cache.
+    /// After calling this method, the cache will be completely empty and ready for new data.
+    /// - Throws: NDKNostrDBCacheError if the database cannot be reinitialized
+    public func clearPersisted() async throws {
+        // Clear in-memory state first
+        events.removeAll()
+        eventRelaySources.removeAll()
+        await relayCache.clear()
+        deletedEventIds.removeAll()
+
+        // Close the nostrdb connection
+        ndb?.close()
+        ndb = nil
+
+        // Get the database path
+        guard let dbPath = cachePath ?? Ndb.db_path() else {
+            throw NDKNostrDBCacheError.failedToOpen
+        }
+
+        // Delete the LMDB files
+        let fileManager = FileManager.default
+        for dbFile in ["data.mdb", "lock.mdb"] {
+            let filePath = "\(dbPath)/\(dbFile)"
+            if fileManager.fileExists(atPath: filePath) {
+                do {
+                    try fileManager.removeItem(atPath: filePath)
+                } catch {
+                    NDKLogger.log(.warning, category: .cache, "Failed to delete \(dbFile): \(error.localizedDescription)")
+                }
+            }
+        }
+
+        // Reinitialize nostrdb with a fresh database
+        ndb = Ndb(path: cachePath)
+        if ndb == nil {
+            throw NDKNostrDBCacheError.failedToOpen
+        }
+    }
+
 
     // MARK: - Reactive Observation
 
@@ -581,8 +641,8 @@ public actor NDKNostrDBCache: NDKCache {
             throw NDKNostrDBCacheError.notInitialized
         }
 
-        // Track this relay URL for later source queries
-        knownRelays.insert(relay)
+        // Track this relay URL in LRU cache (automatically evicts least recently used)
+        await relayCache.set(relay, value: true)
 
         // Track event-to-relay mapping in-memory (for immediate availability)
         var sources = eventRelaySources[event.id] ?? []

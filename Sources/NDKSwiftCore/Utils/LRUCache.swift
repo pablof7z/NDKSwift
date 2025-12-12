@@ -16,7 +16,7 @@ import Foundation
 ///     // Use cached data
 /// }
 /// ```
-actor LRUCache<Key: Hashable, Value> {
+public actor LRUCache<Key: Hashable, Value> {
     /// Internal structure to store cached values with metadata
     private struct CacheEntry {
         let value: Value
@@ -26,21 +26,21 @@ actor LRUCache<Key: Hashable, Value> {
 
     /// Main storage dictionary mapping keys to cache entries
     private var cache: [Key: CacheEntry] = [:]
-    
+
     /// Ordered list of keys by access time (most recent at end)
     private var accessOrder: [Key] = []
-    
+
     /// Maximum number of items the cache can hold
     private let capacity: Int
-    
+
     /// Default time-to-live for cache entries in seconds
     private let defaultTTL: TimeInterval
 
     // MARK: - Statistics
-    
+
     /// Number of successful cache hits
     private var hits: Int = 0
-    
+
     /// Number of cache misses
     private var misses: Int = 0
 
@@ -48,7 +48,7 @@ actor LRUCache<Key: Hashable, Value> {
     /// - Parameters:
     ///   - capacity: Maximum number of items to store (default: 100)
     ///   - defaultTTL: Default time-to-live for entries in seconds (default: 1 hour)
-    init(capacity: Int = 100, defaultTTL: TimeInterval = TimeConstants.hour) {
+    public init(capacity: Int = 100, defaultTTL: TimeInterval = TimeConstants.hour) {
         self.capacity = capacity
         self.defaultTTL = defaultTTL
     }
@@ -57,7 +57,7 @@ actor LRUCache<Key: Hashable, Value> {
     /// - Parameter key: The key to look up
     /// - Returns: The cached value if it exists and hasn't expired, nil otherwise
     /// - Note: This method updates the access order, making the item the most recently used
-    func get(_ key: Key) -> Value? {
+    public func get(_ key: Key) -> Value? {
         guard var entry = cache[key] else {
             misses += 1
             return nil
@@ -84,7 +84,7 @@ actor LRUCache<Key: Hashable, Value> {
     }
 
     /// Set a value in the cache
-    func set(_ key: Key, value: Value, ttl: TimeInterval? = nil) {
+    public func set(_ key: Key, value: Value, ttl: TimeInterval? = nil) {
         let expiresAt = Date().addingTimeInterval(ttl ?? defaultTTL)
         let entry = CacheEntry(
             value: value,
@@ -117,7 +117,7 @@ actor LRUCache<Key: Hashable, Value> {
     }
 
     /// Clear all values from the cache
-    func clear() {
+    public func clear() {
         cache.removeAll()
         accessOrder.removeAll()
         hits = 0

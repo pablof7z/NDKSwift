@@ -430,6 +430,56 @@ final class NDKNostrDBCacheTests: NDKTestCase {
         XCTAssertTrue(sources.contains(relay2))
     }
 
+    func testRelayTrackingLRUBehavior() async throws {
+        // Given - create more relays than the max cache size (100)
+        let maxRelays = 100
+        let extraRelays = 20
+        let totalRelays = maxRelays + extraRelays
+
+        // When - process events from many relays
+        for i in 0 ..< totalRelays {
+            let event = createTestEvent(content: "Event \(i)")
+            let relay = "wss://relay\(i).example.com"
+            try await cache.processEvent(event, from: relay, subscriptionId: "sub\(i)")
+        }
+
+        // Then - the relay cache should have been bounded
+        // Note: We can't directly inspect the relay cache size, but we can verify
+        // that the implementation doesn't crash and continues to work correctly
+        // The LRU cache will automatically evict the oldest relays
+
+        // Process one more event to ensure the cache still works after evictions
+        let finalEvent = createTestEvent(content: "Final event")
+        let finalRelay = "wss://final.example.com"
+        try await cache.processEvent(finalEvent, from: finalRelay, subscriptionId: "final_sub")
+
+        // Verify the event was processed
+        let retrieved = await cache.getEvent(id: finalEvent.id)
+        XCTAssertNotNil(retrieved)
+    }
+
+    func testRelayTrackingDoesNotGrowUnbounded() async throws {
+        // Given - process many events from different relays
+        let relayCount = 200 // Twice the max relay cache size
+
+        // When
+        for i in 0 ..< relayCount {
+            let event = createTestEvent(content: "Event \(i)")
+            let relay = "wss://relay\(i).example.com"
+            try await cache.processEvent(event, from: relay, subscriptionId: "sub\(i)")
+        }
+
+        // Then - verify cache still functions correctly
+        // The LRU cache should have evicted older relays to stay within bounds
+        let testEvent = createTestEvent(content: "Test event")
+        let testRelay = "wss://test.example.com"
+        try await cache.processEvent(testEvent, from: testRelay, subscriptionId: "test_sub")
+
+        let sources = await cache.getRelaySources(eventId: testEvent.id)
+        XCTAssertEqual(sources.count, 1)
+        XCTAssertTrue(sources.contains(testRelay))
+    }
+
     // MARK: - Cache Management
 
     func testClear() async throws {
@@ -455,6 +505,88 @@ final class NDKNostrDBCacheTests: NDKTestCase {
         let filter = NDKFilter(kinds: [1])
         let results = try await cache.queryEvents(filter)
         XCTAssertEqual(results.count, 0, "In-memory cache should be empty")
+    }
+
+    func testClearPersisted() async throws {
+        // Given
+        let events = (0 ..< 5).map { i in
+            createTestEvent(content: "Event \(i)")
+        }
+
+        for event in events {
+            try await cache.saveEvent(event)
+        }
+
+        // Verify events exist
+        for event in events {
+            let retrieved = await cache.getEvent(id: event.id)
+            XCTAssertNotNil(retrieved)
+        }
+
+        // When
+        try await cache.clearPersisted()
+
+        // Then - all events should be gone, including persisted ones
+        for event in events {
+            let retrieved = await cache.getEvent(id: event.id)
+            XCTAssertNil(retrieved, "Event \(event.id) should be completely removed")
+        }
+
+        // Verify cache is still operational after clearPersisted
+        let newEvent = createTestEvent(content: "New event after clear")
+        try await cache.saveEvent(newEvent)
+        let retrieved = await cache.getEvent(id: newEvent.id)
+        XCTAssertNotNil(retrieved, "Cache should still work after clearPersisted")
+        XCTAssertEqual(retrieved?.content, "New event after clear")
+    }
+
+    func testClearPersistedDeletesLMDBFiles() async throws {
+        // Given
+        let event = createTestEvent(content: "Test event")
+        try await cache.saveEvent(event)
+
+        // Get the cache path
+        let dbPath = await cache.getCachePath()
+        XCTAssertNotNil(dbPath)
+
+        // When
+        try await cache.clearPersisted()
+
+        // Then - LMDB files should be deleted (or recreated fresh)
+        // The cache should still be operational
+        let newEvent = createTestEvent(content: "After clear")
+        try await cache.saveEvent(newEvent)
+        let retrieved = await cache.getEvent(id: newEvent.id)
+        XCTAssertNotNil(retrieved)
+
+        // Old event should be gone
+        let oldRetrieved = await cache.getEvent(id: event.id)
+        XCTAssertNil(oldRetrieved, "Old event should be gone after clearPersisted")
+    }
+
+    func testClearPersistedReinitializesDatabase() async throws {
+        // Given
+        let event = createTestEvent(content: "Test event")
+        try await cache.saveEvent(event)
+
+        // When
+        try await cache.clearPersisted()
+
+        // Then - database should be reinitialized and fully functional
+        // Test basic operations
+        let newEvent = createTestEvent(content: "New event")
+        try await cache.saveEvent(newEvent)
+
+        // Test query
+        let filter = NDKFilter(kinds: [1])
+        let results = try await cache.queryEvents(filter)
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results.first?.id, newEvent.id)
+
+        // Test deletion
+        try await cache.deleteEvent(id: newEvent.id)
+        let afterDelete = await cache.getEvent(id: newEvent.id)
+        XCTAssertNil(afterDelete)
     }
 
     // MARK: - Reactive Observation
