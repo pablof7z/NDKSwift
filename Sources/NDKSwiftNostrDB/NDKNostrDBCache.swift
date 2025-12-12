@@ -25,8 +25,8 @@ import NDKSwiftCore
 /// - `textSearch(_:limit:)` - Leverages nostrdb's full-text search index
 /// - `processEvent(_:from:subscriptionId:)` - Tracks relay sources via nostrdb
 /// - `getRelaySources(eventId:)` - Returns relays that provided an event
-/// - `observeEvents(matching:includeExisting:)` - Returns existing events only (subscription support planned)
-/// - `observeProfile(pubkey:includeExisting:)` - Returns existing profile only (subscription support planned)
+/// - `observeEvents(matching:includeExisting:)` - Real-time event observation using nostrdb subscriptions
+/// - `observeProfile(pubkey:includeExisting:)` - Real-time profile observation using nostrdb subscriptions
 /// - `clear()` - Clears in-memory cache only (nostrdb files persist)
 ///
 /// ## Protocol Defaults Used
@@ -312,10 +312,15 @@ public actor NDKNostrDBCache: NDKCache {
         matching filter: NDKFilter,
         includeExisting: Bool
     ) async -> AsyncThrowingStream<[NDKEvent], Error> {
-        // Note: Full reactive subscription support is planned for the future.
-        // Currently this returns existing events only and finishes.
+        guard let ndb = ndb else {
+            return AsyncThrowingStream { continuation in
+                continuation.finish(throwing: NDKNostrDBCacheError.notInitialized)
+            }
+        }
+
         return AsyncThrowingStream { continuation in
             Task {
+                // Yield existing events first if requested
                 if includeExisting {
                     do {
                         let existing = try await self.queryEvents(filter)
@@ -327,7 +332,36 @@ public actor NDKNostrDBCache: NDKCache {
                         return
                     }
                 }
-                continuation.finish()
+
+                // Convert NDKFilter to NostrFilter and then NdbFilter for subscription
+                let nostrFilter = self.convertToNostrFilter(filter)
+                do {
+                    let ndbFilter = try NdbFilter(from: nostrFilter)
+
+                    // Subscribe to new events matching the filter
+                    let subscriptionStream = try ndb.subscribe(filters: [ndbFilter])
+
+                    // Process incoming events from the subscription
+                    for try await item in subscriptionStream {
+                        switch item {
+                        case .eose:
+                            // EOSE just indicates initial query is done, continue listening
+                            continue
+                        case .event(let noteKey):
+                            // Convert NoteKey to NDKEvent
+                            if let txn = ndb.lookup_note_by_key(noteKey),
+                               let note = txn.unsafeUnownedValue,
+                               let event = self.convertToNDKEvent(note)
+                            {
+                                continuation.yield([event])
+                            }
+                        }
+                    }
+
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
             }
         }
     }
@@ -336,10 +370,15 @@ public actor NDKNostrDBCache: NDKCache {
         pubkey: String,
         includeExisting: Bool
     ) async -> AsyncThrowingStream<NDKUserMetadata?, Error> {
-        // Note: Full reactive subscription support is planned for the future.
-        // Currently this returns existing profile only and finishes.
+        guard let ndb = ndb else {
+            return AsyncThrowingStream { continuation in
+                continuation.finish(throwing: NDKNostrDBCacheError.notInitialized)
+            }
+        }
+
         return AsyncThrowingStream { continuation in
             Task {
+                // Yield existing profile first if requested
                 if includeExisting {
                     if let profile = await self.getProfileMetadata(pubkey: pubkey) {
                         let metadata = NDKUserMetadata(
@@ -351,7 +390,66 @@ public actor NDKNostrDBCache: NDKCache {
                         continuation.yield(metadata)
                     }
                 }
-                continuation.finish()
+
+                // Subscribe to profile updates (kind 0 events for this pubkey)
+                guard let pkData = self.hexToData(pubkey),
+                      let kind0 = NostrKind(rawValue: 0)
+                else {
+                    continuation.finish()
+                    return
+                }
+
+                let nostrFilter = NostrFilter(
+                    ids: nil,
+                    kinds: [kind0],
+                    referenced_ids: nil,
+                    pubkeys: nil,
+                    since: nil,
+                    until: nil,
+                    limit: nil,
+                    authors: [NdbPubkey(pkData)],
+                    hashtag: nil,
+                    parameter: nil,
+                    quotes: nil
+                )
+
+                do {
+                    let ndbFilter = try NdbFilter(from: nostrFilter)
+
+                    // Subscribe to new profile events
+                    let subscriptionStream = try ndb.subscribe(filters: [ndbFilter])
+
+                    // Process incoming profile events from the subscription
+                    for try await item in subscriptionStream {
+                        switch item {
+                        case .eose:
+                            // EOSE just indicates initial query is done, continue listening
+                            continue
+                        case .event(let noteKey):
+                            // Convert NoteKey to profile metadata
+                            if let txn = ndb.lookup_note_by_key(noteKey),
+                               let note = txn.unsafeUnownedValue
+                            {
+                                // Parse profile metadata from the event content
+                                if let data = note.content.data(using: .utf8),
+                                   let metadata = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+                                {
+                                    let userMetadata = NDKUserMetadata(
+                                        pubkey: pubkey,
+                                        parsedMetadata: metadata,
+                                        updatedAt: Timestamp(note.created_at),
+                                        eventId: self.dataToHex(note.id.id)
+                                    )
+                                    continuation.yield(userMetadata)
+                                }
+                            }
+                        }
+                    }
+
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
             }
         }
     }
