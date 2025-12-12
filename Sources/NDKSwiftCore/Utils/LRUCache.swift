@@ -169,24 +169,27 @@ actor LRUCache<Key: Hashable, Value> {
 
         // Find the oldest entry that isn't expired
         var indexToRemove: Int?
+        var keyToRemove: Key?
         let now = Date()
 
+        // Prioritize evicting expired items
         for (index, key) in accessOrder.enumerated() {
-            if let entry = cache[key], entry.expiresAt > now {
-                indexToRemove = index
-                break
+            if let entry = cache[key] {
+                if entry.expiresAt <= now {
+                    // Found expired item, remove it immediately and return
+                    cache.removeValue(forKey: key)
+                    accessOrder.remove(at: index)
+                    return
+                }
             } else {
-                // Remove expired entry
-                cache.removeValue(forKey: key)
+                 // Inconsistency: key in accessOrder but not cache. Remove it.
+                 accessOrder.remove(at: index)
+                 return
             }
         }
 
-        if let index = indexToRemove {
-            let key = accessOrder.remove(at: index)
-            cache.removeValue(forKey: key)
-        } else {
-            // All entries were expired, clear access order
-            accessOrder.removeAll()
-        }
+        // If no expired items found, remove the LRU item (first in accessOrder)
+        let key = accessOrder.removeFirst()
+        cache.removeValue(forKey: key)
     }
 }
