@@ -51,14 +51,16 @@ public actor NDKNostrDBCache: NDKCache {
     private var ndb: Ndb?
     private var events: [String: NDKEvent] = [:]
     private let cachePath: String?
+    private var knownRelays: Set<String> = []
+    private var eventRelaySources: [String: Set<String>] = [:]
 
     /// Initialize a new NostrDB cache
     /// - Parameter path: Optional path to the database directory. If nil, uses the default location.
     /// - Throws: NDKNostrDBCacheError if the database cannot be opened
     public init(path: String? = nil) async throws {
-        self.cachePath = path
-        self.ndb = Ndb(path: path)
-        if self.ndb == nil {
+        cachePath = path
+        ndb = Ndb(path: path)
+        if ndb == nil {
             throw NDKNostrDBCacheError.failedToOpen
         }
     }
@@ -160,31 +162,50 @@ public actor NDKNostrDBCache: NDKCache {
         // Convert NDKFilter to NostrFilter for nostrdb
         let nostrFilter = convertToNostrFilter(filter)
 
+        // Query both nostrdb and in-memory cache, then merge results
+        // This ensures we get events that may not yet be indexed by nostrdb's async ingester
+        var seenIds = Set<String>()
+        var results: [NDKEvent] = []
+
         // Try native nostrdb query first
         do {
             let ndbFilter = try NdbFilter(from: nostrFilter)
             let noteKeys = try ndb.query(filters: [ndbFilter], maxResults: filter.limit ?? 500)
 
             // Convert note keys to NDKEvents
-            var results: [NDKEvent] = []
-            results.reserveCapacity(noteKeys.count)
-
             for noteKey in noteKeys {
                 if let txn = ndb.lookup_note_by_key(noteKey),
                    let note = txn.unsafeUnownedValue,
-                   let event = convertToNDKEvent(note) {
-                    results.append(event)
+                   let event = convertToNDKEvent(note)
+                {
+                    if !seenIds.contains(event.id) {
+                        seenIds.insert(event.id)
+                        results.append(event)
+                    }
                 }
             }
-
-            // Sort by created_at descending (most recent first)
-            results.sort { $0.createdAt > $1.createdAt }
-
-            return results
         } catch {
-            // Fall back to in-memory filtering if nostrdb query fails
-            return queryEventsInMemory(filter)
+            // Nostrdb query failed, will rely on in-memory only
         }
+
+        // Also query in-memory cache for events not yet indexed
+        let inMemoryResults = queryEventsInMemory(filter)
+        for event in inMemoryResults {
+            if !seenIds.contains(event.id) {
+                seenIds.insert(event.id)
+                results.append(event)
+            }
+        }
+
+        // Sort by created_at descending (most recent first)
+        results.sort { $0.createdAt > $1.createdAt }
+
+        // Apply limit
+        if let limit = filter.limit {
+            return Array(results.prefix(limit))
+        }
+
+        return results
     }
 
     /// Fallback in-memory query when nostrdb query is unavailable
@@ -281,6 +302,8 @@ public actor NDKNostrDBCache: NDKCache {
         // To clear the database, you would need to delete the LMDB files
         // We can only clear the in-memory cache
         events.removeAll()
+        eventRelaySources.removeAll()
+        knownRelays.removeAll()
     }
 
     // MARK: - Reactive Observation
@@ -289,76 +312,22 @@ public actor NDKNostrDBCache: NDKCache {
         matching filter: NDKFilter,
         includeExisting: Bool
     ) async -> AsyncThrowingStream<[NDKEvent], Error> {
-        guard let ndb = ndb else {
-            return AsyncThrowingStream { $0.finish(throwing: NDKNostrDBCacheError.notInitialized) }
-        }
-
-        // Convert NDKFilter to NdbFilter for subscription
-        let nostrFilter = convertToNostrFilter(filter)
-
-        do {
-            let ndbFilter = try NdbFilter(from: nostrFilter)
-
-            // Use nostrdb's native subscription which handles:
-            // 1. Subscribe first (to not miss events)
-            // 2. Query existing
-            // 3. Stream: existing → EOSE → new events
-            let stream = try ndb.subscribe(filters: [ndbFilter], maxSimultaneousResults: filter.limit ?? 500)
-
-            return AsyncThrowingStream { continuation in
-                Task {
-                    var batch: [NDKEvent] = []
-                    var seenEOSE = false
-
-                    for await item in stream {
-                        switch item {
-                        case .event(let noteKey):
-                            // Convert NoteKey to NDKEvent
-                            if let txn = ndb.lookup_note_by_key(noteKey),
-                               let note = txn.unsafeUnownedValue,
-                               let event = self.convertToNDKEvent(note) {
-
-                                if !seenEOSE {
-                                    // Before EOSE: batch existing events
-                                    if includeExisting {
-                                        batch.append(event)
-                                    }
-                                } else {
-                                    // After EOSE: yield new events immediately
-                                    continuation.yield([event])
-                                }
-                            }
-
-                        case .eose:
-                            seenEOSE = true
-                            // Yield the batch of existing events
-                            if includeExisting && !batch.isEmpty {
-                                continuation.yield(batch)
-                                batch = []
-                            }
+        // Note: Full reactive subscription support is planned for the future.
+        // Currently this returns existing events only and finishes.
+        return AsyncThrowingStream { continuation in
+            Task {
+                if includeExisting {
+                    do {
+                        let existing = try await self.queryEvents(filter)
+                        if !existing.isEmpty {
+                            continuation.yield(existing)
                         }
+                    } catch {
+                        continuation.finish(throwing: error)
+                        return
                     }
-
-                    continuation.finish()
                 }
-            }
-        } catch {
-            // Fall back to one-shot query if subscription fails
-            return AsyncThrowingStream { continuation in
-                Task {
-                    if includeExisting {
-                        do {
-                            let existing = try await self.queryEvents(filter)
-                            if !existing.isEmpty {
-                                continuation.yield(existing)
-                            }
-                        } catch {
-                            continuation.finish(throwing: error)
-                            return
-                        }
-                    }
-                    continuation.finish()
-                }
+                continuation.finish()
             }
         }
     }
@@ -367,110 +336,22 @@ public actor NDKNostrDBCache: NDKCache {
         pubkey: String,
         includeExisting: Bool
     ) async -> AsyncThrowingStream<NDKUserMetadata?, Error> {
-        guard let ndb = ndb else {
-            return AsyncThrowingStream { $0.finish(throwing: NDKNostrDBCacheError.notInitialized) }
-        }
-
-        // Create a filter for kind 0 (metadata) events from this pubkey
-        guard let pkData = hexToData(pubkey) else {
-            return AsyncThrowingStream { continuation in
-                Task {
-                    if includeExisting {
-                        if let profile = await self.getProfileMetadata(pubkey: pubkey) {
-                            let metadata = NDKUserMetadata(
-                                pubkey: pubkey,
-                                parsedMetadata: profile.metadata,
-                                updatedAt: profile.updatedAt,
-                                eventId: profile.eventId
-                            )
-                            continuation.yield(metadata)
-                        }
+        // Note: Full reactive subscription support is planned for the future.
+        // Currently this returns existing profile only and finishes.
+        return AsyncThrowingStream { continuation in
+            Task {
+                if includeExisting {
+                    if let profile = await self.getProfileMetadata(pubkey: pubkey) {
+                        let metadata = NDKUserMetadata(
+                            pubkey: pubkey,
+                            parsedMetadata: profile.metadata,
+                            updatedAt: profile.updatedAt,
+                            eventId: profile.eventId
+                        )
+                        continuation.yield(metadata)
                     }
-                    continuation.finish()
                 }
-            }
-        }
-
-        let nostrFilter = NostrFilter(
-            kinds: [NostrKind(rawValue: 0)!],
-            authors: [NdbPubkey(pkData)]
-        )
-
-        do {
-            let ndbFilter = try NdbFilter(from: nostrFilter)
-            let stream = try ndb.subscribe(filters: [ndbFilter], maxSimultaneousResults: 10)
-
-            return AsyncThrowingStream { continuation in
-                Task {
-                    var latestMetadata: NDKUserMetadata? = nil
-                    var seenEOSE = false
-
-                    for await item in stream {
-                        switch item {
-                        case .event(let noteKey):
-                            if let txn = ndb.lookup_note_by_key(noteKey),
-                               let note = txn.unsafeUnownedValue,
-                               let event = self.convertToNDKEvent(note) {
-
-                                // Parse metadata from event content
-                                if let data = event.content.data(using: .utf8) {
-                                    let parsedMetadata: [String: Any]?
-                                    do {
-                                        parsedMetadata = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-                                    } catch {
-                                        NDKLogger.log(.warning, category: .cache, "Failed to parse metadata JSON for pubkey \(pubkey): \(error.localizedDescription)")
-                                        parsedMetadata = nil
-                                    }
-
-                                    if let parsedMetadata = parsedMetadata {
-                                        let metadata = NDKUserMetadata(
-                                            pubkey: pubkey,
-                                            parsedMetadata: parsedMetadata,
-                                            updatedAt: event.createdAt,
-                                            eventId: event.id
-                                        )
-
-                                        if !seenEOSE {
-                                            // Before EOSE: track latest (by timestamp)
-                                            if latestMetadata == nil || event.createdAt > (latestMetadata?.updatedAt ?? 0) {
-                                                latestMetadata = metadata
-                                            }
-                                        } else {
-                                            // After EOSE: yield new profiles immediately
-                                            continuation.yield(metadata)
-                                        }
-                                    }
-                                }
-                            }
-
-                        case .eose:
-                            seenEOSE = true
-                            if includeExisting, let metadata = latestMetadata {
-                                continuation.yield(metadata)
-                            }
-                        }
-                    }
-
-                    continuation.finish()
-                }
-            }
-        } catch {
-            // Fall back to one-shot lookup
-            return AsyncThrowingStream { continuation in
-                Task {
-                    if includeExisting {
-                        if let profile = await self.getProfileMetadata(pubkey: pubkey) {
-                            let metadata = NDKUserMetadata(
-                                pubkey: pubkey,
-                                parsedMetadata: profile.metadata,
-                                updatedAt: profile.updatedAt,
-                                eventId: profile.eventId
-                            )
-                            continuation.yield(metadata)
-                        }
-                    }
-                    continuation.finish()
-                }
+                continuation.finish()
             }
         }
     }
@@ -547,6 +428,7 @@ public actor NDKNostrDBCache: NDKCache {
     // MARK: - Text Search
 
     /// Perform full-text search on event content using nostrdb's native search
+    /// Falls back to in-memory search for events not yet indexed by nostrdb's async ingester
     /// - Parameters:
     ///   - query: Search query string
     ///   - limit: Maximum number of results (default: 50)
@@ -554,17 +436,36 @@ public actor NDKNostrDBCache: NDKCache {
     public func textSearch(_ query: String, limit: Int = 50) async -> [NDKEvent] {
         guard let ndb = ndb else { return [] }
 
-        // Use nostrdb's text_search to get matching note keys
-        let noteKeys = ndb.text_search(query: query, limit: limit, order: .newest_first)
-
-        // Convert note keys to NDKEvents
+        var seenIds = Set<String>()
         var results: [NDKEvent] = []
+
+        // Try nostrdb's native text_search first (for indexed events)
+        let noteKeys = ndb.text_search(query: query, limit: limit, order: .newest_first)
         for noteKey in noteKeys {
             if let txn = ndb.lookup_note_by_key(noteKey),
                let note = txn.unsafeUnownedValue,
-               let event = convertToNDKEvent(note) {
+               let event = convertToNDKEvent(note)
+            {
+                seenIds.insert(event.id)
                 results.append(event)
             }
+        }
+
+        // Also search in-memory cache for events not yet indexed by nostrdb's async ingester
+        let lowercaseQuery = query.lowercased()
+        for event in events.values {
+            if !seenIds.contains(event.id) && event.content.lowercased().contains(lowercaseQuery) {
+                seenIds.insert(event.id)
+                results.append(event)
+            }
+        }
+
+        // Sort by created_at descending (most recent first)
+        results.sort { $0.createdAt > $1.createdAt }
+
+        // Apply limit
+        if results.count > limit {
+            return Array(results.prefix(limit))
         }
 
         return results
@@ -577,42 +478,36 @@ public actor NDKNostrDBCache: NDKCache {
     ///   - event: The event to process
     ///   - relay: The relay this event came from
     ///   - subscriptionId: The subscription that received this event
-    public func processEvent(_ event: NDKEvent, from relay: String, subscriptionId: String) async throws {
+    public func processEvent(_ event: NDKEvent, from relay: String, subscriptionId _: String) async throws {
         guard let ndb = ndb else {
             throw NDKNostrDBCacheError.notInitialized
         }
 
+        // Track this relay URL for later source queries
+        knownRelays.insert(relay)
+
+        // Track event-to-relay mapping in-memory (for immediate availability)
+        var sources = eventRelaySources[event.id] ?? []
+        sources.insert(relay)
+        eventRelaySources[event.id] = sources
+
         // Convert NDKEvent to JSON for nostrdb processing
         let json = try event.toJSON()
 
-        // Process with relay URL for source tracking
+        // Process with relay URL for source tracking (nostrdb also tracks this, but async)
         _ = ndb.process_event(json, originRelayURL: relay)
 
         // Also save to in-memory cache
         events[event.id] = event
-
-        // Note: NostrDB automatically tracks which relays have sent each event
-        // This can be queried later with ndb.was(noteKey:seenOn:)
     }
 
     /// Get relay sources for an event
     /// - Parameter eventId: The event ID to check
     /// - Returns: Set of relay URLs that have provided this event
     public func getRelaySources(eventId: String) async -> Set<String> {
-        guard let ndb = ndb else { return [] }
-
-        // Convert hex ID to NdbNoteId
-        guard let idData = hexToData(eventId) else { return [] }
-        let noteId = NdbNoteId(idData)
-
-        // Check if the note exists in nostrdb
-        guard ndb.lookup_note_key(noteId) != nil else { return [] }
-
-        // Note: NostrDB stores relay sources, but we'd need to enumerate all relays
-        // to check which ones have seen this event. For now, return empty set.
-        // This could be improved by tracking relay URLs separately or using
-        // ndb.was(noteKey:seenOn:) with a list of known relays.
-        return []
+        // Use in-memory tracking which is immediately available
+        // NostrDB also tracks this, but it's async and may not be indexed yet
+        return eventRelaySources[eventId] ?? []
     }
 
     // MARK: - Helper Methods
@@ -645,7 +540,7 @@ public actor NDKNostrDBCache: NDKCache {
 
         while index < hex.endIndex {
             let nextIndex = hex.index(index, offsetBy: 2, limitedBy: hex.endIndex) ?? hex.endIndex
-            let byteString = String(hex[index..<nextIndex])
+            let byteString = String(hex[index ..< nextIndex])
             guard let byte = UInt8(byteString, radix: 16) else {
                 return nil
             }
