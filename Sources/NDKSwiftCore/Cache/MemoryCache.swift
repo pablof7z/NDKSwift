@@ -469,7 +469,7 @@ public actor MemoryCache: NDKCache {
                     continuation: continuation,
                     includeExisting: includeExisting
                 )
-                await self.addEventObserver(id: observerId, observer: observer)
+                self.addEventObserver(id: observerId, observer: observer)
 
                 // If includeExisting, emit current matching events
                 if includeExisting {
@@ -478,10 +478,10 @@ public actor MemoryCache: NDKCache {
                         if !existingEvents.isEmpty {
                             continuation.yield(existingEvents)
                         }
-                        await self.markObserverAsEmittedExisting(id: observerId)
+                        self.markObserverAsEmittedExisting(id: observerId)
                     } catch {
                         continuation.finish(throwing: error)
-                        await self.removeEventObserver(id: observerId)
+                        self.removeEventObserver(id: observerId)
                         return
                     }
                 }

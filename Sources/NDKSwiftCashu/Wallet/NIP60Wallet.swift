@@ -218,7 +218,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
                         filter: filter,
                         maxAge: 0,
                         cachePolicy: .cacheWithNetwork,
-                        relays: relayUrls,
+                        relays: relayURLs,
                         subscriptionId: subscriptionId
                     )
                     dataSources.append(dataSource)
@@ -866,6 +866,9 @@ public actor NIP60Wallet: NDKPaymentProvider {
 
     /// Initialize wallet by subscribing to wallet events
     public func load() async throws {
+        // Register the Cashu fallback handler for Lightning-to-Nutzap conversions
+        await ndk.zapManager.register(fallbackHandler: CashuZapFallbackHandler())
+
         // Clear state before starting
         await proofStateManager.clear()
         await eventManager.clearTrackedEvents()

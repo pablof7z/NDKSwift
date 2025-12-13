@@ -115,7 +115,7 @@ public final class NDK: @unchecked Sendable {
     // MARK: - Lazy Internal Components
 
     lazy var relayRanker: NDKRelayRanker = {
-        NDKRelayRanker()
+        NDKRelayRanker(ndk: self, tracker: outbox)
     }()
 
     lazy var relaySelector: NDKRelaySelector = {
@@ -123,7 +123,7 @@ public final class NDK: @unchecked Sendable {
     }()
 
     lazy var publishingStrategy: NDKPublishingStrategy = {
-        NDKPublishingStrategy()
+        NDKPublishingStrategy(ndk: self, selector: relaySelector, ranker: relayRanker)
     }()
 
     /// NIP-05 manager for efficient resolution and caching
@@ -374,8 +374,8 @@ public final class NDK: @unchecked Sendable {
     /// - Returns: Set of relays that accepted the event
     /// - Throws: NDKError if publishing fails
     public func publish(_ event: NDKEvent, to relayURLs: Set<String>? = nil, logRawJSON: Bool = false) async throws -> Set<NDKRelay> {
-        if let relayUrls = relayUrls {
-            try await eventManager.publish(event: event, to: relayUrls, logRawJSON: logRawJSON)
+        if let relayURLs = relayURLs {
+            try await eventManager.publish(event: event, to: relayURLs, logRawJSON: logRawJSON)
         } else {
             try await eventManager.publish(event, logRawJSON: logRawJSON)
         }
