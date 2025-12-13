@@ -167,26 +167,34 @@ public actor LRUCache<Key: Hashable, Value> {
     private func evictOldest() {
         guard !accessOrder.isEmpty else { return }
 
-        // Find the oldest entry that isn't expired
+        // Find the oldest entry that isn't expired, evicting expired ones along the way
+        var expiredIndices: [Int] = []
         var indexToRemove: Int?
         let now = Date()
 
         for (index, key) in accessOrder.enumerated() {
             if let entry = cache[key], entry.expiresAt > now {
+                // Found first non-expired entry - this is the oldest we'll evict
                 indexToRemove = index
                 break
             } else {
-                // Remove expired entry
+                // Mark expired entry for removal
+                expiredIndices.append(index)
                 cache.removeValue(forKey: key)
             }
         }
 
+        // Remove expired entries from accessOrder (in reverse to preserve indices)
+        for index in expiredIndices.reversed() {
+            accessOrder.remove(at: index)
+        }
+
+        // Remove oldest non-expired entry if found
         if let index = indexToRemove {
-            let key = accessOrder.remove(at: index)
+            // Adjust index after removing expired entries
+            let adjustedIndex = index - expiredIndices.filter { $0 < index }.count
+            let key = accessOrder.remove(at: adjustedIndex)
             cache.removeValue(forKey: key)
-        } else {
-            // All entries were expired, clear access order
-            accessOrder.removeAll()
         }
     }
 }
