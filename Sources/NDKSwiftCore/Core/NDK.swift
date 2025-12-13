@@ -114,43 +114,27 @@ public final class NDK: @unchecked Sendable {
 
     // MARK: - Lazy Internal Components
 
-    var _relayRanker: NDKRelayRanker?
-    var _relaySelector: NDKRelaySelector?
-    var _publishingStrategy: NDKPublishingStrategy?
-    var _nip05Manager: NIP05Manager?
-    var _blossomServerManager: NDKBlossomServerManager?
+    lazy var relayRanker: NDKRelayRanker = {
+        NDKRelayRanker()
+    }()
 
-    // MARK: - Computed Properties
+    lazy var relaySelector: NDKRelaySelector = {
+        NDKRelaySelector(ndk: self, tracker: outbox, ranker: relayRanker)
+    }()
 
-    /// Helper to lazily initialize properties
-    func lazyInit<T>(_ storage: inout T?, creator: () -> T) -> T {
-        if let existing = storage {
-            return existing
-        }
-        let newValue = creator()
-        storage = newValue
-        return newValue
-    }
-
-    var relaySelector: NDKRelaySelector {
-        lazyInit(&_relaySelector) {
-            NDKRelaySelector(ndk: self, tracker: outbox, ranker: relayRanker)
-        }
-    }
+    lazy var publishingStrategy: NDKPublishingStrategy = {
+        NDKPublishingStrategy()
+    }()
 
     /// NIP-05 manager for efficient resolution and caching
-    public var nip05Manager: NIP05Manager {
-        lazyInit(&_nip05Manager) {
-            NIP05Manager(ndk: self)
-        }
-    }
+    public lazy var nip05Manager: NIP05Manager = {
+        NIP05Manager(ndk: self)
+    }()
 
     /// Blossom server manager for managing server lists and uploads
-    public var blossomServerManager: NDKBlossomServerManager {
-        lazyInit(&_blossomServerManager) {
-            NDKBlossomServerManager(ndk: self)
-        }
-    }
+    public lazy var blossomServerManager: NDKBlossomServerManager = {
+        NDKBlossomServerManager(ndk: self)
+    }()
 
     // MARK: - Initialization
 
@@ -389,7 +373,7 @@ public final class NDK: @unchecked Sendable {
     ///   - logRawJSON: If true, logs the raw JSON for debugging
     /// - Returns: Set of relays that accepted the event
     /// - Throws: NDKError if publishing fails
-    public func publish(_ event: NDKEvent, to relayUrls: Set<String>? = nil, logRawJSON: Bool = false) async throws -> Set<NDKRelay> {
+    public func publish(_ event: NDKEvent, to relayURLs: Set<String>? = nil, logRawJSON: Bool = false) async throws -> Set<NDKRelay> {
         if let relayUrls = relayUrls {
             try await eventManager.publish(event: event, to: relayUrls, logRawJSON: logRawJSON)
         } else {

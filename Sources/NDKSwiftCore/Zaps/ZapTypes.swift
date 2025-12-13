@@ -1,5 +1,4 @@
 import Foundation
-import NDKSwiftCore
 
 // Core payment types (PaymentRequest, PaymentConfirmation, LightningInvoiceRequest, LightningPaymentConfirmation)
 // are defined in NDKSwiftCore/Payment/PaymentTypes.swift

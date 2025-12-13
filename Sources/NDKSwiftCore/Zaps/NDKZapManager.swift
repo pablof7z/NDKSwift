@@ -1,13 +1,16 @@
-import CashuSwift
-import CryptoKit
 import Foundation
-import NDKSwiftCore
+import CryptoKit
+import CashuSwift
 
 /// Manages zapping functionality with decoupled protocol and payment handling
 public actor NDKZapManager {
     private let ndk: NDK
     private var zapProtocols: [ZapType: NDKZapProtocol] = [:]
     private var paymentProviders: [NDKPaymentProvider] = []
+    private var fallbackHandlers: [ZapFallbackHandler] = []
+
+    // Typealias for payment provider factory/selection logic
+    public typealias PaymentProviderSelector = (PaymentRequest, String?) async throws -> NDKPaymentProvider?
 
     // Cache for recipient zap info (pubkey -> info)
     private var recipientInfoCache: [String: RecipientZapInfo] = [:]
@@ -17,9 +20,9 @@ public actor NDKZapManager {
     public init(ndk: NDK) {
         self.ndk = ndk
 
-        // Register default protocols
+        // Register default Lightning protocol
+        // Nutzap protocol should be registered by NDKSwiftCashu
         zapProtocols[.lightning] = NDKLightningZapProtocol(ndk: ndk)
-        zapProtocols[.nutzap] = NDKNutzapProtocol(ndk: ndk)
     }
 
     // MARK: - Protocol Management
@@ -36,37 +39,32 @@ public actor NDKZapManager {
         paymentProviders.append(provider)
     }
 
+    /// Get all registered payment providers
+    public func getRegisteredProviders() -> [NDKPaymentProvider] {
+        return paymentProviders
+    }
+
     /// Remove a payment provider
     public func unregister(providerId: String) {
         paymentProviders.removeAll { $0.id == providerId }
     }
 
-    /// Configure with default providers based on available wallets
-    public func configureDefaults(
-        cashuWallet: NIP60Wallet? = nil,
-        nwcWallet: NDKNWCWallet? = nil
-    ) {
-        // Clear existing providers
+    /// Clear all providers
+    public func clearProviders() {
         paymentProviders.removeAll()
+    }
 
-        // Add Cashu provider if available (highest priority for privacy)
-        if let cashuWallet = cashuWallet {
-            register(provider: cashuWallet)
-        }
+    // MARK: - Fallback Handler Management
 
-        // Add NWC provider if available
-        if let nwcWallet = nwcWallet {
-            register(provider: nwcWallet)
-        }
-
-        // Always add QR code as fallback
-        register(provider: QRCodePaymentProvider())
+    /// Register a fallback handler
+    public func register(fallbackHandler: ZapFallbackHandler) {
+        fallbackHandlers.append(fallbackHandler)
     }
 
     // MARK: - Recipient Info Management
 
     /// Fetch all zap-related info for a recipient in one go
-    private func fetchRecipientZapInfo(for user: NDKUser, maxAge: TimeInterval = TimeConstants.day) async -> RecipientZapInfo {
+    public func fetchRecipientZapInfo(for user: NDKUser, maxAge: TimeInterval = TimeConstants.day) async -> RecipientZapInfo {
         let pubkey = user.pubkey
 
         // Check cache first
@@ -85,8 +83,8 @@ public actor NDKZapManager {
             var filter = NDKFilter()
             filter.authors = [pubkey]
             filter.kinds = [
-                EventKind.metadata, // kind:0 - profile with lightning address
-                EventKind.nutzapPreferences, // kind:10019 - nutzap preferences
+                EventKind.metadata,           // kind:0 - profile with lightning address
+                EventKind.nutzapPreferences  // kind:10019 - nutzap preferences
             ]
 
             // Create data source and collect until EOSE
@@ -189,203 +187,21 @@ public actor NDKZapManager {
             )
         }
 
-        NDKLogger.log(.debug, category: .wallet, "// 4. No direct provider - try protocol transformation")
-        // 4. No direct provider - try protocol transformation
-        // If this is a Nutzap, try Lightning fallback
-        if zapProtocol.type == .nutzap,
-           let nutzapProtocol = zapProtocol as? NDKNutzapProtocol,
-           let nutzapRequest = prepared.paymentRequest as? NutzapPaymentRequest
-        {
-            // Try Lightning-based funding
-            return try await fundNutzapViaLightning(
-                nutzapProtocol: nutzapProtocol,
+        NDKLogger.log(.debug, category: .wallet, "// 4. No direct provider - trying fallback handlers")
+
+        // 4. Try fallback handlers
+        for handler in fallbackHandlers {
+            if let result = try await handler.tryFallback(
+                manager: self,
+                protocol: zapProtocol,
                 prepared: prepared,
-                nutzapRequest: nutzapRequest,
                 preferredProvider: preferredProvider
-            )
+            ) {
+                return result
+            }
         }
 
-        // 5. No fallback available
         throw ZapError.noWalletConfigured
-    }
-
-    /// Fund a Nutzap using Lightning payment to mint
-    private func fundNutzapViaLightning(
-        nutzapProtocol: NDKNutzapProtocol,
-        prepared: PreparedZap,
-        nutzapRequest: NutzapPaymentRequest,
-        preferredProvider: String?
-    ) async throws -> ZapResult {
-        // Try each accepted mint
-        var mintAttempts = 0
-        var lastError: Error?
-
-        for mintURL in nutzapRequest.acceptedMints {
-            mintAttempts += 1
-            let mintHost = mintURL.host ?? mintURL.absoluteString
-
-            do {
-                // Create mint quote
-                let quote: MintQuote
-                do {
-                    quote = try await nutzapProtocol.createMintQuote(
-                        invoice: "", // Will be filled by mint
-                        mint: mintURL,
-                        amount: nutzapRequest.amountSats
-                    )
-                } catch {
-                    lastError = ZapError.mintQuoteFailed(mint: mintHost, reason: error.localizedDescription)
-                    continue
-                }
-
-                // Create Lightning request for the mint's invoice
-                let lightningRequest = LightningInvoiceRequest(
-                    invoice: quote.invoice,
-                    amountSats: quote.amount,
-                    recipient: "Mint: \(mintHost)"
-                )
-
-                // Find a Lightning provider
-                let lightningProvider: (any NDKPaymentProvider)?
-                do {
-                    lightningProvider = try await selectPaymentProvider(
-                        for: lightningRequest,
-                        preferredId: preferredProvider
-                    )
-                } catch {
-                    NDKLogger.log(.warning, category: .wallet, "Failed to select Lightning provider for mint quote: \(error.localizedDescription)")
-                    lastError = ZapError.noWalletConfigured
-                    continue
-                }
-
-                guard let lightningProvider = lightningProvider else {
-                    lastError = ZapError.noWalletConfigured
-                    continue
-                }
-
-                // Pay the Lightning invoice
-                do {
-                    _ = try await lightningProvider.fulfill(lightningRequest)
-                } catch {
-                    lastError = ZapError.paymentFailed(error.localizedDescription)
-                    continue
-                }
-
-                // Mint tokens using the paid invoice
-                let proofs: [CashuSwift.Proof]
-                do {
-                    proofs = try await mintTokensWithQuote(
-                        quote: quote,
-                        recipientP2PK: nutzapRequest.recipientP2PK
-                    )
-                } catch {
-                    lastError = ZapError.mintTokenCreationFailed(mint: mintHost, reason: error.localizedDescription)
-                    continue
-                }
-
-                // Create Cashu confirmation
-                let cashuConfirmation = CashuPaymentConfirmation(
-                    proofs: proofs,
-                    change: nil,
-                    mintURL: mintURL
-                )
-
-                // Complete the zap
-                return try await nutzapProtocol.completeZap(
-                    prepared: prepared,
-                    confirmation: cashuConfirmation
-                )
-
-            } catch {
-                // Catch any other errors
-                lastError = error
-                continue
-            }
-        }
-
-        // All mints failed
-        if mintAttempts > 0 {
-            throw ZapError.allMintsFailed(attempts: mintAttempts)
-        } else {
-            throw lastError ?? ZapError.paymentFailed("No mints available")
-        }
-    }
-
-    /// Mint tokens using a paid quote
-    private func mintTokensWithQuote(
-        quote: MintQuote,
-        recipientP2PK: String
-    ) async throws -> [CashuSwift.Proof] {
-        // Connect to the mint and load keysets
-        let cashuMint = try await CashuSwift.loadMint(url: quote.mint)
-
-        do {
-            // Mint is now loaded with keysets
-
-            // First, check if the quote has been paid
-            let quoteState = try await CashuSwift.mintQuoteState(
-                for: quote.id,
-                mint: cashuMint
-            )
-
-            guard quoteState.state == .paid else {
-                throw ZapError.paymentFailed("Lightning invoice not yet paid")
-            }
-
-            // Generate a seed for deterministic output generation
-            let seed = Crypto.randomBytes(count: Crypto.Constants.privateKeySize).hexString
-
-            // Since CashuSwift has already verified the quote is paid,
-            // we can now issue the tokens
-            // Create a properly typed mint quote from our stored data
-            let mintQuoteData: [String: Any] = [
-                "quote": quote.id,
-                "amount": Int(quote.amount),
-                "request": quote.invoice,
-                "state": "PAID",
-                "expiry": Int(Timestamp.from(quote.expiry)),
-            ]
-
-            let mintQuote = try JSONCoding.decodeFromDictionary(CashuSwift.Bolt11.MintQuote.self, from: mintQuoteData)
-
-            // Issue tokens for the paid quote
-            let issueResult = try await CashuSwift.issue(
-                for: mintQuote,
-                mint: cashuMint,
-                seed: seed
-            )
-
-            if case .fail = issueResult.dleqResult {
-                NDKLogger.log(.warning, category: .general, "⚠️ Warning: DLEQ verification failed for minted proofs")
-            }
-
-            // Now we need to swap these proofs to P2PK-locked ones
-            // Use the CashuSwift send API correctly
-            let sendResult = try await CashuSwift.send(
-                inputs: issueResult.proofs,
-                mint: cashuMint,
-                amount: Int(quote.amount),
-                seed: seed,
-                lockToPublicKey: recipientP2PK
-            )
-
-            // Extract the locked proofs from the token
-            guard let mintProofs = sendResult.token.proofsByMint[quote.mint.absoluteString] else {
-                throw ZapError.mintTokenCreationFailed(
-                    mint: quote.mint.host ?? quote.mint.absoluteString,
-                    reason: "No proofs returned from mint"
-                )
-            }
-
-            // Return the locked proofs directly
-            return mintProofs
-
-        } catch {
-            throw ZapError.mintTokenCreationFailed(
-                mint: quote.mint.host ?? quote.mint.absoluteString,
-                reason: error.localizedDescription
-            )
-        }
     }
 
     /// Get available payment providers for a given payment request
@@ -395,7 +211,7 @@ public actor NDKZapManager {
         for provider in paymentProviders {
             let isAvailable = await provider.isAvailable()
             let canFulfill = await provider.canFulfill(request)
-            if isAvailable, canFulfill {
+            if isAvailable && canFulfill {
                 available.append(provider)
             }
         }
@@ -403,23 +219,34 @@ public actor NDKZapManager {
         return available
     }
 
+    /// Select the best payment provider for a request
+    public func selectPaymentProvider(
+        for request: PaymentRequest,
+        preferredId: String?
+    ) async throws -> NDKPaymentProvider {
+        // Try preferred provider first
+        if let preferredId = preferredId,
+           let provider = paymentProviders.first(where: { $0.id == preferredId }) {
+            let isAvailable = await provider.isAvailable()
+            let canFulfill = await provider.canFulfill(request)
+            if isAvailable && canFulfill {
+                return provider
+            }
+        }
+
+        // Find first available provider that can fulfill the request
+        for provider in paymentProviders {
+            let isAvailable = await provider.isAvailable()
+            let canFulfill = await provider.canFulfill(request)
+            if isAvailable && canFulfill {
+                return provider
+            }
+        }
+
+        throw ZapError.noWalletConfigured
+    }
+
     /// Subscribe to zaps for an event or user (reactive, event-driven approach)
-    ///
-    /// This method returns immediately with an AsyncSequence that yields zaps as they arrive.
-    /// Perfect for UIs that should update progressively as zaps are received.
-    ///
-    /// - Parameters:
-    ///   - event: The event to get zaps for
-    ///   - user: The user to get zaps for (if event is nil)
-    /// - Returns: AsyncSequence of ZapInfo objects
-    ///
-    /// ## Example:
-    /// ```swift
-    /// for try await zap in zapManager.subscribeToZaps(for: event) {
-    ///     // Update UI with each zap as it arrives
-    ///     updateZapDisplay(zap)
-    /// }
-    /// ```
     public func subscribeToZaps(
         for event: NDKEvent? = nil,
         user: NDKUser? = nil
@@ -428,7 +255,8 @@ public actor NDKZapManager {
             Task {
                 do {
                     var kinds = [EventKind.zapReceipt]
-                    kinds.append(EventKind.nutzap)
+                    // We need to know if we should listen for Nutzaps (kind 9321)
+                    kinds.append(9321) // nutzap kind
 
                     var filter = NDKFilter()
                     filter.kinds = kinds
@@ -462,16 +290,21 @@ public actor NDKZapManager {
                             } catch {
                                 NDKLogger.log(.warning, category: .wallet, "Failed to validate zap receipt \(receipt.event.id): \(error.localizedDescription)")
                             }
-                        } else if eventKind == EventKind.nutzap {
-                            let nutzap = NDKNutzap(event: event)
-                            let totalAmount = nutzap.totalAmount
+                        } else if eventKind == 9321 { // nutzap
+                            // In Core we might not have full NDKNutzap model if it depends on CashuSwift.
+                            // But we can parse basic info.
+
+                            let recipientPubkey = event.tags.first(where: { $0.first == "p" })?[safe: 1] ?? ""
+                            // amount is tag "amount"
+                            let amountStr = event.tags.first(where: { $0.first == "amount" })?[safe: 1] ?? "0"
+                            let totalAmount = Int64(amountStr) ?? 0
 
                             let zapInfo = ZapInfo(
                                 type: .nutzap,
-                                amountSats: Int64(totalAmount),
+                                amountSats: totalAmount,
                                 sender: event.pubkey,
-                                recipient: nutzap.recipientPubkey ?? "",
-                                comment: nutzap.comment,
+                                recipient: recipientPubkey,
+                                comment: event.content,
                                 timestamp: Date(nostrTimestamp: event.createdAt),
                                 event: event
                             )
@@ -484,6 +317,7 @@ public actor NDKZapManager {
         }
     }
 
+
     // MARK: - Private Methods
 
     private func selectZapProtocol(
@@ -495,54 +329,25 @@ public actor NDKZapManager {
         // Try preferred type first if it's supported
         if let preferredType = preferredType,
            recipientInfo.supports(preferredType),
-           let zapProtocol = zapProtocols[preferredType]
-        {
+           let zapProtocol = zapProtocols[preferredType] {
             return zapProtocol
         }
 
         // Smart routing: Prioritize Nutzap for privacy
+        // But only if we have the protocol registered!
         if recipientInfo.hasNutzapSupport,
-           let nutzapProtocol = zapProtocols[.nutzap]
-        {
+           let nutzapProtocol = zapProtocols[.nutzap] {
             return nutzapProtocol
         }
 
         // Fallback to Lightning
         if recipientInfo.hasLightningSupport,
-           let lightningProtocol = zapProtocols[.lightning]
-        {
+           let lightningProtocol = zapProtocols[.lightning] {
             return lightningProtocol
         }
         NDKLogger.log(.debug, category: .wallet, "recipientDoesNotSupportZaps")
 
         throw ZapError.recipientDoesNotSupportZaps
-    }
-
-    private func selectPaymentProvider(
-        for request: PaymentRequest,
-        preferredId: String?
-    ) async throws -> NDKPaymentProvider {
-        // Try preferred provider first
-        if let preferredId = preferredId,
-           let provider = paymentProviders.first(where: { $0.id == preferredId })
-        {
-            let isAvailable = await provider.isAvailable()
-            let canFulfill = await provider.canFulfill(request)
-            if isAvailable && canFulfill {
-                return provider
-            }
-        }
-
-        // Find first available provider that can fulfill the request
-        for provider in paymentProviders {
-            let isAvailable = await provider.isAvailable()
-            let canFulfill = await provider.canFulfill(request)
-            if isAvailable && canFulfill {
-                return provider
-            }
-        }
-
-        throw ZapError.noWalletConfigured
     }
 
     private func validateAndParseZapReceipt(_ receipt: NDKZapReceipt) async throws -> ZapInfo? {
@@ -566,14 +371,14 @@ public actor NDKZapManager {
                         providerPubkey = resolution.providerPubkey
 
                         // If no provider pubkey from LNURL, check if service allows Nostr
-                        if providerPubkey == nil, resolution.payResponse.allowsNostr == true {
+                        if providerPubkey == nil && resolution.payResponse.allowsNostr == true {
                             // Some services that allow Nostr might use the recipient's pubkey
                             // as the zap receipt signer
                             providerPubkey = receipt.event.pubkey
                         }
                     } catch {
                         NDKLogger.log(.warning, category: .general,
-                                      "Failed to resolve LNURL for \(lnurlAddress): \(error)")
+                                    "Failed to resolve LNURL for \(lnurlAddress): \(error)")
                         // Fall back to using receipt pubkey
                         providerPubkey = receipt.event.pubkey
                     }
@@ -586,8 +391,7 @@ public actor NDKZapManager {
         }
 
         guard let providerPubkey = providerPubkey,
-              receipt.validate(lnurlProviderPubkey: providerPubkey)
-        else {
+              receipt.validate(lnurlProviderPubkey: providerPubkey) else {
             return nil
         }
 
@@ -621,9 +425,9 @@ public struct ZapInfo {
 
 // MARK: - NDK Extension
 
-public extension NDK {
+extension NDK {
     /// Access the zap manager
-    var zapManager: NDKZapManager {
+    public var zapManager: NDKZapManager {
         if let existing = objc_getAssociatedObject(self, &zapManagerKey) as? NDKZapManager {
             return existing
         }
@@ -638,14 +442,14 @@ private var zapManagerKey: UInt8 = 0
 
 // MARK: - User Extension
 
-public extension NDKUser {
+extension NDKUser {
     /// Zap this user
-    func zap(
+    public func zap(
         amountSats: Int64,
         comment: String? = nil,
         preferredType: ZapType? = nil
     ) async throws -> ZapResult {
-        guard let ndk = await ndk else {
+        guard let ndk = await self.ndk else {
             throw NDKError.notConfigured(ErrorMessageConstants.Messages.ndkNotAvailable)
         }
 
@@ -656,13 +460,14 @@ public extension NDKUser {
             preferredType: preferredType
         )
     }
+
 }
 
 // MARK: - Event Extension
 
-public extension NDKEvent {
+extension NDKEvent {
     /// Zap this event (requires NDK instance)
-    func zap(
+    public func zap(
         with ndk: NDK,
         amountSats: Int64,
         comment: String? = nil,
@@ -678,4 +483,5 @@ public extension NDKEvent {
             preferredType: preferredType
         )
     }
+
 }

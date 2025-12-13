@@ -1,5 +1,4 @@
 import Foundation
-import NDKSwiftCore
 
 /// All zap-related information for a recipient, fetched once and cached
 public struct RecipientZapInfo {

@@ -1,5 +1,4 @@
 import Foundation
-import NDKSwiftCore
 
 /// LNURL Pay endpoint response
 struct LNURLPayEndpoint: Codable {
