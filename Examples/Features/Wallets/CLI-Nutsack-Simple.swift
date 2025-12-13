@@ -8,22 +8,22 @@ struct CLINutsackSimple {
     static func main() async throws {
         print("⚡ NIP-60 Wallet Calculator - Simple Demo")
         print("=========================================\n")
-        
+
         // Create a test private key
         let signer = try NDKPrivateKeySigner.generate()
-        
+
         // Initialize NDK
         let ndk = NDK(relayUrls: ["wss://relay.primal.net"])
         ndk.signer = signer
-        
+
         print("📡 Connecting to relay...")
         await ndk.connect()
         print("✅ Connected!\n")
-        
+
         // Create wallet
         print("💰 Creating wallet...")
         let wallet = try NIP60Wallet(ndk: ndk)
-        
+
         // Setup wallet with test mint
         try await wallet.setup(
             mints: ["https://testnut.cashu.space"],
@@ -31,30 +31,30 @@ struct CLINutsackSimple {
             publishMintList: true
         )
         print("✅ Wallet configured with test mint\n")
-        
+
         // Load wallet
         try await wallet.load()
-        
+
         // Check balance
         let balance = try await wallet.getBalance()
         print("💵 Current balance: \(balance) sats")
-        
+
         // Get mints
         let mints = await wallet.getMintsInfo()
         print("🏦 Configured mints:")
         for mint in mints {
             print("   - \(mint.url)")
         }
-        
+
         // Get P2PK pubkey for receiving
         if let p2pk = try? await wallet.getP2PKPubkey() {
             print("\n🔑 P2PK pubkey for receiving nutzaps:")
             print("   \(p2pk)")
         }
-        
+
         print("\n✅ Wallet ready!")
-        print("   Your pubkey: \(try await signer.pubkey)")
-        
+        try print("   Your pubkey: \(await signer.pubkey)")
+
         // Keep the program running for a bit to see output
         try await Task.sleep(nanoseconds: 2_000_000_000)
     }

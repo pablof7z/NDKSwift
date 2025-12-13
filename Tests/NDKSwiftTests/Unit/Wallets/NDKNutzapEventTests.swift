@@ -1,38 +1,37 @@
-import XCTest
-@testable import NDKSwiftCore
-import NDKSwiftCashu
 import CashuSwift
+import NDKSwiftCashu
+@testable import NDKSwiftCore
+import XCTest
 
 final class NDKNutzapEventTests: XCTestCase {
-    
     var mockSigner: MockNDKSigner!
     var ndk: NDK!
     var testMintURL: String!
     var testRecipientPubkey: String!
     var testSenderPubkey: String!
-    
+
     override func setUp() async throws {
         try await super.setUp()
-        
+
         // Setup test data
         testMintURL = "https://testnut.cashu.space"
         testRecipientPubkey = "e9fbced3a42dcf551486650cc752ab354347dd413b307484e4fd1818ab53f991"
         testSenderPubkey = "d30effaa4e7090322e07b7b95b2c2f42c23bb16b12582d358fb088993a26e53f"
-        
+
         // Setup mock signer and NDK
         mockSigner = MockNDKSigner(publicKey: testSenderPubkey)
         ndk = NDK()
         ndk.signer = mockSigner
     }
-    
+
     override func tearDown() async throws {
         mockSigner = nil
         ndk = nil
         try await super.tearDown()
     }
-    
+
     // MARK: - Creation Tests
-    
+
     func testCreateBasicNutzapEvent() async throws {
         // Create sample proofs
         let proof1 = CashuSwift.Proof(
@@ -41,17 +40,17 @@ final class NDKNutzapEventTests: XCTestCase {
             secret: "[\"P2PK\",{\"nonce\":\"b00bdd0467b0090a25bdf2d2f0d45ac4e355c482c1418350f273a04fedaaee83\",\"data\":\"02eaee8939e3565e48cc62967e2fde9d8e2a4b3ec0081f29eceff5c64ef10ac1ed\"}]",
             C: "02277c66191736eb72fce9d975d08e3191f8f96afb73ab1eec37e4465683066d3f"
         )
-        
+
         let proof2 = CashuSwift.Proof(
             keysetID: "keyset1",
             amount: 10,
             secret: "[\"P2PK\",{\"nonce\":\"a11acc0467b0090a25bdf2d2f0d45ac4e355c482c1418350f273a04fedaaee84\",\"data\":\"02eaee8939e3565e48cc62967e2fde9d8e2a4b3ec0081f29eceff5c64ef10ac1ed\"}]",
             C: "03388c77191736eb72fce9d975d08e3191f8f96afb73ab1eec37e4465683066d4f"
         )
-        
+
         let proofs = [proof1, proof2]
         let token = CashuSwift.Token(proofs: [testMintURL: proofs], unit: "sat")
-        
+
         // Create nutzap event
         let nutzapEvent = try await NDKNutzapEvent.create(
             ndk: ndk,
@@ -62,61 +61,62 @@ final class NDKNutzapEventTests: XCTestCase {
             eventId: nil,
             signer: mockSigner
         )
-        
+
         // Verify event structure
         XCTAssertEqual(nutzapEvent.event.kind, EventKind.nutzap)
         XCTAssertEqual(nutzapEvent.event.pubkey, testSenderPubkey)
         XCTAssertEqual(nutzapEvent.event.content, "Thanks for this great idea.")
-        
+
         // Verify tags
         let tags = nutzapEvent.event.tags
-        
+
         // Check p tag (recipient)
         let pTags = tags.filter { $0.first == "p" }
         XCTAssertEqual(pTags.count, 1)
         XCTAssertEqual(pTags.first?[1], testRecipientPubkey)
-        
+
         // Check proof tags
         let proofTags = tags.filter { $0.first == "proof" }
         XCTAssertEqual(proofTags.count, 2)
-        
+
         // Verify proof content
         for (index, proofTag) in proofTags.enumerated() {
             XCTAssertEqual(proofTag.count, 2)
-            
+
             guard let proofData = proofTag[1].data(using: .utf8),
-                  let decodedProof = try? JSONCoding.decoder.decode(CashuSwift.Proof.self, from: proofData) else {
+                  let decodedProof = try? JSONCoding.decoder.decode(CashuSwift.Proof.self, from: proofData)
+            else {
                 XCTFail("Failed to decode proof at index \(index)")
                 continue
             }
-            
+
             let originalProof = proofs[index]
             XCTAssertEqual(decodedProof.amount, originalProof.amount)
             XCTAssertEqual(decodedProof.id, originalProof.id)
             XCTAssertEqual(decodedProof.secret, originalProof.secret)
             XCTAssertEqual(decodedProof.C, originalProof.C)
         }
-        
+
         // Check mint URL tag (u tag per NIP-61)
         let mintTags = tags.filter { $0.first == "u" }
         XCTAssertEqual(mintTags.count, 1)
         XCTAssertEqual(mintTags.first?[1], testMintURL)
-        
+
         // Check amount tag
         let amountTags = tags.filter { $0.first == "amount" }
         XCTAssertEqual(amountTags.count, 1)
         XCTAssertEqual(amountTags.first?[1], "60") // 50 + 10
-        
+
         // Check unit tag
         let unitTags = tags.filter { $0.first == "unit" }
         XCTAssertEqual(unitTags.count, 1)
         XCTAssertEqual(unitTags.first?[1], "sat")
-        
+
         // Should not have e tag since no eventId provided
         let eTags = tags.filter { $0.first == "e" }
         XCTAssertEqual(eTags.count, 0)
     }
-    
+
     func testCreateNutzapEventWithZappedEvent() async throws {
         let proof = CashuSwift.Proof(
             keysetID: "keyset1",
@@ -124,10 +124,10 @@ final class NDKNutzapEventTests: XCTestCase {
             secret: "[\"P2PK\",{\"nonce\":\"b00bdd0467b0090a25bdf2d2f0d45ac4e355c482c1418350f273a04fedaaee83\",\"data\":\"02eaee8939e3565e48cc62967e2fde9d8e2a4b3ec0081f29eceff5c64ef10ac1ed\"}]",
             C: "02277c66191736eb72fce9d975d08e3191f8f96afb73ab1eec37e4465683066d3f"
         )
-        
+
         let token = CashuSwift.Token(proofs: [testMintURL: [proof]], unit: "sat")
         let zappedEventId = "abc123def456"
-        
+
         let nutzapEvent = try await NDKNutzapEvent.create(
             ndk: ndk,
             token: token,
@@ -137,19 +137,19 @@ final class NDKNutzapEventTests: XCTestCase {
             eventId: zappedEventId,
             signer: mockSigner
         )
-        
+
         // Check e tag for zapped event
         let eTags = nutzapEvent.event.tags.filter { $0.first == "e" }
         XCTAssertEqual(eTags.count, 1)
         XCTAssertEqual(eTags.first?[1], zappedEventId)
-        
+
         // Content should be empty when no comment
         XCTAssertEqual(nutzapEvent.event.content, "")
     }
-    
+
     func testCreateNutzapEventWithNoProofs() async throws {
         let token = CashuSwift.Token(proofs: [:], unit: "sat")
-        
+
         do {
             _ = try await NDKNutzapEvent.create(
                 ndk: ndk,
@@ -165,9 +165,9 @@ final class NDKNutzapEventTests: XCTestCase {
             XCTAssertTrue(error is NDKError)
         }
     }
-    
+
     // MARK: - Parsing Tests
-    
+
     func testParseValidNutzapEvent() throws {
         // Create a properly formatted nutzap event
         let eventJSON = """
@@ -188,17 +188,18 @@ final class NDKNutzapEventTests: XCTestCase {
             "sig": "signature_here"
         }
         """
-        
+
         guard let eventData = eventJSON.data(using: .utf8),
-              let eventDict = try? JSONSerialization.jsonObject(with: eventData) as? [String: Any] else {
+              let eventDict = try? JSONSerialization.jsonObject(with: eventData) as? [String: Any]
+        else {
             XCTFail("Failed to create test event data")
             return
         }
-        
+
         let eventJSONData = try JSONSerialization.data(withJSONObject: eventDict)
         let event = try JSONCoding.decoder.decode(NDKEvent.self, from: eventJSONData)
         let nutzapEvent = NDKNutzapEvent(event: event)
-        
+
         // Test parsing properties
         XCTAssertEqual(nutzapEvent.comment, "Thanks for this great idea.")
         XCTAssertEqual(nutzapEvent.mintURL, testMintURL)
@@ -206,19 +207,19 @@ final class NDKNutzapEventTests: XCTestCase {
         XCTAssertEqual(nutzapEvent.unit, "sat")
         XCTAssertEqual(nutzapEvent.recipient, testRecipientPubkey)
         XCTAssertEqual(nutzapEvent.nutzappedEventId, "abc123def456")
-        
+
         // Test token extraction
         XCTAssertNotNil(nutzapEvent.token)
         let token = nutzapEvent.token!
         XCTAssertEqual(token.unit, "sat")
         XCTAssertEqual(token.proofsByMint.count, 1)
         XCTAssertTrue(token.proofsByMint.keys.contains(testMintURL))
-        
+
         let proofs = token.proofsByMint[testMintURL]!
         XCTAssertEqual(proofs.count, 1)
         XCTAssertEqual(proofs.first?.amount, 1)
     }
-    
+
     func testParseNutzapEventWithMultipleProofs() throws {
         let eventJSON = """
         {
@@ -239,32 +240,33 @@ final class NDKNutzapEventTests: XCTestCase {
             "sig": "signature_here"
         }
         """
-        
+
         guard let eventData = eventJSON.data(using: .utf8),
-              let eventDict = try? JSONSerialization.jsonObject(with: eventData) as? [String: Any] else {
+              let eventDict = try? JSONSerialization.jsonObject(with: eventData) as? [String: Any]
+        else {
             XCTFail("Failed to create test event data")
             return
         }
-        
+
         let eventJSONData = try JSONSerialization.data(withJSONObject: eventDict)
         let event = try JSONCoding.decoder.decode(NDKEvent.self, from: eventJSONData)
         let nutzapEvent = NDKNutzapEvent(event: event)
-        
+
         // Test token with multiple proofs
         XCTAssertNotNil(nutzapEvent.token)
         let token = nutzapEvent.token!
-        
+
         let proofs = token.proofsByMint[testMintURL]!
         XCTAssertEqual(proofs.count, 3)
-        
+
         let totalAmount = proofs.reduce(0) { $0 + $1.amount }
         XCTAssertEqual(totalAmount, 100) // 50 + 25 + 25
-        
+
         // Verify individual proof amounts
         let amounts = proofs.map { $0.amount }.sorted()
         XCTAssertEqual(amounts, [25, 25, 50])
     }
-    
+
     func testParseNutzapEventWithEmptyComment() throws {
         let eventJSON = """
         {
@@ -283,21 +285,22 @@ final class NDKNutzapEventTests: XCTestCase {
             "sig": "signature_here"
         }
         """
-        
+
         guard let eventData = eventJSON.data(using: .utf8),
-              let eventDict = try? JSONSerialization.jsonObject(with: eventData) as? [String: Any] else {
+              let eventDict = try? JSONSerialization.jsonObject(with: eventData) as? [String: Any]
+        else {
             XCTFail("Failed to create test event data")
             return
         }
-        
+
         let eventJSONData = try JSONSerialization.data(withJSONObject: eventDict)
         let event = try JSONCoding.decoder.decode(NDKEvent.self, from: eventJSONData)
         let nutzapEvent = NDKNutzapEvent(event: event)
-        
+
         // Empty content should return nil comment
         XCTAssertNil(nutzapEvent.comment)
     }
-    
+
     func testParseNutzapEventMissingRequiredTags() throws {
         // Test event without proof tags
         let eventWithoutProofs = """
@@ -316,21 +319,22 @@ final class NDKNutzapEventTests: XCTestCase {
             "sig": "signature_here"
         }
         """
-        
+
         guard let eventData = eventWithoutProofs.data(using: .utf8),
-              let eventDict = try? JSONSerialization.jsonObject(with: eventData) as? [String: Any] else {
+              let eventDict = try? JSONSerialization.jsonObject(with: eventData) as? [String: Any]
+        else {
             XCTFail("Failed to create test event data")
             return
         }
-        
+
         let eventJSONData = try JSONSerialization.data(withJSONObject: eventDict)
         let event = try JSONCoding.decoder.decode(NDKEvent.self, from: eventJSONData)
         let nutzapEvent = NDKNutzapEvent(event: event)
-        
+
         // Should return nil token when no valid proofs
         XCTAssertNil(nutzapEvent.token)
     }
-    
+
     func testParseNutzapEventMissingMintTag() throws {
         let eventJSON = """
         {
@@ -348,21 +352,22 @@ final class NDKNutzapEventTests: XCTestCase {
             "sig": "signature_here"
         }
         """
-        
+
         guard let eventData = eventJSON.data(using: .utf8),
-              let eventDict = try? JSONSerialization.jsonObject(with: eventData) as? [String: Any] else {
+              let eventDict = try? JSONSerialization.jsonObject(with: eventData) as? [String: Any]
+        else {
             XCTFail("Failed to create test event data")
             return
         }
-        
+
         let eventJSONData = try JSONSerialization.data(withJSONObject: eventDict)
         let event = try JSONCoding.decoder.decode(NDKEvent.self, from: eventJSONData)
         let nutzapEvent = NDKNutzapEvent(event: event)
-        
+
         XCTAssertNil(nutzapEvent.mintURL)
         XCTAssertNil(nutzapEvent.token) // Should be nil when no mint URL
     }
-    
+
     func testParseInvalidProofJSON() throws {
         let eventJSON = """
         {
@@ -382,26 +387,27 @@ final class NDKNutzapEventTests: XCTestCase {
             "sig": "signature_here"
         }
         """
-        
+
         guard let eventData = eventJSON.data(using: .utf8),
-              let eventDict = try? JSONSerialization.jsonObject(with: eventData) as? [String: Any] else {
+              let eventDict = try? JSONSerialization.jsonObject(with: eventData) as? [String: Any]
+        else {
             XCTFail("Failed to create test event data")
             return
         }
-        
+
         let eventJSONData = try JSONSerialization.data(withJSONObject: eventDict)
         let event = try JSONCoding.decoder.decode(NDKEvent.self, from: eventJSONData)
         let nutzapEvent = NDKNutzapEvent(event: event)
-        
+
         // Should only parse valid proofs, ignoring invalid ones
         XCTAssertNotNil(nutzapEvent.token)
         let proofs = nutzapEvent.token!.proofsByMint[testMintURL]!
         XCTAssertEqual(proofs.count, 1)
         XCTAssertEqual(proofs.first?.amount, 50)
     }
-    
+
     // MARK: - NIP-61 Compliance Tests
-    
+
     func testNIP61ComplianceEventStructure() async throws {
         // Create nutzap that matches NIP-61 example exactly
         let proof = CashuSwift.Proof(
@@ -410,10 +416,10 @@ final class NDKNutzapEventTests: XCTestCase {
             secret: "[\"P2PK\",{\"nonce\":\"b00bdd0467b0090a25bdf2d2f0d45ac4e355c482c1418350f273a04fedaaee83\",\"data\":\"02eaee8939e3565e48cc62967e2fde9d8e2a4b3ec0081f29eceff5c64ef10ac1ed\"}]",
             C: "02277c66191736eb72fce9d975d08e3191f8f96afb73ab1eec37e4465683066d3f"
         )
-        
+
         let token = CashuSwift.Token(proofs: [testMintURL: [proof]], unit: "sat")
         let eventId = "nutzapped-event-id"
-        
+
         let nutzapEvent = try await NDKNutzapEvent.create(
             ndk: ndk,
             token: token,
@@ -423,40 +429,40 @@ final class NDKNutzapEventTests: XCTestCase {
             eventId: eventId,
             signer: mockSigner
         )
-        
+
         // Verify NIP-61 required structure
         let tags = nutzapEvent.event.tags
-        
+
         // Must have proof tag(s)
         let proofTags = tags.filter { $0.first == "proof" }
         XCTAssertFalse(proofTags.isEmpty, "Must have at least one proof tag")
-        
+
         // Must have u tag for mint URL (NIP-61)
         let mintTags = tags.filter { $0.first == "u" }
         XCTAssertEqual(mintTags.count, 1, "Must have exactly one u tag for mint URL")
-        
+
         // Must have p tag for recipient
         let pTags = tags.filter { $0.first == "p" }
         XCTAssertEqual(pTags.count, 1, "Must have exactly one p tag")
         XCTAssertEqual(pTags.first?[1], testRecipientPubkey)
-        
+
         // Should have e tag when eventId provided
         let eTags = tags.filter { $0.first == "e" }
         XCTAssertEqual(eTags.count, 1, "Must have e tag when eventId provided")
         XCTAssertEqual(eTags.first?[1], eventId)
-        
+
         // Should have amount tag
         let amountTags = tags.filter { $0.first == "amount" }
         XCTAssertEqual(amountTags.count, 1, "Must have amount tag")
         XCTAssertEqual(amountTags.first?[1], "1")
-        
+
         // Content should contain the comment
         XCTAssertEqual(nutzapEvent.event.content, "Thanks for this great idea.")
-        
+
         // Event kind must be 9321
         XCTAssertEqual(nutzapEvent.event.kind, 9321)
     }
-    
+
     func testNIP61ProofFormat() throws {
         // Test that proof format matches NIP-61 specification
         let eventJSON = """
@@ -477,35 +483,36 @@ final class NDKNutzapEventTests: XCTestCase {
             "sig": "signature_here"
         }
         """
-        
+
         guard let eventData = eventJSON.data(using: .utf8),
-              let eventDict = try? JSONSerialization.jsonObject(with: eventData) as? [String: Any] else {
+              let eventDict = try? JSONSerialization.jsonObject(with: eventData) as? [String: Any]
+        else {
             XCTFail("Failed to create test event data")
             return
         }
-        
+
         let eventJSONData = try JSONSerialization.data(withJSONObject: eventDict)
         let event = try JSONCoding.decoder.decode(NDKEvent.self, from: eventJSONData)
         let nutzapEvent = NDKNutzapEvent(event: event)
-        
+
         // Extract and verify proof structure
         let token = nutzapEvent.token!
         let proofs = token.proofsByMint[testMintURL]!
         let proof = proofs.first!
-        
+
         // Verify proof contains P2PK lock structure
         XCTAssertTrue(proof.secret.contains("P2PK"))
         XCTAssertTrue(proof.secret.contains("nonce"))
         XCTAssertTrue(proof.secret.contains("data"))
-        
+
         // Verify proof has required fields
         XCTAssertEqual(proof.amount, 1)
         XCTAssertEqual(proof.id, "000a93d6f8a1d2c4")
         XCTAssertEqual(proof.C, "02277c66191736eb72fce9d975d08e3191f8f96afb73ab1eec37e4465683066d3f")
     }
-    
+
     // MARK: - Edge Cases
-    
+
     func testParseEventWithNoRecipient() throws {
         let eventJSON = """
         {
@@ -524,20 +531,21 @@ final class NDKNutzapEventTests: XCTestCase {
             "sig": "signature_here"
         }
         """
-        
+
         guard let eventData = eventJSON.data(using: .utf8),
-              let eventDict = try? JSONSerialization.jsonObject(with: eventData) as? [String: Any] else {
+              let eventDict = try? JSONSerialization.jsonObject(with: eventData) as? [String: Any]
+        else {
             XCTFail("Failed to create test event data")
             return
         }
-        
+
         let eventJSONData = try JSONSerialization.data(withJSONObject: eventDict)
         let event = try JSONCoding.decoder.decode(NDKEvent.self, from: eventJSONData)
         let nutzapEvent = NDKNutzapEvent(event: event)
-        
+
         XCTAssertNil(nutzapEvent.recipient)
     }
-    
+
     func testParseEventWithNoUnit() throws {
         let eventJSON = """
         {
@@ -555,20 +563,21 @@ final class NDKNutzapEventTests: XCTestCase {
             "sig": "signature_here"
         }
         """
-        
+
         guard let eventData = eventJSON.data(using: .utf8),
-              let eventDict = try? JSONSerialization.jsonObject(with: eventData) as? [String: Any] else {
+              let eventDict = try? JSONSerialization.jsonObject(with: eventData) as? [String: Any]
+        else {
             XCTFail("Failed to create test event data")
             return
         }
-        
+
         let eventJSONData = try JSONSerialization.data(withJSONObject: eventDict)
         let event = try JSONCoding.decoder.decode(NDKEvent.self, from: eventJSONData)
         let nutzapEvent = NDKNutzapEvent(event: event)
-        
+
         XCTAssertEqual(nutzapEvent.amount, 1)
-        
-        // Token should still be created with default "sat" unit  
+
+        // Token should still be created with default "sat" unit
         XCTAssertNotNil(nutzapEvent.token)
         XCTAssertEqual(nutzapEvent.token?.unit, "sat")
     }

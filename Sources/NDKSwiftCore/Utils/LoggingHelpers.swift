@@ -2,7 +2,6 @@ import Foundation
 
 /// Helper utilities for consistent logging patterns across NDKSwift
 public enum LoggingHelpers {
-    
     /// Formats a method entry log message with consistent formatting
     /// - Parameters:
     ///   - className: The name of the class/actor
@@ -15,17 +14,17 @@ public enum LoggingHelpers {
         parameters: [String: Any]? = nil
     ) -> String {
         var message = "\(className).\(methodName)"
-        
+
         if let parameters = parameters, !parameters.isEmpty {
             let params = parameters
                 .map { "\($0.key): \($0.value)" }
                 .joined(separator: ", ")
             message += " - \(params)"
         }
-        
+
         return message
     }
-    
+
     /// Formats a method result log message with consistent formatting
     /// - Parameters:
     ///   - className: The name of the class/actor
@@ -39,7 +38,7 @@ public enum LoggingHelpers {
     ) -> String {
         return "\(className).\(methodName) - Result: \(result)"
     }
-    
+
     /// Formats a state change log message
     /// - Parameters:
     ///   - className: The name of the class/actor
@@ -55,7 +54,7 @@ public enum LoggingHelpers {
     ) -> String {
         return "\(className).\(property) - Changed from \(from) to \(to)"
     }
-    
+
     /// Formats an error log message
     /// - Parameters:
     ///   - className: The name of the class/actor
@@ -75,7 +74,7 @@ public enum LoggingHelpers {
         }
         return message
     }
-    
+
     /// Formats a warning log message
     /// - Parameters:
     ///   - className: The name of the class/actor
@@ -89,7 +88,7 @@ public enum LoggingHelpers {
     ) -> String {
         return "\(className).\(methodName) - Warning: \(warning)"
     }
-    
+
     /// Formats a collection summary for logging
     /// - Parameters:
     ///   - items: The collection to summarize
@@ -101,7 +100,7 @@ public enum LoggingHelpers {
     ) -> String {
         return "\(name): \(items.count) items"
     }
-    
+
     /// Formats timing information for performance logging
     /// - Parameters:
     ///   - className: The name of the class/actor
@@ -116,12 +115,12 @@ public enum LoggingHelpers {
         itemCount: Int? = nil
     ) -> String {
         var message = "\(className).\(methodName) - Completed in \(String(format: "%.3f", duration))s"
-        
+
         if let count = itemCount {
             let rate = Double(count) / duration
             message += " (\(count) items, \(String(format: "%.1f", rate)) items/s)"
         }
-        
+
         return message
     }
 }
@@ -140,7 +139,7 @@ public extension NDKLogger {
         let message = LoggingHelpers.methodEntry(className, methodName, parameters: parameters)
         log(level, category: category, message)
     }
-    
+
     /// Log a method result with consistent formatting
     static func logMethodResult(
         _ level: NDKLogLevel = .debug,
@@ -152,7 +151,7 @@ public extension NDKLogger {
         let message = LoggingHelpers.methodResult(className, methodName, result: result)
         log(level, category: category, message)
     }
-    
+
     /// Log an error with consistent formatting
     static func logError(
         category: NDKLogCategory,
@@ -164,7 +163,7 @@ public extension NDKLogger {
         let message = LoggingHelpers.error(className, methodName, error: error, context: context)
         log(.error, category: category, message)
     }
-    
+
     /// Log timing information with consistent formatting
     static func logTiming(
         category: NDKLogCategory,

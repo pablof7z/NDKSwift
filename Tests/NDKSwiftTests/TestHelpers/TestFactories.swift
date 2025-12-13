@@ -21,7 +21,7 @@ enum NDKTestFactory {
         ndk.outboxEnabled = outboxEnabled
         return ndk
     }
-    
+
     /// Creates an authenticated NDK instance with a generated signer
     static func createAuthenticatedNDK(
         relayUrls: [RelayURL] = [],
@@ -31,7 +31,7 @@ enum NDKTestFactory {
         let ndk = createNDK(relayUrls: relayUrls, signer: signer, cache: cache)
         return (ndk, signer)
     }
-    
+
     /// Creates a connected NDK instance with test relays
     static func createConnectedNDK(
         useTestRelays: Bool = true,
@@ -41,13 +41,13 @@ enum NDKTestFactory {
         let relayUrls = useTestRelays ? RelayConstants.testRelays : []
         let ndk = createNDK(relayUrls: relayUrls, signer: signer, cache: cache)
         await ndk.connect()
-        
+
         // Wait for connections
         _ = await ndk.waitForRelayConnections(minimumRelays: 1, timeout: 10.0)
-        
+
         return ndk
     }
-    
+
     /// Creates a connected, authenticated NDK with a generated signer
     static func createConnectedAuthenticatedNDK(
         useTestRelays: Bool = true,
@@ -77,7 +77,7 @@ enum EventTestFactory {
         let actualCreatedAt = createdAt ?? Timestamp.now
         let actualId = id ?? generateEventId()
         let actualSig = sig ?? generateTestSignature()
-        
+
         return NDKEvent(
             id: actualId,
             pubkey: actualPubkey,
@@ -88,7 +88,7 @@ enum EventTestFactory {
             sig: actualSig
         )
     }
-    
+
     /// Creates a signed event using NDKEventBuilder
     static func createSignedEvent(
         ndk: NDK,
@@ -100,14 +100,14 @@ enum EventTestFactory {
         let builder = NDKEventBuilder(ndk: ndk)
             .kind(kind)
             .content(content)
-        
+
         for tag in tags {
             builder.tag(tag)
         }
-        
+
         return try await builder.build(signer: signer)
     }
-    
+
     /// Creates a text note (kind 1)
     static func createTextNote(
         content: String = "Test note",
@@ -116,7 +116,7 @@ enum EventTestFactory {
     ) -> NDKEvent {
         return createEvent(kind: 1, content: content, tags: tags, pubkey: pubkey)
     }
-    
+
     /// Creates a metadata event (kind 0)
     static func createMetadataEvent(
         name: String = "Test User",
@@ -127,12 +127,12 @@ enum EventTestFactory {
         let metadata = [
             "name": name,
             "about": about,
-            "picture": picture
+            "picture": picture,
         ]
         let content = try! JSONCoding.encodeToString(metadata)
         return createEvent(kind: 0, content: content, pubkey: pubkey)
     }
-    
+
     /// Creates a contact list event (kind 3)
     static func createContactListEvent(
         contacts: [String] = [],
@@ -141,7 +141,7 @@ enum EventTestFactory {
         let tags = contacts.map { [NostrConstants.TagName.pubkey, $0] }
         return createEvent(kind: 3, content: "", tags: tags, pubkey: pubkey)
     }
-    
+
     /// Creates a deletion event (kind 5)
     static func createDeletionEvent(
         eventIds: [EventID],
@@ -151,7 +151,7 @@ enum EventTestFactory {
         let tags = eventIds.map { [NostrConstants.TagName.event, $0] }
         return createEvent(kind: 5, content: reason, tags: tags, pubkey: pubkey)
     }
-    
+
     /// Creates a repost event (kind 6)
     static func createRepostEvent(
         event: NDKEvent,
@@ -159,12 +159,12 @@ enum EventTestFactory {
     ) -> NDKEvent {
         let tags = [
             [NostrConstants.TagName.event, event.id],
-            [NostrConstants.TagName.pubkey, event.pubkey]
+            [NostrConstants.TagName.pubkey, event.pubkey],
         ]
         let content = try! JSONCoding.encodeToString(event)
         return createEvent(kind: 6, content: content, tags: tags, pubkey: pubkey)
     }
-    
+
     /// Creates a reaction event (kind 7)
     static func createReactionEvent(
         to event: NDKEvent,
@@ -173,21 +173,21 @@ enum EventTestFactory {
     ) -> NDKEvent {
         let tags = [
             [NostrConstants.TagName.event, event.id],
-            [NostrConstants.TagName.pubkey, event.pubkey]
+            [NostrConstants.TagName.pubkey, event.pubkey],
         ]
         return createEvent(kind: 7, content: content, tags: tags, pubkey: pubkey)
     }
-    
+
     // MARK: - Helpers
-    
+
     private static func generateTestPubkey() -> String {
         return try! generateRandomHex(32)
     }
-    
+
     private static func generateEventId() -> EventID {
         return try! generateRandomHex(32)
     }
-    
+
     private static func generateTestSignature() -> String {
         return try! generateRandomHex(64)
     }
@@ -213,7 +213,7 @@ enum FilterTestFactory {
                 tagsDict![key] = Set(values)
             }
         }
-        
+
         return NDKFilter(
             ids: ids,
             authors: authors,
@@ -224,7 +224,7 @@ enum FilterTestFactory {
             tags: tagsDict
         )
     }
-    
+
     /// Creates a filter for text notes
     static func createTextNoteFilter(
         authors: [PublicKey]? = nil,
@@ -238,7 +238,7 @@ enum FilterTestFactory {
             limit: limit
         )
     }
-    
+
     /// Creates a filter for user metadata
     static func createMetadataFilter(
         pubkeys: [PublicKey],
@@ -251,7 +251,7 @@ enum FilterTestFactory {
             limit: pubkeys.count
         )
     }
-    
+
     /// Creates a filter for replies to an event
     static func createReplyFilter(
         to eventId: EventID,
@@ -274,21 +274,21 @@ enum UserTestFactory {
     static func createUser(name: String? = nil) async throws -> TestUser {
         let signer = try NDKPrivateKeySigner.generate()
         let pubkey = try await signer.pubkey
-        
+
         var user = TestUser(signer: signer, pubkey: pubkey)
-        
+
         // Optionally set a name
         if let name = name {
             user.name = name
         }
-        
+
         return user
     }
-    
+
     /// Creates multiple test users
     static func createUsers(count: Int) async throws -> [TestUser] {
         var users: [TestUser] = []
-        for i in 0..<count {
+        for i in 0 ..< count {
             let user = try await createUser(name: "Test User \(i + 1)")
             users.append(user)
         }
@@ -310,10 +310,10 @@ enum RelayTestFactory {
         relay.publishDelay = publishDelay
         return relay
     }
-    
+
     /// Creates multiple mock relays
     static func createMockRelays(count: Int) -> [MockRelay] {
-        return (0..<count).map { i in
+        return (0 ..< count).map { i in
             createMockRelay(url: "wss://mock\(i).relay.test")
         }
     }
@@ -326,7 +326,7 @@ extension TestUser {
         get { _name }
         set { _name = newValue }
     }
-    
+
     private var _name: String? {
         get {
             objc_getAssociatedObject(self, &nameKey) as? String

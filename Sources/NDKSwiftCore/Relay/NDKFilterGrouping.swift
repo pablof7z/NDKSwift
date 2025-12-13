@@ -2,7 +2,6 @@ import Foundation
 
 /// Utilities for filter fingerprinting and merging based on ndk-core implementation
 enum NDKFilterGrouping {
-    
     /// Creates a fingerprint for filters to determine if they can be grouped together
     ///
     /// This creates a deterministic association of the filters. When the combination of filters
@@ -17,10 +16,10 @@ enum NDKFilterGrouping {
     /// - Returns: The fingerprint string
     static func filterFingerprint(_ filters: [NDKFilter], closeOnEose: Bool) -> String {
         var elements: [String] = []
-        
+
         for filter in filters {
             var keys: [String] = []
-            
+
             // Add array-based keys (just the key name, not values)
             if filter.ids != nil { keys.append("ids") }
             if filter.authors != nil { keys.append("authors") }
@@ -31,25 +30,25 @@ enum NDKFilterGrouping {
             if filter.until != nil { keys.append("until:\(filter.until!)") }
             if filter.limit != nil { keys.append("limit") }
             // Note: search property doesn't exist in NDKSwift
-            
+
             // Add tag filters
             if let tags = filter.tags {
                 for (tagName, _) in tags.sorted(by: { $0.key < $1.key }) {
                     keys.append("#\(tagName)")
                 }
             }
-            
+
             // Sort keys for deterministic output
             keys.sort()
-            
+
             elements.append(keys.joined(separator: "-"))
         }
-        
+
         // Prefix with + for closeOnEose to separate subscription types
         let prefix = closeOnEose ? "+" : ""
         return prefix + elements.joined(separator: "|")
     }
-    
+
     /// Merges filters with the same structure
     ///
     /// Filters with limits are concatenated (not merged) as merging would change their meaning.
@@ -59,21 +58,21 @@ enum NDKFilterGrouping {
     /// - Returns: Merged filters
     static func mergeFilters(_ filters: [NDKFilter]) -> [NDKFilter] {
         guard !filters.isEmpty else { return [] }
-        
+
         var result: [NDKFilter] = []
         var lastResult = NDKFilter()
-        
+
         // Concatenate filters that have a limit
         let filtersWithLimit = filters.filter { $0.limit != nil }
         result.append(contentsOf: filtersWithLimit)
-        
+
         // Only merge filters without limits
         let filtersWithoutLimit = filters.filter { $0.limit == nil }
-        
+
         if filtersWithoutLimit.isEmpty {
             return result
         }
-        
+
         // Merge array values
         var mergedIds = Set<String>()
         var mergedAuthors = Set<String>()
@@ -81,7 +80,7 @@ enum NDKFilterGrouping {
         var mergedEventIds = Set<String>()
         var mergedPubkeys = Set<String>()
         var mergedTags = [String: Set<String>]()
-        
+
         // Collect all values
         for filter in filtersWithoutLimit {
             if let ids = filter.ids {
@@ -105,7 +104,7 @@ enum NDKFilterGrouping {
                 }
             }
         }
-        
+
         // Build merged filter
         if !mergedIds.isEmpty {
             lastResult.ids = Array(mergedIds)
@@ -127,16 +126,16 @@ enum NDKFilterGrouping {
                 lastResult.addTagFilter(tagName, values: Array(values))
             }
         }
-        
+
         // Use time constraints from first filter (they should all be the same in a group)
         if let firstFilter = filtersWithoutLimit.first {
             lastResult.since = firstFilter.since
             lastResult.until = firstFilter.until
             // Note: search property doesn't exist in NDKSwift
         }
-        
+
         result.append(lastResult)
-        
+
         return result
     }
 }

@@ -103,9 +103,9 @@ public class NDKSessionData {
 
         if !kinds.isEmpty {
             await loadLists(kinds: kinds,
-                          needsFollowList: needsFollowList,
-                          needsMuteList: needsMuteList,
-                          needsBlockedRelays: needsBlockedRelays)
+                            needsFollowList: needsFollowList,
+                            needsMuteList: needsMuteList,
+                            needsBlockedRelays: needsBlockedRelays)
         }
 
         // Mark session as ready
@@ -146,7 +146,8 @@ public class NDKSessionData {
             }
 
             if let cachedEvents = cachedEvents,
-               let cachedEvent = cachedEvents.first {
+               let cachedEvent = cachedEvents.first
+            {
                 latestTimestamps[kind] = cachedEvent.createdAt
 
                 // Process the cached event immediately
@@ -185,7 +186,7 @@ public class NDKSessionData {
         // Create data source for continuous updates with meaningful subscription ID
         let subscriptionId = "session_lists_\(pubkey.prefix(8))"
         let dataSource = NDKSubscription<NDKEvent>(ndk: ndk, filter: filter, subscriptionId: subscriptionId)
-        self.listsDataSource = dataSource
+        listsDataSource = dataSource
 
         // Start processing events in background - don't block
         Task {
@@ -219,7 +220,7 @@ public class NDKSessionData {
             NDKLogger.log(.info, category: .subscription, "✅ Follow list loaded - \(follows.count) follows, fromCache: \(fromCache)")
             followListState = .ready(follows, fromCache: fromCache)
         } else {
-            if case .ready(let current, _) = followListState {
+            if case let .ready(current, _) = followListState {
                 NDKLogger.log(.info, category: .subscription, "🔄 Follow list updating - from \(current.count) to \(follows.count) follows")
                 followListState = .updating(current: current, changes: follows)
             }
@@ -262,7 +263,7 @@ public class NDKSessionData {
         if latestMuteListEventId == nil {
             muteListState = .ready(mutedPubkeys, fromCache: fromCache)
         } else {
-            if case .ready(let current, _) = muteListState {
+            if case let .ready(current, _) = muteListState {
                 muteListState = .updating(current: current, changes: mutedPubkeys)
             }
         }
@@ -291,7 +292,7 @@ public class NDKSessionData {
         if latestBlockedRelaysEventId == nil {
             blockedRelaysState = .ready(blockedUrls, fromCache: fromCache)
         } else {
-            if case .ready(let current, _) = blockedRelaysState {
+            if case let .ready(current, _) = blockedRelaysState {
                 blockedRelaysState = .updating(current: current, changes: blockedUrls)
             }
         }
@@ -438,7 +439,7 @@ public class NDKSessionData {
         return nil
     }
 
-    private func saveWOTToCache(_ scores: [String: Int]) {
+    private func saveWOTToCache(_: [String: Int]) {
         // Implementation depends on cache adapter
         // For now, no-op
     }

@@ -1,10 +1,10 @@
-import SwiftUI
 import LinkPresentation
+import SwiftUI
 
 #if canImport(UIKit)
-import UIKit
+    import UIKit
 #elseif canImport(AppKit)
-import AppKit
+    import AppKit
 #endif
 import NDKSwiftCore
 
@@ -12,25 +12,25 @@ import NDKSwiftCore
 public struct NDKUIURLPreview: View {
     let url: URL
     let style: Style
-    
+
     @State private var linkMetadata: LPLinkMetadata?
     @State private var isLoading = true
     @State private var isImage = false
     @State private var imageLoadFailed = false
     @State private var showFullScreenImage = false
-    
+
     public enum Style {
-        case full           // Full preview with image, title, and description
-        case compact        // Smaller preview for inline display
-        case minimal        // Just icon and title
-        case embedded       // For embedding in other content
+        case full // Full preview with image, title, and description
+        case compact // Smaller preview for inline display
+        case minimal // Just icon and title
+        case embedded // For embedding in other content
     }
-    
+
     public init(url: URL, style: Style = .full) {
         self.url = url
         self.style = style
     }
-    
+
     public var body: some View {
         Group {
             if isImage && !imageLoadFailed {
@@ -53,13 +53,13 @@ public struct NDKUIURLPreview: View {
         }
         #else
         .sheet(isPresented: $showFullScreenImage) {
-            NDKUIFullScreenImage(url: url, isPresented: $showFullScreenImage)
-        }
+                    NDKUIFullScreenImage(url: url, isPresented: $showFullScreenImage)
+                }
         #endif
     }
-    
+
     // MARK: - Image Preview
-    
+
     private var imagePreview: some View {
         CachedAsyncImage(url: url) { image in
             image
@@ -83,23 +83,23 @@ public struct NDKUIURLPreview: View {
                 .frame(maxWidth: .infinity)
         }
     }
-    
+
     // MARK: - Link Preview
-    
+
     private func linkPreview(metadata: LPLinkMetadata) -> some View {
         VStack(alignment: .leading, spacing: spacing) {
             // Preview image if available and not minimal style
             if style != .minimal, let imageProvider = metadata.imageProvider {
                 LinkPreviewImage(imageProvider: imageProvider, style: style)
             }
-            
+
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .top, spacing: 8) {
                     // Site icon
                     if let iconProvider = metadata.iconProvider {
                         LinkPreviewIcon(iconProvider: iconProvider)
                     }
-                    
+
                     VStack(alignment: .leading, spacing: 2) {
                         // Title
                         if let title = metadata.title {
@@ -109,17 +109,17 @@ public struct NDKUIURLPreview: View {
                                 .lineLimit(titleLineLimit)
                                 .foregroundColor(.primary)
                         }
-                        
+
                         // URL host
                         Text(url.host ?? url.absoluteString)
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .lineLimit(1)
                     }
-                    
+
                     Spacer()
                 }
-                
+
                 // Description if not minimal style
                 if style != .minimal, let description = metadata.value(forKey: "_summary") as? String {
                     Text(description)
@@ -136,17 +136,17 @@ public struct NDKUIURLPreview: View {
         .cornerRadius(cornerRadius)
         .onTapGesture {
             #if canImport(UIKit)
-            if UIApplication.shared.canOpenURL(url) {
-                UIApplication.shared.open(url)
-            }
+                if UIApplication.shared.canOpenURL(url) {
+                    UIApplication.shared.open(url)
+                }
             #elseif canImport(AppKit)
-            NSWorkspace.shared.open(url)
+                NSWorkspace.shared.open(url)
             #endif
         }
     }
-    
+
     // MARK: - Loading View
-    
+
     private var loadingView: some View {
         HStack {
             ProgressView()
@@ -160,14 +160,14 @@ public struct NDKUIURLPreview: View {
         .background(Color.ndkTertiaryBackground)
         .cornerRadius(cornerRadius)
     }
-    
+
     // MARK: - Helper Methods
-    
+
     private func checkIfImage() {
         let imageExtensions = ["jpg", "jpeg", "png", "gif", "webp", "heic", "svg"]
         let pathExtension = url.pathExtension.lowercased()
         isImage = imageExtensions.contains(pathExtension)
-        
+
         // Also check content type from URL if possible
         if !isImage {
             let urlString = url.absoluteString.lowercased()
@@ -179,12 +179,12 @@ public struct NDKUIURLPreview: View {
             }
         }
     }
-    
+
     private func fetchLinkMetadata() {
         Task {
             let provider = LPMetadataProvider()
             provider.timeout = 5 // 5 second timeout
-            
+
             do {
                 let metadata = try await provider.startFetchingMetadata(for: url)
                 await MainActor.run {
@@ -198,9 +198,9 @@ public struct NDKUIURLPreview: View {
             }
         }
     }
-    
+
     // MARK: - Style Properties
-    
+
     private var imageHeight: CGFloat {
         switch style {
         case .full: return 200
@@ -209,7 +209,7 @@ public struct NDKUIURLPreview: View {
         case .embedded: return 150
         }
     }
-    
+
     private var imageMaxHeight: CGFloat {
         switch style {
         case .full: return 500
@@ -218,7 +218,7 @@ public struct NDKUIURLPreview: View {
         case .embedded: return 300
         }
     }
-    
+
     private var spacing: CGFloat {
         switch style {
         case .full: return 8
@@ -227,7 +227,7 @@ public struct NDKUIURLPreview: View {
         case .embedded: return 6
         }
     }
-    
+
     private var titleFont: Font {
         switch style {
         case .full: return .subheadline
@@ -236,7 +236,7 @@ public struct NDKUIURLPreview: View {
         case .embedded: return .caption
         }
     }
-    
+
     private var titleLineLimit: Int {
         switch style {
         case .full: return 2
@@ -245,7 +245,7 @@ public struct NDKUIURLPreview: View {
         case .embedded: return 2
         }
     }
-    
+
     private var descriptionFont: Font {
         switch style {
         case .full: return .caption
@@ -254,7 +254,7 @@ public struct NDKUIURLPreview: View {
         case .embedded: return .caption2
         }
     }
-    
+
     private var descriptionLineLimit: Int {
         switch style {
         case .full: return 3
@@ -263,7 +263,7 @@ public struct NDKUIURLPreview: View {
         case .embedded: return 2
         }
     }
-    
+
     private var horizontalPadding: CGFloat {
         switch style {
         case .full: return 12
@@ -272,7 +272,7 @@ public struct NDKUIURLPreview: View {
         case .embedded: return 10
         }
     }
-    
+
     private var verticalPadding: CGFloat {
         switch style {
         case .full: return 8
@@ -281,7 +281,7 @@ public struct NDKUIURLPreview: View {
         case .embedded: return 6
         }
     }
-    
+
     private var backgroundColor: Color {
         switch style {
         case .full: return Color.ndkSecondaryBackground
@@ -290,7 +290,7 @@ public struct NDKUIURLPreview: View {
         case .embedded: return Color.ndkTertiaryBackground
         }
     }
-    
+
     private var cornerRadius: CGFloat {
         switch style {
         case .full: return 12
@@ -306,35 +306,35 @@ public struct NDKUIURLPreview: View {
 private struct LinkPreviewImage: View {
     let imageProvider: NSItemProvider
     let style: NDKUIURLPreview.Style
-    
+
     #if canImport(UIKit)
-    @State private var previewImage: UIImage?
+        @State private var previewImage: UIImage?
     #elseif canImport(AppKit)
-    @State private var previewImage: NSImage?
+        @State private var previewImage: NSImage?
     #endif
-    
+
     var body: some View {
         Group {
             if let image = previewImage {
                 #if canImport(UIKit)
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(maxHeight: imageHeight)
-                    .clipped()
-                    .cornerRadius(8)
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(maxHeight: imageHeight)
+                        .clipped()
+                        .cornerRadius(8)
                 #elseif canImport(AppKit)
-                Image(nsImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(maxHeight: imageHeight)
-                    .clipped()
-                    .cornerRadius(8)
+                    Image(nsImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(maxHeight: imageHeight)
+                        .clipped()
+                        .cornerRadius(8)
                 #endif
             }
         }
     }
-    
+
     private var imageHeight: CGFloat {
         switch style {
         case .full: return 180
@@ -343,28 +343,28 @@ private struct LinkPreviewImage: View {
         case .embedded: return 120
         }
     }
-    
+
     init(imageProvider: NSItemProvider, style: NDKUIURLPreview.Style) {
         self.imageProvider = imageProvider
         self.style = style
         loadImage()
     }
-    
+
     private func loadImage() {
-        imageProvider.loadDataRepresentation(for: .image) { data, error in
+        imageProvider.loadDataRepresentation(for: .image) { data, _ in
             if let data = data {
                 #if canImport(UIKit)
-                if let image = UIImage(data: data) {
-                    Task { @MainActor in
-                        self.previewImage = image
+                    if let image = UIImage(data: data) {
+                        Task { @MainActor in
+                            self.previewImage = image
+                        }
                     }
-                }
                 #elseif canImport(AppKit)
-                if let image = NSImage(data: data) {
-                    Task { @MainActor in
-                        self.previewImage = image
+                    if let image = NSImage(data: data) {
+                        Task { @MainActor in
+                            self.previewImage = image
+                        }
                     }
-                }
                 #endif
             }
         }
@@ -375,51 +375,51 @@ private struct LinkPreviewImage: View {
 
 private struct LinkPreviewIcon: View {
     let iconProvider: NSItemProvider
-    
+
     #if canImport(UIKit)
-    @State private var iconImage: UIImage?
+        @State private var iconImage: UIImage?
     #elseif canImport(AppKit)
-    @State private var iconImage: NSImage?
+        @State private var iconImage: NSImage?
     #endif
-    
+
     var body: some View {
         Group {
             if let icon = iconImage {
                 #if canImport(UIKit)
-                Image(uiImage: icon)
-                    .resizable()
-                    .frame(width: 24, height: 24)
-                    .cornerRadius(4)
+                    Image(uiImage: icon)
+                        .resizable()
+                        .frame(width: 24, height: 24)
+                        .cornerRadius(4)
                 #elseif canImport(AppKit)
-                Image(nsImage: icon)
-                    .resizable()
-                    .frame(width: 24, height: 24)
-                    .cornerRadius(4)
+                    Image(nsImage: icon)
+                        .resizable()
+                        .frame(width: 24, height: 24)
+                        .cornerRadius(4)
                 #endif
             }
         }
     }
-    
+
     init(iconProvider: NSItemProvider) {
         self.iconProvider = iconProvider
         loadIcon()
     }
-    
+
     private func loadIcon() {
-        iconProvider.loadDataRepresentation(for: .image) { data, error in
+        iconProvider.loadDataRepresentation(for: .image) { data, _ in
             if let data = data {
                 #if canImport(UIKit)
-                if let image = UIImage(data: data) {
-                    Task { @MainActor in
-                        self.iconImage = image
+                    if let image = UIImage(data: data) {
+                        Task { @MainActor in
+                            self.iconImage = image
+                        }
                     }
-                }
                 #elseif canImport(AppKit)
-                if let image = NSImage(data: data) {
-                    Task { @MainActor in
-                        self.iconImage = image
+                    if let image = NSImage(data: data) {
+                        Task { @MainActor in
+                            self.iconImage = image
+                        }
                     }
-                }
                 #endif
             }
         }
@@ -432,7 +432,7 @@ private struct LinkPreviewIcon: View {
 public struct NDKUIFullScreenImage: View {
     let url: URL
     @Binding var isPresented: Bool
-    
+
     @State private var dragOffset: CGSize = .zero
     @State private var dragVelocity: CGSize = .zero
     @State private var scale: CGFloat = 1.0
@@ -441,10 +441,10 @@ public struct NDKUIFullScreenImage: View {
     @State private var imageOpacity: Double = 0
     @State private var backgroundOpacity: Double = 0
     @GestureState private var magnifyBy = 1.0
-    
+
     private let dismissThreshold: CGFloat = 100
     private let velocityThreshold: CGFloat = 500
-    
+
     public var body: some View {
         ZStack {
             // Background
@@ -454,7 +454,7 @@ public struct NDKUIFullScreenImage: View {
                 .onTapGesture {
                     dismiss()
                 }
-            
+
             // Image
             CachedAsyncImage(url: url) { image in
                 image
@@ -472,7 +472,7 @@ public struct NDKUIFullScreenImage: View {
                     .progressViewStyle(CircularProgressViewStyle(tint: .white))
                     .scaleEffect(1.5)
             }
-            
+
             // Close button
             VStack {
                 HStack {
@@ -500,25 +500,25 @@ public struct NDKUIFullScreenImage: View {
             }
         }
     }
-    
+
     private func dismiss() {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
             imageOpacity = 0
             backgroundOpacity = 0
         }
-        
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             isPresented = false
         }
     }
-    
+
     private var dragGesture: some Gesture {
         DragGesture()
             .onChanged { value in
                 if scale == 1.0 {
                     // Only allow dragging when not zoomed
                     dragOffset = value.translation
-                    
+
                     // Calculate opacity based on drag distance
                     let distance = abs(value.translation.height)
                     let opacity = 1.0 - min(distance / 300, 0.5)
@@ -535,8 +535,8 @@ public struct NDKUIFullScreenImage: View {
             .onEnded { value in
                 if scale == 1.0 {
                     let shouldDismiss = abs(value.translation.height) > dismissThreshold ||
-                                       abs(value.predictedEndTranslation.height) > velocityThreshold
-                    
+                        abs(value.predictedEndTranslation.height) > velocityThreshold
+
                     if shouldDismiss {
                         // Dismiss with animation
                         dismiss()
@@ -551,7 +551,7 @@ public struct NDKUIFullScreenImage: View {
                 }
             }
     }
-    
+
     private var magnificationGesture: some Gesture {
         MagnificationGesture()
             .updating($magnifyBy) { currentState, gestureState, _ in
@@ -561,7 +561,7 @@ public struct NDKUIFullScreenImage: View {
                 lastScale *= value
                 scale = min(max(lastScale, 1.0), 4.0)
                 lastScale = scale
-                
+
                 // Reset offset if scale is back to 1
                 if scale == 1.0 {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
@@ -570,7 +570,7 @@ public struct NDKUIFullScreenImage: View {
                 }
             }
     }
-    
+
     private var doubleTapGesture: some Gesture {
         TapGesture(count: 2)
             .onEnded {
@@ -591,15 +591,15 @@ public struct NDKUIFullScreenImage: View {
 // MARK: - Preview
 
 #if DEBUG
-struct NDKUIURLPreview_Previews: PreviewProvider {
-    static var previews: some View {
-        VStack(spacing: 20) {
-            NDKUIURLPreview(url: URL(string: "https://example.com")!, style: .full)
-            NDKUIURLPreview(url: URL(string: "https://example.com/image.jpg")!, style: .full)
-            NDKUIURLPreview(url: URL(string: "https://example.com")!, style: .compact)
-            NDKUIURLPreview(url: URL(string: "https://example.com")!, style: .minimal)
+    struct NDKUIURLPreview_Previews: PreviewProvider {
+        static var previews: some View {
+            VStack(spacing: 20) {
+                NDKUIURLPreview(url: URL(string: "https://example.com")!, style: .full)
+                NDKUIURLPreview(url: URL(string: "https://example.com/image.jpg")!, style: .full)
+                NDKUIURLPreview(url: URL(string: "https://example.com")!, style: .compact)
+                NDKUIURLPreview(url: URL(string: "https://example.com")!, style: .minimal)
+            }
+            .padding()
         }
-        .padding()
     }
-}
 #endif

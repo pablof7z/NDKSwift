@@ -1,7 +1,7 @@
+import CashuSwift
+import CryptoKit
 import Foundation
 import NDKSwiftCore
-import CryptoKit
-import CashuSwift
 
 /// Manages zapping functionality with decoupled protocol and payment handling
 public actor NDKZapManager {
@@ -85,8 +85,8 @@ public actor NDKZapManager {
             var filter = NDKFilter()
             filter.authors = [pubkey]
             filter.kinds = [
-                EventKind.metadata,           // kind:0 - profile with lightning address
-                EventKind.nutzapPreferences  // kind:10019 - nutzap preferences
+                EventKind.metadata, // kind:0 - profile with lightning address
+                EventKind.nutzapPreferences, // kind:10019 - nutzap preferences
             ]
 
             // Create data source and collect until EOSE
@@ -194,8 +194,8 @@ public actor NDKZapManager {
         // If this is a Nutzap, try Lightning fallback
         if zapProtocol.type == .nutzap,
            let nutzapProtocol = zapProtocol as? NDKNutzapProtocol,
-           let nutzapRequest = prepared.paymentRequest as? NutzapPaymentRequest {
-
+           let nutzapRequest = prepared.paymentRequest as? NutzapPaymentRequest
+        {
             // Try Lightning-based funding
             return try await fundNutzapViaLightning(
                 nutzapProtocol: nutzapProtocol,
@@ -343,7 +343,7 @@ public actor NDKZapManager {
                 "amount": Int(quote.amount),
                 "request": quote.invoice,
                 "state": "PAID",
-                "expiry": Int(Timestamp.from(quote.expiry))
+                "expiry": Int(Timestamp.from(quote.expiry)),
             ]
 
             let mintQuote = try JSONCoding.decodeFromDictionary(CashuSwift.Bolt11.MintQuote.self, from: mintQuoteData)
@@ -395,7 +395,7 @@ public actor NDKZapManager {
         for provider in paymentProviders {
             let isAvailable = await provider.isAvailable()
             let canFulfill = await provider.canFulfill(request)
-            if isAvailable && canFulfill {
+            if isAvailable, canFulfill {
                 available.append(provider)
             }
         }
@@ -484,7 +484,6 @@ public actor NDKZapManager {
         }
     }
 
-
     // MARK: - Private Methods
 
     private func selectZapProtocol(
@@ -496,19 +495,22 @@ public actor NDKZapManager {
         // Try preferred type first if it's supported
         if let preferredType = preferredType,
            recipientInfo.supports(preferredType),
-           let zapProtocol = zapProtocols[preferredType] {
+           let zapProtocol = zapProtocols[preferredType]
+        {
             return zapProtocol
         }
 
         // Smart routing: Prioritize Nutzap for privacy
         if recipientInfo.hasNutzapSupport,
-           let nutzapProtocol = zapProtocols[.nutzap] {
+           let nutzapProtocol = zapProtocols[.nutzap]
+        {
             return nutzapProtocol
         }
 
         // Fallback to Lightning
         if recipientInfo.hasLightningSupport,
-           let lightningProtocol = zapProtocols[.lightning] {
+           let lightningProtocol = zapProtocols[.lightning]
+        {
             return lightningProtocol
         }
         NDKLogger.log(.debug, category: .wallet, "recipientDoesNotSupportZaps")
@@ -522,7 +524,8 @@ public actor NDKZapManager {
     ) async throws -> NDKPaymentProvider {
         // Try preferred provider first
         if let preferredId = preferredId,
-           let provider = paymentProviders.first(where: { $0.id == preferredId }) {
+           let provider = paymentProviders.first(where: { $0.id == preferredId })
+        {
             let isAvailable = await provider.isAvailable()
             let canFulfill = await provider.canFulfill(request)
             if isAvailable && canFulfill {
@@ -563,14 +566,14 @@ public actor NDKZapManager {
                         providerPubkey = resolution.providerPubkey
 
                         // If no provider pubkey from LNURL, check if service allows Nostr
-                        if providerPubkey == nil && resolution.payResponse.allowsNostr == true {
+                        if providerPubkey == nil, resolution.payResponse.allowsNostr == true {
                             // Some services that allow Nostr might use the recipient's pubkey
                             // as the zap receipt signer
                             providerPubkey = receipt.event.pubkey
                         }
                     } catch {
                         NDKLogger.log(.warning, category: .general,
-                                    "Failed to resolve LNURL for \(lnurlAddress): \(error)")
+                                      "Failed to resolve LNURL for \(lnurlAddress): \(error)")
                         // Fall back to using receipt pubkey
                         providerPubkey = receipt.event.pubkey
                     }
@@ -583,7 +586,8 @@ public actor NDKZapManager {
         }
 
         guard let providerPubkey = providerPubkey,
-              receipt.validate(lnurlProviderPubkey: providerPubkey) else {
+              receipt.validate(lnurlProviderPubkey: providerPubkey)
+        else {
             return nil
         }
 
@@ -617,9 +621,9 @@ public struct ZapInfo {
 
 // MARK: - NDK Extension
 
-extension NDK {
+public extension NDK {
     /// Access the zap manager
-    public var zapManager: NDKZapManager {
+    var zapManager: NDKZapManager {
         if let existing = objc_getAssociatedObject(self, &zapManagerKey) as? NDKZapManager {
             return existing
         }
@@ -634,14 +638,14 @@ private var zapManagerKey: UInt8 = 0
 
 // MARK: - User Extension
 
-extension NDKUser {
+public extension NDKUser {
     /// Zap this user
-    public func zap(
+    func zap(
         amountSats: Int64,
         comment: String? = nil,
         preferredType: ZapType? = nil
     ) async throws -> ZapResult {
-        guard let ndk = await self.ndk else {
+        guard let ndk = await ndk else {
             throw NDKError.notConfigured(ErrorMessageConstants.Messages.ndkNotAvailable)
         }
 
@@ -652,14 +656,13 @@ extension NDKUser {
             preferredType: preferredType
         )
     }
-
 }
 
 // MARK: - Event Extension
 
-extension NDKEvent {
+public extension NDKEvent {
     /// Zap this event (requires NDK instance)
-    public func zap(
+    func zap(
         with ndk: NDK,
         amountSats: Int64,
         comment: String? = nil,
@@ -675,5 +678,4 @@ extension NDKEvent {
             preferredType: preferredType
         )
     }
-
 }

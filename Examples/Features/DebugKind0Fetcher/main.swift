@@ -13,9 +13,9 @@ struct DebugKind0Fetcher {
             print("Example: swift run DebugKind0Fetcher npub1...")
             return
         }
-        
+
         let npubInput = CommandLine.arguments[1]
-        
+
         // Convert npub to hex if needed
         let pubkeyHex: String
         if npubInput.hasPrefix("npub1") {
@@ -28,32 +28,32 @@ struct DebugKind0Fetcher {
         } else {
             pubkeyHex = npubInput
         }
-        
+
         print("🔍 Debug Kind:0 Fetcher")
         print("======================")
         print("Target pubkey: \(pubkeyHex)")
         print("Relay: wss://relay.primal.net")
         print("")
-        
+
         // Initialize NDK with debugging enabled
         let ndk = NDK(
             relayUrls: ["wss://relay.primal.net"],
             signer: nil
         )
-        
+
         // Enable debugging
         ndk.debugMode = true
-        
+
         print("🔄 Connecting to relay...")
-        
+
         // Connect to relay
         await ndk.connect()
-        
+
         // Wait a moment for connection
         try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
-        
+
         print("🔍 Fetching profile using NDK Data Source...")
-        
+
         // Use NDK's declarative API to fetch the profile
         let profileDataSource = NDKSubscription<NDKUserProfile>(
             ndk: ndk,
@@ -63,15 +63,16 @@ struct DebugKind0Fetcher {
             )
         ) { event in
             guard let data = event.content.data(using: .utf8),
-                  let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: data) else {
+                  let profile = JSONCoding.safeDecode(NDKUserProfile.self, from: data)
+            else {
                 return nil
             }
             return profile
         }
-        
+
         // Wait for data to arrive
         try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
-        
+
         let profiles = profileDataSource.data
         if let profile = profiles.first {
             print("✅ Found profile for pubkey")
@@ -90,7 +91,7 @@ struct DebugKind0Fetcher {
         } else {
             print("❌ No profile found for this pubkey")
         }
-        
+
         print("")
         print("🏁 Debug session complete")
     }

@@ -1,11 +1,11 @@
+import CashuSwift
 import Foundation
 import NDKSwiftCore
-import CashuSwift
 
 /// Spending direction for history events
 public enum SpendingDirection: String {
-    case `in` = "in"   // Received funds
-    case out = "out"   // Sent funds
+    case `in` // Received funds
+    case out // Sent funds
 }
 
 /// Manages wallet event operations for NIP-60 Cashu wallets
@@ -55,7 +55,7 @@ public actor WalletEventManager {
                 .kind(EventKind.deletion) // Event deletion
                 .content("")
                 .tags([
-                    ["k", String(7375)] // Cashu token kind
+                    ["k", String(7375)], // Cashu token kind
                 ] + tokenChange.deletedTokenIds.map { ["e", $0] })
                 .build(signer: signer)
 
@@ -128,10 +128,10 @@ public actor WalletEventManager {
             signer: signer,
             deletedEventIds: deletedEventIds
         )
-        
+
         // Publish to specific relays
         _ = try await ndk.publish(tokenEvent.event, to: Set(relays))
-        
+
         return tokenEvent.event.id
     }
 
@@ -168,10 +168,10 @@ public actor WalletEventManager {
             quote: quote,
             signer: signer
         )
-        
+
         // Publish to specific relays
         _ = try await ndk.publish(quoteEvent.event, to: Set(relays))
-        
+
         return quoteEvent.event.id
     }
 
@@ -223,10 +223,10 @@ public actor WalletEventManager {
             token: token,
             signer: signer
         )
-        
+
         // Publish to specific relays
         _ = try await ndk.publish(historyEvent.event, to: Set(relays))
-        
+
         NDKLogger.log(.info, category: .wallet, "✅ Spending history event created and published")
     }
 
@@ -273,7 +273,7 @@ public actor WalletEventManager {
         var mint = ""
 
         for tag in event.tags {
-            if tag.count >= 2 && tag[0] == NostrConstants.TagName.proof {
+            if tag.count >= 2, tag[0] == NostrConstants.TagName.proof {
                 if let proofData = tag[1].data(using: .utf8) {
                     do {
                         let proof = try JSONCoding.decode(CashuSwift.Proof.self, from: proofData)
@@ -284,7 +284,7 @@ public actor WalletEventManager {
                 }
             }
             // Extract mint from tags
-            if tag.count >= 2 && tag[0] == NostrConstants.TagName.url {
+            if tag.count >= 2, tag[0] == NostrConstants.TagName.url {
                 mint = tag[1]
             }
         }
@@ -394,7 +394,7 @@ public actor WalletEventManager {
             }
         case .retryableFailed:
             filtered = nutzapEvents.values.filter { nutzap in
-                if case .failed(let error, _, _) = nutzap.status {
+                if case let .failed(error, _, _) = nutzap.status {
                     return error.isRetryable
                 }
                 return false
@@ -456,7 +456,7 @@ public struct NutzapInfo: Sendable, Codable {
 
     // For backward compatibility
     public var redeemedAt: Timestamp? {
-        if case .redeemed(let at, _) = status {
+        if case let .redeemed(at, _) = status {
             return at
         }
         return nil

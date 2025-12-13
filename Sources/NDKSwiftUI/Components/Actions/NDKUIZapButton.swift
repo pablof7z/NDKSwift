@@ -1,9 +1,9 @@
-import SwiftUI
-import NDKSwiftCore
 import NDKSwiftCashu
+import NDKSwiftCore
+import SwiftUI
 
 #if canImport(UIKit)
-import UIKit
+    import UIKit
 #endif
 
 // MARK: - NDKZapButton
@@ -32,7 +32,6 @@ import UIKit
 /// NDKZapButton(ndk: ndk, event: event, style: .compact, showCount: true, customAmountEnabled: true)
 /// ```
 public struct NDKZapButton: View {
-
     // MARK: - Properties
 
     private let ndk: NDK
@@ -53,9 +52,9 @@ public struct NDKZapButton: View {
     // MARK: - Supporting Types
 
     public enum ButtonStyle {
-        case standard       // Full button with background
-        case compact        // Small icon button
-        case minimal        // Text-based button
+        case standard // Full button with background
+        case compact // Small icon button
+        case minimal // Text-based button
     }
 
     // MARK: - Initialization
@@ -87,7 +86,7 @@ public struct NDKZapButton: View {
         self.customAmountEnabled = customAmountEnabled
 
         // Initialize zap state
-        self._zapState = StateObject(wrappedValue: ZapState(eventId: event.id))
+        _zapState = StateObject(wrappedValue: ZapState(eventId: event.id))
     }
 
     // MARK: - Body
@@ -182,8 +181,8 @@ public struct NDKZapButton: View {
 
         // Haptic feedback
         #if canImport(UIKit)
-        let impact = UIImpactFeedbackGenerator(style: .medium)
-        impact.impactOccurred()
+            let impact = UIImpactFeedbackGenerator(style: .medium)
+            impact.impactOccurred()
         #endif
     }
 
@@ -197,16 +196,16 @@ public struct NDKZapButton: View {
 
                 // Success haptic
                 #if canImport(UIKit)
-                let feedback = UINotificationFeedbackGenerator()
-                feedback.notificationOccurred(.success)
+                    let feedback = UINotificationFeedbackGenerator()
+                    feedback.notificationOccurred(.success)
                 #endif
             } else if let error = zapState.lastError {
                 onZapFailed?(error)
 
                 // Error haptic
                 #if canImport(UIKit)
-                let feedback = UINotificationFeedbackGenerator()
-                feedback.notificationOccurred(.error)
+                    let feedback = UINotificationFeedbackGenerator()
+                    feedback.notificationOccurred(.error)
                 #endif
             }
         }
@@ -221,8 +220,8 @@ public struct NDKZapButton: View {
     private func formatAmount(_ amount: Int) -> String {
         if amount >= 1_000_000 {
             return String(format: "%.1fM", Double(amount) / 1_000_000)
-        } else if amount >= 1_000 {
-            return String(format: "%.1fK", Double(amount) / 1_000)
+        } else if amount >= 1000 {
+            return String(format: "%.1fK", Double(amount) / 1000)
         } else {
             return "\(amount)"
         }
@@ -320,7 +319,6 @@ public struct NDKZapButton: View {
 /// Observable state for managing zap data and interactions
 @MainActor
 private class ZapState: ObservableObject {
-
     @Published var hasZapped: Bool = false
     @Published var totalAmount: Int = 0
     @Published var isLoading: Bool = false
@@ -384,7 +382,8 @@ private class ZapState: ObservableObject {
                 // This would require parsing the zap request to get the original sender
                 if let userPubkey = userPubkey,
                    let zapSender = extractZapSender(event),
-                   zapSender == userPubkey {
+                   zapSender == userPubkey
+                {
                     userZapped = true
                 }
             }
@@ -425,15 +424,16 @@ private class ZapState: ObservableObject {
     private func parseInvoiceAmount(_ invoice: String) -> Int? {
         // Use comprehensive Bolt11 parser
         guard let parsedInvoice = Bolt11Parser.decode(string: invoice),
-              let amount = parsedInvoice.amount else {
+              let amount = parsedInvoice.amount
+        else {
             return nil
         }
-        
+
         // Convert millisatoshis to satoshis for display
         return Int(PaymentConstants.millisatsToSats(amount.int64))
     }
 
-    private func parseZapRequestSender(_ json: String) -> String? {
+    private func parseZapRequestSender(_: String) -> String? {
         // Parse JSON to extract the pubkey from the zap request
         return nil
     }
@@ -490,7 +490,7 @@ private struct AmountSelectorSheet: View {
                 LazyVGrid(columns: [
                     GridItem(.flexible()),
                     GridItem(.flexible()),
-                    GridItem(.flexible())
+                    GridItem(.flexible()),
                 ], spacing: 16) {
                     ForEach(amounts, id: \.self) { amount in
                         Button(action: { onAmountSelected(amount) }) {
@@ -524,15 +524,15 @@ private struct AmountSelectorSheet: View {
             }
             .padding()
             #if !os(macOS)
-            .navigationBarTitleDisplayMode(.inline)
+                .navigationBarTitleDisplayMode(.inline)
             #endif
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Cancel") {
-                        dismiss()
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Cancel") {
+                            dismiss()
+                        }
                     }
                 }
-            }
         }
     }
 }
@@ -571,15 +571,15 @@ private struct CustomAmountSheet: View {
             }
             .padding()
             #if !os(macOS)
-            .navigationBarTitleDisplayMode(.inline)
+                .navigationBarTitleDisplayMode(.inline)
             #endif
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Cancel") {
-                        dismiss()
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Cancel") {
+                            dismiss()
+                        }
                     }
                 }
-            }
         }
     }
 }
@@ -606,37 +606,37 @@ private enum ZapError: LocalizedError {
 // MARK: - Preview
 
 #if DEBUG
-struct NDKZapButton_Previews: PreviewProvider {
-    static var previews: some View {
-        let mockNDK = NDK(relayUrls: [])
-        
-        VStack(spacing: 20) {
-            // Different styles
-            HStack(spacing: 16) {
-                NDKZapButton(ndk: mockNDK, event: mockEvent, style: .standard)
-                NDKZapButton(ndk: mockNDK, event: mockEvent, style: .compact)
-                NDKZapButton(ndk: mockNDK, event: mockEvent, style: .minimal)
-            }
+    struct NDKZapButton_Previews: PreviewProvider {
+        static var previews: some View {
+            let mockNDK = NDK(relayUrls: [])
 
-            // Different configurations
-            HStack(spacing: 16) {
-                NDKZapButton(ndk: mockNDK, event: mockEvent, amounts: [21])
-                NDKZapButton(ndk: mockNDK, event: mockEvent, amounts: UIConstants.ZapAmounts.standard)
-                NDKZapButton(ndk: mockNDK, event: mockEvent, showCount: false)
+            VStack(spacing: 20) {
+                // Different styles
+                HStack(spacing: 16) {
+                    NDKZapButton(ndk: mockNDK, event: mockEvent, style: .standard)
+                    NDKZapButton(ndk: mockNDK, event: mockEvent, style: .compact)
+                    NDKZapButton(ndk: mockNDK, event: mockEvent, style: .minimal)
+                }
+
+                // Different configurations
+                HStack(spacing: 16) {
+                    NDKZapButton(ndk: mockNDK, event: mockEvent, amounts: [21])
+                    NDKZapButton(ndk: mockNDK, event: mockEvent, amounts: UIConstants.ZapAmounts.standard)
+                    NDKZapButton(ndk: mockNDK, event: mockEvent, showCount: false)
+                }
             }
+            .padding()
         }
-        .padding()
-    }
 
-    // Mock event for preview
-    private static let mockEvent = NDKEvent(
-        id: "mock_id",
-        pubkey: "mock_pubkey",
-        createdAt: Date.currentNostrTimestamp,
-        kind: EventKind.textNote,
-        tags: [],
-        content: "Mock event content",
-        sig: "mock_sig"
-    )
-}
+        // Mock event for preview
+        private static let mockEvent = NDKEvent(
+            id: "mock_id",
+            pubkey: "mock_pubkey",
+            createdAt: Date.currentNostrTimestamp,
+            kind: EventKind.textNote,
+            tags: [],
+            content: "Mock event content",
+            sig: "mock_sig"
+        )
+    }
 #endif

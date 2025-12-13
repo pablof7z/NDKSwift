@@ -46,13 +46,13 @@ public struct NDKFollowPack {
         // Look for an "imeta" tag first
         if let imetaTag = event.tags.first(where: { $0.first == "imeta" }),
            let imeta = ImetaUtils.mapImetaTag(imetaTag),
-           let url = imeta.url {
+           let url = imeta.url
+        {
             return url
         }
         // Fallback to "image" tag
         return getTagValue("image")
     }
-
 
     /// Get the identifier (d tag) for parameterized replaceable events
     public var identifier: String? {
@@ -77,9 +77,7 @@ public struct NDKFollowPack {
     public func containsPubkey(_ pubkey: String) -> Bool {
         return pubkeys.contains(pubkey)
     }
-
 }
-
 
 // MARK: - Builder Pattern
 
@@ -183,4 +181,3 @@ public class NDKFollowPackBuilder {
         return followPack
     }
 }
-

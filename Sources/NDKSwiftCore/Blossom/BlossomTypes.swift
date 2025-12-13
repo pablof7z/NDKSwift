@@ -73,7 +73,8 @@ public struct BlossomBlob: Codable, Sendable {
         uploaded = try container.decode(Date.self, forKey: .uploaded)
 
         if let width = try container.decodeIfPresent(Int.self, forKey: .dimensionWidth),
-           let height = try container.decodeIfPresent(Int.self, forKey: .dimensionHeight) {
+           let height = try container.decodeIfPresent(Int.self, forKey: .dimensionHeight)
+        {
             dimensions = (width: width, height: height)
         } else {
             dimensions = nil
@@ -141,7 +142,7 @@ public struct BlossomAuth {
         var tags: [[String]] = [
             [NostrConstants.TagName.hashtag, NostrConstants.BlossomTag.upload],
             [NostrConstants.BlossomTag.hash, sha256],
-            [NostrConstants.BlossomTag.size, String(size)]
+            [NostrConstants.BlossomTag.size, String(size)],
         ]
 
         if let mimeType = mimeType {
@@ -170,7 +171,7 @@ public struct BlossomAuth {
     ) async throws -> BlossomAuth {
         let tags: [[String]] = [
             [NostrConstants.TagName.hashtag, NostrConstants.BlossomTag.delete],
-            [NostrConstants.BlossomTag.hash, sha256]
+            [NostrConstants.BlossomTag.hash, sha256],
         ]
 
         let event = try await NDKEventBuilder(ndk: ndk)
@@ -190,7 +191,7 @@ public struct BlossomAuth {
         until: Date? = nil
     ) async throws -> BlossomAuth {
         var tags: [[String]] = [
-            [NostrConstants.TagName.hashtag, NostrConstants.BlossomTag.list]
+            [NostrConstants.TagName.hashtag, NostrConstants.BlossomTag.list],
         ]
 
         if let since = since {

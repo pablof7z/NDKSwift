@@ -63,16 +63,13 @@ public class NDKSignerRegistry {
     /// - Returns: A reconstructed signer instance
     /// - Throws: Deserialization errors if the data is invalid or the signer type is not registered
     public func createSigner(from data: Data, ndk: NDK? = nil) async throws -> any NDKSigner {
-
         // Parse the outer container to get the signer type
         let container: SignerContainer
         do {
             container = try JSONCoding.decode(SignerContainer.self, from: data)
         } catch {
-
             throw error
         }
-
 
         // Get the registered signer type
         guard let signerType = getSignerType(for: container.type) else {
@@ -96,7 +93,6 @@ public class NDKSignerRegistry {
 
     /// Register built-in signer types
     private func registerBuiltInSigners() {
-
         // Register NDKPrivateKeySigner
         register(NDKPrivateKeySigner.self)
 
@@ -134,11 +130,11 @@ public enum NDKSignerRegistryError: LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .unknownSignerType(let type):
+        case let .unknownSignerType(type):
             return "Unknown signer type: \(type)"
-        case .serializationError(let message):
+        case let .serializationError(message):
             return "Serialization error: \(message)"
-        case .deserializationError(let message):
+        case let .deserializationError(message):
             return "Deserialization error: \(message)"
         case .invalidData:
             return "Invalid serialized data"

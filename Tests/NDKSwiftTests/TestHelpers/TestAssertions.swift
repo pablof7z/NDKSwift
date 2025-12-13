@@ -1,5 +1,5 @@
-import XCTest
 @testable import NDKSwiftCore
+import XCTest
 
 // MARK: - Event Assertions
 
@@ -17,7 +17,7 @@ func XCTAssertEventEqual(
     XCTAssertEqual(event1.content, event2.content, "Event content doesn't match", file: file, line: line)
     XCTAssertEqual(event1.sig, event2.sig, "Event signatures don't match", file: file, line: line)
     XCTAssertEqual(event1.tags.count, event2.tags.count, "Event tag counts don't match", file: file, line: line)
-    
+
     // Compare tags
     for (index, tag1) in event1.tags.enumerated() {
         let tag2 = event2.tags[index]
@@ -69,14 +69,14 @@ func XCTAssertRelayConnected(
     line: UInt = #line
 ) async {
     let startTime = Date()
-    
+
     while Date().timeIntervalSince(startTime) < timeout {
         if await relay.isConnected {
             return // Success
         }
         try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
     }
-    
+
     XCTFail("Relay \(relay.url) failed to connect within \(timeout) seconds", file: file, line: line)
 }
 
@@ -88,14 +88,14 @@ func XCTAssertRelayDisconnected(
     line: UInt = #line
 ) async {
     let startTime = Date()
-    
+
     while Date().timeIntervalSince(startTime) < timeout {
         if await !relay.isConnected {
             return // Success
         }
         try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
     }
-    
+
     XCTFail("Relay \(relay.url) failed to disconnect within \(timeout) seconds", file: file, line: line)
 }
 
@@ -110,7 +110,7 @@ func XCTAssertEventInCache(
 ) async {
     let cachedEvent = await cache.getEvent(id: event.id)
     XCTAssertNotNil(cachedEvent, "Event \(event.id) not found in cache", file: file, line: line)
-    
+
     if let cachedEvent = cachedEvent {
         XCTAssertEventEqual(event, cachedEvent, file: file, line: line)
     }
@@ -156,14 +156,14 @@ func XCTAssertDataSourceReceivesEvents<T>(
     line: UInt = #line
 ) async throws {
     let deadline = Date().addingTimeInterval(timeout)
-    
+
     while Date() < deadline {
         if dataSource.data.count >= minimumCount {
             return // Success
         }
         try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
     }
-    
+
     XCTFail(
         "Data source received only \(dataSource.data.count) items, expected at least \(minimumCount)",
         file: file,
@@ -183,12 +183,12 @@ func XCTAssertAsyncCompletes<T>(
     let task = Task {
         try await operation()
     }
-    
+
     let timeoutTask = Task {
         try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
         task.cancel()
     }
-    
+
     do {
         let result = try await task.value
         timeoutTask.cancel()
@@ -244,7 +244,7 @@ func XCTAssertEventuallyContains<T>(
     line: UInt = #line
 ) async {
     let deadline = Date().addingTimeInterval(timeout)
-    
+
     while Date() < deadline {
         let values = await getValue()
         if values.contains(where: predicate) {
@@ -252,7 +252,7 @@ func XCTAssertEventuallyContains<T>(
         }
         try? await Task.sleep(nanoseconds: UInt64(pollingInterval * 1_000_000_000))
     }
-    
+
     let finalValues = await getValue()
     XCTFail(
         "Collection never contained matching element. Final values: \(finalValues)",
@@ -267,119 +267,119 @@ extension Array where Element == ContentEntity {
     /// Check if array contains a text entity
     func containsText(_ text: String? = nil) -> Bool {
         contains { entity in
-            if case .text(let entityText) = entity {
+            if case let .text(entityText) = entity {
                 return text == nil || entityText == text
             }
             return false
         }
     }
-    
+
     /// Check if array contains an npub entity
     func containsNpub(_ npub: String? = nil) -> Bool {
         contains { entity in
-            if case .npub(let entityNpub) = entity {
+            if case let .npub(entityNpub) = entity {
                 return npub == nil || entityNpub == npub
             }
             return false
         }
     }
-    
+
     /// Check if array contains a hashtag entity
     func containsHashtag(_ tag: String? = nil) -> Bool {
         contains { entity in
-            if case .hashtag(let entityTag) = entity {
+            if case let .hashtag(entityTag) = entity {
                 return tag == nil || entityTag == tag
             }
             return false
         }
     }
-    
+
     /// Check if array contains a URL entity
     func containsURL(_ url: String? = nil) -> Bool {
         contains { entity in
-            if case .url(let entityURL) = entity {
+            if case let .url(entityURL) = entity {
                 return url == nil || entityURL.absoluteString == url
             }
             return false
         }
     }
-    
+
     /// Check if array contains a note entity
     func containsNote(_ note: String? = nil) -> Bool {
         contains { entity in
-            if case .note(let entityNote) = entity {
+            if case let .note(entityNote) = entity {
                 return note == nil || entityNote == note
             }
             return false
         }
     }
-    
+
     /// Check if array contains an nprofile entity
     func containsNprofile(_ nprofile: String? = nil) -> Bool {
         contains { entity in
-            if case .nprofile(let entityNprofile) = entity {
+            if case let .nprofile(entityNprofile) = entity {
                 return nprofile == nil || entityNprofile == nprofile
             }
             return false
         }
     }
-    
+
     /// Check if array contains a nevent entity
     func containsNevent(_ nevent: String? = nil) -> Bool {
         contains { entity in
-            if case .nevent(let entityNevent) = entity {
+            if case let .nevent(entityNevent) = entity {
                 return nevent == nil || entityNevent == nevent
             }
             return false
         }
     }
-    
+
     /// Check if array contains an naddr entity
     func containsNaddr(_ naddr: String? = nil) -> Bool {
         contains { entity in
-            if case .naddr(let entityNaddr) = entity {
+            if case let .naddr(entityNaddr) = entity {
                 return naddr == nil || entityNaddr == naddr
             }
             return false
         }
     }
-    
+
     /// Check if array contains a user mention
     func containsUserMention(pubkey: String? = nil) -> Bool {
         contains { entity in
-            if case .userMention(let entityPubkey, _) = entity {
+            if case let .userMention(entityPubkey, _) = entity {
                 return pubkey == nil || entityPubkey == pubkey
             }
             return false
         }
     }
-    
+
     /// Check if array contains an event mention
     func containsEventMention(_ eventId: String? = nil) -> Bool {
         contains { entity in
-            if case .eventMention(let entityEventId) = entity {
+            if case let .eventMention(entityEventId) = entity {
                 return eventId == nil || entityEventId == eventId
             }
             return false
         }
     }
-    
+
     /// Extract all hashtags from entities
     var hashtags: [String] {
         compactMap { entity in
-            if case .hashtag(let tag) = entity { return tag }
+            if case let .hashtag(tag) = entity { return tag }
             return nil
         }
     }
-    
+
     /// Extract all URLs from entities
     var urls: [String] {
         compactMap { entity in
-            if case .url(let url) = entity { return url.absoluteString }
+            if case let .url(url) = entity { return url.absoluteString }
             return nil
         }
     }
-    
+
     /// Count entities of a specific type
     func countOf(_ entityType: ContentEntityType) -> Int {
         filter { entity in

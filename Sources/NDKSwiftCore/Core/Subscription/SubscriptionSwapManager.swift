@@ -48,7 +48,7 @@ public actor SubscriptionSwapManager {
 
     /// Handle follow list update
     /// - Parameter sessionData: Updated session data
-    func handleFollowListUpdate(_ sessionData: NDKSessionData) async {
+    func handleFollowListUpdate(_: NDKSessionData) async {
         // Find all subscriptions that depend on follow list
         let affectedSubscriptions = trackedSubscriptions.values.filter { subscription in
             subscription.reactiveFilter.dependencies.contains(.followList)
@@ -98,9 +98,9 @@ public actor SubscriptionSwapManager {
     private func filtersEqual(_ a: NDKFilter, _ b: NDKFilter) -> Bool {
         // Compare relevant fields
         return a.kinds == b.kinds &&
-               a.authors == b.authors &&
-               a.tags == b.tags &&
-               a.since == b.since &&
-               a.until == b.until
+            a.authors == b.authors &&
+            a.tags == b.tags &&
+            a.since == b.since &&
+            a.until == b.until
     }
 }

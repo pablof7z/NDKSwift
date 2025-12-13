@@ -2,8 +2,7 @@ import GRDB
 import NDKSwiftCore
 
 /// Helper to build SQL queries for NDKSQLiteCache, eliminating duplicate query building logic
-struct SQLiteQueryBuilder {
-
+enum SQLiteQueryBuilder {
     /// Build WHERE clauses and arguments from an NDKFilter
     static func buildFilterClauses(
         from filter: NDKFilter,

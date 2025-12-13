@@ -69,7 +69,6 @@ public actor NDKProfileManager {
         self.config = config
     }
 
-
     /// Observe profile updates for a given pubkey
     /// Returns an AsyncSequence that yields the profile immediately if cached,
     /// then yields updates as they arrive from relays
@@ -110,7 +109,7 @@ public actor NDKProfileManager {
                 // Process events from data source
                 for await event in dataSource.events {
                     let metadata = NDKUserMetadata(event: event, ndk: ndk)
-                    
+
                     // Update memory cache
                     updateCache(pubkey: pubkey, metadata: metadata)
 
@@ -157,13 +156,13 @@ public actor NDKProfileManager {
     public func loadMetadata(for pubkey: PublicKey) async -> NDKUserMetadata? {
         return await getCachedMetadata(for: pubkey)
     }
-    
+
     /// Load multiple metadata entries from cache
     /// - Parameter pubkeys: Array of public keys to load
     /// - Returns: Dictionary mapping pubkeys to their metadata (if found)
     public func loadMetadata(for pubkeys: [PublicKey]) async -> [PublicKey: NDKUserMetadata] {
         var metadata: [PublicKey: NDKUserMetadata] = [:]
-        
+
         // First check memory cache
         var missingPubkeys: [PublicKey] = []
         for pubkey in pubkeys {
@@ -174,11 +173,11 @@ public actor NDKProfileManager {
                 missingPubkeys.append(pubkey)
             }
         }
-        
+
         // Then check SQLite cache for missing ones
         if !missingPubkeys.isEmpty, let ndk = ndk {
             let cachedProfiles = await ndk.cache.getMultipleProfileMetadata(pubkeys: missingPubkeys)
-            
+
             for (pubkey, profileData) in cachedProfiles {
                 let userMetadata = NDKUserMetadata(
                     pubkey: pubkey,
@@ -187,25 +186,25 @@ public actor NDKProfileManager {
                     eventId: profileData.eventId,
                     ndk: ndk
                 )
-                
+
                 // Update memory cache
                 updateCache(pubkey: pubkey, metadata: userMetadata)
-                
+
                 metadata[pubkey] = userMetadata
             }
         }
-        
+
         return metadata
     }
-    
+
     /// Save metadata to cache
     /// - Parameters:
     ///   - metadata: The metadata to save
     ///   - pubkey: The public key associated with the metadata
     ///   - expiresIn: Optional expiry time in seconds (not implemented)
-    public func saveMetadata(_ metadata: NDKUserMetadata, for pubkey: PublicKey, expiresIn: TimeInterval? = nil) async {
+    public func saveMetadata(_ metadata: NDKUserMetadata, for pubkey: PublicKey, expiresIn _: TimeInterval? = nil) async {
         updateCache(pubkey: pubkey, metadata: metadata)
-        
+
         // Save parsed metadata to SQLite cache
         if let ndk = ndk, let parsedData = metadata.metadata {
             do {
@@ -220,12 +219,12 @@ public actor NDKProfileManager {
             }
         }
     }
-    
+
     /// Process a metadata event from a relay
     /// - Parameter event: The kind 0 event containing user metadata
     public func processMetadataEvent(_ event: NDKEvent) async {
         guard event.kind == EventKind.metadata else { return }
-        
+
         let metadata = NDKUserMetadata(event: event, ndk: ndk)
         await saveMetadata(metadata, for: event.pubkey)
     }
@@ -251,7 +250,7 @@ public actor NDKProfileManager {
             updateCacheOrder(for: pubkey)
             return entry.metadata
         }
-        
+
         // Check SQLite cache
         guard let ndk = ndk else { return nil }
         if let cached = await ndk.cache.getProfileMetadata(pubkey: pubkey) {
@@ -263,13 +262,13 @@ public actor NDKProfileManager {
                 eventId: cached.eventId,
                 ndk: ndk
             )
-            
+
             // Update memory cache
             updateCache(pubkey: pubkey, metadata: metadata)
-            
+
             return metadata
         }
-        
+
         return nil
     }
 
@@ -297,5 +296,4 @@ public actor NDKProfileManager {
         cacheOrder.removeAll { $0 == pubkey }
         cacheOrder.append(pubkey)
     }
-
 }

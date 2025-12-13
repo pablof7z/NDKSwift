@@ -116,7 +116,8 @@ public enum ImetaUtils {
             let parts = value.split(separator: ":")
             if parts.count == 3,
                let x = Int(parts[1]),
-               let y = Int(parts[2]) {
+               let y = Int(parts[2])
+            {
                 let annotation = UserAnnotation(pubkey: String(parts[0]), x: x, y: y)
                 if imeta.userAnnotations == nil {
                     imeta.userAnnotations = []

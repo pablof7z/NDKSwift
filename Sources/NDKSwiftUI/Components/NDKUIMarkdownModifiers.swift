@@ -1,5 +1,5 @@
-import SwiftUI
 import NDKSwiftCore
+import SwiftUI
 
 // MARK: - Predefined Markdown Styles
 
@@ -167,7 +167,7 @@ public struct NDKNostrEntityText: View {
 
     private func parseContent() async {
         let result = ContentParser.parseContent(content)
-        self.parsedEntities = result.entities
+        parsedEntities = result.entities
 
         var attributed = AttributedString(result.normalizedContent)
         attributed.font = font
@@ -177,25 +177,25 @@ public struct NDKNostrEntityText: View {
         for entity in result.entities {
             let entityText: String
             switch entity {
-            case .npub(let id):
+            case let .npub(id):
                 entityText = "npub\(id)"
-            case .nprofile(let id):
+            case let .nprofile(id):
                 entityText = "nprofile\(id)"
-            case .note(let id):
+            case let .note(id):
                 entityText = "note\(id)"
-            case .nevent(let id):
+            case let .nevent(id):
                 entityText = "nevent\(id)"
-            case .naddr(let id):
+            case let .naddr(id):
                 entityText = "naddr\(id)"
-            case .userMention(_, let npub):
+            case let .userMention(_, npub):
                 entityText = npub
-            case .eventMention(let id):
+            case let .eventMention(id):
                 entityText = "#[\(id)]"
-            case .hashtag(let tag):
+            case let .hashtag(tag):
                 entityText = "#\(tag)"
-            case .url(let url):
+            case let .url(url):
                 entityText = url.absoluteString
-            case .text(_):
+            case .text:
                 continue
             }
 
@@ -226,13 +226,14 @@ public struct NDKNostrEntityText: View {
         ) { match, _, _ in
             if let match = match,
                let range = Range(match.range, in: result.normalizedContent),
-               let attributedRange = attributed.range(of: String(result.normalizedContent[range])) {
+               let attributedRange = attributed.range(of: String(result.normalizedContent[range]))
+            {
                 attributed[attributedRange].foregroundColor = hashtagColor
                 attributed[attributedRange].font = font.weight(.medium)
             }
         }
 
-        self.attributedString = attributed
+        attributedString = attributed
     }
 }
 

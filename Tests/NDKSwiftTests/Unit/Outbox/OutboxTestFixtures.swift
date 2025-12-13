@@ -2,10 +2,9 @@ import Foundation
 @testable import NDKSwiftCore
 
 /// Test fixtures for outbox-related tests
-struct OutboxTestFixtures {
-    
+enum OutboxTestFixtures {
     // MARK: - Sample Relay URLs
-    
+
     static let relay1 = "wss://relay1.test.com/"
     static let relay2 = "wss://relay2.test.com/"
     static let relay3 = "wss://relay3.test.com/"
@@ -14,21 +13,21 @@ struct OutboxTestFixtures {
     static let relay6 = "wss://relay6.test.com/"
     static let authRelay = "wss://auth.relay.test.com/"
     static let blacklistedRelay = "wss://blacklisted.test.com/"
-    
+
     static let allTestRelays: Set<RelayURL> = [
-        relay1, relay2, relay3, relay4, relay5, relay6, authRelay
+        relay1, relay2, relay3, relay4, relay5, relay6, authRelay,
     ]
-    
+
     // MARK: - Sample Pubkeys
-    
+
     static let alicePubkey = "alice123456789012345678901234567890123456789012345678901234567890"
     static let bobPubkey = "bob1234567890123456789012345678901234567890123456789012345678901234"
     static let charliePubkey = "charlie3456789012345678901234567890123456789012345678901234567890"
     static let davePubkey = "dave234567890123456789012345678901234567890123456789012345678901234"
     static let evePubkey = "eve3234567890123456789012345678901234567890123456789012345678901234"
-    
+
     // MARK: - NDKOutboxItem Factory
-    
+
     static func makeOutboxItem(
         pubkey: String = alicePubkey,
         readRelays: Set<RelayURL>,
@@ -44,42 +43,42 @@ struct OutboxTestFixtures {
             source: source ?? .unknown
         )
     }
-    
+
     // MARK: - Common Relay Configurations
-    
+
     static let aliceRelayInfo = makeOutboxItem(
         readRelays: [relay1, relay2],
         writeRelays: [relay1, relay3]
     )
-    
+
     static let bobRelayInfo = makeOutboxItem(
         readRelays: [relay2, relay4],
         writeRelays: [relay2, relay5]
     )
-    
+
     static let charlieRelayInfo = makeOutboxItem(
         readRelays: [relay3, relay4],
         writeRelays: [relay3, relay6]
     )
-    
+
     static let daveRelayInfo = makeOutboxItem(
         readRelays: [relay1, relay5],
         writeRelays: [relay5, relay6]
     )
-    
+
     static let eveRelayInfo = makeOutboxItem(
-        readRelays: [],  // Eve only has write relays
+        readRelays: [], // Eve only has write relays
         writeRelays: [relay4, relay6]
     )
-    
+
     // MARK: - NDKEvent Factory
-    
+
     static func makeEvent(
         kind: Int = EventKind.textNote,
         content: String = "Test event",
-        pubkey: PublicKey? = nil,
+        pubkey _: PublicKey? = nil,
         tags: [Tag] = [],
-        createdAt: Timestamp? = nil
+        createdAt _: Timestamp? = nil
     ) async throws -> NDKEvent {
         let builder = NDKEventBuilder(ndk: NDK())
             .kind(Kind(kind))
@@ -87,10 +86,10 @@ struct OutboxTestFixtures {
             .tags(tags)
         return try await builder.build()
     }
-    
+
     /// Make event with p-tags
     static func makeEventWithPTags(
-        author: PublicKey,
+        author _: PublicKey,
         pTaggedUsers: [PublicKey],
         content: String = "Test event with mentions"
     ) async throws -> NDKEvent {
@@ -101,10 +100,10 @@ struct OutboxTestFixtures {
             tags: tags
         )
     }
-    
+
     /// Make event with e-tag relay hints
     static func makeEventWithETagRelayHints(
-        author: PublicKey,
+        author _: PublicKey,
         referencedEvents: [(String, RelayURL)],
         content: String = "Reply event"
     ) async throws -> NDKEvent {
@@ -117,40 +116,40 @@ struct OutboxTestFixtures {
             tags: tags
         )
     }
-    
+
     /// Make kind 10002 relay list event
     static func makeRelayListEvent(
-        pubkey: PublicKey,
+        pubkey _: PublicKey,
         readRelays: Set<RelayURL>,
         writeRelays: Set<RelayURL>,
-        createdAt: Timestamp? = nil
+        createdAt _: Timestamp? = nil
     ) async throws -> NDKEvent {
         var tags: [Tag] = []
-        
+
         // Add read-only relays
         for relay in readRelays.subtracting(writeRelays) {
             tags.append(["r", relay, "read"])
         }
-        
+
         // Add write-only relays
         for relay in writeRelays.subtracting(readRelays) {
             tags.append(["r", relay, "write"])
         }
-        
+
         // Add read+write relays
         for relay in readRelays.intersection(writeRelays) {
             tags.append(["r", relay])
         }
-        
+
         return try await makeEvent(
             kind: EventKind.relayList,
             content: "",
             tags: tags
         )
     }
-    
+
     // MARK: - NDKFilter Factory
-    
+
     static func makeFilter(
         authors: Set<PublicKey>? = nil,
         kinds: Set<Int>? = nil,
@@ -168,7 +167,7 @@ struct OutboxTestFixtures {
             tags: tags
         )
     }
-    
+
     /// Make filter with p-tags
     static func makeFilterWithPTags(
         authors: Set<PublicKey>? = nil,
@@ -181,11 +180,11 @@ struct OutboxTestFixtures {
             tags: ["p": pTaggedUsers]
         )
     }
-    
+
     // MARK: - Relay Performance Data (removed - type doesn't exist)
-    
+
     // MARK: - Pre-configured Test Scenarios
-    
+
     /// Scenario: Small group (< 10 p-tags)
     static func makeSmallGroupEvent() async throws -> NDKEvent {
         try await makeEventWithPTags(
@@ -194,10 +193,10 @@ struct OutboxTestFixtures {
             content: "Message to small group"
         )
     }
-    
+
     /// Scenario: Large group (>= 10 p-tags)
     static func makeLargeGroupEvent() async throws -> NDKEvent {
-        let manyPubkeys = (1...15).map { n in
+        let manyPubkeys = (1 ... 15).map { n in
             "user\(n)23456789012345678901234567890123456789012345678901234567890"
         }
         return try await makeEventWithPTags(
@@ -206,7 +205,7 @@ struct OutboxTestFixtures {
             content: "Message to large group"
         )
     }
-    
+
     /// Scenario: Direct message
     static func makeDirectMessage(from: PublicKey, to: PublicKey) async throws -> NDKEvent {
         try await makeEvent(
@@ -216,7 +215,7 @@ struct OutboxTestFixtures {
             tags: [["p", to]]
         )
     }
-    
+
     /// Scenario: Filter for multiple authors
     static func makeMultiAuthorFilter() -> NDKFilter {
         makeFilter(
@@ -224,7 +223,7 @@ struct OutboxTestFixtures {
             kinds: [EventKind.textNote]
         )
     }
-    
+
     /// Scenario: Filter with p-tags
     static func makePTagFilter() -> NDKFilter {
         makeFilterWithPTags(
@@ -232,7 +231,7 @@ struct OutboxTestFixtures {
             kinds: [EventKind.textNote]
         )
     }
-    
+
     /// Scenario: Complex filter with authors and p-tags
     static func makeComplexFilter() -> NDKFilter {
         makeFilter(

@@ -33,7 +33,7 @@ public struct NegentropySyncResult {
 }
 
 // Extension to NDK for NIP-77 sync support
-extension NDK {
+public extension NDK {
     /// Sync events with a specific relay using NIP-77 Negentropy protocol
     /// - Parameters:
     ///   - filter: Filter to apply for sync
@@ -41,7 +41,7 @@ extension NDK {
     ///   - direction: Sync direction (.send, .receive, or .both) - default is .both
     /// - Returns: Sync result with statistics
     /// - Throws: NIP77Error if sync fails
-    public func syncEvents(filter: NDKFilter, relay relayURL: String, direction: SyncDirection = .both) async throws -> NegentropySyncResult {
+    func syncEvents(filter: NDKFilter, relay relayURL: String, direction: SyncDirection = .both) async throws -> NegentropySyncResult {
         let startTime = Date()
 
         // Get or create relay connection
@@ -109,7 +109,7 @@ extension NDK {
     ///   - filter: Filter to apply for sync
     ///   - direction: Sync direction (.send, .receive, or .both) - default is .both
     /// - Returns: Dictionary of relay URLs to sync results
-    public func syncWithAllRelays(filter: NDKFilter, direction: SyncDirection = .both) async throws -> [String: NegentropySyncResult] {
+    func syncWithAllRelays(filter: NDKFilter, direction: SyncDirection = .both) async throws -> [String: NegentropySyncResult] {
         let relays = await pool.connectedRelays()
 
         return await withTaskGroup(of: (String, NegentropySyncResult?).self) { group in
@@ -127,7 +127,7 @@ extension NDK {
             }
 
             var results: [String: NegentropySyncResult] = [:]
-            for await (relay, result) in group {
+            for await(relay, result) in group {
                 if let result = result {
                     results[relay] = result
                 }
@@ -139,7 +139,7 @@ extension NDK {
     /// Check if a relay supports NIP-77
     /// - Parameter relayURL: Relay URL to check
     /// - Returns: True if relay supports NIP-77
-    public func relaySupportsNegentropy(_ relayURL: String) async -> Bool {
+    func relaySupportsNegentropy(_ relayURL: String) async -> Bool {
         // First check if we have a connected relay
         guard let relay = await pool.getRelay(for: relayURL) else {
             return false
@@ -147,7 +147,8 @@ extension NDK {
 
         // Check the relay's NIP-11 information first
         if let info = await relay.info,
-           let supportedNips = info.supportedNips {
+           let supportedNips = info.supportedNips
+        {
             // If NIP-11 says it supports NIP-77, trust it
             if supportedNips.contains(77) {
                 return true
@@ -156,7 +157,7 @@ extension NDK {
 
         // If no explicit support in NIP-11, we'll try anyway
         // Some relays might support it without advertising
-        return false  // Changed to false but we'll still try in the demo
+        return false // Changed to false but we'll still try in the demo
     }
 
     // MARK: - Helper Methods
@@ -198,11 +199,9 @@ extension NIP77SyncHandler {
 
     private static var completedSessions = [String: CompletedSession]()
 
-
     func getActiveSession(subscriptionId: String) async -> SyncSession? {
         return activeSessions[subscriptionId]
     }
-
 
     func completeSession(_ session: SyncSession, subscriptionId: String) {
         Self.completedSessions[subscriptionId] = CompletedSession(

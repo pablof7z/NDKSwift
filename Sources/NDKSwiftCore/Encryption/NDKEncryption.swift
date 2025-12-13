@@ -34,9 +34,9 @@ public enum NDKEncryptionError: LocalizedError, Sendable {
 
     public var errorDescription: String? {
         switch self {
-        case .encryptionFailed(let message):
+        case let .encryptionFailed(message):
             return "Encryption failed: \(message)"
-        case .decryptionFailed(let message):
+        case let .decryptionFailed(message):
             return "Decryption failed: \(message)"
         case .unsupportedVersion:
             return "Unsupported encryption version"
@@ -122,7 +122,8 @@ public extension NDKEvent {
 
         // Check cache first (if available)
         if let cache = ndk?.cache,
-           let cached = await cache.getDecryptedContent(for: id, viewerPubkey: viewerPubkey) {
+           let cached = await cache.getDecryptedContent(for: id, viewerPubkey: viewerPubkey)
+        {
             return cached
         }
 

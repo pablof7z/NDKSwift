@@ -8,13 +8,13 @@ public actor BlossomClient {
     // MARK: - Constants
 
     public init(urlSession: NDKNetworkFetching = URLSession.shared) {
-        self.networkClient = NDKNetworkClient(session: urlSession)
+        networkClient = NDKNetworkClient(session: urlSession)
     }
 
     // MARK: - Private Helpers
 
     /// Helper method to handle HTTP responses and extract error messages
-    private func handleHTTPResponse(_ response: URLResponse?, data: Data, serverURL: String) throws -> HTTPURLResponse {
+    private func handleHTTPResponse(_ response: URLResponse?, data _: Data, serverURL _: String) throws -> HTTPURLResponse {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NDKError.invalidResponse(from: "Blossom server")
         }
@@ -49,10 +49,10 @@ public actor BlossomClient {
                 BlossomServerDescriptor.self,
                 for: request
             )
-            
+
             // Cache the descriptor
             serverCache[serverURL] = descriptor
-            
+
             return descriptor
         } catch let error as NDKError {
             throw error
@@ -92,7 +92,8 @@ public actor BlossomClient {
         // Validate mime type if server has restrictions
         if let acceptedTypes = descriptor?.acceptsMimeTypes,
            let mimeType = mimeType,
-           !acceptedTypes.contains(mimeType) && !acceptedTypes.contains("*/*") {
+           !acceptedTypes.contains(mimeType) && !acceptedTypes.contains("*/*")
+        {
             throw NDKError.unsupportedMimeType(mimeType)
         }
 
@@ -114,7 +115,7 @@ public actor BlossomClient {
 
         do {
             let (responseData, httpResponse) = try await networkClient.fetchAndValidateData(for: request)
-            
+
             // The network client already handles common status codes, but we need specific Blossom handling
             switch httpResponse.statusCode {
             case HTTPStatusCode.ok, HTTPStatusCode.created:
@@ -132,7 +133,7 @@ public actor BlossomClient {
                     type: uploadDescriptor.type,
                     uploaded: Date(nostrTimestamp: uploadDescriptor.uploaded)
                 )
-                
+
             default:
                 // This shouldn't happen as fetchAndValidateData handles errors
                 throw createServerError(response: httpResponse, data: responseData, serverURL: serverURL)
@@ -206,7 +207,7 @@ public actor BlossomClient {
                 BlossomListResponse.self,
                 for: request
             )
-            
+
             return listResponse.blobs.map { item in
                 BlossomBlob(
                     sha256: item.sha256,
@@ -245,12 +246,12 @@ public actor BlossomClient {
 
         do {
             let (_, httpResponse) = try await networkClient.fetchAndValidateData(for: request)
-            
+
             switch httpResponse.statusCode {
             case HTTPStatusCode.ok, HTTPStatusCode.noContent:
                 // Success
                 return
-                
+
             default:
                 // This shouldn't happen as fetchAndValidateData handles errors
                 throw NDKError.serverError(relay: serverURL, code: httpResponse.statusCode, message: nil)
@@ -280,15 +281,14 @@ public actor BlossomClient {
 
         do {
             let data = try await networkClient.fetchData(with: request)
-            
+
             // Verify SHA256
             let downloadedHex = Crypto.sha256(data).hexString
-            
+
             guard downloadedHex == sha256 else {
                 throw NDKError.invalidSHA256(sha256)
             }
 
-            
             return data
         } catch NDKError.invalidRequest {
             throw NDKError.blobNotFound(sha256: sha256)

@@ -4,14 +4,12 @@ import Foundation
 extension NDK {
     // MARK: - Internal Outbox Components
 
-
     /// Relay ranker for intelligent selection
     var relayRanker: NDKRelayRanker {
         lazyInit(&_relayRanker) {
             NDKRelayRanker(ndk: self, tracker: outbox)
         }
     }
-
 
     /// Publishing strategy for outbox model
     var publishingStrategy: NDKPublishingStrategy {
@@ -23,7 +21,6 @@ extension NDK {
             )
         }
     }
-
 }
 
 /// NDK Outbox Configuration

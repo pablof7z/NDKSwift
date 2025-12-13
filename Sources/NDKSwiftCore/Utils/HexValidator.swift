@@ -2,7 +2,6 @@ import Foundation
 
 /// Utility for validating hex strings and converting them to Data
 public enum HexValidator {
-
     /// Errors that can occur during hex validation
     public enum HexValidationError: LocalizedError {
         case invalidHexString(String)
@@ -11,9 +10,9 @@ public enum HexValidator {
 
         public var errorDescription: String? {
             switch self {
-            case .invalidHexString(let hex):
+            case let .invalidHexString(hex):
                 return "Invalid hex string: \(hex)"
-            case .invalidLength(let expected, let actual):
+            case let .invalidLength(expected, actual):
                 return "Invalid hex string length: expected \(expected) bytes, got \(actual) bytes"
             case .invalidFormat:
                 return "Invalid hex string format"
@@ -35,7 +34,7 @@ public enum HexValidator {
                 throw HexValidationError.invalidLength(expected: expectedCount, actual: hexString.count / 2)
             }
         }
-        
+
         guard let data = Data(hexString: hexString) else {
             throw HexValidationError.invalidHexString(hexString)
         }
@@ -88,21 +87,21 @@ public enum HexValidator {
     }
 
     // MARK: - Safe Data Conversion
-    
+
     /// Safely convert a hex string to Data
     /// - Parameter hexString: The hex string to convert
     /// - Returns: The Data if valid, nil otherwise
     public static func data(from hexString: String) -> Data? {
         return try? validateHex(hexString)
     }
-    
+
     /// Safely convert a 32-byte hex string to Data
     /// - Parameter hexString: The hex string to convert
     /// - Returns: The 32-byte Data if valid, nil otherwise
     public static func data32(from hexString: String) -> Data? {
         return try? validate32ByteHex(hexString)
     }
-    
+
     /// Safely convert a 64-byte hex string to Data
     /// - Parameter hexString: The hex string to convert
     /// - Returns: The 64-byte Data if valid, nil otherwise

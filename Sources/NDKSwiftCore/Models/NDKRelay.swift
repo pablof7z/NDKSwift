@@ -36,25 +36,25 @@ public struct NDKRelayInfo: Codable, Equatable, Sendable {
 public enum NDKRelayConnectionState: Equatable, Codable, Sendable {
     /// The relay is not connected. This is the initial state.
     case disconnected
-    
+
     /// Connection attempt is in progress
     case connecting
-    
+
     /// Successfully connected to the relay (WebSocket open)
     case connected
-    
+
     /// Relay requires authentication with the provided challenge (NIP-42)
     case authRequired(challenge: String)
-    
+
     /// Authentication is in progress after receiving an AUTH challenge
     case authenticating
-    
+
     /// Successfully authenticated with the relay
     case authenticated
-    
+
     /// Disconnection is in progress (graceful shutdown)
     case disconnecting
-    
+
     /// Connection failed with the given error message
     case failed(String)
 
@@ -272,7 +272,6 @@ actor RelayStateActor {
         return info
     }
 
-
     // MARK: - Observers
 
     func addStateObserver(_ observer: @escaping @Sendable (NDKRelayConnectionState) -> Void) {
@@ -379,15 +378,14 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable, @
         set { _ndk = newValue }
     }
 
-
     /// Internal state actor that manages all mutable state
     private let stateActor = RelayStateActor()
-    
+
     /// Subscription manager for this relay (handles grouping and merging)
-    internal var subscriptionManager: NDKRelaySubscriptionManager?
+    var subscriptionManager: NDKRelaySubscriptionManager?
 
     /// Get the current connection (internal use only)
-    internal var connection: NDKRelayConnection? {
+    var connection: NDKRelayConnection? {
         get async {
             await stateActor.getConnection()
         }
@@ -397,7 +395,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable, @
 
     public init(url: RelayURL) {
         self.url = url
-        self.subscriptionManager = NDKRelaySubscriptionManager(relay: self)
+        subscriptionManager = NDKRelaySubscriptionManager(relay: self)
     }
 
     // MARK: - Public Properties (Async)
@@ -433,7 +431,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable, @
     }
 
     /// Set the origin of this relay
-    internal func setOrigin(_ origin: NDKRelayOrigin) async {
+    func setOrigin(_ origin: NDKRelayOrigin) async {
         await stateActor.setOrigin(origin)
     }
 
@@ -453,7 +451,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable, @
             await stateActor.isConnected()
         }
     }
-    
+
     /// Check if relay is authenticated (NIP-42)
     public var isAuthenticated: Bool {
         get async {
@@ -463,9 +461,9 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable, @
             return false
         }
     }
-    
+
     /// Update connection state (internal use for authentication)
-    internal func updateConnectionState(_ newState: NDKRelayConnectionState) async {
+    func updateConnectionState(_ newState: NDKRelayConnectionState) async {
         await stateActor.updateConnectionState(newState)
     }
 
@@ -485,9 +483,9 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable, @
     public var stateStream: AsyncStream<State> {
         AsyncStream { continuation in
             let task = Task { [weak self] in
-                guard let self = self else { 
+                guard let self = self else {
                     continuation.finish()
-                    return 
+                    return
                 }
                 // Register for state updates
                 await self.stateActor.addFullStateObserver { state in
@@ -504,7 +502,6 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable, @
             }
         }
     }
-
 
     // MARK: - Connection Management
 
@@ -618,7 +615,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable, @
             var request = URLRequest(url: httpURL)
             request.setValue(HTTPConstants.contentTypeNostrJSON, forHTTPHeaderField: HTTPConstants.headerAccept)
             request.timeoutInterval = NetworkConstants.timeoutRelayInfo
-            
+
             let networkClient = NDKNetworkClient()
             let data = try await networkClient.fetchData(with: request)
             let relayInfo = try JSONCoding.decode(NDKRelayInformation.self, from: data)
@@ -630,7 +627,6 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable, @
             }
         }
     }
-
 
     // MARK: - Message Handling
 
@@ -725,7 +721,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable, @
         if event.kind == EventKind.relayList {
             NDKLogger.log(.info, category: .relay, "📋 [10002] Relay list event - Tags: \(event.tags)")
         }
-        
+
         // Update subscription event count
         if let subId = subscriptionId {
             await incrementSubscriptionEventCount(id: subId)
@@ -734,14 +730,14 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable, @
         // First try to route through relay subscription manager (for grouped subs)
         if let subId = subscriptionId {
             NDKLogger.log(.trace, category: .subscription,
-                         "🔄 [Relay] Routing EVENT for subscription '\(subId)' to relay subscription manager")
+                          "🔄 [Relay] Routing EVENT for subscription '\(subId)' to relay subscription manager")
             await subscriptionManager?.routeEvent(event, subscriptionId: subId, from: self)
         }
-        
+
         // Also route to NDK for global subscription management
         if let ndk = ndk, let subId = subscriptionId {
             NDKLogger.log(.trace, category: .subscription,
-                         "🔄 [Relay] Routing EVENT for subscription '\(subId)' to NDK global manager")
+                          "🔄 [Relay] Routing EVENT for subscription '\(subId)' to NDK global manager")
             Task { [weak self] in
                 guard let self = self else { return }
                 await ndk.processEvent(event, subscriptionId: subId, from: self)
@@ -754,11 +750,11 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable, @
     /// Handle EOSE message
     private func handleEOSEMessage(subscriptionId: String) async {
         NDKLogger.log(.debug, category: .subscription,
-                     "🔚 [Relay] Received EOSE for subscription '\(subscriptionId)' on relay \(url)")
-        
+                      "🔚 [Relay] Received EOSE for subscription '\(subscriptionId)' on relay \(url)")
+
         // Route through relay subscription manager first
         await subscriptionManager?.routeEOSE(subscriptionId: subscriptionId)
-        
+
         // Also route to NDK for global subscription management
         if let ndk = ndk {
             ndk.processEOSE(subscriptionId: subscriptionId, from: self)
@@ -868,7 +864,7 @@ extension NDKRelay: NDKRelayConnectionDelegate {
 
             // Fetch relay information
             await fetchRelayInformation()
-            
+
             // Handle relay reconnection for subscription manager
             await subscriptionManager?.handleRelayReconnection()
         }
@@ -879,7 +875,7 @@ extension NDKRelay: NDKRelayConnectionDelegate {
             guard let self = self else { return }
             // Clear all subscriptions when disconnected
             await self.stateActor.clearAllSubscriptions()
-            
+
             // Handle relay disconnection for subscription manager
             await subscriptionManager?.handleRelayDisconnection()
 
@@ -928,7 +924,6 @@ public extension NDKRelay {
         }
     }
 
-
     // MARK: - Signature Statistics
 
     /// Update signature verification statistics in a thread-safe manner
@@ -964,19 +959,19 @@ public extension NDKRelay {
     internal func incrementSubscriptionEventCount(id: String) async {
         await stateActor.updateSubscriptionEventCount(id: id)
     }
-    
+
     // MARK: - Relay-Level Subscription Management
-    
+
     /// Add a subscription to this relay's subscription manager
     internal func addSubscription(_ subscription: NDKSubscriptionCoordinator, filters: [NDKFilter]) async {
         await subscriptionManager?.addSubscription(subscription, filters: filters)
     }
-    
+
     /// Remove a subscription from this relay's subscription manager
     internal func removeSubscription(_ subscription: NDKSubscriptionCoordinator) async {
         await subscriptionManager?.removeSubscription(subscription)
     }
-    
+
     /// Track a subscription group (called by NDKRelaySubscription)
     internal func trackSubscription(_ group: NDKRelaySubscription) async {
         // Track the actual subscription ID that will be sent to relay
@@ -984,26 +979,26 @@ public extension NDKRelay {
             await trackSubscription(id: subId, filters: await group.compileFilters())
         }
     }
-    
+
     /// Send a subscription request to the relay
     internal func sendSubscription(id: String, filters: [NDKFilter]) async {
         do {
             let req = try NostrMessage.req(subscriptionId: id, filters: filters).serialize()
             let filterDescriptions = filters.map { $0.description }.joined(separator: ", ")
             NDKLogger.log(.debug, category: .subscription,
-                         "📤 [Relay] Sending REQ with ID '\(id)' to relay \(url) with \(filters.count) filters: \(filterDescriptions)")
+                          "📤 [Relay] Sending REQ with ID '\(id)' to relay \(url) with \(filters.count) filters: \(filterDescriptions)")
             try await send(req)
         } catch {
             NDKLogger.log(.error, category: .relay, "Failed to send subscription \(id): \(error)")
         }
     }
-    
+
     /// Close a subscription on the relay
     internal func closeSubscription(id: String) async {
         do {
             let close = try NostrMessage.close(subscriptionId: id).serialize()
             NDKLogger.log(.debug, category: .subscription,
-                         "🛑 [Relay] Sending CLOSE for subscription '\(id)' to relay \(url)")
+                          "🛑 [Relay] Sending CLOSE for subscription '\(id)' to relay \(url)")
             try await send(close)
             await untrackSubscription(id: id)
         } catch {
@@ -1117,7 +1112,7 @@ public struct NDKRelaySubscriptionInfo: Sendable, Equatable {
         self.id = id
         self.filters = filters
         self.createdAt = createdAt
-        self.eventCount = 0
-        self.lastEventAt = nil
+        eventCount = 0
+        lastEventAt = nil
     }
 }

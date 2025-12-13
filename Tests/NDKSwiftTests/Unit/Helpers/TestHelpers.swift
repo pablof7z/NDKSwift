@@ -1,6 +1,6 @@
 import Foundation
-import XCTest
 @testable import NDKSwiftCore
+import XCTest
 
 // MARK: - Common Test Helpers
 
@@ -21,14 +21,14 @@ func waitFor(
     condition: () async -> Bool
 ) async throws {
     let deadline = Date().addingTimeInterval(timeout)
-    
+
     while Date() < deadline {
         if await condition() {
             return
         }
         try await delay(interval)
     }
-    
+
     throw TestError.timeout("Condition not met within \(timeout) seconds")
 }
 
@@ -37,14 +37,14 @@ enum TestError: LocalizedError {
     case timeout(String)
     case connectionFailed
     case invalidResponse(String)
-    
+
     var errorDescription: String? {
         switch self {
-        case .timeout(let message):
+        case let .timeout(message):
             return "Timeout: \(message)"
         case .connectionFailed:
             return "Failed to connect to relays"
-        case .invalidResponse(let message):
+        case let .invalidResponse(message):
             return "Invalid response: \(message)"
         }
     }
@@ -57,7 +57,7 @@ let testRelays = RelayConstants.testRelays
 struct TestUser {
     let signer: NDKPrivateKeySigner
     let pubkey: String
-    
+
     static func create() async throws -> TestUser {
         let signer = try NDKPrivateKeySigner.generate()
         let pubkey = try await signer.pubkey
@@ -86,17 +86,17 @@ func createTestEvent(
 ) async throws -> NDKEvent {
     // Create a temporary NDK instance for building the event
     let ndk = NDK()
-    
+
     // Build the event using NDKEventBuilder
     let builder = NDKEventBuilder(ndk: ndk)
         .kind(kind)
         .content(content)
-    
+
     // Add tags
     for tag in tags {
         builder.tag(tag)
     }
-    
+
     // Set pubkey if provided (otherwise will use signer's pubkey)
     if let pubkey = pubkey {
         // For test events without a signer, we need to build manually
@@ -109,7 +109,7 @@ func createTestEvent(
                 tags: tags,
                 content: content
             )
-            
+
             return NDKEvent(
                 id: eventId,
                 pubkey: pubkey,
@@ -121,7 +121,7 @@ func createTestEvent(
             )
         }
     }
-    
+
     // Build with signer if provided
     return try await builder.build(signer: signer)
 }
@@ -150,10 +150,9 @@ func calculateEventId(
         createdAt,
         kind,
         tags,
-        content
+        content,
     ]
-    
+
     let jsonData = try JSONSerialization.data(withJSONObject: serialized, options: [])
     return Crypto.sha256(jsonData).hexEncodedString()
 }
-

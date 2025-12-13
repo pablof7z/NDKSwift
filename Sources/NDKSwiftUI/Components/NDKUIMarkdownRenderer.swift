@@ -1,5 +1,5 @@
-import SwiftUI
 import NDKSwiftCore
+import SwiftUI
 
 /// A SwiftUI component that renders markdown content with Nostr entity parsing.
 ///
@@ -88,8 +88,8 @@ public struct NDKUIMarkdownRenderer: View {
     /// This separates Nostr-specific parsing from markdown parsing.
     func parseContent() {
         let result = ContentParser.parseContent(content)
-        self.parsedEntities = result.entities
-        self.normalizedContent = result.normalizedContent
+        parsedEntities = result.entities
+        normalizedContent = result.normalizedContent
     }
 
     /// Computes the markdown blocks to render from the normalized content.
@@ -101,19 +101,19 @@ public struct NDKUIMarkdownRenderer: View {
     @ViewBuilder
     private func renderBlock(_ block: MarkdownBlock) -> some View {
         switch block {
-        case .heading(let level, let text):
+        case let .heading(level, text):
             renderHeading(level: level, text: text)
 
-        case .paragraph(let inlines):
+        case let .paragraph(inlines):
             renderParagraph(inlines)
 
-        case .codeBlock(let language, let code):
+        case let .codeBlock(language, code):
             renderCodeBlock(language: language, code: code)
 
-        case .blockquote(let inlines):
+        case let .blockquote(inlines):
             renderBlockquote(inlines)
 
-        case .list(let items, let ordered):
+        case let .list(items, ordered):
             renderList(items: items, ordered: ordered)
 
         case .horizontalRule:
@@ -222,43 +222,43 @@ public struct NDKUIMarkdownRenderer: View {
 
         for inline in inlines {
             switch inline {
-            case .text(let string):
+            case let .text(string):
                 result += AttributedString(string)
 
-            case .bold(let inlines):
+            case let .bold(inlines):
                 var boldText = buildAttributedString(from: inlines)
                 boldText.font = configuration.bodyFont.bold()
                 result += boldText
 
-            case .italic(let inlines):
+            case let .italic(inlines):
                 var italicText = buildAttributedString(from: inlines)
                 italicText.font = configuration.bodyFont.italic()
                 result += italicText
 
-            case .code(let text):
+            case let .code(text):
                 var codeText = AttributedString(text)
                 codeText.font = configuration.inlineCodeFont
                 codeText.foregroundColor = configuration.inlineCodeColor
                 codeText.backgroundColor = configuration.inlineCodeBackgroundColor
                 result += codeText
 
-            case .link(let text, let url):
+            case let .link(text, url):
                 var linkText = AttributedString(text)
                 linkText.link = url
                 linkText.foregroundColor = configuration.linkColor
                 linkText.underlineStyle = configuration.linkUnderlineStyle
                 result += linkText
 
-            case .nostrEntity(let entity):
+            case let .nostrEntity(entity):
                 result += renderNostrEntity(entity)
 
-            case .mention(let pubkey):
+            case let .mention(pubkey):
                 result += renderMention(pubkey)
 
-            case .hashtag(let tag):
+            case let .hashtag(tag):
                 result += renderHashtag(tag)
 
-            case .image(_, let url):
+            case let .image(_, url):
                 // Images need special handling in SwiftUI, we'll mark them with a special link
                 var imageText = AttributedString(" 🖼 ")
                 imageText.link = URL(string: "image:\(url.absoluteString)")
@@ -275,36 +275,36 @@ public struct NDKUIMarkdownRenderer: View {
         var entityString: String
 
         switch entity {
-        case .npub(let pubkey):
+        case let .npub(pubkey):
             text = "@\(displayName(for: pubkey))"
             entityString = "npub\(pubkey)"
-        case .nprofile(let id):
+        case let .nprofile(id):
             text = "@\(displayName(for: id))"
             entityString = "nprofile\(id)"
-        case .note(let id):
+        case let .note(id):
             text = "📝 \(id.prefix(8))..."
             entityString = "note\(id)"
-        case .nevent(let id):
+        case let .nevent(id):
             text = "📝 \(id.prefix(8))..."
             entityString = "nevent\(id)"
-        case .naddr(let id):
+        case let .naddr(id):
             text = "📍 \(id.prefix(8))..."
             entityString = "naddr\(id)"
-        case .userMention(let pubkey, let npub):
+        case let .userMention(pubkey, npub):
             text = "@\(displayName(for: pubkey))"
             entityString = npub
-        case .eventMention(let id):
+        case let .eventMention(id):
             text = "📝 \(id.prefix(8))..."
             entityString = "note\(id)"
-        case .hashtag(let tag):
+        case let .hashtag(tag):
             return renderHashtag(tag)
-        case .url(let url):
+        case let .url(url):
             var linkText = AttributedString(url.absoluteString)
             linkText.link = url
             linkText.foregroundColor = configuration.linkColor
             linkText.underlineStyle = configuration.linkUnderlineStyle
             return linkText
-        case .text(let string):
+        case let .text(string):
             return AttributedString(string)
         }
 
@@ -359,12 +359,12 @@ public struct NDKUIMarkdownRenderer: View {
             let urlString = url.absoluteString
             if let entity = parsedEntities.first(where: { entity in
                 switch entity {
-                case .npub(let id), .nprofile(let id), .note(let id),
-                     .nevent(let id), .naddr(let id):
+                case let .npub(id), let .nprofile(id), let .note(id),
+                     let .nevent(id), let .naddr(id):
                     return urlString.contains(id)
-                case .userMention(_, let npub):
+                case let .userMention(_, npub):
                     return urlString.contains(npub)
-                case .eventMention(let id):
+                case let .eventMention(id):
                     return urlString.contains(id)
                 default:
                     return false
@@ -472,7 +472,7 @@ public struct MarkdownConfiguration {
     public var blockquotePadding: CGFloat = 12
     public var listIndentation: CGFloat = 20
     public var listBulletMinWidth: CGFloat = 20
-    public var contentPadding: EdgeInsets = EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16)
+    public var contentPadding: EdgeInsets = .init(top: 16, leading: 16, bottom: 16, trailing: 16)
 
     // Styling
     public var bulletCharacter = "•"

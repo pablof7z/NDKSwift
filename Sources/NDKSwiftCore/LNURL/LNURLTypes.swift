@@ -11,13 +11,13 @@ public enum LNURLError: LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .invalidFormat(let detail):
+        case let .invalidFormat(detail):
             return ErrorMessageConstants.withContext(ErrorMessageConstants.invalid("LNURL format"), context: detail)
-        case .networkError(let error):
+        case let .networkError(error):
             return ErrorMessageConstants.withContext(ErrorMessageConstants.Messages.networkError, context: error.localizedDescription)
-        case .invalidResponse(let detail):
+        case let .invalidResponse(detail):
             return ErrorMessageConstants.withContext(ErrorMessageConstants.invalid("LNURL response"), context: detail)
-        case .decodingError(let detail):
+        case let .decodingError(detail):
             return ErrorMessageConstants.withContext(ErrorMessageConstants.failedTo("decode LNURL data"), context: detail)
         case .unsupportedProtocol:
             return "LNURL protocol not supported"

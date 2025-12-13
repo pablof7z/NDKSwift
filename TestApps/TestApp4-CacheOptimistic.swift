@@ -24,14 +24,14 @@ import NDKSwift
 
 // MARK: - Test Configuration
 
-let TIMEOUT_SHORT = 2_000_000_000  // 2 seconds
+let TIMEOUT_SHORT = 2_000_000_000 // 2 seconds
 let TIMEOUT_MEDIUM = 5_000_000_000 // 5 seconds
-let TIMEOUT_LONG = 10_000_000_000  // 10 seconds
+let TIMEOUT_LONG = 10_000_000_000 // 10 seconds
 
 let TEST_RELAYS = [
     "wss://relay.damus.io",
     "wss://relay.primal.net",
-    "wss://nos.lol"
+    "wss://nos.lol",
 ]
 
 // MARK: - Test Helpers
@@ -159,7 +159,7 @@ func testOptimisticPublishing() async throws {
         case .optimistic:
             printSuccess("Event is in optimistic state")
             printDiscovery("Offline events start in .optimistic state")
-        case .confirmed(let relay):
+        case let .confirmed(relay):
             print("   Confirmed by: \(relay)")
             printDiscovery("Event was already confirmed")
         }
@@ -189,7 +189,7 @@ func testOptimisticPublishing() async throws {
         switch state {
         case .optimistic:
             print("   Still optimistic (may need more time)")
-        case .confirmed(let relay):
+        case let .confirmed(relay):
             printSuccess("Event confirmed by: \(relay)")
             printDiscovery("Events automatically retry and confirm after connection")
         }
@@ -225,7 +225,7 @@ func testEventConfirmationStates() async throws {
 
     // Test 3.2: Monitor confirmation state over time
     printTest("Monitor confirmation state transitions")
-    for i in 0..<5 {
+    for i in 0 ..< 5 {
         try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
 
         if let state = await cache.getEventConfirmationState(eventId: onlineEvent.id) {
@@ -234,10 +234,9 @@ func testEventConfirmationStates() async throws {
             switch state {
             case .optimistic:
                 print("      Still waiting for confirmation...")
-            case .confirmed(let relay):
+            case let .confirmed(relay):
                 print("      ✓ Confirmed by \(relay)")
                 printSuccess("Event transitioned to confirmed state")
-                break
             }
         } else {
             print("   Check \(i + 1): No state found")

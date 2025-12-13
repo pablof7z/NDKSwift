@@ -17,19 +17,19 @@ struct TagsIterator: IteratorProtocol {
     var note: NdbNote
 
     mutating func next() -> TagSequence? {
-        guard ndb_tags_iterate_next(&self.iter) == 1 else {
+        guard ndb_tags_iterate_next(&iter) == 1 else {
             done = true
             return nil
         }
 
-        let tag_ptr = ndb_tag_ptr(ptr: self.iter.tag)
+        let tag_ptr = ndb_tag_ptr(ptr: iter.tag)
         return TagSequence(note: note, tag: tag_ptr)
     }
 
     init(note: NdbNote) {
-        self.iter = ndb_iterator()
-        ndb_tags_iterate_start(note.note.ptr, &self.iter)
-        self.done = false
+        iter = ndb_iterator()
+        ndb_tags_iterate_start(note.note.ptr, &iter)
+        done = false
         self.note = note
     }
 }
@@ -43,14 +43,14 @@ struct TagsSequence: Encodable, Sequence {
     }
 
     func strings() -> [[String]] {
-        return self.map { tag in
+        return map { tag in
             tag.map { t in t.string() }
         }
     }
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.unkeyedContainer()
-        
+
         // Iterate and create the [[String]] for encoding
         for tag in self {
             try container.encode(tag.map { $0.string() })
@@ -68,7 +68,7 @@ struct TagsSequence: Encodable, Sequence {
             }
             i += 1
         }
-        precondition(false, "Sequence subscript out of bounds")
+        preconditionFailure("Sequence subscript out of bounds")
         // it seems like the compiler needs this or it gets bitchy
         let nil_ptr = OpaquePointer(bitPattern: 0)
         return .init(note: .init(note: .init(ptr: nil_ptr), size: 0, owned: true, key: nil), tag: .init(ptr: nil_ptr))

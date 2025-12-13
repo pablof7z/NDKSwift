@@ -18,9 +18,9 @@ public struct NDKSessionConfiguration {
     public let preloadStrategy: PreloadStrategy
 
     public enum PreloadStrategy {
-        case blocking       // Wait for all data before session ready
-        case progressive    // Session ready with cache, update in background
-        case lazy          // Load on demand
+        case blocking // Wait for all data before session ready
+        case progressive // Session ready with cache, update in background
+        case lazy // Load on demand
     }
 
     /// Initialize with data requirements
@@ -104,9 +104,9 @@ public enum DataState<T>: Equatable where T: Equatable {
     /// Get current data if available
     public var data: T? {
         switch self {
-        case .ready(let data, _):
+        case let .ready(data, _):
             return data
-        case .updating(let current, _):
+        case let .updating(current, _):
             return current
         case .loading, .error:
             return nil

@@ -1,6 +1,6 @@
+import CashuSwift
 import Foundation
 import NDKSwiftCore
-import CashuSwift
 
 /// Manages all mint-related operations for the Cashu wallet
 public actor MintManager {
@@ -15,9 +15,9 @@ public actor MintManager {
 
     public init(cache: NDKCache? = nil) {
         if let cache = cache {
-            self.mintLoader = CachedMintLoader(cache: cache)
+            mintLoader = CachedMintLoader(cache: cache)
         } else {
-            self.mintLoader = nil
+            mintLoader = nil
         }
     }
 
@@ -42,7 +42,6 @@ public actor MintManager {
 
         return mint
     }
-
 
     /// Add mint URL without connecting (for configuration)
     public func addMintURL(url: URL) async {
@@ -179,7 +178,6 @@ public actor MintManager {
         return quoteResponse
     }
 
-
     // MARK: - State Management
 
     /// Clear all mints and keysets
@@ -212,25 +210,26 @@ public actor MintManager {
 }
 
 // MARK: - Test Helpers
+
 #if DEBUG
-extension MintManager {
-    /// Test helper to directly set a mint
-    func setTestMint(_ mint: CashuSwift.Mint, for url: URL) {
-        mints[url.absoluteString] = mint
-        // Also store keysets
-        for keyset in mint.keysets {
+    extension MintManager {
+        /// Test helper to directly set a mint
+        func setTestMint(_ mint: CashuSwift.Mint, for url: URL) {
+            mints[url.absoluteString] = mint
+            // Also store keysets
+            for keyset in mint.keysets {
+                keysets[keyset.keysetID] = keyset
+            }
+        }
+
+        /// Test helper to directly set a keyset
+        func setTestKeyset(_ keyset: CashuSwift.Keyset) {
             keysets[keyset.keysetID] = keyset
         }
-    }
 
-    /// Test helper to directly set a keyset
-    func setTestKeyset(_ keyset: CashuSwift.Keyset) {
-        keysets[keyset.keysetID] = keyset
+        /// Get a mint by URL (overload for URL type)
+        func getMint(for url: URL) async throws -> CashuSwift.Mint? {
+            return mints[url.absoluteString]
+        }
     }
-
-    /// Get a mint by URL (overload for URL type)
-    func getMint(for url: URL) async throws -> CashuSwift.Mint? {
-        return mints[url.absoluteString]
-    }
-}
 #endif

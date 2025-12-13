@@ -1,5 +1,5 @@
-import Foundation
 import CoreGraphics
+import Foundation
 
 /// NDKVideo represents a Nostr short-form video event (kind 22) per NIP-71
 public struct NDKVideo {
@@ -131,7 +131,8 @@ public struct NDKVideo {
     public var thumbnailURL: String? {
         // 1. Check imeta additionalFields for "image" key (NIP-71 style)
         if let firstImeta = imetas.first,
-           let imageUrl = firstImeta.additionalFields["image"] {
+           let imageUrl = firstImeta.additionalFields["image"]
+        {
             return imageUrl
         }
 
@@ -147,7 +148,8 @@ public struct NDKVideo {
 
         // 4. Check for "preview" in additionalFields
         if let firstImeta = imetas.first,
-           let previewUrl = firstImeta.additionalFields["preview"] {
+           let previewUrl = firstImeta.additionalFields["preview"]
+        {
             return previewUrl
         }
 

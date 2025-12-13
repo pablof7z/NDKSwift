@@ -1,14 +1,13 @@
-import SwiftUI
 import NDKSwiftCore
+import SwiftUI
 
 // MARK: - NDKEventViewStyles
 
 /// Centralized styling system for NDKUIEventView and its sub-components.
 /// Eliminates code duplication and ensures consistent styling across all event view types.
-public struct NDKEventViewStyles {
-    
+public enum NDKEventViewStyles {
     // MARK: - Spacing System
-    
+
     /// Vertical spacing between components based on event style
     public static func verticalSpacing(for style: NDKUIEventView.EventStyle) -> CGFloat {
         switch style {
@@ -19,7 +18,7 @@ public struct NDKEventViewStyles {
         case .embedded: return 6
         }
     }
-    
+
     /// Horizontal spacing between components based on event style
     public static func horizontalSpacing(for style: NDKUIEventView.EventStyle) -> CGFloat {
         switch style {
@@ -30,9 +29,9 @@ public struct NDKEventViewStyles {
         case .embedded: return 8
         }
     }
-    
+
     // MARK: - Font System
-    
+
     /// Content font based on event style
     public static func contentFont(for style: NDKUIEventView.EventStyle) -> Font {
         switch style {
@@ -43,7 +42,7 @@ public struct NDKEventViewStyles {
         case .embedded: return .callout
         }
     }
-    
+
     /// Title/headline font based on event style
     public static func titleFont(for style: NDKUIEventView.EventStyle) -> Font {
         switch style {
@@ -54,7 +53,7 @@ public struct NDKEventViewStyles {
         case .embedded: return .subheadline
         }
     }
-    
+
     /// Caption/metadata font based on event style
     public static func captionFont(for style: NDKUIEventView.EventStyle) -> Font {
         switch style {
@@ -65,9 +64,9 @@ public struct NDKEventViewStyles {
         case .embedded: return .caption2
         }
     }
-    
+
     // MARK: - Line Limits
-    
+
     /// Content line limit based on event style
     public static func contentLineLimit(for style: NDKUIEventView.EventStyle) -> Int? {
         switch style {
@@ -78,7 +77,7 @@ public struct NDKEventViewStyles {
         case .embedded: return 3
         }
     }
-    
+
     /// Title line limit based on event style
     public static func titleLineLimit(for style: NDKUIEventView.EventStyle) -> Int? {
         switch style {
@@ -89,9 +88,9 @@ public struct NDKEventViewStyles {
         case .embedded: return 1
         }
     }
-    
+
     // MARK: - Container Styling
-    
+
     /// Container padding based on event style
     public static func containerPadding(for style: NDKUIEventView.EventStyle) -> EdgeInsets {
         switch style {
@@ -102,7 +101,7 @@ public struct NDKEventViewStyles {
         case .embedded: return EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12)
         }
     }
-    
+
     /// Background color based on event style
     public static func backgroundColor(for style: NDKUIEventView.EventStyle) -> Color {
         switch style {
@@ -110,7 +109,7 @@ public struct NDKEventViewStyles {
         default: return Color.clear
         }
     }
-    
+
     /// Corner radius based on event style
     public static func cornerRadius(for style: NDKUIEventView.EventStyle) -> CGFloat {
         switch style {
@@ -119,9 +118,9 @@ public struct NDKEventViewStyles {
         default: return 0
         }
     }
-    
+
     // MARK: - Author Header Styles
-    
+
     /// Author header style mapping
     public static func authorHeaderStyle(for style: NDKUIEventView.EventStyle) -> NDKUIEventAuthorHeader.Style {
         switch style {
@@ -132,9 +131,9 @@ public struct NDKEventViewStyles {
         case .embedded: return .minimal
         }
     }
-    
+
     // MARK: - Interaction Bar Styles
-    
+
     /// Interaction bar style mapping
     public static func interactionBarStyle(for style: NDKUIEventView.EventStyle) -> NDKEventInteractionBar.Style {
         switch style {
@@ -145,9 +144,9 @@ public struct NDKEventViewStyles {
         case .embedded: return .minimal
         }
     }
-    
+
     // MARK: - Image Styling
-    
+
     /// Image height for single images based on event style
     public static func imageHeight(for style: NDKUIEventView.EventStyle) -> CGFloat {
         switch style {
@@ -156,7 +155,7 @@ public struct NDKEventViewStyles {
         default: return UIConstants.EventImageHeight.default
         }
     }
-    
+
     /// Grid image height for multiple images based on event style
     public static func gridImageHeight(for style: NDKUIEventView.EventStyle) -> CGFloat {
         switch style {
@@ -165,9 +164,9 @@ public struct NDKEventViewStyles {
         default: return 120
         }
     }
-    
+
     // MARK: - Card Styling
-    
+
     /// Card padding for specialized content (articles, tokens, etc.)
     public static func cardPadding(for style: NDKUIEventView.EventStyle) -> CGFloat {
         switch style {
@@ -178,7 +177,7 @@ public struct NDKEventViewStyles {
         case .embedded: return 8
         }
     }
-    
+
     /// Card corner radius for specialized content
     public static func cardCornerRadius(for style: NDKUIEventView.EventStyle) -> CGFloat {
         switch style {
@@ -196,7 +195,7 @@ public struct NDKEventViewStyles {
 /// View modifier for applying consistent event view styling
 public struct NDKEventViewStyle: ViewModifier {
     let style: NDKUIEventView.EventStyle
-    
+
     public func body(content: Content) -> some View {
         content
             .padding(NDKEventViewStyles.containerPadding(for: style))
@@ -209,12 +208,12 @@ public struct NDKEventViewStyle: ViewModifier {
 public struct NDKEventCardStyle: ViewModifier {
     let style: NDKUIEventView.EventStyle
     let backgroundColor: Color
-    
+
     public init(style: NDKUIEventView.EventStyle, backgroundColor: Color = Color.ndkSecondaryBackground) {
         self.style = style
         self.backgroundColor = backgroundColor
     }
-    
+
     public func body(content: Content) -> some View {
         content
             .padding(NDKEventViewStyles.cardPadding(for: style))
@@ -225,14 +224,14 @@ public struct NDKEventCardStyle: ViewModifier {
 
 // MARK: - View Extensions
 
-extension View {
+public extension View {
     /// Apply standard event view styling
-    public func ndkEventViewStyle(_ style: NDKUIEventView.EventStyle) -> some View {
-        self.modifier(NDKEventViewStyle(style: style))
+    func ndkEventViewStyle(_ style: NDKUIEventView.EventStyle) -> some View {
+        modifier(NDKEventViewStyle(style: style))
     }
-    
+
     /// Apply card styling for specialized content
-    public func ndkEventCardStyle(_ style: NDKUIEventView.EventStyle, backgroundColor: Color = Color.ndkSecondaryBackground) -> some View {
-        self.modifier(NDKEventCardStyle(style: style, backgroundColor: backgroundColor))
+    func ndkEventCardStyle(_ style: NDKUIEventView.EventStyle, backgroundColor: Color = Color.ndkSecondaryBackground) -> some View {
+        modifier(NDKEventCardStyle(style: style, backgroundColor: backgroundColor))
     }
 }

@@ -40,11 +40,10 @@ public enum Crypto {
                 return ErrorMessageConstants.invalid("scalar value")
             }
         }
-
     }
 
     /// Generate a new private key (internal use only - use NDKPrivateKeySigner.generate() instead)
-    internal static func generatePrivateKey() -> PrivateKey {
+    static func generatePrivateKey() -> PrivateKey {
         return randomBytes(count: Constants.privateKeySize).hexString
     }
 
@@ -138,4 +137,3 @@ public enum Crypto {
 
     typealias NIP44Error = NIP44.NIP44Error
 }
-

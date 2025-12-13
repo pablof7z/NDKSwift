@@ -21,7 +21,6 @@ import Foundation
 /// let relays = await tracker.getSeenOnRelays(eventId: event.id)
 /// ```
 public actor NDKEventTracker {
-
     /// Tracks which relays each event has been seen on
     private var seenOnRelays: [EventID: Set<String>] = [:]
 
@@ -245,7 +244,7 @@ public actor NDKEventTracker {
             "eventsWithPublishStatus": relayPublishStatuses.count,
             "eventsWithOKMessages": relayOKMessages.count,
             "eventsWithCustomProperties": customProperties.count,
-            "eventsWithTimestamps": firstSeenTimestamps.count
+            "eventsWithTimestamps": firstSeenTimestamps.count,
         ]
     }
 }

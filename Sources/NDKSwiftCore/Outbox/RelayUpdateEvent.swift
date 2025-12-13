@@ -18,21 +18,21 @@ import Foundation
 public struct RelayUpdateEvent: Sendable {
     /// The public key of the user whose relay preferences were updated
     public let pubkey: String
-    
+
     /// The updated relay sets for reading and writing
     ///
     /// - `readRelays`: Relays the user reads from (for fetching their events)
     /// - `writeRelays`: Relays the user writes to (for publishing to them)
     public let relays: (readRelays: Set<RelayURL>, writeRelays: Set<RelayURL>)
-    
+
     /// Subscription IDs that are affected by this relay update
     ///
     /// These subscriptions may need to be reconfigured to use the new relay set
     public let affectedSubscriptionIds: Set<String>
-    
+
     /// When this relay update was discovered
     public let timestamp: Date
-    
+
     /// Creates a new relay update event
     ///
     /// - Parameters:

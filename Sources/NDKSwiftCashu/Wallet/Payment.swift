@@ -1,6 +1,6 @@
+import CashuSwift
 import Foundation
 import NDKSwiftCore
-import CashuSwift
 
 /// Errors specific to mint failures during payment operations
 public enum MintFailureError: LocalizedError {
@@ -14,7 +14,7 @@ public enum MintFailureError: LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .requiresUserIntervention(let op, let source, let dest, let amount, _):
+        case let .requiresUserIntervention(op, source, dest, amount, _):
             return "\(ErrorMessageConstants.failedTo("mint \(amount) sats at \(dest)")) after payment from \(source). Quote ID: \(op.quoteId)"
         }
     }
@@ -29,7 +29,6 @@ public enum MintFailureError: LocalizedError {
 
 /// Functions for handling payment operations (Lightning, cross-mint transfers, and direct token transfers)
 public enum Payment {
-
     // MARK: - Lightning Payments
 
     /// Pay a Lightning invoice from the wallet
@@ -37,7 +36,7 @@ public enum Payment {
         wallet: NIP60Wallet,
         invoice: String,
         amount: Int64,
-        mints: [String: CashuSwift.Mint],
+        mints _: [String: CashuSwift.Mint],
         proofStateManager: ProofStateManager,
         eventManager: WalletEventManager,
         signer: NDKSigner
@@ -317,7 +316,7 @@ public enum Payment {
         mint mintURL: URL,
         mints: [String: CashuSwift.Mint],
         proofStateManager: ProofStateManager,
-        signer: NDKSigner
+        signer _: NDKSigner
     ) async throws -> (proofs: [CashuSwift.Proof], change: [CashuSwift.Proof]?) {
         // Get the mint
         let mint = try GuardHelpers.unwrap(

@@ -128,27 +128,27 @@ public final class NDKSubscription<T> {
         self.relays = relays
         self.exclusiveRelays = exclusiveRelays
         self.closeOnEose = closeOnEose
-        self.groupable = true
-        self.groupableDelay = nil
-        self.groupableDelayType = nil
-        self.correlationId = IDGenerator.randomId(length: 8)
+        groupable = true
+        groupableDelay = nil
+        groupableDelayType = nil
+        correlationId = IDGenerator.randomId(length: 8)
         self.subscriptionId = subscriptionId
 
         NDKLogger.log(.trace, category: .subscription, "🏗️ NDKSubscription init - filter: \(filter), maxAge: \(maxAge), cachePolicy: \(cachePolicy)", correlationId: correlationId)
 
         // Set up the AsyncStream for events
         var continuation: AsyncStream<T>.Continuation!
-        self.events = AsyncStream { cont in
+        events = AsyncStream { cont in
             continuation = cont
         }
-        self.eventsContinuation = continuation
+        eventsContinuation = continuation
 
         // Set up the AsyncStream for relay updates
         var relayUpdatesCont: AsyncStream<RelayUpdate>.Continuation!
-        self.relayUpdates = AsyncStream { cont in
+        relayUpdates = AsyncStream { cont in
             relayUpdatesCont = cont
         }
-        self.relayUpdatesContinuation = relayUpdatesCont
+        relayUpdatesContinuation = relayUpdatesCont
 
         // Start observing immediately
         task = Task { [weak self] in
@@ -172,32 +172,32 @@ public final class NDKSubscription<T> {
         self.ndk = ndk
         self.filter = filter
         self.transform = transform
-        self.maxAge = options.maxAge
-        self.cachePolicy = options.cachePolicy
-        self.relays = options.relays
-        self.exclusiveRelays = options.exclusiveRelays
-        self.closeOnEose = options.closeOnEose ?? false
-        self.groupable = options.groupable
-        self.groupableDelay = options.groupableDelay
-        self.groupableDelayType = options.groupableDelayType
-        self.correlationId = IDGenerator.randomId(length: 8)
-        self.subscriptionId = options.subscriptionId
+        maxAge = options.maxAge
+        cachePolicy = options.cachePolicy
+        relays = options.relays
+        exclusiveRelays = options.exclusiveRelays
+        closeOnEose = options.closeOnEose ?? false
+        groupable = options.groupable
+        groupableDelay = options.groupableDelay
+        groupableDelayType = options.groupableDelayType
+        correlationId = IDGenerator.randomId(length: 8)
+        subscriptionId = options.subscriptionId
 
         NDKLogger.log(.trace, category: .subscription, "🏗️ NDKSubscription init with options - filter: \(filter), maxAge: \(maxAge), cachePolicy: \(cachePolicy)", correlationId: correlationId)
 
         // Set up the AsyncStream for events
         var continuation: AsyncStream<T>.Continuation!
-        self.events = AsyncStream { cont in
+        events = AsyncStream { cont in
             continuation = cont
         }
-        self.eventsContinuation = continuation
+        eventsContinuation = continuation
 
         // Set up the AsyncStream for relay updates
         var relayUpdatesCont: AsyncStream<RelayUpdate>.Continuation!
-        self.relayUpdates = AsyncStream { cont in
+        relayUpdates = AsyncStream { cont in
             relayUpdatesCont = cont
         }
-        self.relayUpdatesContinuation = relayUpdatesCont
+        relayUpdatesContinuation = relayUpdatesCont
 
         // Start observing immediately
         task = Task { [weak self] in
@@ -219,14 +219,14 @@ public final class NDKSubscription<T> {
 
     private func startObserving() async {
         NDKLogger.log(.info, category: .subscription, "🔍 NDKSubscription.startObserving() called - filter: \(filter), subscriptionId: \(subscriptionId ?? "auto")", correlationId: correlationId)
-        
+
         isLoading = true
         error = nil
 
         // Use the new data requirement manager if available
         if let requirementManager = ndk.dataRequirementManager {
             NDKLogger.log(.debug, category: .subscription, "✅ Found dataRequirementManager, registering requirement", correlationId: correlationId)
-            
+
             let (handle, eventStream, relayUpdateStream) = await requirementManager.registerRequirement(
                 filter: filter,
                 maxAge: maxAge,
@@ -240,7 +240,7 @@ public final class NDKSubscription<T> {
                 groupableDelayType: groupableDelayType
             )
             requirementHandle = handle
-            
+
             // Process events from the stream
             Task { [weak self] in
                 guard let self = self else { return }
@@ -248,7 +248,7 @@ public final class NDKSubscription<T> {
                     await self.handleEvent(event)
                 }
             }
-            
+
             // Process relay updates from the stream
             Task { [weak self] in
                 guard let self = self else { return }
@@ -256,7 +256,7 @@ public final class NDKSubscription<T> {
                     self.relayUpdatesContinuation.yield(update)
                 }
             }
-            
+
             NDKLogger.log(.trace, category: .subscription, "✅ Requirement registered with handle", correlationId: correlationId)
         } else {
             // No data requirement manager available
@@ -279,7 +279,6 @@ public final class NDKSubscription<T> {
         await stateManager.markProcessed(event.id)
 
         if let transformed = transform(event) {
-
             // Yield to AsyncStream
             eventsContinuation.yield(transformed)
 
@@ -296,7 +295,7 @@ public final class NDKSubscription<T> {
     /// This needs to be called by the internal subscription system
     public func handleRelayUpdate(_ update: RelayUpdate) async {
         relayUpdatesContinuation.yield(update)
-        
+
         // Also process events directly
         if case let .event(event, _) = update {
             await handleEvent(event)
@@ -360,12 +359,12 @@ public final class NDKSubscription<T> {
                         // An event arrived, the event monitoring task will handle it
                         break
 
-                    case .eose(let relay):
+                    case let .eose(relay):
                         activeRelays.insert(relay)
                         eoseReceived.insert(relay)
 
                         // If all active relays sent EOSE and no events
-                        if !activeRelays.isEmpty && activeRelays == eoseReceived && self.data.isEmpty {
+                        if !activeRelays.isEmpty, activeRelays == eoseReceived, self.data.isEmpty {
                             return nil
                         }
 
@@ -406,11 +405,11 @@ public final class NDKSubscription<T> {
     /// // Collect all text notes from the last hour
     /// let subscription = ndk.subscribe(filter: NDKFilter(kinds: [1]), maxAge: 3600)
     /// let events = await subscription.collect(timeout: 5.0)
-    /// 
+    ///
     /// // Collect up to 100 events
     /// let limitedEvents = await subscription.collect(limit: 100)
     /// ```
-    /// 
+    ///
     /// - Note: This method returns immediately when aggregated EOSE is received (using smart timeout logic from ndk-core)
     public func collect(timeout: TimeInterval = 10.0, limit: Int? = nil) async -> [T] {
         var collected: [T] = []
@@ -546,13 +545,13 @@ public final class NDKSubscription<T> {
     /// ## Usage
     /// ```swift
     /// let subscription = ndk.subscribe(filter: NDKFilter(kinds: [1]))
-    /// 
+    ///
     /// // Later, update to show only events from specific authors
     /// await subscription.updateFilter(NDKFilter(kinds: [1], authors: ["pubkey1", "pubkey2"]))
     /// ```
     public func updateFilter(_ newFilter: NDKFilter) async {
         // Update the filter property
-        self.filter = newFilter
+        filter = newFilter
 
         // Cancel current task
         task?.cancel()
@@ -628,7 +627,7 @@ public final class NDKSubscription<T> {
 
         // Process events from the nested subscription
         for await event in subscription.events {
-            await self.handleEvent(event)
+            await handleEvent(event)
         }
     }
 }

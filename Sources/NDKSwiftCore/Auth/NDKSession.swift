@@ -28,7 +28,6 @@ public struct NDKSession: Codable, Identifiable, Sendable {
     /// User's public key (hex format)
     public let pubkey: String
 
-
     /// Signer type identifier (used for deserialization)
     /// nil indicates a read-only session without signing capabilities
     public let signerType: String?
@@ -41,7 +40,6 @@ public struct NDKSession: Codable, Identifiable, Sendable {
 
     /// Whether this is the currently active session
     public var isActive: Bool
-
 
     // MARK: - Security Settings
 
@@ -70,12 +68,12 @@ public struct NDKSession: Codable, Identifiable, Sendable {
         isHardwareBacked: Bool = false,
         autoLockTimeout: TimeInterval? = nil
     ) {
-        self.id = "\(pubkey):\(signerType ?? "readonly")"
+        id = "\(pubkey):\(signerType ?? "readonly")"
         self.pubkey = pubkey
         self.signerType = signerType
-        self.createdAt = Date()
-        self.lastUsed = Date()
-        self.isActive = false
+        createdAt = Date()
+        lastUsed = Date()
+        isActive = false
         self.requiresBiometric = requiresBiometric
         self.isHardwareBacked = isHardwareBacked
         self.autoLockTimeout = autoLockTimeout
@@ -88,7 +86,7 @@ public struct NDKSession: Codable, Identifiable, Sendable {
         try? Bech32.npub(from: pubkey)
     }
 
-/// Short identifier for UI display
+    /// Short identifier for UI display
     public var shortIdentifier: String {
         if let npub = npub {
             return StringFormatHelpers.truncate(npub, maxLength: 16)
@@ -115,12 +113,12 @@ public struct NDKSession: Codable, Identifiable, Sendable {
 
         return components.isEmpty ? "Standard" : components.joined(separator: ", ")
     }
-    
+
     /// Whether this is a read-only session (no signer)
     public var isReadOnly: Bool {
         signerType == nil
     }
-    
+
     /// Whether this session can sign events
     public var canSign: Bool {
         !isReadOnly
@@ -143,7 +141,6 @@ public struct NDKSession: Codable, Identifiable, Sendable {
     public mutating func updateLastUsed() {
         lastUsed = Date()
     }
-
 
     // MARK: - Validation
 
@@ -194,11 +191,11 @@ public enum NDKSessionError: LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .invalidPubkey(let pubkey):
+        case let .invalidPubkey(pubkey):
             return "Invalid public key format: \(pubkey)"
-        case .invalidSignerType(let type):
+        case let .invalidSignerType(type):
             return "Invalid signer type: \(type)"
-        case .invalidAutoLockTimeout(let timeout):
+        case let .invalidAutoLockTimeout(timeout):
             return "Auto-lock timeout must be positive: \(timeout)"
         case .sessionExpired:
             return "Session has expired"
@@ -212,24 +209,24 @@ public enum NDKSessionError: LocalizedError {
 
 // MARK: - Session Collection Helpers
 
-extension Array where Element == NDKSession {
+public extension Array where Element == NDKSession {
     /// Get the currently active session
-    public var activeSession: NDKSession? {
+    var activeSession: NDKSession? {
         first { $0.isActive }
     }
 
     /// Get sessions sorted by last used (most recent first)
-    public var sortedByLastUsed: [NDKSession] {
+    var sortedByLastUsed: [NDKSession] {
         sorted { $0.lastUsed > $1.lastUsed }
     }
 
     /// Get sessions that require biometric authentication
-    public var biometricSessions: [NDKSession] {
+    var biometricSessions: [NDKSession] {
         filter { $0.requiresBiometric }
     }
 
     /// Get hardware-backed sessions
-    public var hardwareBackedSessions: [NDKSession] {
+    var hardwareBackedSessions: [NDKSession] {
         filter { $0.isHardwareBacked }
     }
 }

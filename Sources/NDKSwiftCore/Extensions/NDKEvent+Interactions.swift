@@ -1,6 +1,5 @@
 /// Extensions for NDKEvent to handle user interactions (NIP-09, NIP-18, NIP-25)
 public extension NDKEvent {
-
     // MARK: - NIP-18: Reposts
 
     /// Create a repost of this event
@@ -18,12 +17,12 @@ public extension NDKEvent {
     /// - Adds appropriate tags (e, p, and k for non-text events)
     func repost(signer: NDKSigner, ndk: NDK) async throws -> NDKEvent {
         // Determine repost kind based on original event kind
-        let repostKind = self.kind == EventKind.textNote ? EventKind.repost : EventKind.genericRepost
+        let repostKind = kind == EventKind.textNote ? EventKind.repost : EventKind.genericRepost
 
         // Set content to JSON stringified event (unless it's protected)
         let content: String
-        if !self.isProtected {
-            content = (try? self.serialize()) ?? ""
+        if !isProtected {
+            content = (try? serialize()) ?? ""
         } else {
             content = ""
         }
@@ -31,12 +30,12 @@ public extension NDKEvent {
         var builder = await NDKEventBuilder(ndk: ndk)
             .content(content)
             .kind(repostKind)
-            .tagUser(self.pubkey)
+            .tagUser(pubkey)
             .tagEvent(self)
 
         // For non-text events, add k tag with original kind
-        if self.kind != EventKind.textNote {
-            builder = builder.tag(["k", String(self.kind)])
+        if kind != EventKind.textNote {
+            builder = builder.tag(["k", String(kind)])
         }
 
         return try await builder.build(signer: signer)
@@ -52,7 +51,7 @@ public extension NDKEvent {
     /// - Returns: The created quote repost event
     func quoteRepost(comment: String, signer: NDKSigner, ndk: NDK) async throws -> NDKEvent {
         // Create nevent/note reference
-        let reference = try self.encode()
+        let reference = try encode()
         let fullContent = "\(comment)\n\n\(NostrConstants.nostrPrefix)\(reference)"
 
         // Create quote repost as a text note with q tag
@@ -79,8 +78,8 @@ public extension NDKEvent {
         let builder = await NDKEventBuilder(ndk: ndk)
             .content(content)
             .kind(EventKind.reaction)
-            .tagUser(self.pubkey)
-            .tag(["k", String(self.kind)])
+            .tagUser(pubkey)
+            .tag(["k", String(kind)])
             .tagEvent(self)
 
         return try await builder.build(signer: signer)
@@ -111,12 +110,12 @@ public extension NDKEvent {
         let builder = await NDKEventBuilder(ndk: ndk)
             .content(reason)
             .kind(EventKind.deletion)
-            .tag(["k", String(self.kind)])
+            .tag(["k", String(kind)])
             .tagEvent(self)
 
         return try await builder.build(signer: signer)
     }
-    
+
     /// Delete this event by creating and publishing a deletion request
     ///
     /// - Parameters:

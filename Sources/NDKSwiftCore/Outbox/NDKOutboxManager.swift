@@ -18,7 +18,7 @@ public struct RelayDiscoveryEvent: Sendable {
     public let writeRelays: Set<RelayURL>
     public let source: RelayListSource
     public let timestamp: Date
-    
+
     public init(
         pubkey: String,
         readRelays: Set<RelayURL>,
@@ -72,52 +72,55 @@ public struct RelayDiscovery: Sendable {
 /// ```
 public actor NDKOutboxManager: RelayPreferenceProvider {
     // MARK: - Constants
-    
+
     /// Default TTL for positive cache entries (24 hours)
     static let positiveEntryTTL: TimeInterval = TimeConstants.day
-    
+
     /// Default TTL for negative cache entries (1 hour)
     static let negativeEntryTTL: TimeInterval = TimeConstants.hour
-    
+
     /// Default in-memory cache capacity
     static let defaultCapacity = NetworkConstants.outboxTrackerCapacity
-    
+
     // MARK: - Properties
-    
+
     private let ndk: NDK
     private var ranker: NDKRelayRanker {
         ndk.relayRanker
     }
+
     private var selector: NDKRelaySelector {
         ndk.relaySelector
     }
+
     private var publishingStrategy: NDKPublishingStrategy {
         ndk.publishingStrategy
     }
+
     private let lookupTracker: RelayListLookupTracker
-    
+
     // MARK: - Cache Implementation (merged from tracker)
-    
+
     private let memoryCache: LRUCache<String, CachedRelayPreference>
     private let blacklistedRelays: Set<String>
-    
+
     /// Track pending fetches to avoid duplicate requests
     private var pendingFetches: [String: Task<NDKOutboxItem?, Error>] = [:]
-    
+
     // Stream for relay discoveries
     private var discoveryStream: AsyncStream<RelayDiscovery>?
     private var discoveryContinuation: AsyncStream<RelayDiscovery>.Continuation?
-    
+
     /// Stream of relay discoveries (internal format from tracker)
     public let relayDiscoveriesInternal: AsyncStream<RelayDiscoveryEvent>
     private let relayDiscoveryInternalContinuation: AsyncStream<RelayDiscoveryEvent>.Continuation
-    
+
     /// Cached relay preference with metadata
     private struct CachedRelayPreference {
-        let item: NDKOutboxItem?  // nil = negative cache
+        let item: NDKOutboxItem? // nil = negative cache
         let fetchedAt: Date
         let expiresAt: Date
-        let checkedRelays: Set<String>?  // For negative entries only
+        let checkedRelays: Set<String>? // For negative entries only
     }
 
     init(
@@ -126,25 +129,25 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         blacklistedRelays: Set<String> = []
     ) {
         self.ndk = ndk
-        self.lookupTracker = RelayListLookupTracker()
-        self.memoryCache = LRUCache(capacity: capacity, defaultTTL: Self.positiveEntryTTL)
+        lookupTracker = RelayListLookupTracker()
+        memoryCache = LRUCache(capacity: capacity, defaultTTL: Self.positiveEntryTTL)
         self.blacklistedRelays = blacklistedRelays
-        
+
         // Set up discovery stream (public format)
         let (stream, continuation) = AsyncStream<RelayDiscovery>.makeStream()
-        self.discoveryStream = stream
-        self.discoveryContinuation = continuation
-        
+        discoveryStream = stream
+        discoveryContinuation = continuation
+
         // Set up internal discovery stream (from tracker)
         var internalContinuation: AsyncStream<RelayDiscoveryEvent>.Continuation!
-        self.relayDiscoveriesInternal = AsyncStream { cont in
+        relayDiscoveriesInternal = AsyncStream { cont in
             internalContinuation = cont
         }
-        self.relayDiscoveryInternalContinuation = internalContinuation
+        relayDiscoveryInternalContinuation = internalContinuation
     }
 
     // MARK: - Public API
-    
+
     /// Stream of relay discoveries as they happen
     public var relayDiscoveries: AsyncStream<RelayDiscovery> {
         discoveryStream ?? AsyncStream { _ in }
@@ -191,7 +194,7 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
     /// ```swift
     /// let filter = NDKFilter(authors: [alicePubkey], kinds: [1])
     /// let dataSource = await outbox.subscribe(filter: filter, maxAge: 3600)
-    /// 
+    ///
     /// for await event in dataSource {
     ///     print("New event from Alice: \(event.content)")
     /// }
@@ -242,7 +245,7 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
     /// ```swift
     /// // Start tracking a user's relays
     /// await outbox.trackUser(bobPubkey)
-    /// 
+    ///
     /// // Now publishing to Bob will use his preferred relays
     /// let event = NDKEvent(content: "Hello Bob!", kind: 1)
     /// event.tags = [["p", bobPubkey]]
@@ -263,7 +266,6 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
             )
         }
     }
-
 
     /// Gets the current performance score for a relay.
     ///
@@ -353,7 +355,7 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
     /// ```swift
     /// let filter = NDKFilter(authors: [alice, bob, charlie], kinds: [1])
     /// let strategy = await outbox.getOutboxStrategy(for: filter)
-    /// 
+    ///
     /// // Use the optimized filters
     /// for (relay, optimizedFilter) in strategy.filtersByRelay {
     ///     print("Query \(relay) for \(optimizedFilter.authors?.count ?? 0) authors")
@@ -364,7 +366,7 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
     public func getOutboxStrategy(for filter: NDKFilter) async -> OutboxFilterStrategy {
         guard let authors = filter.authors, !authors.isEmpty else {
             NDKLogger.log(.debug, category: .outbox, "📡 No authors in filter, no outbox strategy needed")
-            
+
             return OutboxFilterStrategy(
                 filtersByRelay: [:],
                 unknownAuthors: [],
@@ -373,7 +375,7 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         }
 
         NDKLogger.log(.info, category: .outbox, "📡 Building outbox strategy for \(authors.count) authors")
-        
+
         var filtersByRelay: [RelayURL: NDKFilter] = [:]
         var unknownAuthors = Set<String>()
         var authorsToDiscover = Set<String>()
@@ -415,7 +417,7 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         }
 
         NDKLogger.log(.info, category: .outbox, "📊 Relay mapping: \(unknownAuthors.count) unknown authors, \(authorsToDiscover.count) to discover")
-        
+
         // Log current state of relayToAuthors before adding unknown authors
         if NDKLogger.logLevel >= .debug && !relayToAuthors.isEmpty {
             NDKLogger.log(.debug, category: .outbox, "📋 Current relayToAuthors mapping before adding unknown authors:")
@@ -431,7 +433,7 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
             // Normalize outbox relay URLs to match the format of connected relays
             let normalizedOutboxRelays = Set(ndk.outboxConfig.outboxRelays.map { $0.normalizedRelayURL })
             let explicitRelays = allConnectedRelays.subtracting(normalizedOutboxRelays)
-            
+
             NDKLogger.log(.debug, category: .outbox, "🔍 Relay filtering details:")
             NDKLogger.log(.debug, category: .outbox, "  - Connected relays: \(allConnectedRelays.sorted())")
             NDKLogger.log(.debug, category: .outbox, "  - Outbox config relays (raw): \(ndk.outboxConfig.outboxRelays.sorted())")
@@ -472,7 +474,7 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         guard !authors.isEmpty else { return }
 
         NDKLogger.log(.info, category: .outbox, "🔍 Starting background relay discovery for \(authors.count) authors")
-        
+
         Task {
             // Create filter for relay lists
             // Do NOT set a limit - this prevents filter aggregation
@@ -484,18 +486,18 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
             // Determine which relays to use for discovery
             let relaysToUse: Set<RelayURL>
             let connectedRelays = await ndk.pool.connectedRelayURLs
-            
+
             if !ndk.outboxConfig.outboxRelays.isEmpty {
                 // Check if any outbox relays are connected (normalize for comparison)
                 let normalizedOutboxRelays = Set(ndk.outboxConfig.outboxRelays.map { $0.normalizedRelayURL })
                 let connectedOutboxRelays = normalizedOutboxRelays.intersection(connectedRelays)
-                
+
                 NDKLogger.log(.debug, category: .outbox, "🔍 Checking outbox relay connectivity:")
                 NDKLogger.log(.debug, category: .outbox, "  - Configured outbox relays (raw): \(ndk.outboxConfig.outboxRelays.sorted())")
                 NDKLogger.log(.debug, category: .outbox, "  - Configured outbox relays (normalized): \(normalizedOutboxRelays.sorted())")
                 NDKLogger.log(.debug, category: .outbox, "  - Connected relays: \(connectedRelays.sorted())")
                 NDKLogger.log(.debug, category: .outbox, "  - Intersection: \(connectedOutboxRelays.sorted())")
-                
+
                 if !connectedOutboxRelays.isEmpty {
                     // Use connected outbox relays
                     relaysToUse = connectedOutboxRelays
@@ -514,12 +516,12 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
                 relaysToUse = connectedRelays
                 NDKLogger.log(.debug, category: .outbox, "📡 No outbox relays configured, using \(connectedRelays.count) connected relays for discovery")
             }
-            
+
             // Create data source for relay list discovery
             // Generate a short subscription ID by taking prefix of first author and adding count
             let shortAuthorsId = authors.first.map { String($0.prefix(8)) } ?? "unknown"
             let subscriptionId = "relay_disc_\(shortAuthorsId)_\(authors.count)"
-            
+
             let dataSource = NDKSubscription(
                 ndk: ndk,
                 filter: relayListFilter,
@@ -537,14 +539,14 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
     }
 
     /// Process a relay list event and update tracking
-    internal func processRelayListEvent(_ event: NDKEvent) async {
+    func processRelayListEvent(_ event: NDKEvent) async {
         guard event.kind == EventKind.relayList else { return }
 
         NDKLogger.log(.debug, category: .outbox, "📋 Processing relay list for \(event.pubkey.prefix(StringConstants.DisplayFormatting.hexPrefixLength))")
 
         // Use NDKRelayList to parse the event - single source of truth
         let relayList = NDKRelayList.fromEvent(event)
-        
+
         let readRelayUrls = Set(relayList.readRelays.map { $0.url })
         let writeRelayUrls = Set(relayList.writeRelays.map { $0.url })
 
@@ -557,13 +559,13 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         )
 
         NDKLogger.log(.info, category: .outbox, "✅ Updated relay info for \(event.pubkey.prefix(StringConstants.DisplayFormatting.hexPrefixLength)): \(readRelayUrls.count) read, \(writeRelayUrls.count) write")
-        
+
         // Log specific relays discovered
         if NDKLogger.logLevel >= .debug {
             NDKLogger.log(.debug, category: .outbox, "📋 Read relays: \(readRelayUrls.sorted())")
             NDKLogger.log(.debug, category: .outbox, "📋 Write relays: \(writeRelayUrls.sorted())")
         }
-        
+
         // Emit relay discovery event
         let allRelays = readRelayUrls.union(writeRelayUrls)
         if !allRelays.isEmpty {
@@ -575,14 +577,14 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
             discoveryContinuation?.yield(discovery)
         }
     }
-    
+
     /// Stop tracking a user for outbox operations
     /// - Parameter pubkey: The public key of the user to stop tracking
-    public func untrackUser(_ pubkey: String) async {
+    public func untrackUser(_: String) async {
         // Remove from tracker cache
         await clear() // For now, just clear - in future could implement selective removal
     }
-    
+
     /// Get relay update statistics
     /// - Returns: Current statistics about relay updates and subscriptions
     public func getRelayUpdateStats() async -> RelayUpdateStats {
@@ -593,7 +595,7 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
             totalUpdateSubscriptions: 0
         )
     }
-    
+
     /// Stream of relay updates
     public var relayUpdates: AsyncStream<RelayUpdateEvent> {
         // Convert RelayDiscoveryEvent to RelayUpdateEvent
@@ -612,9 +614,9 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
             }
         }
     }
-    
+
     // MARK: - Cache Methods
-    
+
     /// Get relay information for a user
     public func getRelaysFor(
         pubkey: String,
@@ -667,7 +669,7 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         let result = try await fetchTask.value
         return result.flatMap { filterByType($0, type: type) }
     }
-    
+
     /// Get relay information synchronously from cache only
     public func getRelaysSyncFor(
         pubkey: String,
@@ -677,7 +679,7 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
               let item = cached.item else { return nil }
         return filterByType(item, type: type)
     }
-    
+
     /// Get all cached outbox items
     public func getAllCachedItems() async -> [NDKOutboxItem] {
         var items: [NDKOutboxItem] = []
@@ -687,14 +689,15 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         for key in allKeys {
             if let cached = await memoryCache.get(key),
                let item = cached.item,
-               Date() <= cached.expiresAt {
+               Date() <= cached.expiresAt
+            {
                 items.append(item)
             }
         }
 
         return items
     }
-    
+
     /// Track a user's relay information
     public func track(
         pubkey: String,
@@ -706,7 +709,7 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         // Filter out blacklisted relays
         let filteredReadRelays = readRelays.subtracting(blacklistedRelays)
         let filteredWriteRelays = writeRelays.subtracting(blacklistedRelays)
-        
+
         let readRelayInfos = filteredReadRelays
             .map { RelayInfo(url: $0) }
 
@@ -726,7 +729,7 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
             expiresAt: Date().addingTimeInterval(Self.positiveEntryTTL),
             checkedRelays: nil
         ))
-        
+
         // Emit discovery event only if requested
         if emitDiscoveryEvent {
             let discoveryEvent = RelayDiscoveryEvent(
@@ -736,24 +739,24 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
                 source: source
             )
             relayDiscoveryInternalContinuation.yield(discoveryEvent)
-            
+
             NDKLogger.log(.debug, category: .outbox, "📡 Emitted relay discovery for \(pubkey.prefix(8)): \(filteredReadRelays.count) read, \(filteredWriteRelays.count) write relays")
         }
     }
-    
+
     /// Clear the cache
     public func clear() async {
         await memoryCache.clear()
         pendingFetches.removeAll()
     }
-    
+
     /// Clean up expired entries
     public func cleanupExpired() async {
         await memoryCache.cleanupExpired()
     }
-    
+
     // MARK: - Private Cache Methods
-    
+
     private func checkMemoryCache(pubkey: String, maxAge: TimeInterval) async -> CachedRelayPreference? {
         guard let cached = await memoryCache.get(pubkey) else { return nil }
 
@@ -878,7 +881,7 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         var relayListEvent: NDKEvent?
 
         NDKLogger.log(.info, category: .outbox, "🔍 Fetching relay list (10002) for \(pubkey.prefix(8))...")
-        
+
         let filter = NDKFilter(
             authors: [pubkey],
             kinds: [EventKind.relayList]
@@ -886,11 +889,11 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
 
         // Determine which relays to use for fetching relay lists
         let relaysToUse: Set<String>
-        
+
         // Check if outbox relays are connected
         let connectedRelays = await ndk.pool.connectedRelayURLs
         let connectedOutboxRelays = ndk.outboxConfig.outboxRelays.intersection(connectedRelays)
-        
+
         if !connectedOutboxRelays.isEmpty {
             // Use connected outbox relays
             relaysToUse = connectedOutboxRelays
@@ -927,7 +930,7 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
             // Task 2: Track EOSE
             group.addTask {
                 for await update in dataSource.relayUpdates {
-                    if case .eose(let relay) = update {
+                    if case let .eose(relay) = update {
                         eoseRelays.insert(relay)
                     }
                 }
@@ -952,12 +955,12 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         }
 
         NDKLogger.log(.info, category: .outbox, "📬 Found relay list (10002) for \(pubkey.prefix(8))... created at: \(Date(timeIntervalSince1970: TimeInterval(event.createdAt)))")
-        
+
         // Debug log the actual event tags
         NDKLogger.log(.debug, category: .outbox, "📋 Event tags: \(event.tags)")
 
         let relayList = NDKRelayList.fromEvent(event)
-        
+
         NDKLogger.log(.debug, category: .outbox, "📝 Raw relay list data - Read: \(relayList.readRelays.map { $0.url }), Write: \(relayList.writeRelays.map { $0.url })")
 
         let readRelayUrls = Set(relayList.readRelays.map { $0.url })
@@ -978,7 +981,7 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
             writeRelays: Set(writeRelayInfos),
             source: .nip65
         )
-        
+
         NDKLogger.log(.info, category: .outbox, "✅ Processed relay list for \(pubkey.prefix(8))... - \(readRelayUrls.count) read relays, \(writeRelayUrls.count) write relays")
 
         return (item, eoseRelays)

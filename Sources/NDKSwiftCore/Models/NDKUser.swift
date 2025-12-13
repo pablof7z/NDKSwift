@@ -34,18 +34,15 @@ public final class NDKUser: Equatable, Hashable, Sendable {
         await stateActor.setNdk(ndk)
     }
 
-
     /// Relay list (NIP-65)
     public var relayList: [NDKRelayInfo] {
         get async { await stateActor.getRelayList() }
     }
 
-
     /// NIP-46 relay URLs (for remote signing)
     public var nip46Urls: [String]? {
         get async { await stateActor.getNip46Urls() }
     }
-
 
     // MARK: - Initialization
 
@@ -74,7 +71,8 @@ public final class NDKUser: Equatable, Hashable, Sendable {
 
         // Restore NIP-46 URLs if available
         if let cached = await ndk.cache.getNIP05Entry(nip05.lowercased()),
-           let nip46Relays = cached.nip46Relays {
+           let nip46Relays = cached.nip46Relays
+        {
             await user.stateActor.setNip46Urls(nip46Relays)
         }
 
@@ -82,8 +80,6 @@ public final class NDKUser: Equatable, Hashable, Sendable {
     }
 
     // MARK: - Profile Management
-
-
 
     /// Fetch user's relay list (NIP-65)
     @discardableResult
@@ -234,7 +230,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
     ///   - comment: Optional comment for the payment
     ///   - tags: Optional additional tags
     /// - Returns: Payment confirmation
-    public func pay(amount: Int64, comment: String? = nil, tags: [[String]]? = nil) async throws -> PaymentConfirmation {
+    public func pay(amount _: Int64, comment _: String? = nil, tags _: [[String]]? = nil) async throws -> PaymentConfirmation {
         guard await ndk != nil else {
             throw NDKError.configurationError(ErrorMessageConstants.Messages.ndkInstanceNotSet)
         }
@@ -242,6 +238,4 @@ public final class NDKUser: Equatable, Hashable, Sendable {
         // Payment routing will be implemented when wallet integration is complete
         throw NDKError.failedTo("route payment", message: "Not yet implemented")
     }
-
 }
-

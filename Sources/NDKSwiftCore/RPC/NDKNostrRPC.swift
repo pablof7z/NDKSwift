@@ -47,16 +47,16 @@ public actor NDKNostrRPC {
         self.localSigner = localSigner
         self.relayUrls = relayUrls
     }
-    
+
     deinit {
         // Cancel all pending timeout tasks
         timeoutTasks.values.forEach { $0.cancel() }
         timeoutTasks.removeAll()
-        
+
         // Resolve any pending continuations with a cancellation error
         pendingRequests.values.forEach { $0.resume(throwing: NDKError.cancelled) }
         pendingRequests.removeAll()
-        
+
         NDKLogger.log(.debug, category: .auth, "NDKNostrRPC deinitialized")
     }
 
@@ -84,7 +84,8 @@ public actor NDKNostrRPC {
         let id = json["id"] as? String ?? ""
 
         if let method = json["method"] as? String,
-           let params = json["params"] as? [String] {
+           let params = json["params"] as? [String]
+        {
             return NDKRPCRequest(
                 id: id,
                 pubkey: event.pubkey,
@@ -121,7 +122,7 @@ public actor NDKNostrRPC {
         let request: [String: Any] = [
             "id": id,
             "method": method,
-            "params": params
+            "params": params,
         ]
 
         let requestData = try JSONSerialization.data(withJSONObject: request)
@@ -151,7 +152,7 @@ public actor NDKNostrRPC {
         NDKLogger.log(.info, category: .auth, "Published to relays: \(publishedRelays.map { $0.url })")
 
         // If publishing to specific relays failed, try direct send as fallback
-        if !relayUrls.isEmpty && publishedRelays.isEmpty {
+        if !relayUrls.isEmpty, publishedRelays.isEmpty {
             NDKLogger.log(.warning, category: .auth, "\(ErrorMessageConstants.failedTo("publish to any relay"))! Attempting direct send fallback...")
             await attemptDirectSend(event: event, to: relayUrls)
         }
@@ -226,7 +227,7 @@ public actor NDKNostrRPC {
             continuation.resume(throwing: NDKError.timeout(operation: "RPC request", seconds: Int(NetworkConstants.timeoutRPCRequest)))
         }
     }
-    
+
     private func cleanupRequest(id: String) async {
         pendingRequests.removeValue(forKey: id)
         timeoutTasks[id]?.cancel()

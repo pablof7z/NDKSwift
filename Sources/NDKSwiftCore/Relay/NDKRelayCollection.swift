@@ -11,7 +11,7 @@ import Observation
 /// ```swift
 /// struct RelayStatusView: View {
 ///     @ObservedObject var relayCollection: NDKRelayCollection
-///     
+///
 ///     var body: some View {
 ///         List(relayCollection.relays) { relay in
 ///             HStack {
@@ -40,8 +40,8 @@ public final class NDKRelayCollection {
         public var lastError: String?
 
         init(relay: NDKRelay, state: NDKRelayConnectionState) {
-            self.id = relay.url
-            self.url = relay.url
+            id = relay.url
+            url = relay.url
             self.state = state
         }
     }
@@ -132,7 +132,7 @@ public final class NDKRelayCollection {
         let task = Task { @MainActor in
             for await state in relay.stateStream {
                 // Extract error message if state is failed
-                let errorMessage: String? = if case .failed(let message) = state.connectionState {
+                let errorMessage: String? = if case let .failed(message) = state.connectionState {
                     message
                 } else {
                     nil
@@ -244,13 +244,13 @@ public final class NDKRelayCollection {
             // Listen for relay pool changes
             for await change in relayChangesStream {
                 switch change {
-                case .relayAdded(let relay):
+                case let .relayAdded(relay):
                     await handleRelayAdded(relay)
 
-                case .relayRemoved(let url):
+                case let .relayRemoved(url):
                     await handleRelayRemoved(url)
 
-                case .relayConnected(_), .relayDisconnected(_):
+                case .relayConnected(_), .relayDisconnected:
                     // State changes are already handled by individual relay observers
                     // Pool events are primarily for external consumers like NostrManager
                     break

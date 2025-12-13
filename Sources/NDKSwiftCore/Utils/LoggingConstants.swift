@@ -1,6 +1,5 @@
 /// Common logging constants for consistent log formatting
 public enum LoggingConstants {
-
     // MARK: - Log Prefixes (Emoji indicators for quick visual scanning)
 
     /// Success indicator

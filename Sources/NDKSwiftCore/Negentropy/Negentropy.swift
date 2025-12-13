@@ -1,5 +1,5 @@
-import Foundation
 import CryptoKit
+import Foundation
 
 // Protocol constants
 enum NegentropyConstants {
@@ -206,7 +206,6 @@ public actor Negentropy {
             }
         }
 
-
         let storageSize = try await storage.size()
         var prevBound = NegentropyBound(timestamp: 0)
         var prevIndex = 0
@@ -265,7 +264,7 @@ public actor Negentropy {
                 NDKLogger.log(.debug, category: .sync, "[Negentropy] Received ID list with \(numIds) IDs (isInitiator=\(isInitiator))")
 
                 var theirIds = Set<Data>()
-                for i in 0..<numIds {
+                for i in 0 ..< numIds {
                     guard let id = input.readBytes(NegentropyConstants.idSize) else {
                         throw NegentropyError.decodingError
                     }
@@ -300,7 +299,7 @@ public actor Negentropy {
                     var numResponseIds = 0
                     var endBound = currBound
 
-                    try await storage.iterate(lower, upper) { item, index in
+                    try await storage.iterate(lower, upper) { item, _ in
                         if exceededFrameSizeLimit(fullOutput.count + responseIds.count) {
                             endBound = NegentropyBound(timestamp: item.timestamp, id: item.id)
                             return false
@@ -378,7 +377,7 @@ public actor Negentropy {
             let bucketsWithExtra = numElems % buckets
             var curr = lower
 
-            for i in 0..<buckets {
+            for i in 0 ..< buckets {
                 let bucketSize = itemsPerBucket + (i < bucketsWithExtra ? 1 : 0)
                 let ourFingerprint = try await storage.fingerprint(curr, curr + bucketSize)
                 curr += bucketSize
@@ -418,7 +417,7 @@ public actor Negentropy {
             return NegentropyBound(timestamp: curr.timestamp)
         } else {
             var sharedPrefixBytes = 0
-            for i in 0..<min(prev.id.count, curr.id.count) {
+            for i in 0 ..< min(prev.id.count, curr.id.count) {
                 if prev.id[i] != curr.id[i] { break }
                 sharedPrefixBytes += 1
             }
@@ -465,7 +464,7 @@ public actor Negentropy {
 
         bytes.reverse()
 
-        for i in 0..<bytes.count - 1 {
+        for i in 0 ..< bytes.count - 1 {
             bytes[i] |= 128
         }
 
@@ -550,7 +549,8 @@ extension NegentropyStorage {
 
             let item = items[mid]
             if item.timestamp < bound.timestamp ||
-               (item.timestamp == bound.timestamp && compareData(item.id, bound.id) < 0) {
+                (item.timestamp == bound.timestamp && compareData(item.id, bound.id) < 0)
+            {
                 low = mid + 1
             } else {
                 high = mid
@@ -562,7 +562,7 @@ extension NegentropyStorage {
 
     func fingerprint(_ lower: Int, _ upper: Int) async throws -> Data {
         let items = try await getItems(in: NegentropyRange(lower: nil, upper: nil, fingerprint: Data(), count: 0))
-        let rangeItems = Array(items[lower..<min(upper, items.count)])
+        let rangeItems = Array(items[lower ..< min(upper, items.count)])
 
         let accumulator = NegentropyAccumulator.from(rangeItems)
         return accumulator.fingerprint().prefix(NegentropyConstants.fingerprintSize)
@@ -571,7 +571,7 @@ extension NegentropyStorage {
     func iterate(_ lower: Int, _ upper: Int, _ callback: (NegentropyItem, Int) async throws -> Bool) async throws {
         let items = try await getItems(in: NegentropyRange(lower: nil, upper: nil, fingerprint: Data(), count: 0))
 
-        for i in lower..<min(upper, items.count) {
+        for i in lower ..< min(upper, items.count) {
             let shouldContinue = try await callback(items[i], i)
             if !shouldContinue { break }
         }
@@ -580,7 +580,7 @@ extension NegentropyStorage {
     func iterate(_ lower: Int, _ upper: Int, _ callback: (NegentropyItem) async throws -> Bool) async throws {
         let items = try await getItems(in: NegentropyRange(lower: nil, upper: nil, fingerprint: Data(), count: 0))
 
-        for i in lower..<min(upper, items.count) {
+        for i in lower ..< min(upper, items.count) {
             let shouldContinue = try await callback(items[i])
             if !shouldContinue { break }
         }
@@ -607,7 +607,7 @@ func compareData(_ a: Data, _ b: Data) -> Int {
     let aBytes = Array(a)
     let bBytes = Array(b)
 
-    for i in 0..<minLength {
+    for i in 0 ..< minLength {
         if aBytes[i] < bBytes[i] { return -1 }
         if aBytes[i] > bBytes[i] { return 1 }
     }
@@ -645,7 +645,7 @@ struct DataReader {
 
     mutating func readBytes(_ count: Int) -> Data? {
         guard position + count <= data.count else { return nil }
-        let bytes = data[position..<position + count]
+        let bytes = data[position ..< position + count]
         position += count
         return bytes
     }

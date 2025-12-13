@@ -19,7 +19,7 @@ import Foundation
 ///       .content("Hello, Nostr!")
 ///       .tags([["t", "greeting"]])
 /// }
-/// 
+///
 /// // Accessing event properties
 /// print("Event ID: \(event.id)")
 /// print("Author: \(event.pubkey)")
@@ -46,7 +46,6 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
 
     /// Event signature
     public let sig: Signature
-
 
     // MARK: - Initialization
 
@@ -78,7 +77,7 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
         let id = try GuardHelpers.unwrap(
-            try container.decodeIfPresent(String.self, forKey: .id),
+            container.decodeIfPresent(String.self, forKey: .id),
             error: NDKError.invalidEventID("Event ID is required")
         )
 
@@ -89,7 +88,7 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
         let content = try container.decode(String.self, forKey: .content)
 
         let sig = try GuardHelpers.unwrap(
-            try container.decodeIfPresent(String.self, forKey: .sig),
+            container.decodeIfPresent(String.self, forKey: .sig),
             error: NDKError.invalidSignature("Event signature is required")
         )
 
@@ -173,7 +172,7 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
             createdAt,
             kind,
             tags,
-            content
+            content,
         ]
 
         return try JSONCoding.serializeToString(array)
@@ -257,7 +256,6 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
             return false
         }
     }
-
 
     // MARK: - Convenience
 
@@ -348,7 +346,7 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
             NostrConstants.JSONField.kind: kind,
             NostrConstants.JSONField.tags: tags,
             NostrConstants.JSONField.content: content,
-            NostrConstants.JSONField.sig: sig
+            NostrConstants.JSONField.sig: sig,
         ]
     }
 
@@ -415,5 +413,4 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
         // Use nevent if the event has non-standard kind or has important tags
         return kind != EventKind.textNote || !referencedEventIds.isEmpty || !referencedPubkeys.isEmpty
     }
-
 }

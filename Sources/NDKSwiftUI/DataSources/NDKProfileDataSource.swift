@@ -1,7 +1,7 @@
 import Foundation
 import NDKSwiftCore
-import SwiftUI
 import Observation
+import SwiftUI
 
 // MARK: - NDKProfileDataSource
 
@@ -34,7 +34,6 @@ import Observation
 @Observable
 @MainActor
 public final class NDKProfileDataSource: @preconcurrency NDKSubscriptionProtocol {
-
     // MARK: - Published Properties
 
     /// The user profile metadata, if available
@@ -65,7 +64,7 @@ public final class NDKProfileDataSource: @preconcurrency NDKSubscriptionProtocol
         self.pubkey = pubkey
 
         // Create data source for profile events (kind:0)
-        self.dataSource = ndk.subscribe(
+        dataSource = ndk.subscribe(
             filter: NDKFilter(
                 authors: [pubkey],
                 kinds: [EventKind.metadata]

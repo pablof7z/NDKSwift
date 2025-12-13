@@ -1,14 +1,14 @@
-import XCTest
-@testable import NDKSwiftCore
-import NDKSwiftCashu
 import CashuSwift
+import NDKSwiftCashu
+@testable import NDKSwiftCore
+import XCTest
 
 final class CashuDepositTests: XCTestCase {
     var ndk: NDK!
     var eventManager: WalletEventManager!
     var mints: MintManager!
     var signer: NDKPrivateKeySigner!
-    
+
     override func setUp() async throws {
         ndk = NDK()
         eventManager = WalletEventManager(ndk: ndk)
@@ -16,14 +16,14 @@ final class CashuDepositTests: XCTestCase {
         // Use a valid 64 character hex string for testing
         signer = try NDKPrivateKeySigner(privateKey: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef")
     }
-    
+
     func testRequestMintQuoteReturnsEventId() async throws {
         // Test that requestMintQuote returns both quote and event ID when persisting
         let mockMintURL = "https://testmint.com"
-        
+
         // Mock the mint manager response
         // Note: In a real test, you'd want to mock the network call
-        
+
         do {
             let (quote, eventId) = try await CashuDeposit.requestMintQuote(
                 amount: 1000,
@@ -33,7 +33,7 @@ final class CashuDepositTests: XCTestCase {
                 persistQuote: true,
                 signer: signer
             )
-            
+
             XCTAssertNotNil(quote)
             XCTAssertNotNil(eventId, "Event ID should be returned when persistQuote is true")
             XCTAssertEqual(quote.amount, 1000)
@@ -43,11 +43,11 @@ final class CashuDepositTests: XCTestCase {
             print("Test failed as expected without mock: \(error)")
         }
     }
-    
+
     func testRequestMintQuoteWithoutPersistReturnsNilEventId() async throws {
         // Test that requestMintQuote returns nil event ID when not persisting
         let mockMintURL = "https://testmint.com"
-        
+
         do {
             let (quote, eventId) = try await CashuDeposit.requestMintQuote(
                 amount: 1000,
@@ -57,7 +57,7 @@ final class CashuDepositTests: XCTestCase {
                 persistQuote: false,
                 signer: nil
             )
-            
+
             XCTAssertNotNil(quote)
             XCTAssertNil(eventId, "Event ID should be nil when persistQuote is false")
         } catch {
@@ -65,7 +65,7 @@ final class CashuDepositTests: XCTestCase {
             print("Test failed as expected without mock: \(error)")
         }
     }
-    
+
     func testMonitorDepositAcceptsQuoteEventId() async throws {
         // Test that monitorDeposit accepts an optional quote event ID
         let quote = CashuMintQuote(
@@ -76,7 +76,7 @@ final class CashuDepositTests: XCTestCase {
             expiry: Date().addingTimeInterval(600),
             requestedAt: Date()
         )
-        
+
         // This should compile without errors
         let stream = CashuDeposit.monitorDeposit(
             quote: quote,
@@ -86,11 +86,11 @@ final class CashuDepositTests: XCTestCase {
             signer: signer,
             timeout: 60,
             quoteAge: 0,
-            onProofsReceived: { proofs in
-                return []
+            onProofsReceived: { _ in
+                []
             }
         )
-        
+
         // Cancel the stream immediately since we're just testing compilation
         var iterator = stream.makeAsyncIterator()
         _ = try? await iterator.next()

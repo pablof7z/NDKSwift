@@ -1,5 +1,5 @@
-import SwiftUI
 import NDKSwiftCore
+import SwiftUI
 
 // MARK: - NDKUIEventAuthorHeader
 
@@ -25,7 +25,6 @@ import NDKSwiftCore
 /// }
 /// ```
 public struct NDKUIEventAuthorHeader: View {
-
     // MARK: - Properties
 
     private let ndk: NDK
@@ -37,9 +36,9 @@ public struct NDKUIEventAuthorHeader: View {
     // MARK: - Supporting Types
 
     public enum Style {
-        case minimal    // Small avatar, name only
-        case standard   // Medium avatar, name + timestamp
-        case detailed   // Large avatar, name + username + timestamp
+        case minimal // Small avatar, name only
+        case standard // Medium avatar, name + timestamp
+        case detailed // Large avatar, name + username + timestamp
     }
 
     // MARK: - Initialization
@@ -193,7 +192,6 @@ public struct NDKUIEventAuthorHeader: View {
 ///     }
 /// ```
 public struct NDKEventInteractionBar: View {
-
     // MARK: - Properties
 
     private let ndk: NDK
@@ -204,14 +202,14 @@ public struct NDKEventInteractionBar: View {
     private var repostAction: ((NDKEvent) -> Void)?
     private var zapAction: ((NDKEvent) -> Void)?
 
-    @State private var reactionCounts: ReactionCounts = ReactionCounts()
+    @State private var reactionCounts: ReactionCounts = .init()
 
     // MARK: - Supporting Types
 
     public enum Style {
-        case minimal    // Icons only, no counts
-        case standard   // Icons with counts
-        case detailed   // Icons with counts and labels
+        case minimal // Icons only, no counts
+        case standard // Icons with counts
+        case detailed // Icons with counts and labels
     }
 
     private struct ReactionCounts {
@@ -361,39 +359,39 @@ private struct InteractionButton: View {
 // MARK: - Preview
 
 #if DEBUG
-struct NDKUIEventAuthorHeader_Previews: PreviewProvider {
-    static var previews: some View {
-        // Create a mock NDK for preview
-        let mockNDK = NDK(relayUrls: [])
-        
-        VStack(spacing: 20) {
-            NDKUIEventAuthorHeader(
-                ndk: mockNDK,
-                pubkey: "sample_pubkey",
-                timestamp: 1640995200,
-                style: .minimal
-            )
+    struct NDKUIEventAuthorHeader_Previews: PreviewProvider {
+        static var previews: some View {
+            // Create a mock NDK for preview
+            let mockNDK = NDK(relayUrls: [])
 
-            NDKUIEventAuthorHeader(
-                ndk: mockNDK,
-                pubkey: "sample_pubkey",
-                timestamp: 1640995200,
-                style: .standard
-            )
+            VStack(spacing: 20) {
+                NDKUIEventAuthorHeader(
+                    ndk: mockNDK,
+                    pubkey: "sample_pubkey",
+                    timestamp: 1_640_995_200,
+                    style: .minimal
+                )
 
-            NDKUIEventAuthorHeader(
-                ndk: mockNDK,
-                pubkey: "sample_pubkey",
-                timestamp: 1640995200,
-                style: .detailed
-            )
+                NDKUIEventAuthorHeader(
+                    ndk: mockNDK,
+                    pubkey: "sample_pubkey",
+                    timestamp: 1_640_995_200,
+                    style: .standard
+                )
 
-            Divider()
+                NDKUIEventAuthorHeader(
+                    ndk: mockNDK,
+                    pubkey: "sample_pubkey",
+                    timestamp: 1_640_995_200,
+                    style: .detailed
+                )
 
-            // Mock interaction bar
-            // NDKEventInteractionBar(event: mockEvent, style: .standard)
+                Divider()
+
+                // Mock interaction bar
+                // NDKEventInteractionBar(event: mockEvent, style: .standard)
+            }
+            .padding()
         }
-        .padding()
     }
-}
 #endif

@@ -1,13 +1,13 @@
-import XCTest
-@testable import NDKSwiftCore
-import NDKSwiftCashu
 import CashuSwift
+import NDKSwiftCashu
+@testable import NDKSwiftCore
+import XCTest
 
 final class CachedMintLoaderTests: XCTestCase {
     var mockCache: MockNDKCache!
     var cachedLoader: CachedMintLoader!
     let testMintURL = URL(string: "https://test.mint.com")!
-    
+
     override func setUp() async throws {
         try await super.setUp()
         mockCache = MockNDKCache()
@@ -17,13 +17,13 @@ final class CachedMintLoaderTests: XCTestCase {
             keysetMaxAge: 1800
         )
     }
-    
+
     override func tearDown() async throws {
         mockCache = nil
         cachedLoader = nil
         try await super.tearDown()
     }
-    
+
     func testLoadMintWithFreshCache() async throws {
         // Given
         let keysetJSON = """
@@ -38,16 +38,16 @@ final class CachedMintLoaderTests: XCTestCase {
         let testKeysets = [testKeyset]
         await mockCache.setMockKeysets(testKeysets, for: testMintURL.absoluteString)
         await mockCache.setMockKeysetsLastUpdated(Date(), for: testMintURL.absoluteString)
-        
+
         // When
         let mint = try await cachedLoader.loadMint(url: testMintURL)
-        
+
         // Then
         XCTAssertEqual(mint.url, testMintURL)
         XCTAssertEqual(mint.keysets.count, 1)
         // XCTAssertEqual(mint.keysets.first?.id, "test-keyset-1") // Keyset may not have id property
     }
-    
+
     func testLoadMintWithStaleCache() async throws {
         // Given
         let keysetJSON = """
@@ -62,8 +62,8 @@ final class CachedMintLoaderTests: XCTestCase {
         let oldKeysets = [testKeyset]
         await mockCache.setMockKeysets(oldKeysets, for: testMintURL.absoluteString)
         // Set last updated to 2 days ago (beyond keyset max age)
-        await mockCache.setMockKeysetsLastUpdated(Date().addingTimeInterval(-172800), for: testMintURL.absoluteString)
-        
+        await mockCache.setMockKeysetsLastUpdated(Date().addingTimeInterval(-172_800), for: testMintURL.absoluteString)
+
         // When/Then - should throw because network call would fail in test
         do {
             _ = try await cachedLoader.loadMint(url: testMintURL)
@@ -72,7 +72,7 @@ final class CachedMintLoaderTests: XCTestCase {
             // Expected - network call fails in test environment
         }
     }
-    
+
     func testLoadMintWithForceRefresh() async throws {
         // Given
         let keysetJSON = """
@@ -87,7 +87,7 @@ final class CachedMintLoaderTests: XCTestCase {
         let cachedKeysets = [testKeyset]
         await mockCache.setMockKeysets(cachedKeysets, for: testMintURL.absoluteString)
         await mockCache.setMockKeysetsLastUpdated(Date(), for: testMintURL.absoluteString)
-        
+
         // When/Then - should throw because network call would fail in test
         do {
             _ = try await cachedLoader.loadMint(url: testMintURL, forceRefresh: true)
@@ -96,7 +96,7 @@ final class CachedMintLoaderTests: XCTestCase {
             // Expected - network call fails in test environment
         }
     }
-    
+
     func testLoadMintInfoWithFreshCache() async throws {
         // Given
         let testMintInfo = NDKMintInfo(
@@ -119,7 +119,7 @@ final class CachedMintLoaderTests: XCTestCase {
                             unit: "sat",
                             minAmount: nil,
                             maxAmount: nil
-                        )
+                        ),
                     ],
                     disabled: false
                 ),
@@ -133,16 +133,16 @@ final class CachedMintLoaderTests: XCTestCase {
         )
         await mockCache.setMockMintInfo(testMintInfo, for: testMintURL.absoluteString)
         await mockCache.setMockMintInfoLastUpdated(Date(), for: testMintURL.absoluteString)
-        
+
         // When
         let mintInfo = try await cachedLoader.loadMintInfo(url: testMintURL)
-        
+
         // Then
         XCTAssertEqual(mintInfo.name, "Test Mint")
         XCTAssertEqual(mintInfo.pubkey, "test-pubkey")
         XCTAssertEqual(mintInfo.version, "1.0")
     }
-    
+
     func testLoadMintInfoWithStaleCache() async throws {
         // Given
         let oldMintInfo = NDKMintInfo(
@@ -161,8 +161,8 @@ final class CachedMintLoaderTests: XCTestCase {
         )
         await mockCache.setMockMintInfo(oldMintInfo, for: testMintURL.absoluteString)
         // Set last updated to 8 days ago (beyond mint info max age)
-        await mockCache.setMockMintInfoLastUpdated(Date().addingTimeInterval(-691200), for: testMintURL.absoluteString)
-        
+        await mockCache.setMockMintInfoLastUpdated(Date().addingTimeInterval(-691_200), for: testMintURL.absoluteString)
+
         // When/Then - should throw because network call would fail in test
         do {
             _ = try await cachedLoader.loadMintInfo(url: testMintURL)
@@ -171,7 +171,7 @@ final class CachedMintLoaderTests: XCTestCase {
             // Expected - network call fails in test environment
         }
     }
-    
+
     func testGetKeysetById() async throws {
         // Given
         let keysetJSON = """
@@ -184,19 +184,19 @@ final class CachedMintLoaderTests: XCTestCase {
         """
         let testKeyset = try JSONCoding.decode(CashuSwift.Keyset.self, from: keysetJSON)
         await mockCache.setMockKeysetById(testKeyset, for: "test-keyset-123")
-        
+
         // When
         let keyset = await cachedLoader.getKeyset(id: "test-keyset-123")
-        
+
         // Then
         XCTAssertNotNil(keyset)
         // XCTAssertEqual(keyset?.id, "test-keyset-123") // Keyset may not have id property
     }
-    
+
     func testGetKeysetByIdNotFound() async throws {
         // When
         let keyset = await cachedLoader.getKeyset(id: "non-existent")
-        
+
         // Then
         XCTAssertNil(keyset)
     }
@@ -234,7 +234,7 @@ actor MockNDKCache: NDKCache {
         try? await helper.saveMintInfo(info, url: url)
     }
 
-    func setMockMintInfoLastUpdated(_ date: Date, for url: String) async {
+    func setMockMintInfoLastUpdated(_: Date, for _: String) async {
         // The CashuCacheHelper stores timestamp with the mint info
         // We need to re-save with updated timestamp - this is a limitation of the test setup
     }
@@ -242,14 +242,14 @@ actor MockNDKCache: NDKCache {
     // MARK: - NDKCache Protocol Implementation
 
     // Event operations
-    func saveEvent(_ event: NDKEvent) async throws {}
-    func getEvent(id: String) async -> NDKEvent? { nil }
-    func queryEvents(_ filter: NDKFilter) async throws -> [NDKEvent] { [] }
-    func deleteEvent(id: String) async throws {}
+    func saveEvent(_: NDKEvent) async throws {}
+    func getEvent(id _: String) async -> NDKEvent? { nil }
+    func queryEvents(_: NDKFilter) async throws -> [NDKEvent] { [] }
+    func deleteEvent(id _: String) async throws {}
 
     // Profile operations
-    func saveProfileMetadata(pubkey: String, metadata: [String: Any], updatedAt: Timestamp, eventId: String) async throws {}
-    func getProfileMetadata(pubkey: String) async -> (metadata: [String: Any], updatedAt: Timestamp, eventId: String)? { nil }
+    func saveProfileMetadata(pubkey _: String, metadata _: [String: Any], updatedAt _: Timestamp, eventId _: String) async throws {}
+    func getProfileMetadata(pubkey _: String) async -> (metadata: [String: Any], updatedAt: Timestamp, eventId: String)? { nil }
 
     // Cache management
     func clear() async throws {
@@ -257,7 +257,7 @@ actor MockNDKCache: NDKCache {
     }
 
     // Observation
-    func observeEvents(matching filter: NDKFilter, includeExisting: Bool = true) async -> AsyncThrowingStream<[NDKEvent], any Error> {
+    func observeEvents(matching _: NDKFilter, includeExisting _: Bool = true) async -> AsyncThrowingStream<[NDKEvent], any Error> {
         AsyncThrowingStream { continuation in
             continuation.finish()
         }
@@ -288,43 +288,43 @@ actor MockNDKCache: NDKCache {
 
     // MARK: - Additional NDKCache Protocol Requirements
 
-    func addUnpublishedEvent(_ event: NDKEvent, relays: Set<String>) async throws {}
-    func confirmEvent(eventId: String, onRelay relay: String) async throws {}
-    func getEventConfirmationState(eventId: String) async -> EventConfirmationState? { nil }
-    func getUnpublishedEvents(maxAge: TimeInterval, limit: Int?) async -> [(event: NDKEvent, targetRelays: Set<String>)] { [] }
+    func addUnpublishedEvent(_: NDKEvent, relays _: Set<String>) async throws {}
+    func confirmEvent(eventId _: String, onRelay _: String) async throws {}
+    func getEventConfirmationState(eventId _: String) async -> EventConfirmationState? { nil }
+    func getUnpublishedEvents(maxAge _: TimeInterval, limit _: Int?) async -> [(event: NDKEvent, targetRelays: Set<String>)] { [] }
 
-    func getDecryptedContent(for eventId: String, viewerPubkey: String) async -> String? { nil }
-    func storeDecryptedContent(_ content: String, for eventId: String, viewerPubkey: String) async {}
+    func getDecryptedContent(for _: String, viewerPubkey _: String) async -> String? { nil }
+    func storeDecryptedContent(_: String, for _: String, viewerPubkey _: String) async {}
     func clearDecryptedContent() async {}
-    func clearDecryptedContent(for viewerPubkey: String) async {}
+    func clearDecryptedContent(for _: String) async {}
 
-    func processEvent(_ event: NDKEvent, from relay: String, subscriptionId: String) async throws {}
-    func getRelaySources(eventId: String) async -> Set<String> { [] }
+    func processEvent(_: NDKEvent, from _: String, subscriptionId _: String) async throws {}
+    func getRelaySources(eventId _: String) async -> Set<String> { [] }
 
-    func getLastFetchTime(for filter: NDKFilter) async -> Date? { nil }
-    func recordFetchTime(for filter: NDKFilter, timestamp: Date) async {}
+    func getLastFetchTime(for _: NDKFilter) async -> Date? { nil }
+    func recordFetchTime(for _: NDKFilter, timestamp _: Date) async {}
 
-    func saveNIP05Claim(_ identifier: String, pubkey: String, retrievedAt: Date) async throws {}
-    func getNIP05Entry(_ identifier: String) async -> NIP05CacheEntry? { nil }
-    func getNIP05Entries(pubkey: String) async -> [NIP05CacheEntry] { [] }
-    func searchNIP05(_ prefix: String, limit: Int) async -> [NIP05CacheEntry] { [] }
-    func saveNIP05Resolution(_ entry: NIP05CacheEntry) async throws {}
-    func invalidateNIP05(_ identifier: String, actualPubkey: String?) async throws {}
-    func needsNIP05Verification(_ identifier: String, maxAge: TimeInterval) async -> Bool { true }
-    func getUnverifiedNIP05s(limit: Int) async -> [NIP05CacheEntry] { [] }
-    func canVerifyDomain(_ domain: String) async -> Bool { true }
-    func recordDomainVerificationAttempt(_ domain: String) async {}
+    func saveNIP05Claim(_: String, pubkey _: String, retrievedAt _: Date) async throws {}
+    func getNIP05Entry(_: String) async -> NIP05CacheEntry? { nil }
+    func getNIP05Entries(pubkey _: String) async -> [NIP05CacheEntry] { [] }
+    func searchNIP05(_: String, limit _: Int) async -> [NIP05CacheEntry] { [] }
+    func saveNIP05Resolution(_: NIP05CacheEntry) async throws {}
+    func invalidateNIP05(_: String, actualPubkey _: String?) async throws {}
+    func needsNIP05Verification(_: String, maxAge _: TimeInterval) async -> Bool { true }
+    func getUnverifiedNIP05s(limit _: Int) async -> [NIP05CacheEntry] { [] }
+    func canVerifyDomain(_: String) async -> Bool { true }
+    func recordDomainVerificationAttempt(_: String) async {}
 
-    func saveRelayPreferences(pubkey: String, writeRelays: [String]?, readRelays: [String]?, fetchedAt: Date, expiresAt: Date, checkedRelays: Set<String>?) async throws {}
-    func getRelayPreferences(pubkey: String) async -> (writeRelays: [String]?, readRelays: [String]?, fetchedAt: Date, expiresAt: Date, checkedRelays: Set<String>?)? { nil }
+    func saveRelayPreferences(pubkey _: String, writeRelays _: [String]?, readRelays _: [String]?, fetchedAt _: Date, expiresAt _: Date, checkedRelays _: Set<String>?) async throws {}
+    func getRelayPreferences(pubkey _: String) async -> (writeRelays: [String]?, readRelays: [String]?, fetchedAt: Date, expiresAt: Date, checkedRelays: Set<String>?)? { nil }
 
-    func getEventsByTimeRange(from: Timestamp, to: Timestamp, filter: NDKFilter?) async throws -> [NDKEvent] { [] }
-    func getEventIdsWithTimestamps(from: Timestamp, to: Timestamp, filter: NDKFilter?) async throws -> [(id: String, timestamp: Timestamp)] { [] }
+    func getEventsByTimeRange(from _: Timestamp, to _: Timestamp, filter _: NDKFilter?) async throws -> [NDKEvent] { [] }
+    func getEventIdsWithTimestamps(from _: Timestamp, to _: Timestamp, filter _: NDKFilter?) async throws -> [(id: String, timestamp: Timestamp)] { [] }
     func hasEvents(ids: [String]) async -> [String: Bool] { ids.reduce(into: [:]) { $0[$1] = false } }
 
-    func getMultipleProfileMetadata(pubkeys: [String]) async -> [String: (metadata: [String: Any], updatedAt: Timestamp, eventId: String)] { [:] }
+    func getMultipleProfileMetadata(pubkeys _: [String]) async -> [String: (metadata: [String: Any], updatedAt: Timestamp, eventId: String)] { [:] }
 
-    func observeProfile(pubkey: String, includeExisting: Bool) async -> AsyncThrowingStream<NDKUserMetadata?, Error> {
+    func observeProfile(pubkey _: String, includeExisting _: Bool) async -> AsyncThrowingStream<NDKUserMetadata?, Error> {
         AsyncThrowingStream { continuation in
             continuation.finish()
         }

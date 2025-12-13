@@ -2,7 +2,6 @@ import Foundation
 
 /// Centralized JSON encoding/decoding utility for consistent behavior across NDKSwift
 public enum JSONCoding {
-
     // MARK: - Encoders
 
     /// Standard JSON encoder with sorted keys and without escaping slashes.
@@ -98,7 +97,7 @@ public enum JSONCoding {
     public static func encodeToDictionary<T: Encodable>(_ value: T) throws -> [String: Any] {
         let data = try encode(value)
         let dictionary = try GuardHelpers.unwrap(
-            try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            JSONSerialization.jsonObject(with: data) as? [String: Any],
             error: NDKError.failedTo("convert JSON data to dictionary", message: "Type: \(T.self)")
         )
         return dictionary
@@ -165,7 +164,7 @@ public enum JSONCoding {
     /// Parse JSON data to dictionary
     public static func parseDictionary(from data: Data) throws -> [String: Any] {
         let dict = try GuardHelpers.unwrap(
-            try parseJSON(from: data) as? [String: Any],
+            parseJSON(from: data) as? [String: Any],
             error: NDKError.parseError(for: "JSON dictionary", details: "Expected dictionary but got different type")
         )
         return dict

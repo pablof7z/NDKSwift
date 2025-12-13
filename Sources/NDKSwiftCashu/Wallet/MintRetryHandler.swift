@@ -1,6 +1,6 @@
+import CashuSwift
 import Foundation
 import NDKSwiftCore
-import CashuSwift
 
 /// Configuration for mint retry behavior
 public struct MintRetryConfig {
@@ -11,7 +11,7 @@ public struct MintRetryConfig {
     let delayIncrement: TimeInterval = NetworkConstants.retryDelayIncrement
 
     /// Maximum number of retry attempts
-    let maxRetries: Int = NetworkConstants.maxMintRetries  // Total wait time: 5+10+15+20+25+30 = 105 seconds
+    let maxRetries: Int = NetworkConstants.maxMintRetries // Total wait time: 5+10+15+20+25+30 = 105 seconds
 
     /// Maximum delay between retries
     let maxDelay: TimeInterval = NetworkConstants.maxRetryDelay
@@ -25,7 +25,7 @@ public actor MintRetryHandler {
 
     /// Persistent storage for pending mint operations
     private var pendingMints: [String: PendingMintOperation] = [:]
-    
+
     public init() {}
 
     /// Retry minting tokens with linear backoff
@@ -37,7 +37,6 @@ public actor MintRetryHandler {
         paymentProof: String? = nil,
         onRetryAttempt: ((Int, TimeInterval) -> Void)? = nil
     ) async throws -> (proofs: [CashuSwift.Proof], wasUserNotified: Bool) {
-
         let operationId = mintQuote.quote
         var attemptCount = 0
 
@@ -194,7 +193,7 @@ public struct PendingMintOperation: Codable, Identifiable {
         createdAt: Date,
         lastAttemptAt: Date
     ) {
-        self.id = quoteId
+        id = quoteId
         self.quoteId = quoteId
         self.mintURL = mintURL
         self.amount = amount
@@ -211,7 +210,7 @@ public enum MintRetryError: LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .userNotificationRequired(let operation):
+        case let .userNotificationRequired(operation):
             return "Mint at \(operation.mintURL) failed to issue tokens after multiple attempts. User intervention required."
         }
     }

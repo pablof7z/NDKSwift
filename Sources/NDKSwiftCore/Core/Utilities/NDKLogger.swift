@@ -11,7 +11,7 @@ public struct NDKLogEntry: Identifiable, Sendable {
     public let message: String
 
     public init(timestamp: Date = Date(), level: NDKLogLevel, category: NDKLogCategory, message: String) {
-        self.id = UUID()
+        id = UUID()
         self.timestamp = timestamp
         self.level = level
         self.category = category
@@ -34,7 +34,7 @@ public struct NDKNetworkMessage: Identifiable, Sendable {
     public let raw: String
 
     public init(timestamp: Date = Date(), relay: String, direction: Direction, messageType: String, raw: String) {
-        self.id = UUID()
+        id = UUID()
         self.timestamp = timestamp
         self.relay = relay
         self.direction = direction
@@ -172,14 +172,14 @@ public enum NDKLogCategory: String, CaseIterable, Sendable {
     case general = "GENERAL"
 
     // New categories for complex areas
-    case connection = "CONNECTION"     // WebSocket lifecycle, retry logic
-    case outbox = "OUTBOX"            // Relay selection, scoring, NIP-65
-    case signer = "SIGNER"            // Signing flows, NWC, Bunker
-    case sync = "SYNC"                // Negentropy, sync operations
-    case performance = "PERFORMANCE"   // Timing, throughput, latency
-    case security = "SECURITY"        // Encryption, key management
-    case database = "DATABASE"        // SQL operations, migrations
-    case signature = "SIGNATURE"      // Signature verification
+    case connection = "CONNECTION" // WebSocket lifecycle, retry logic
+    case outbox = "OUTBOX" // Relay selection, scoring, NIP-65
+    case signer = "SIGNER" // Signing flows, NWC, Bunker
+    case sync = "SYNC" // Negentropy, sync operations
+    case performance = "PERFORMANCE" // Timing, throughput, latency
+    case security = "SECURITY" // Encryption, key management
+    case database = "DATABASE" // SQL operations, migrations
+    case signature = "SIGNATURE" // Signature verification
 }
 
 /// NDK Logger for configurable logging
@@ -187,9 +187,9 @@ public enum NDKLogger {
     /// Current log level
     public static var logLevel: NDKLogLevel = {
         #if DEBUG
-        return .info
+            return .info
         #else
-        return .warning
+            return .warning
         #endif
     }()
 
@@ -210,7 +210,7 @@ public enum NDKLogger {
     /// - Worst case: a log message uses stale config value (acceptable for logging)
     /// - Standard practice in logging libraries to accept this trade-off
     public nonisolated(unsafe) static var prettyPrintNetworkMessages: Bool = true
-    
+
     /// Check if logging is enabled (log level is not off)
     public static var isEnabled: Bool {
         return logLevel != .off
@@ -230,7 +230,7 @@ public enum NDKLogger {
         categories.remove(.performance)
         return categories
     }()
-    
+
     /// Configure the logger
     public static func configure(
         logLevel: NDKLogLevel? = nil,
@@ -255,8 +255,8 @@ public enum NDKLogger {
     /// - Never modified after initial configuration
     /// - Logging is a cross-cutting concern that shouldn't require `await`
     /// - Standard practice in logging libraries to accept this trade-off
-    public nonisolated(unsafe) static var logHandler: ((String) -> Void)? = nil
-    
+    public nonisolated(unsafe) static var logHandler: ((String) -> Void)?
+
     /// Log a message at the specified level
     public static func log(_ level: NDKLogLevel, category: NDKLogCategory, _ message: String) {
         guard level <= logLevel else { return }
@@ -275,7 +275,7 @@ public enum NDKLogger {
             handler(formattedMessage)
         } else {
             #if DEBUG
-            print(formattedMessage)
+                print(formattedMessage)
             #endif
         }
     }
@@ -325,21 +325,20 @@ public enum NDKLogger {
         logTimingResult(startTime: startTime, level: level, category: category, operation: operation, correlationId: correlationId)
         return result
     }
-    
+
     // MARK: - Private Helpers
-    
+
     private static func logTimingResult(startTime: CFAbsoluteTime, level: NDKLogLevel, category: NDKLogCategory, operation: String, correlationId: String?) {
         let duration = CFAbsoluteTimeGetCurrent() - startTime
         let durationMs = String(format: "%.2f", duration * 1000)
         let message = "⏱️ \(operation) completed in \(durationMs)ms"
-        
+
         if let correlationId = correlationId {
             log(level, category: category, message, correlationId: correlationId)
         } else {
             log(level, category: category, message)
         }
     }
-
 }
 
 // CaseIterable conformance already added to the enum declaration

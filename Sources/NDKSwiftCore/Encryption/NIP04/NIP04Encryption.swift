@@ -8,7 +8,6 @@ import secp256k1
 ///
 /// Specification: https://github.com/nostr-protocol/nips/blob/master/04.md
 public enum NIP04 {
-
     /// Compute shared secret using ECDH
     /// - Parameters:
     ///   - privateKey: Sender's private key (hex)
@@ -176,7 +175,7 @@ public enum NIP04 {
 
         // Verify all padding bytes are the same
         let paddingStart = data.count - paddingLength
-        for i in paddingStart..<data.count {
+        for i in paddingStart ..< data.count {
             if data[i] != lastByte {
                 throw Crypto.CryptoError.invalidPoint
             }
