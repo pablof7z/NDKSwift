@@ -127,6 +127,9 @@ actor RelayStateActor {
     // Relay origin tracking
     var origin: NDKRelayOrigin = .explicit
 
+    // NDK reference
+    weak var ndk: NDK?
+
     // Subscription tracking
     var activeSubscriptions: [String: NDKRelaySubscriptionInfo] = [:]
 
@@ -240,6 +243,16 @@ actor RelayStateActor {
 
     func getOrigin() -> NDKRelayOrigin {
         return origin
+    }
+
+    // MARK: - NDK Reference
+
+    func setNDK(_ newNdk: NDK?) {
+        ndk = newNdk
+    }
+
+    func getNDK() -> NDK? {
+        return ndk
     }
 
     // MARK: - Stats
@@ -364,18 +377,16 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
         }
     }
 
-    /// Reference to NDK instance
-    private weak var _ndk: NDK?
-
     /// Set the NDK instance for this relay
-    public func setNDK(_ ndk: NDK?) {
-        _ndk = ndk
+    public func setNDK(_ ndk: NDK?) async {
+        await stateActor.setNDK(ndk)
     }
 
-    /// Get/set the NDK instance (required by RelayProtocol)
+    /// Get the NDK instance (required by RelayProtocol)
     public var ndk: NDK? {
-        get { _ndk }
-        set { _ndk = newValue }
+        get async {
+            await stateActor.getNDK()
+        }
     }
 
     /// Internal state actor that manages all mutable state
@@ -624,7 +635,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
             await stateActor.setInfo(relayInfo)
         } catch {
             // Silently fail - not all relays support NIP-11
-            if ndk?.debugMode == true {
+            if await ndk?.debugMode == true {
                 NDKLogger.log(.warning, category: .relay, "Failed to fetch relay information from \(url): \(error)")
             }
         }
@@ -671,7 +682,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
             await routeMessage(nostrMessage)
         } catch {
             // Log parsing error but don't crash
-            if ndk?.debugMode == true {
+            if await ndk?.debugMode == true {
                 NDKLogger.log(.warning, category: .relay, "Failed to parse message from \(url): \(error)")
             }
         }
@@ -705,7 +716,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
         case .negOpen, .negMsg, .negClose, .negErr:
             // NIP-77 messages - route to sync handler via NDK
             NDKLogger.log(.debug, category: .relay, "Routing NIP-77 message to handler: \(message)")
-            if let ndk = ndk {
+            if let ndk = await ndk {
                 Task { [weak self] in
                     guard let self = self else { return }
                     await ndk.processNIP77Message(message, from: self)
@@ -737,7 +748,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
         }
 
         // Also route to NDK for global subscription management
-        if let ndk = ndk, let subId = subscriptionId {
+        if let ndk = await ndk, let subId = subscriptionId {
             NDKLogger.log(.trace, category: .subscription,
                           "🔄 [Relay] Routing EVENT for subscription '\(subId)' to NDK global manager")
             Task { [weak self] in
@@ -758,7 +769,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
         await subscriptionManager.routeEOSE(subscriptionId: subscriptionId)
 
         // Also route to NDK for global subscription management
-        if let ndk = ndk {
+        if let ndk = await ndk {
             ndk.processEOSE(subscriptionId: subscriptionId, from: self)
         } else {
             NDKLogger.log(.warning, category: .relay, "⚠️ Cannot process EOSE - no NDK instance")
@@ -767,14 +778,14 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
 
     /// Handle OK message (publish result)
     private func handleOKMessage(eventId: EventID, accepted: Bool, message: String?) async {
-        if ndk?.debugMode == true {
+        if await ndk?.debugMode == true {
             let status = accepted ? "✅ Accepted" : "❌ Rejected"
             let msg = message.map { ": \($0)" } ?? ""
             NDKLogger.log(.info, category: .relay, "\(status) event \(eventId) at \(url)\(msg)")
         }
 
         // Notify NDK about OK message
-        if let ndk = ndk {
+        if let ndk = await ndk {
             Task { [weak self] in
                 guard let self = self else { return }
                 await ndk.processOKMessage(eventId: eventId, accepted: accepted, message: message, from: self)
@@ -784,32 +795,34 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
 
     /// Handle NOTICE message
     private func handleNoticeMessage(_ message: String) async {
-        if ndk?.debugMode == true {
+        if await ndk?.debugMode == true {
             NDKLogger.log(.info, category: .relay, "Notice from \(url): \(message)")
         }
 
         // Notify NDK about notice message
-        ndk?.processNotice(message: message, from: self)
+        await ndk?.processNotice(message: message, from: self)
     }
 
     /// Handle AUTH message
     private func handleAuthMessage(challenge: String) async {
-        if ndk?.debugMode == true {
+        if await ndk?.debugMode == true {
             NDKLogger.log(.info, category: .relay, "Auth challenge from \(url): \(challenge)")
         }
 
         // Notify NDK about auth challenge - implementation requires signer
-        await ndk?.handleAuthChallenge(challenge: challenge, from: self)
+        if let ndk = await ndk {
+            await ndk.handleAuthChallenge(challenge: challenge, from: self)
+        }
     }
 
     /// Handle COUNT message
     private func handleCountMessage(subscriptionId: String, count: Int) async {
-        if ndk?.debugMode == true {
+        if await ndk?.debugMode == true {
             NDKLogger.log(.info, category: .relay, "Count for subscription \(subscriptionId): \(count)")
         }
 
         // Route to subscription manager via NDK only
-        ndk?.processCount(subscriptionId: subscriptionId, count: count, from: self)
+        await ndk?.processCount(subscriptionId: subscriptionId, count: count, from: self)
     }
 
     // MARK: - State Management

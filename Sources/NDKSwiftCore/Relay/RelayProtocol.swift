@@ -8,7 +8,7 @@ public protocol RelayProtocol: AnyObject, Sendable {
     var connectionState: NDKRelayConnectionState { get async }
 
     /// Reference to NDK instance
-    var ndk: NDK? { get set }
+    var ndk: NDK? { get async }
 
     /// Connect to the relay
     func connect() async throws
