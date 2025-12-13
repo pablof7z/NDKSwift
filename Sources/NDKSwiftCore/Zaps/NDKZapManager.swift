@@ -2,7 +2,7 @@ import Foundation
 import CryptoKit
 
 /// Manages zapping functionality with decoupled protocol and payment handling
-public actor NDKZapManager {
+public actor NDKZapManager: ZapManaging {
     private let ndk: NDK
     private var zapProtocols: [ZapType: NDKZapProtocol] = [:]
     private var paymentProviders: [NDKPaymentProvider] = []
@@ -422,22 +422,8 @@ public struct ZapInfo {
     public let event: NDKEvent
 }
 
-// MARK: - NDK Extension
-
-extension NDK {
-    /// Access the zap manager
-    public var zapManager: NDKZapManager {
-        if let existing = objc_getAssociatedObject(self, &zapManagerKey) as? NDKZapManager {
-            return existing
-        }
-
-        let manager = NDKZapManager(ndk: self)
-        objc_setAssociatedObject(self, &zapManagerKey, manager, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
-        return manager
-    }
-}
-
-private var zapManagerKey: UInt8 = 0
+// MARK: - Removed objc_associatedObject pattern
+// ZapManager is now a lazy property on NDK class for cleaner Swift-native dependency injection
 
 // MARK: - User Extension
 
@@ -446,17 +432,20 @@ extension NDKUser {
     public func zap(
         amountSats: Int64,
         comment: String? = nil,
-        preferredType: ZapType? = nil
+        preferredType: ZapType? = nil,
+        preferredProvider: String? = nil
     ) async throws -> ZapResult {
         guard let ndk = await self.ndk else {
             throw NDKError.notConfigured(ErrorMessageConstants.Messages.ndkNotAvailable)
         }
 
         return try await ndk.zapManager.zap(
+            event: nil,
             to: self,
             amountSats: amountSats,
             comment: comment,
-            preferredType: preferredType
+            preferredType: preferredType,
+            preferredProvider: preferredProvider
         )
     }
 
@@ -470,7 +459,8 @@ extension NDKEvent {
         with ndk: NDK,
         amountSats: Int64,
         comment: String? = nil,
-        preferredType: ZapType? = nil
+        preferredType: ZapType? = nil,
+        preferredProvider: String? = nil
     ) async throws -> ZapResult {
         let author = NDKUser(pubkey: pubkey)
 
@@ -479,7 +469,8 @@ extension NDKEvent {
             to: author,
             amountSats: amountSats,
             comment: comment,
-            preferredType: preferredType
+            preferredType: preferredType,
+            preferredProvider: preferredProvider
         )
     }
 
