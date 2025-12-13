@@ -53,10 +53,9 @@ public actor P2PKManager {
         let privateKey = try secp256k1.Schnorr.PrivateKey(dataRepresentation: privateKeyData)
 
         // Create message to sign (secret)
-        let messageData = try GuardHelpers.unwrap(
-            secret.data(using: .utf8),
-            error: NDKError.validationError(ErrorMessageConstants.invalid("secret for P2PK signing"))
-        )
+        guard let messageData = secret.data(using: .utf8) else {
+            throw NDKError.validationError(ErrorMessageConstants.invalid("secret for P2PK signing"))
+        }
 
         // Sign the secret - using same pattern as Crypto.swift
         var messageBytes = Array(messageData)
