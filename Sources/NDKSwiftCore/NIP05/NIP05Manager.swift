@@ -95,7 +95,8 @@ public actor NIP05Manager {
         // Combine results, removing duplicates
         var combined = Array(memoryResults)
         let existingIdentifiers = Set(combined.map { $0.identifier })
-        combined.append(contentsOf: dbResults.filter { !existingIdentifiers.contains($0.identifier) })
+        let uniqueDbResults = dbResults.filter { !existingIdentifiers.contains($0.identifier) }
+        combined.append(contentsOf: uniqueDbResults)
 
         return Array(combined.prefix(limit))
     }
