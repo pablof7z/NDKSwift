@@ -75,19 +75,4 @@ public extension Array where Element == NDKEvent {
 }
 
 // MARK: - Array Mutation Extensions
-
-public extension Array {
-    /// Remove all elements matching the predicate and return the removed elements
-    @discardableResult
-    mutating func removeAll(where predicate: (Element) throws -> Bool) rethrows -> [Element] {
-        var removed: [Element] = []
-        self = try filter { element in
-            let shouldRemove = try predicate(element)
-            if shouldRemove {
-                removed.append(element)
-            }
-            return !shouldRemove
-        }
-        return removed
-    }
-}
+// (No custom removeAll to avoid shadowing Swift stdlib)

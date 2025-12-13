@@ -55,24 +55,24 @@ public final class NDKSubscription<T> {
     private let correlationId: String
     private let subscriptionId: String?
 
-    // Actor for thread-safe state management
-    private actor StateManager {
-        var processedEventIds = Set<String>()
+    /// Thread-safe set of processed event IDs (protected via actor)
+    private let processedEventIds = ProcessedEventIds()
 
-        func isProcessed(_ eventId: String) -> Bool {
-            processedEventIds.contains(eventId)
+    private actor ProcessedEventIds {
+        private var ids: Set<String> = []
+
+        func contains(_ id: String) -> Bool {
+            ids.contains(id)
         }
 
-        func markProcessed(_ eventId: String) {
-            processedEventIds.insert(eventId)
+        func insert(_ id: String) {
+            ids.insert(id)
         }
 
-        func clearProcessed() {
-            processedEventIds.removeAll()
+        func clear() {
+            ids.removeAll()
         }
     }
-
-    private let stateManager = StateManager()
 
     /// Initialize a data source for NDKEvent objects
     public convenience init(
@@ -265,11 +265,15 @@ public final class NDKSubscription<T> {
     // MARK: - Event Handling
 
     private func handleEvent(_ event: NDKEvent) async {
-        // Check if we've already processed this event
-        guard await !stateManager.isProcessed(event.id) else {
+        // Check if we've already processed this event (thread-safe via actor)
+        let alreadyProcessed = await processedEventIds.contains(event.id)
+        if !alreadyProcessed {
+            await processedEventIds.insert(event.id)
+        }
+
+        guard !alreadyProcessed else {
             return
         }
-        await stateManager.markProcessed(event.id)
 
         if let transformed = transform(event) {
             // Yield to AsyncStream
@@ -299,7 +303,7 @@ public final class NDKSubscription<T> {
     public func refresh() async {
         NDKLogger.log(.info, category: .subscription, "🔄 Refreshing data source", correlationId: correlationId)
         data.removeAll()
-        await stateManager.clearProcessed()
+        await processedEventIds.clear()
 
         if let handle = requirementHandle {
             NDKLogger.log(.trace, category: .subscription, "Releasing existing requirement handle", correlationId: correlationId)
@@ -549,8 +553,8 @@ public final class NDKSubscription<T> {
         // Cancel current task
         task?.cancel()
 
-        // Clear processed events
-        await stateManager.clearProcessed()
+        // Clear processed events (thread-safe via actor)
+        await processedEventIds.clear()
 
         // Clear current data
         await MainActor.run {

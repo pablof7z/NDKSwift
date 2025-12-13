@@ -57,21 +57,20 @@ public final class NDK {
     /// Configuration for automatic client tagging (NIP-89)
     public let clientTagConfig: NDKClientTagConfig?
 
-    /// Actor to manage thread-safe access to pending auth events
-    private actor PendingAuthEventsManager {
-        private var pendingAuthEvents: [EventID: NDKRelay] = [:]
+    /// Track pending auth events by event ID to relay (thread-safe via actor)
+    private let pendingAuthEvents = PendingAuthEvents()
 
-        func setPendingAuthEvent(eventId: EventID, relay: NDKRelay) {
-            pendingAuthEvents[eventId] = relay
+    private actor PendingAuthEvents {
+        private var events: [EventID: NDKRelay] = [:]
+
+        func remove(for eventId: EventID) -> NDKRelay? {
+            events.removeValue(forKey: eventId)
         }
 
-        func removePendingAuthEvent(for eventId: EventID) -> NDKRelay? {
-            return pendingAuthEvents.removeValue(forKey: eventId)
+        func set(eventId: EventID, relay: NDKRelay) {
+            events[eventId] = relay
         }
     }
-
-    /// Track pending auth events by event ID to relay
-    private let pendingAuthEventsManager = PendingAuthEventsManager()
 
     // MARK: - Outbox API
 
@@ -588,7 +587,7 @@ public final class NDK {
 
     func processOKMessage(eventId: EventID, accepted: Bool, message: String?, from relay: RelayProtocol) async {
         // Check if this is an auth event response
-        let authRelay = await pendingAuthEventsManager.removePendingAuthEvent(for: eventId)
+        let authRelay = await pendingAuthEvents.remove(for: eventId)
 
         if let authRelay = authRelay {
             if accepted {
@@ -682,7 +681,7 @@ public final class NDK {
             let jsonString = String(data: jsonData, encoding: .utf8) ?? ""
 
             // Track pending auth event - moved inside try block after authEvent is created
-            await pendingAuthEventsManager.setPendingAuthEvent(eventId: authEvent.id, relay: ndkRelay)
+            await pendingAuthEvents.set(eventId: authEvent.id, relay: ndkRelay)
 
             try await relay.send(jsonString)
 

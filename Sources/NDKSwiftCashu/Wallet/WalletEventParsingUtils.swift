@@ -22,10 +22,9 @@ enum WalletEventParsingUtils {
             scheme: scheme
         )
 
-        let data = try GuardHelpers.unwrap(
-            decryptedContent.data(using: .utf8),
-            error: NDKError.invalidContent("Decrypted content not valid UTF-8 for event \(event.id)")
-        )
+        guard let data = decryptedContent.data(using: .utf8) else {
+            throw NDKError.invalidContent("Decrypted content not valid UTF-8 for event \(event.id)")
+        }
 
         return try JSONCoding.decode(T.self, from: data)
     }

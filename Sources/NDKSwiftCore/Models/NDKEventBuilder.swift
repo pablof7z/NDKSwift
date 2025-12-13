@@ -870,10 +870,9 @@ public final class NDKEventBuilder {
     /// - Throws: Signing errors or validation errors
     public func build(signer: NDKSigner? = nil, generateContentTags: Bool = true) async throws -> NDKEvent {
         // Use provided signer or fall back to NDK's signer
-        let actualSigner = try GuardHelpers.unwrap(
-            signer ?? ndk?.signer,
-            error: NDKError.configurationError(ErrorMessageConstants.Messages.noSignerAvailable)
-        )
+        guard let actualSigner = signer ?? ndk?.signer else {
+            throw NDKError.configurationError(ErrorMessageConstants.Messages.noSignerAvailable)
+        }
         // Set pubkey from signer if not already set
         if pubkey.isEmpty {
             pubkey = try await actualSigner.pubkey
