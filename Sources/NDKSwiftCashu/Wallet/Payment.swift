@@ -113,10 +113,9 @@ public enum Payment {
 
         // Select proofs to cover the payment
         let selectedProofs = await proofStateManager.selectProofs(amount: totalNeeded, mint: mintURL)
-        try GuardHelpers.requireNotEmpty(
-            selectedProofs,
-            error: NDKError.insufficientBalance(amount: totalNeeded)
-        )
+        guard !selectedProofs.isEmpty else {
+            throw NDKError.insufficientBalance(amount: totalNeeded)
+        }
 
         // Reserve proofs for this operation
         try await proofStateManager.reserveProofs(selectedProofs)
@@ -213,10 +212,9 @@ public enum Payment {
         guard mints[sourceMintURL.absoluteString] != nil else {
             throw NDKError.invalidRequest("Source mint not found in wallet")
         }
-        let destinationMint = try GuardHelpers.unwrap(
-            mints[destinationMintURL.absoluteString],
-            error: NDKError.invalidRequest("Destination mint not found in wallet")
-        )
+        guard let destinationMint = mints[destinationMintURL.absoluteString] else {
+            throw NDKError.invalidRequest("Destination mint not found in wallet")
+        }
 
         // Step 1: Create Lightning invoice at destination mint
         let mintQuoteRequest = CashuSwift.Bolt11.RequestMintQuote(
@@ -229,10 +227,9 @@ public enum Payment {
             quoteRequest: mintQuoteRequest
         )
 
-        let mintQuote = try GuardHelpers.unwrap(
-            mintResponse as? CashuSwift.Bolt11.MintQuote,
-            error: NDKError.walletError(message: "Unexpected mint quote response type")
-        )
+        guard let mintQuote = mintResponse as? CashuSwift.Bolt11.MintQuote else {
+            throw NDKError.walletError(message: "Unexpected mint quote response type")
+        }
 
         let invoice = mintQuote.request
 
@@ -281,10 +278,9 @@ public enum Payment {
             )
         }
 
-        try GuardHelpers.requireNotEmpty(
-            newProofs,
-            error: NDKError.paymentFailed(reason: ErrorMessageConstants.failedTo("mint tokens at destination after multiple retries"))
-        )
+        guard !newProofs.isEmpty else {
+            throw NDKError.paymentFailed(reason: ErrorMessageConstants.failedTo("mint tokens at destination after multiple retries"))
+        }
 
         // Step 4: Update wallet state with new proofs
         for proof in newProofs {
@@ -319,10 +315,9 @@ public enum Payment {
         signer _: NDKSigner
     ) async throws -> (proofs: [CashuSwift.Proof], change: [CashuSwift.Proof]?) {
         // Get the mint
-        let mint = try GuardHelpers.unwrap(
-            mints[mintURL.absoluteString],
-            error: NDKError.noMintAvailable("Mint not found: \(mintURL)")
-        )
+        guard let mint = mints[mintURL.absoluteString] else {
+            throw NDKError.noMintAvailable("Mint not found: \(mintURL)")
+        }
 
         // Get available proofs for fee calculation
         let availableProofs = await proofStateManager.getAvailableProofs(mint: mintURL.absoluteString)
@@ -332,10 +327,9 @@ public enum Payment {
         let totalNeeded = amount + Int64(inputFee)
 
         let selectedProofs = await proofStateManager.selectProofs(amount: totalNeeded, mint: mintURL.absoluteString)
-        try GuardHelpers.requireNotEmpty(
-            selectedProofs,
-            error: NDKError.insufficientBalance(amount: totalNeeded)
-        )
+        guard !selectedProofs.isEmpty else {
+            throw NDKError.insufficientBalance(amount: totalNeeded)
+        }
 
         // Reserve proofs for this operation
         try await proofStateManager.reserveProofs(selectedProofs)
@@ -352,10 +346,9 @@ public enum Payment {
             )
 
             // Get the locked proofs from the token
-            let lockedProofs = try GuardHelpers.unwrap(
-                sendResult.token.proofsByMint[mintURL.absoluteString],
-                error: NDKError.invalidProof("No proofs in created token")
-            )
+            guard let lockedProofs = sendResult.token.proofsByMint[mintURL.absoluteString] else {
+                throw NDKError.invalidProof("No proofs in created token")
+            }
 
             // Mark used proofs as deleted
             await proofStateManager.markProofsAsDeleted(selectedProofs)

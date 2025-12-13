@@ -222,17 +222,15 @@ public enum Nutzap {
 
         NDKLogger.log(.debug, category: .wallet, "Mint URLs in nutzap: \(mintURLs)")
 
-        try GuardHelpers.requireNotEmpty(
-            mintURLs,
-            error: NutzapRedemptionError.invalidProofs(reason: "No mint URLs in nutzap event")
-        )
+        guard !mintURLs.isEmpty else {
+            throw NutzapRedemptionError.invalidProofs(reason: "No mint URLs in nutzap event")
+        }
 
         // Extract proofs from proof tags
         let proofTags = event.tags.filter { $0.count >= 2 && $0[0] == NostrConstants.TagName.proof }
-        try GuardHelpers.requireNotEmpty(
-            proofTags,
-            error: NutzapRedemptionError.invalidProofs(reason: "No proofs in nutzap event")
-        )
+        guard !proofTags.isEmpty else {
+            throw NutzapRedemptionError.invalidProofs(reason: "No proofs in nutzap event")
+        }
 
         NDKLogger.log(.debug, category: .wallet, "Found \(proofTags.count) proof tags in nutzap")
 
@@ -429,10 +427,9 @@ public enum Nutzap {
         )
 
         // Get the locked proofs from the token
-        let lockedProofs = try GuardHelpers.unwrap(
-            sendResult.token.proofsByMint[mintURL],
-            error: NDKError.walletInvalidProof(details: "No proofs found in created token for mint \(mintURL)")
-        )
+        guard let lockedProofs = sendResult.token.proofsByMint[mintURL] else {
+            throw NDKError.walletInvalidProof(details: "No proofs found in created token for mint \(mintURL)")
+        }
 
         return (proofs: lockedProofs, change: sendResult.change.isEmpty ? nil : sendResult.change)
     }
