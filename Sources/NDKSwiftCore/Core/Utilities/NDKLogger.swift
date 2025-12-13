@@ -183,10 +183,10 @@ public enum NDKLogCategory: String, CaseIterable, Sendable {
 }
 
 /// Thread-safe configuration for NDK Logger
-actor NDKLoggerConfig {
-    static let shared = NDKLoggerConfig()
+public actor NDKLoggerConfig {
+    public static let shared = NDKLoggerConfig()
 
-    var logLevel: NDKLogLevel = {
+    public var logLevel: NDKLogLevel = {
         #if DEBUG
             return .info
         #else
@@ -194,29 +194,29 @@ actor NDKLoggerConfig {
         #endif
     }()
 
-    var logNetworkTraffic: Bool = false
-    var prettyPrintNetworkMessages: Bool = true
-    var enabledCategories: Set<NDKLogCategory> = {
+    public var logNetworkTraffic: Bool = false
+    public var prettyPrintNetworkMessages: Bool = true
+    public var enabledCategories: Set<NDKLogCategory> = {
         var categories = Set(NDKLogCategory.allCases)
         categories.remove(.database)
         categories.remove(.performance)
         return categories
     }()
-    var logHandler: (@Sendable (String) -> Void)?
+    public var logHandler: (@Sendable (String) -> Void)?
 
-    func setLogLevel(_ level: NDKLogLevel) {
+    public func setLogLevel(_ level: NDKLogLevel) {
         logLevel = level
     }
 
-    func setEnabledCategories(_ categories: Set<NDKLogCategory>) {
+    public func setEnabledCategories(_ categories: Set<NDKLogCategory>) {
         enabledCategories = categories
     }
 
-    func setLogNetworkTraffic(_ enabled: Bool) {
+    public func setLogNetworkTraffic(_ enabled: Bool) {
         logNetworkTraffic = enabled
     }
 
-    func setLogHandler(_ handler: (@Sendable (String) -> Void)?) {
+    public func setLogHandler(_ handler: (@Sendable (String) -> Void)?) {
         logHandler = handler
     }
 
