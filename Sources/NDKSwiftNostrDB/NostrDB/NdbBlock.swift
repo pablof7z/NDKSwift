@@ -237,8 +237,8 @@ extension NdbBlockGroup {
         private let blocks_ptr: ndb_blocks_ptr
         private let buffer: UnsafeMutableRawPointer?
 
-        init(ptr: OpaquePointer?, buffer: UnsafeMutableRawPointer? = nil) {
-            blocks_ptr = ndb_blocks_ptr(ptr: ptr)
+        init(ptr: ndb_blocks_ptr, buffer: UnsafeMutableRawPointer? = nil) {
+            blocks_ptr = ptr
             self.buffer = buffer
         }
 
@@ -246,11 +246,11 @@ extension NdbBlockGroup {
             Int(ndb_blocks_word_count(blocks_ptr.ptr))
         }
 
-        /// Gets the opaque pointer
+        /// Gets the ndb_blocks_ptr wrapper
         ///
         /// **Implementation note:** This is marked `fileprivate` because we want to minimize the exposure of raw pointers to Swift code outside these wrapper structs.
-        fileprivate func as_ptr() -> OpaquePointer? {
-            return blocks_ptr.ptr
+        fileprivate func as_blocks_ptr() -> ndb_blocks_ptr {
+            return blocks_ptr
         }
 
         /// Parses text content and returns the parsed block metadata if successful
@@ -262,7 +262,7 @@ extension NdbBlockGroup {
                 return nil
             }
 
-            var blocks: OpaquePointer? = nil
+            var blocks_ptr = ndb_blocks_ptr(ptr: nil)
 
             // Call the C parsing function and check its success status
             let success = content.withCString { contentPtr -> Bool in
@@ -272,11 +272,11 @@ extension NdbBlockGroup {
                     Int32(MAX_NOTE_SIZE),
                     contentPtr,
                     Int32(contentLen),
-                    &blocks
+                    &blocks_ptr.ptr
                 ) == 1
             }
 
-            if !success || blocks == nil {
+            if !success || blocks_ptr.ptr == nil {
                 // Something failed
                 free(buffer)
                 return nil
@@ -287,7 +287,7 @@ extension NdbBlockGroup {
             // The C code uses the flag to determine if ndb_blocks_free() should call free(),
             // but we handle that directly in deinit by freeing the buffer ourselves.
 
-            return BlocksMetadata(ptr: blocks, buffer: buffer)
+            return BlocksMetadata(ptr: blocks_ptr, buffer: buffer)
         }
 
         deinit {
@@ -347,7 +347,8 @@ extension NdbBlockGroup {
 
             // Start the iteration
             return try self.metadata.borrow { value in
-                ndb_blocks_iterate_start(cptr, value.as_ptr(), &iter)
+                let blocks_ptr = value.as_blocks_ptr()
+                ndb_blocks_iterate_start(cptr, blocks_ptr.ptr, &iter)
 
                 // Collect blocks into array
                 outerLoop: while let ptr = ndb_blocks_iterate_next(&iter),

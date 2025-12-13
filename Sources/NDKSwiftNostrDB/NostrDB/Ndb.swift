@@ -372,7 +372,7 @@ class Ndb: @unchecked Sendable {
             return nil
         }
 
-        return NdbBlockGroup.BlocksMetadata(ptr: blocks)
+        return NdbBlockGroup.BlocksMetadata(ptr: ndb_blocks_ptr(ptr: blocks))
     }
 
     func lookup_blocks_by_key(_ key: NoteKey) -> SafeNdbTxn<NdbBlockGroup.BlocksMetadata?>? {
@@ -675,15 +675,15 @@ class Ndb: @unchecked Sendable {
     }
 
     func lookup_note(_ id: NdbNoteId, txn_name: String? = nil) -> NdbTxn<NdbNote?>? {
-        NdbTxn(ndb: self, name: txn_name) { txn in
+        NdbTxn(ndb: self, with: { txn in
             lookup_note_with_txn_inner(id: id, txn: txn)
-        }
+        }, name: txn_name)
     }
 
     func lookup_profile(_ pubkey: NdbPubkey, txn_name: String? = nil) -> NdbTxn<NdbCachedProfile?>? {
-        NdbTxn(ndb: self, name: txn_name) { txn in
+        NdbTxn(ndb: self, with: { txn in
             lookup_profile_with_txn_inner(pubkey: pubkey, txn: txn)
-        }
+        }, name: txn_name)
     }
 
     func lookup_profile_with_txn<Y>(_ pubkey: NdbPubkey, txn: NdbTxn<Y>) -> NdbCachedProfile? {
@@ -699,7 +699,7 @@ class Ndb: @unchecked Sendable {
 
     func write_profile_last_fetched(pubkey: Pubkey, fetched_at: UInt64) {
         guard !closed else { return }
-        _ = pubkey.id.withUnsafeBytes { (ptr: UnsafeRawBufferPointer) in
+        pubkey.id.withUnsafeBytes { (ptr: UnsafeRawBufferPointer) in
             guard let p = ptr.baseAddress else { return }
             ndb_write_last_profile_fetch(ndb.ndb, p, fetched_at)
         }
