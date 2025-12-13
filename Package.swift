@@ -17,6 +17,7 @@ let package = Package(
         .library(name: "NDKSwiftNostrDB", targets: ["NDKSwiftNostrDB"]),
         .library(name: "NDKSwiftCashu", targets: ["NDKSwiftCashu"]),
         .library(name: "NDKSwiftUI", targets: ["NDKSwiftUI"]),
+        .library(name: "NDKSwiftTesting", targets: ["NDKSwiftTesting"]),
     ],
     dependencies: [
         .package(url: "https://github.com/krzyzanowskim/CryptoSwift.git", from: "1.8.0"),
@@ -114,6 +115,12 @@ let package = Package(
             dependencies: [
                 "NDKSwiftCore",
                 "NDKSwiftCashu",
+            ]
+        ),
+        .target(
+            name: "NDKSwiftTesting",
+            dependencies: [
+                "NDKSwiftCore",
             ]
         ),
         .testTarget(
