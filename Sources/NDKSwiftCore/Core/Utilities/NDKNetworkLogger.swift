@@ -4,43 +4,53 @@ import Foundation
 public enum NDKNetworkLogger {
     /// Log network traffic (special handling)
     public static func logNetworkSend(to relay: URL, message: String, parsed _: NostrMessage? = nil) {
-        guard NDKLogger.logNetworkTraffic else { return }
-        guard NDKLogger.isEnabled else { return }
+        Task {
+            let config = NDKLoggerConfig.shared
+            guard await config.logNetworkTraffic else { return }
+            guard await NDKLogger.isEnabled else { return }
 
-        let output = "\n📤 SENDING TO \(relay.host ?? relay.absoluteString):\n" +
-            "   RAW: \(NDKLogFormatter.truncateMessage(message))"
+            let output = "\n📤 SENDING TO \(relay.host ?? relay.absoluteString):\n" +
+                "   RAW: \(NDKLogFormatter.truncateMessage(message))"
 
-        NDKLogger.logHandler?(output)
+            await config.logHandler?(output)
+        }
     }
 
     /// Log received network traffic
     public static func logNetworkReceive(from relay: URL, message: String, parsed _: NostrMessage? = nil) {
-        guard NDKLogger.logNetworkTraffic else { return }
-        guard NDKLogger.isEnabled else { return }
+        Task {
+            let config = NDKLoggerConfig.shared
+            guard await config.logNetworkTraffic else { return }
+            guard await NDKLogger.isEnabled else { return }
 
-        let output = "\n📥 RECEIVED FROM \(relay.host ?? relay.absoluteString):\n" +
-            "   RAW: \(NDKLogFormatter.truncateMessage(message))"
+            let output = "\n📥 RECEIVED FROM \(relay.host ?? relay.absoluteString):\n" +
+                "   RAW: \(NDKLogFormatter.truncateMessage(message))"
 
-        NDKLogger.logHandler?(output)
+            await config.logHandler?(output)
+        }
     }
 
     /// Log parsing errors
     public static func logNetworkParseError(from relay: URL, message: String, error: Error) {
-        guard NDKLogger.logNetworkTraffic else { return }
-        guard NDKLogger.isEnabled else { return }
+        Task {
+            let config = NDKLoggerConfig.shared
+            guard await config.logNetworkTraffic else { return }
+            guard await NDKLogger.isEnabled else { return }
 
-        let output = "\n📥 RECEIVED FROM \(relay.host ?? relay.absoluteString):\n" +
-            "   RAW: \(NDKLogFormatter.truncateMessage(message))\n" +
-            "   ❌ PARSE ERROR: \(error)"
+            let output = "\n📥 RECEIVED FROM \(relay.host ?? relay.absoluteString):\n" +
+                "   RAW: \(NDKLogFormatter.truncateMessage(message))\n" +
+                "   ❌ PARSE ERROR: \(error)"
 
-        NDKLogger.logHandler?(output)
+            await config.logHandler?(output)
+        }
     }
 
     /// Log parsed message details
     public static func logParsedMessage(_ message: NostrMessage) {
-        var output = ""
+        Task {
+            var output = ""
 
-        switch message {
+            switch message {
         case let .event(subscriptionId, event):
             output += "   TYPE: EVENT\n"
             if let subId = subscriptionId {
@@ -125,8 +135,10 @@ public enum NDKNetworkLogger {
             output += "   TYPE: NEG-ERR\n"
             output += "   SUBSCRIPTION: \(subscriptionId)\n"
             output += "   ERROR: \(error)"
-        }
+            }
 
-        NDKLogger.logHandler?(output)
+            let config = NDKLoggerConfig.shared
+            await config.logHandler?(output)
+        }
     }
 }

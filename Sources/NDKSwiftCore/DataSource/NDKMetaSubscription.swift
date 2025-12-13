@@ -120,7 +120,7 @@ private actor MetaSubscriptionStateManager {
 /// ```
 @available(iOS 17.0, macOS 14.0, *)
 @Observable
-public final class NDKMetaSubscription: Sendable {
+public final class NDKMetaSubscription {
     // MARK: - Public Properties
 
     /// The pointed-to events, sorted according to current sort mode

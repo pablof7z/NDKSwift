@@ -182,16 +182,11 @@ public enum NDKLogCategory: String, CaseIterable, Sendable {
     case signature = "SIGNATURE" // Signature verification
 }
 
-/// NDK Logger for configurable logging
-public enum NDKLogger {
-    /// Current log level
-    ///
-    /// **Concurrency Safety**: `nonisolated(unsafe)` is acceptable here because:
-    /// - Typically set once at app startup, rarely modified during runtime
-    /// - Logging is a cross-cutting concern that shouldn't require `await`
-    /// - Worst case: a log message uses stale config value (acceptable for logging)
-    /// - Standard practice in logging libraries to accept this trade-off
-    public nonisolated(unsafe) static var logLevel: NDKLogLevel = {
+/// Thread-safe configuration for NDK Logger
+actor NDKLoggerConfig {
+    static let shared = NDKLoggerConfig()
+
+    var logLevel: NDKLogLevel = {
         #if DEBUG
             return .info
         #else
@@ -199,104 +194,107 @@ public enum NDKLogger {
         #endif
     }()
 
-    /// Enable/disable network traffic logging
-    ///
-    /// **Concurrency Safety**: `nonisolated(unsafe)` is acceptable here because:
-    /// - Typically set once at app startup, rarely modified during runtime
-    /// - Logging is a cross-cutting concern that shouldn't require `await`
-    /// - Worst case: a log message uses stale config value (acceptable for logging)
-    /// - Standard practice in logging libraries to accept this trade-off
-    public nonisolated(unsafe) static var logNetworkTraffic: Bool = false
-
-    /// Enable/disable pretty printing for network messages
-    ///
-    /// **Concurrency Safety**: `nonisolated(unsafe)` is acceptable here because:
-    /// - Typically set once at app startup, rarely modified during runtime
-    /// - Logging is a cross-cutting concern that shouldn't require `await`
-    /// - Worst case: a log message uses stale config value (acceptable for logging)
-    /// - Standard practice in logging libraries to accept this trade-off
-    public nonisolated(unsafe) static var prettyPrintNetworkMessages: Bool = true
-
-    /// Check if logging is enabled (log level is not off)
-    public static var isEnabled: Bool {
-        return logLevel != .off
-    }
-
-    /// Categories to log - default excludes noisiest categories for better experience
-    ///
-    /// **Concurrency Safety**: `nonisolated(unsafe)` is acceptable here because:
-    /// - Typically set once at app startup, rarely modified during runtime
-    /// - Logging is a cross-cutting concern that shouldn't require `await`
-    /// - Worst case: a log message uses stale category filter (acceptable for logging)
-    /// - Standard practice in logging libraries to accept this trade-off
-    public nonisolated(unsafe) static var enabledCategories: Set<NDKLogCategory> = {
+    var logNetworkTraffic: Bool = false
+    var prettyPrintNetworkMessages: Bool = true
+    var enabledCategories: Set<NDKLogCategory> = {
         var categories = Set(NDKLogCategory.allCases)
-        // Remove noisiest categories by default
         categories.remove(.database)
         categories.remove(.performance)
         return categories
     }()
+    var logHandler: (@Sendable (String) -> Void)?
+
+    func setLogLevel(_ level: NDKLogLevel) {
+        logLevel = level
+    }
+
+    func setEnabledCategories(_ categories: Set<NDKLogCategory>) {
+        enabledCategories = categories
+    }
+
+    func setLogNetworkTraffic(_ enabled: Bool) {
+        logNetworkTraffic = enabled
+    }
+
+    func setLogHandler(_ handler: (@Sendable (String) -> Void)?) {
+        logHandler = handler
+    }
+
+    private init() {}
+}
+
+/// NDK Logger for configurable logging
+public enum NDKLogger {
+    /// Check if logging is enabled (log level is not off)
+    public static var isEnabled: Bool {
+        get async {
+            await NDKLoggerConfig.shared.logLevel != .off
+        }
+    }
 
     /// Configure the logger
     public static func configure(
         logLevel: NDKLogLevel? = nil,
         enabledCategories: Set<NDKLogCategory>? = nil,
         logNetworkTraffic: Bool? = nil
-    ) {
+    ) async {
         if let level = logLevel {
-            self.logLevel = level
+            await NDKLoggerConfig.shared.setLogLevel(level)
         }
         if let categories = enabledCategories {
-            self.enabledCategories = categories
+            await NDKLoggerConfig.shared.setEnabledCategories(categories)
         }
         if let traffic = logNetworkTraffic {
-            self.logNetworkTraffic = traffic
+            await NDKLoggerConfig.shared.setLogNetworkTraffic(traffic)
         }
     }
 
-    /// Custom log handler for external integration
-    ///
-    /// **Concurrency Safety**: `nonisolated(unsafe)` is acceptable here because:
-    /// - Set once at app startup before any logging occurs
-    /// - Never modified after initial configuration
-    /// - Logging is a cross-cutting concern that shouldn't require `await`
-    /// - Standard practice in logging libraries to accept this trade-off
-    public nonisolated(unsafe) static var logHandler: ((String) -> Void)?
+    /// Set custom log handler for external integration
+    public static func setLogHandler(_ handler: (@Sendable (String) -> Void)?) async {
+        await NDKLoggerConfig.shared.setLogHandler(handler)
+    }
 
     /// Log a message at the specified level
     public static func log(_ level: NDKLogLevel, category: NDKLogCategory, _ message: String) {
-        guard level <= logLevel else { return }
-        guard enabledCategories.contains(category) else { return }
+        Task {
+            let config = NDKLoggerConfig.shared
+            let currentLogLevel = await config.logLevel
+            guard level <= currentLogLevel else { return }
+            let enabledCategories = await config.enabledCategories
+            guard enabledCategories.contains(category) else { return }
 
-        let now = Date()
-        let timestamp = DateFormatters.iso8601.string(from: now)
-        let emoji = NDKLogFormatter.emojiForCategory(category)
-        let formattedMessage = "[\(timestamp)] [\(category.rawValue)] [\(level)] \(emoji) \(message)"
+            let now = Date()
+            let timestamp = DateFormatters.iso8601.string(from: now)
+            let emoji = NDKLogFormatter.emojiForCategory(category)
+            let formattedMessage = "[\(timestamp)] [\(category.rawValue)] [\(level)] \(emoji) \(message)"
 
-        // Add to log buffer for developer tools
-        let entry = NDKLogEntry(timestamp: now, level: level, category: category, message: message)
-        Task { await NDKLogBuffer.shared.addEntry(entry) }
+            // Add to log buffer for developer tools
+            let entry = NDKLogEntry(timestamp: now, level: level, category: category, message: message)
+            await NDKLogBuffer.shared.addEntry(entry)
 
-        if let handler = logHandler {
-            handler(formattedMessage)
-        } else {
-            #if DEBUG
-                print(formattedMessage)
-            #endif
+            if let handler = await config.logHandler {
+                handler(formattedMessage)
+            } else {
+                #if DEBUG
+                    print(formattedMessage)
+                #endif
+            }
         }
     }
 
     /// Log a network message for protocol-level debugging
     public static func logNetwork(relay: String, direction: NDKNetworkMessage.Direction, messageType: String, raw: String) {
-        guard logNetworkTraffic else { return }
+        Task {
+            guard await NDKLoggerConfig.shared.logNetworkTraffic else { return }
 
-        let message = NDKNetworkMessage(relay: relay, direction: direction, messageType: messageType, raw: raw)
-        Task { await NDKLogBuffer.shared.addNetworkMessage(message) }
+            let message = NDKNetworkMessage(relay: relay, direction: direction, messageType: messageType, raw: raw)
+            await NDKLogBuffer.shared.addNetworkMessage(message)
 
-        // Also log to regular log if network category is enabled
-        if enabledCategories.contains(.network) {
-            let dirSymbol = direction.rawValue
-            log(.debug, category: .network, "\(dirSymbol) [\(relay)] \(messageType)")
+            // Also log to regular log if network category is enabled
+            if await NDKLoggerConfig.shared.enabledCategories.contains(.network) {
+                let dirSymbol = direction.rawValue
+                log(.debug, category: .network, "\(dirSymbol) [\(relay)] \(messageType)")
+            }
         }
     }
 
@@ -308,12 +306,17 @@ public enum NDKLogger {
 
     /// Log structured data for searchable logs
     public static func logStructured(_ level: NDKLogLevel, category: NDKLogCategory, _ data: [String: Any]) {
-        guard level <= logLevel else { return }
-        guard enabledCategories.contains(category) else { return }
+        Task {
+            let config = NDKLoggerConfig.shared
+            let currentLogLevel = await config.logLevel
+            guard level <= currentLogLevel else { return }
+            let enabledCategories = await config.enabledCategories
+            guard enabledCategories.contains(category) else { return }
 
-        let jsonData = try? JSONSerialization.data(withJSONObject: data, options: [.sortedKeys])
-        let jsonString = jsonData.flatMap { String(data: $0, encoding: .utf8) } ?? "<invalid JSON>"
-        log(level, category: category, jsonString)
+            let jsonData = try? JSONSerialization.data(withJSONObject: data, options: [.sortedKeys])
+            let jsonString = jsonData.flatMap { String(data: $0, encoding: .utf8) } ?? "<invalid JSON>"
+            log(level, category: category, jsonString)
+        }
     }
 
     /// Log performance timing automatically

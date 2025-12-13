@@ -106,16 +106,11 @@ public struct NDKUIRelayManagementView: View {
 
         // Add relay
         do {
-            let relay = await ndk.addRelay(cleanUrl)
-            if relay != nil {
-                await loadRelays()
+            _ = await ndk.addRelay(cleanUrl)
+            await loadRelays()
 
-                // Publish updated relay list
-                await publishRelayList()
-            } else {
-                errorMessage = "Failed to connect to relay"
-                showingError = true
-            }
+            // Publish updated relay list
+            await publishRelayList()
         }
     }
 

@@ -419,7 +419,7 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         NDKLogger.log(.info, category: .outbox, "📊 Relay mapping: \(unknownAuthors.count) unknown authors, \(authorsToDiscover.count) to discover")
 
         // Log current state of relayToAuthors before adding unknown authors
-        if NDKLogger.logLevel >= .debug && !relayToAuthors.isEmpty {
+        if !relayToAuthors.isEmpty {
             NDKLogger.log(.debug, category: .outbox, "📋 Current relayToAuthors mapping before adding unknown authors:")
             for (relay, authors) in relayToAuthors {
                 NDKLogger.log(.debug, category: .outbox, "  - \(relay): \(authors.count) authors")
@@ -455,10 +455,8 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         }
 
         NDKLogger.log(.info, category: .outbox, "✅ Created \(filtersByRelay.count) relay-specific filters")
-        if NDKLogger.logLevel >= .debug {
-            for (relay, _) in filtersByRelay {
-                NDKLogger.log(.debug, category: .outbox, "  - Filter for relay: \(relay)")
-            }
+        for (relay, _) in filtersByRelay {
+            NDKLogger.log(.debug, category: .outbox, "  - Filter for relay: \(relay)")
         }
 
         return OutboxFilterStrategy(
@@ -561,10 +559,8 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         NDKLogger.log(.info, category: .outbox, "✅ Updated relay info for \(event.pubkey.prefix(StringConstants.DisplayFormatting.hexPrefixLength)): \(readRelayUrls.count) read, \(writeRelayUrls.count) write")
 
         // Log specific relays discovered
-        if NDKLogger.logLevel >= .debug {
-            NDKLogger.log(.debug, category: .outbox, "📋 Read relays: \(readRelayUrls.sorted())")
-            NDKLogger.log(.debug, category: .outbox, "📋 Write relays: \(writeRelayUrls.sorted())")
-        }
+        NDKLogger.log(.debug, category: .outbox, "📋 Read relays: \(readRelayUrls.sorted())")
+        NDKLogger.log(.debug, category: .outbox, "📋 Write relays: \(writeRelayUrls.sorted())")
 
         // Emit relay discovery event
         let allRelays = readRelayUrls.union(writeRelayUrls)

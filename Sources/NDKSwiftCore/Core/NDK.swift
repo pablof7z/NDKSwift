@@ -11,22 +11,17 @@ public protocol NDKAuthenticationDelegate: AnyObject, Sendable {
 }
 
 /// Main entry point for NDKSwift
-/// **Sendable Conformance**: Uses @unchecked Sendable because:
-/// - NDK is designed as a singleton-style coordinator accessed from multiple contexts
-/// - Internal state is protected by actors (PendingAuthEventsManager, etc.)
-/// - Mutable properties (signer, cache, pool) are thread-safe types or accessed via MainActor
-/// - Typical usage pattern: created once, configured early, then used read-only
-public final class NDK: @unchecked Sendable {
+public final class NDK {
     // MARK: - Core Properties
 
     /// Active signer for this NDK instance
     public var signer: NDKSigner?
 
     /// Active session data for reactive filters
-    public internal(set) var sessionData: NDKSessionData?
+    public var sessionData: NDKSessionData?
 
     /// Cache for storing events (always present, defaults to in-memory)
-    public var cache: NDKCache
+    public let cache: NDKCache
 
     /// Active user (derived from signer)
     public var activeUser: NDKUser? {
@@ -42,10 +37,10 @@ public final class NDK: @unchecked Sendable {
     }
 
     /// Whether debug mode is enabled
-    public var debugMode: Bool = false
+    public let debugMode: Bool
 
     /// Signature verification configuration
-    public var signatureVerificationConfig: NDKSignatureVerificationConfig
+    public let signatureVerificationConfig: NDKSignatureVerificationConfig
 
     /// Signature verification delegate
     public weak var signatureVerificationDelegate: NDKSignatureVerificationDelegate?
@@ -54,13 +49,13 @@ public final class NDK: @unchecked Sendable {
     public weak var authenticationDelegate: NDKAuthenticationDelegate?
 
     /// Whether outbox model is enabled (default: true)
-    public var outboxEnabled: Bool = true
+    public let outboxEnabled: Bool
 
     /// Outbox configuration
-    public var outboxConfig: NDKOutboxConfig = .default
+    public let outboxConfig: NDKOutboxConfig
 
     /// Configuration for automatic client tagging (NIP-89)
-    public var clientTagConfig: NDKClientTagConfig?
+    public let clientTagConfig: NDKClientTagConfig?
 
     /// Actor to manage thread-safe access to pending auth events
     private actor PendingAuthEventsManager {
@@ -86,25 +81,37 @@ public final class NDK: @unchecked Sendable {
     // MARK: - Internal Components
 
     /// Event publishing and management
-    var eventManager: NDKEventManager!
+    lazy var eventManager: NDKEventManager = {
+        NDKEventManager(ndk: self, cache: self.cache)
+    }()
 
     /// Relay pool management
-    public var pool: NDKPool!
+    public lazy var pool: NDKPool = {
+        NDKPool(ndk: self)
+    }()
 
     /// User and profile management
-    public private(set) var profileManager: NDKProfileManager!
+    public lazy var profileManager: NDKProfileManager = {
+        NDKProfileManager(ndk: self)
+    }()
 
     /// Event tracker for managing event metadata
     public let eventTracker: NDKEventTracker = .init()
 
     /// Internal subscription manager for NDKSubscriptionManager
-    var internalSubscriptionManager: InternalSubscriptionManager!
+    lazy var internalSubscriptionManager: InternalSubscriptionManager = {
+        InternalSubscriptionManager(ndk: self)
+    }()
 
     /// Signature verification sampler
-    private let signatureVerificationSampler: NDKSignatureVerificationSampler
+    private lazy var signatureVerificationSampler: NDKSignatureVerificationSampler = {
+        NDKSignatureVerificationSampler(config: self.signatureVerificationConfig)
+    }()
 
     /// Data requirement manager for declarative data access
-    var dataRequirementManager: NDKSubscriptionManager?
+    lazy var dataRequirementManager: NDKSubscriptionManager = {
+        NDKSubscriptionManager(ndk: self)
+    }()
 
     /// Initial relay URLs to add after construction
     private var initialRelayURLs: [RelayURL] = []
@@ -144,40 +151,32 @@ public final class NDK: @unchecked Sendable {
     ///   - signer: Optional signer for signing events
     ///   - cache: Custom cache instance. If nil, uses MemoryCache
     ///   - signatureVerificationConfig: Configuration for signature verification
+    ///   - debugMode: Whether debug mode is enabled
+    ///   - outboxEnabled: Whether outbox model is enabled
+    ///   - outboxConfig: Outbox configuration
+    ///   - clientTagConfig: Configuration for automatic client tagging
     public init(
         relayURLs: [RelayURL] = [],
         signer: NDKSigner? = nil,
+        sessionData: NDKSessionData? = nil,
         cache: NDKCache? = nil,
-        signatureVerificationConfig: NDKSignatureVerificationConfig = .default
+        signatureVerificationConfig: NDKSignatureVerificationConfig = .default,
+        debugMode: Bool = false,
+        outboxEnabled: Bool = true,
+        outboxConfig: NDKOutboxConfig = .default,
+        clientTagConfig: NDKClientTagConfig? = nil
     ) {
         self.signer = signer
+        self.sessionData = sessionData
         self.cache = cache ?? MemoryCache()
         self.signatureVerificationConfig = signatureVerificationConfig
-        signatureVerificationSampler = NDKSignatureVerificationSampler(config: signatureVerificationConfig)
+        self.debugMode = debugMode
+        self.outboxEnabled = outboxEnabled
+        self.outboxConfig = outboxConfig
+        self.clientTagConfig = clientTagConfig
 
-        // Auth manager is now lazy-initialized on first access from MainActor
-
-        // Initialize internal subscription manager (must be early for event routing)
-        internalSubscriptionManager = InternalSubscriptionManager(ndk: self)
-
-        // Initialize core managers
-        // Note: These are initialized directly (not lazy) because they're essential
-        // for basic NDK operation and have interdependencies during startup
-        eventManager = NDKEventManager(
-            ndk: self,
-            cache: self.cache
-        )
-
-        pool = NDKPool(
-            ndk: self
-        )
-
-        profileManager = NDKProfileManager(
-            ndk: self
-        )
-
-        // Initialize data requirement manager for declarative API
-        dataRequirementManager = NDKSubscriptionManager(ndk: self)
+        // All managers are now lazy-initialized on first access
+        // This avoids initialization order issues with 'self'
 
         // Set shared NDK instance for NDKEventBuilder
         NDKEventBuilder.setSharedNDK(self)
