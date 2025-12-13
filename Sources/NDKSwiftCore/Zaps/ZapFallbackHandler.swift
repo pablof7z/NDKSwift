@@ -1,5 +1,4 @@
 import Foundation
-import NDKSwiftCore
 
 /// Protocol for handling zap failures/fallbacks (e.g., funding a Nutzap via Lightning)
 public protocol ZapFallbackHandler {
