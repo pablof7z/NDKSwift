@@ -1,7 +1,7 @@
 import Foundation
 import NDKSwiftCore
-import SwiftUI
 import Observation
+import SwiftUI
 
 // MARK: - Multiple Profiles Data Source
 
@@ -19,12 +19,12 @@ public class NDKUIMultipleProfilesDataSource {
 
     public init(ndk: NDK, pubkeys: Set<String>) {
         self.pubkeys = pubkeys
-        self.dataSource = ndk.subscribe(
+        dataSource = ndk.subscribe(
             filter: NDKFilter(
                 authors: Array(pubkeys),
                 kinds: [EventKind.metadata]
             ),
-            maxAge: 0,  // Real-time updates
+            maxAge: 0, // Real-time updates
             cachePolicy: .cacheWithNetwork
         )
 

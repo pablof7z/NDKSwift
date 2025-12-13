@@ -1,6 +1,6 @@
+import CashuSwift
 import Foundation
 import NDKSwiftCore
-import CashuSwift
 
 /// Manages wallet transaction history by merging multiple event types
 /// Uses NDKSubscription for fully reactive event processing
@@ -13,14 +13,14 @@ public actor WalletTransactionHistory {
     private weak var eventStream: NIP60WalletEventStream?
 
     // Transaction storage
-    private var transactions: [String: WalletTransaction] = [:]  // transactionId -> transaction
+    private var transactions: [String: WalletTransaction] = [:] // transactionId -> transaction
 
     // Lookup indices for efficient transaction finding
-    private var nutzapEventIndex: [String: String] = [:]         // nutzapId -> txId
-    private var historyEventIndex: [String: String] = [:]        // historyId -> txId
-    private var quoteIndex: [String: String] = [:]               // quoteId -> txId
-    private var paymentHashIndex: [String: String] = [:]         // paymentHash -> txId
-    private var recipientIndex: [String: [String]] = [:]         // recipientPubkey -> [txIds]
+    private var nutzapEventIndex: [String: String] = [:] // nutzapId -> txId
+    private var historyEventIndex: [String: String] = [:] // historyId -> txId
+    private var quoteIndex: [String: String] = [:] // quoteId -> txId
+    private var paymentHashIndex: [String: String] = [:] // paymentHash -> txId
+    private var recipientIndex: [String: [String]] = [:] // recipientPubkey -> [txIds]
 
     // Data sources for reactive event processing
     private var historyDataSource: NDKSubscription<NDKEvent>?
@@ -29,7 +29,7 @@ public actor WalletTransactionHistory {
 
     // Track user pubkey for filtering
     private var userPubkey: String?
-    
+
     // Relays for wallet operations
     private var relays: [String] = []
 
@@ -48,11 +48,11 @@ public actor WalletTransactionHistory {
 
     /// Set the event stream for real-time updates
     public func setEventStream(_ stream: NIP60WalletEventStream) {
-        self.eventStream = stream
+        eventStream = stream
     }
 
     // MARK: - Lifecycle
-    
+
     /// Update the relays to use for wallet operations
     public func updateRelays(_ newRelays: [String]) {
         relays = newRelays
@@ -80,11 +80,11 @@ public actor WalletTransactionHistory {
 
         // Create data sources
         let relayUrls = relays.isEmpty ? nil : Set(relays)
-        
+
         historyDataSource = NDKSubscription(
             ndk: ndk,
             filter: historyFilter,
-            maxAge: 0,  // Always fresh
+            maxAge: 0, // Always fresh
             cachePolicy: .cacheWithNetwork,
             relays: relayUrls,
             subscriptionId: "wallet-history"
@@ -310,7 +310,7 @@ public actor WalletTransactionHistory {
         // Extract nutzap data
         var amount: Int64 = 0
         for tag in event.tags {
-            if tag.count >= 2 && tag[0] == NostrConstants.TagName.proof {
+            if tag.count >= 2, tag[0] == NostrConstants.TagName.proof {
                 if let proofData = tag[1].data(using: .utf8) {
                     do {
                         let proof = try JSONCoding.decode(CashuSwift.Proof.self, from: proofData)
@@ -355,7 +355,7 @@ public actor WalletTransactionHistory {
             direction: .incoming,
             status: status,
             memo: nutzapData.comment ?? "Nutzap received",
-            mint: nil,  // Could extract from u tags if needed
+            mint: nil, // Could extract from u tags if needed
             timestamp: Date(nostrTimestamp: event.createdAt),
             events: TransactionEvents(nutzapEventId: event.id),
             lookupKeys: TransactionLookupKeys(nutzapEventId: event.id),
@@ -603,8 +603,8 @@ public actor WalletTransactionHistory {
         // Try to match by amount and type
         let candidates = transactions.values.filter { tx in
             tx.status == .pending &&
-            tx.amount == historyData.amount &&
-            matchesTransactionType(tx.type, historyData: historyData)
+                tx.amount == historyData.amount &&
+                matchesTransactionType(tx.type, historyData: historyData)
         }
 
         // If we have exactly one match, return it

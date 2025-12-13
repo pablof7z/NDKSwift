@@ -44,7 +44,7 @@ public enum NIP77MessageType: String {
 /// ```
 public struct NIP77Message {
     // MARK: - Properties
-    
+
     public let messageType: NIP77MessageType
     public let subscriptionId: String
     public let filter: NDKFilter?
@@ -167,10 +167,11 @@ public struct NIP77Message {
         }
 
         guard let typeString = array[0] as? String,
-              let messageType = NIP77MessageType(rawValue: typeString) else {
+              let messageType = NIP77MessageType(rawValue: typeString)
+        else {
             throw NIP77Error.invalidMessageType(String(describing: array[0]))
         }
-        
+
         guard let subscriptionId = array[1] as? String else {
             throw NIP77Error.invalidMessageFormat("Missing subscription ID")
         }
@@ -179,7 +180,8 @@ public struct NIP77Message {
         case .negOpen:
             guard array.count >= 4,
                   let filterDict = array[2] as? [String: Any],
-                  let initialMessage = array[3] as? String else {
+                  let initialMessage = array[3] as? String
+            else {
                 throw NIP77Error.missingRequiredField("filter or initialMessage")
             }
 
@@ -195,7 +197,8 @@ public struct NIP77Message {
 
         case .negMsg:
             guard array.count >= 3,
-                  let message = array[2] as? String else {
+                  let message = array[2] as? String
+            else {
                 throw NIP77Error.missingRequiredField("message")
             }
 
@@ -210,7 +213,8 @@ public struct NIP77Message {
 
         case .negErr:
             guard array.count >= 3,
-                  let reason = array[2] as? String else {
+                  let reason = array[2] as? String
+            else {
                 throw NIP77Error.missingRequiredField("reason")
             }
 
@@ -248,19 +252,19 @@ public enum NIP77Error: LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .invalidMessageType(let type):
+        case let .invalidMessageType(type):
             return "Invalid NIP-77 message type: \(type)"
-        case .invalidMessageFormat(let reason):
+        case let .invalidMessageFormat(reason):
             return "Invalid NIP-77 message format: \(reason)"
-        case .missingRequiredField(let field):
+        case let .missingRequiredField(field):
             return "Missing required field: \(field)"
-        case .syncFailed(let reason):
+        case let .syncFailed(reason):
             return "Negentropy sync failed: \(reason)"
-        case .relayError(let error):
+        case let .relayError(error):
             return ErrorMessageConstants.relayError(relay: "NIP-77", message: error)
         case .unsupportedByRelay:
             return "Relay does not support NIP-77"
-        case .timeout(let message):
+        case let .timeout(message):
             return ErrorMessageConstants.withContext(ErrorMessageConstants.Messages.timeout, context: message)
         }
     }
@@ -326,7 +330,8 @@ extension NDKFilter {
         var tags: [String: Set<String>] = [:]
         for (key, value) in dict {
             if key.hasPrefix("#"), key.count > 1,
-               let values = value as? [String] {
+               let values = value as? [String]
+            {
                 let tagName = String(key.dropFirst())
                 tags[tagName] = Set(values)
             }

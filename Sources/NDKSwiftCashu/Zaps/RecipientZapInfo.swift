@@ -4,7 +4,7 @@ import NDKSwiftCore
 /// All zap-related information for a recipient, fetched once and cached
 public struct RecipientZapInfo {
     public let pubkey: String
-    public let metadata: NDKUserMetadata?              // From kind:0
+    public let metadata: NDKUserMetadata? // From kind:0
     public let nutzapPreferences: NDKNutzapPreferences? // From kind:10019
     public let fetchedAt: Date
 

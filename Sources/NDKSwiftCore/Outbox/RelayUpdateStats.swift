@@ -7,13 +7,13 @@ import Foundation
 public struct RelayUpdateStats: Sendable {
     /// The number of currently active subscriptions across all relays
     public let activeSubscriptions: Int
-    
+
     /// The total number of authors whose relay preferences are unknown
     ///
     /// These authors will be queried through relay discovery to find their
     /// preferred relays for publishing and reading events.
     public let totalUnknownAuthors: Int
-    
+
     /// The total number of subscriptions created specifically for relay updates
     ///
     /// These subscriptions monitor for NIP-65 relay list metadata events

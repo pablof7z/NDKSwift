@@ -2,7 +2,6 @@ import Foundation
 
 /// Common validation helpers to reduce duplication and improve code clarity
 public enum ValidationHelpers {
-
     // MARK: - String Validation
 
     /// Check if a string has content (not empty after trimming whitespace)

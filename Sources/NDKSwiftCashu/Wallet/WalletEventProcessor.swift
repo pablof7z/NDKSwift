@@ -1,11 +1,10 @@
+import CashuSwift
 import Foundation
 import NDKSwiftCore
-import CashuSwift
 
 /// Consolidated processor for all wallet-related events
 /// Replaces the multiple EventHandler structs with a single, cohesive component
 actor WalletEventProcessor {
-
     /// Process a wallet event based on its kind
     func processEvent(_ event: NDKEvent, context: WalletEventContext) async {
         NDKLogger.log(.debug, category: .wallet, "Wallet event received: kind=\(event.kind)")
@@ -120,7 +119,6 @@ actor WalletEventProcessor {
 
     /// Process delete events (kind 5)
     private func processDeleteEvent(_ event: NDKEvent, context: WalletEventContext) async throws {
-
         // Find 'e' tags that reference events to delete
         let eventIdsToDelete = event.tags.eventIds
 
@@ -162,7 +160,7 @@ actor WalletEventProcessor {
 
         // Check for redeemed nutzap events in the clear tags
         for tag in event.tags {
-            if tag.count >= 4 && tag[0] == NostrConstants.TagName.event && tag[3] == NostrConstants.Marker.redeemed {
+            if tag.count >= 4, tag[0] == NostrConstants.TagName.event, tag[3] == NostrConstants.Marker.redeemed {
                 let redeemedNutzapId = tag[1]
                 NDKLogger.log(.info, category: .wallet, "Found redeemed nutzap in history: \(redeemedNutzapId)")
 

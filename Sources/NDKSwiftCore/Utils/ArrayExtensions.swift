@@ -28,7 +28,6 @@ public extension Array {
 
 /// Convenience extensions for arrays containing NDKEvent objects
 public extension Array where Element == NDKEvent {
-
     /// Returns the most recent event based on createdAt timestamp
     /// - Returns: The event with the highest createdAt value, or nil if array is empty
     ///
@@ -71,9 +70,8 @@ public extension Array where Element == NDKEvent {
     /// let sorted = events.sortedByRecency()
     /// ```
     func sortedByRecency() -> [NDKEvent] {
-        return self.sorted(by: { $0.createdAt > $1.createdAt })
+        return sorted(by: { $0.createdAt > $1.createdAt })
     }
-
 }
 
 // MARK: - Array Mutation Extensions
@@ -93,4 +91,3 @@ public extension Array {
         return removed
     }
 }
-

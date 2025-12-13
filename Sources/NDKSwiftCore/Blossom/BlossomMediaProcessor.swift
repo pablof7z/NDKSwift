@@ -1,38 +1,37 @@
 import Foundation
 #if canImport(UIKit)
-import UIKit
+    import UIKit
 #elseif canImport(AppKit)
-import AppKit
+    import AppKit
 #endif
 
 /// Processes media files to extract metadata like dimensions
 public enum BlossomMediaProcessor {
-
     /// Process image data to extract dimensions
     /// - Parameter data: The image data
     /// - Returns: Image dimensions, or nil if not an image
     public static func processImage(_ data: Data) -> (width: Int, height: Int)? {
         #if canImport(UIKit)
-        guard let image = UIImage(data: data) else { return nil }
-        let size = image.size
-        let scale = image.scale
-        let pixelWidth = Int(size.width * scale)
-        let pixelHeight = Int(size.height * scale)
+            guard let image = UIImage(data: data) else { return nil }
+            let size = image.size
+            let scale = image.scale
+            let pixelWidth = Int(size.width * scale)
+            let pixelHeight = Int(size.height * scale)
 
-        return (width: pixelWidth, height: pixelHeight)
+            return (width: pixelWidth, height: pixelHeight)
 
         #elseif canImport(AppKit)
-        guard let image = NSImage(data: data) else { return nil }
+            guard let image = NSImage(data: data) else { return nil }
 
-        // For macOS, we need to get the pixel dimensions differently
-        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-            return nil
-        }
+            // For macOS, we need to get the pixel dimensions differently
+            guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+                return nil
+            }
 
-        let pixelWidth = cgImage.width
-        let pixelHeight = cgImage.height
+            let pixelWidth = cgImage.width
+            let pixelHeight = cgImage.height
 
-        return (width: pixelWidth, height: pixelHeight)
+            return (width: pixelWidth, height: pixelHeight)
         #endif
     }
 
@@ -40,7 +39,7 @@ public enum BlossomMediaProcessor {
     public static func isProcessableImageType(_ mimeType: String?) -> Bool {
         guard let mimeType = mimeType?.lowercased() else { return false }
         return mimeType.hasPrefix("image/") &&
-               (mimeType.contains("jpeg") ||
+            (mimeType.contains("jpeg") ||
                 mimeType.contains("jpg") ||
                 mimeType.contains("png") ||
                 mimeType.contains("webp") ||
@@ -82,8 +81,9 @@ public enum BlossomMediaProcessor {
             return "image/gif"
         } else if Array(bytes[ImageSignatures.webpOffset...]).starts(with: ImageSignatures.webp) {
             return "image/webp"
-        } else if Array(bytes[ImageSignatures.ftypOffset...]).starts(with: ImageSignatures.ftypBox) &&
-                  Array(bytes[(ImageSignatures.ftypOffset + ImageSignatures.ftypBox.count)...]).starts(with: ImageSignatures.heicType) {
+        } else if Array(bytes[ImageSignatures.ftypOffset...]).starts(with: ImageSignatures.ftypBox),
+                  Array(bytes[(ImageSignatures.ftypOffset + ImageSignatures.ftypBox.count)...]).starts(with: ImageSignatures.heicType)
+        {
             return "image/heic"
         }
 

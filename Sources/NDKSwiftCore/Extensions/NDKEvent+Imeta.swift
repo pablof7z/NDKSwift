@@ -2,7 +2,6 @@ import Foundation
 
 /// Extension for NDKEvent to handle NIP-92 imeta tag extraction
 public extension NDKEvent {
-
     /// Extract all imeta tags from this event
     /// - Returns: Array of NDKImetaTag objects parsed from the event's tags
     var imetas: [NDKImetaTag] {

@@ -36,9 +36,9 @@ let followPack = try await NDKFollowPackBuilder(ndk: ndk)
     .description("A curated list of Bitcoin Core developers and contributors")
     .identifier("bitcoin-devs-\(Timestamp.now)")
     .pubkeys([
-        "82341f882b6eabcd2ba7f1ef90aad961cf074af15b9ef44a09f9d2a8fbfbe6a2",  // jack
-        "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d",  // fiatjaf
-        "32e1827635450ebb3c5a7d12c1f8e7b2b514439ac10a67eef3d9fd9c5c68e245",  // jb55
+        "82341f882b6eabcd2ba7f1ef90aad961cf074af15b9ef44a09f9d2a8fbfbe6a2", // jack
+        "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d", // fiatjaf
+        "32e1827635450ebb3c5a7d12c1f8e7b2b514439ac10a67eef3d9fd9c5c68e245", // jb55
     ])
     .image(NDKImetaTag(
         url: "https://example.com/bitcoin-devs.jpg",
@@ -55,13 +55,13 @@ print("\n🎨 Creating a media follow pack...")
 
 // Create a media-focused follow pack
 let mediaFollowPack = try await NDKFollowPackBuilder(ndk: ndk)
-    .kind(EventKind.mediaFollowPack)  // Kind 39092 for media-focused packs
+    .kind(EventKind.mediaFollowPack) // Kind 39092 for media-focused packs
     .title("Nostr Photography")
     .description("Amazing photographers sharing their work on Nostr")
     .identifier("nostr-photography")
-    .image("https://example.com/photography-pack.jpg")  // Simple image URL
-    .addPubkey("npub1234...")  // Example photographer 1
-    .addPubkey("npub5678...")  // Example photographer 2
+    .image("https://example.com/photography-pack.jpg") // Simple image URL
+    .addPubkey("npub1234...") // Example photographer 1
+    .addPubkey("npub5678...") // Example photographer 2
     .publish()
 
 print("✅ Published media follow pack")
@@ -83,7 +83,7 @@ for await event in userPacksObserver.events {
     let pack = NDKFollowPack(event: event, ndk: ndk)
     userPacks.append(pack)
     print("  - \(pack.title ?? "Untitled") (\(pack.pubkeys.count) pubkeys)")
-    
+
     // For demo purposes, break after getting a few
     if userPacks.count >= 5 {
         break
@@ -103,7 +103,7 @@ for await event in specificObserver.events {
     print("\n📦 Found specific pack: \(fetchedPack.title ?? "Untitled")")
     print("   Description: \(fetchedPack.description ?? "No description")")
     print("   Contains \(fetchedPack.pubkeys.count) pubkeys")
-    break  // Just get the first one
+    break // Just get the first one
 }
 
 // Observe all follow packs (with limit)
@@ -115,11 +115,12 @@ var allPacks: [NDKFollowPack] = []
 for await event in allPacksObserver.events {
     let pack = NDKFollowPack(event: event, ndk: ndk)
     allPacks.append(pack)
-    
+
     if allPacks.count >= 10 {
         break
     }
 }
+
 print("Found \(allPacks.count) follow packs")
 
 // MARK: - Managing Follow Pack Contents
@@ -129,19 +130,19 @@ print("\n✏️ Managing follow pack contents...")
 // Demonstrate how to work with existing follow packs
 if let existingPack = allPacks.first {
     print("Found pack: \(existingPack.title ?? "Untitled")")
-    
+
     // Check if pack contains a specific pubkey
     let containsJack = existingPack.containsPubkey("82341f882b6eabcd2ba7f1ef90aad961cf074af15b9ef44a09f9d2a8fbfbe6a2")
     print("Contains jack: \(containsJack)")
-    
+
     // To update a pack, create a new version with modified content
     let updatedPack = try await ndk.followPack()
         .title("\(existingPack.title ?? "") - Updated")
         .description(existingPack.description ?? "")
         .identifier(existingPack.identifier ?? "updated-pack")
-        .pubkeys(existingPack.pubkeys + ["newpubkey123..."])  // Add new pubkey
+        .pubkeys(existingPack.pubkeys + ["newpubkey123..."]) // Add new pubkey
         .publish()
-    
+
     print("✅ Published updated pack")
 }
 
@@ -165,9 +166,9 @@ print("\n🎯 Advanced usage examples...")
 let advancedPack = try await NDKFollowPackBuilder(ndk: ndk)
     .title("Nostr Protocol Developers")
     .description("""
-        Core developers and contributors to the Nostr protocol.
-        This list includes NIP authors and implementers.
-        """)
+    Core developers and contributors to the Nostr protocol.
+    This list includes NIP authors and implementers.
+    """)
     .identifier("nostr-protocol-devs")
     .image(NDKImetaTag(
         url: "https://primary.com/image.jpg",
@@ -176,14 +177,14 @@ let advancedPack = try await NDKFollowPackBuilder(ndk: ndk)
         alt: "Nostr Protocol Developers",
         fallback: [
             "https://backup1.com/image.jpg",
-            "https://backup2.com/image.jpg"
+            "https://backup2.com/image.jpg",
         ]
     ))
     .pubkeys([
         "valid_64_char_hex_pubkey_1_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "valid_64_char_hex_pubkey_2_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        "valid_64_char_hex_pubkey_2_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     ])
-    .build()  // Just build, don't publish
+    .build() // Just build, don't publish
 
 print("📦 Created advanced pack with:")
 print("   - Rich image metadata including blurhash")

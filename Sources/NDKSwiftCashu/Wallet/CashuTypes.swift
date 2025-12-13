@@ -1,6 +1,6 @@
+import CashuSwift
 import Foundation
 import NDKSwiftCore
-import CashuSwift
 
 // MARK: - Payment Types
 
@@ -26,7 +26,7 @@ public struct CashuMintQuote: Codable {
 /// Deposit status for monitoring Lightning deposits to mint
 public enum DepositStatus {
     case pending
-    case minted(proofs: [CashuSwift.Proof])  // Tokens successfully minted after deposit
+    case minted(proofs: [CashuSwift.Proof]) // Tokens successfully minted after deposit
     case expired
     case cancelled
 }

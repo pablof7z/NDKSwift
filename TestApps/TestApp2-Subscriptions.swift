@@ -24,14 +24,14 @@ import NDKSwift
 
 // MARK: - Test Configuration
 
-let TIMEOUT_SHORT = 2_000_000_000  // 2 seconds
+let TIMEOUT_SHORT = 2_000_000_000 // 2 seconds
 let TIMEOUT_MEDIUM = 5_000_000_000 // 5 seconds
-let TIMEOUT_LONG = 10_000_000_000  // 10 seconds
+let TIMEOUT_LONG = 10_000_000_000 // 10 seconds
 
 let TEST_RELAYS = [
     "wss://relay.damus.io",
     "wss://relay.primal.net",
-    "wss://nos.lol"
+    "wss://nos.lol",
 ]
 
 // Well-known test pubkeys
@@ -249,16 +249,16 @@ func testRelayUpdates() async throws {
     let updateTask = Task {
         for await update in subscription.relayUpdates {
             switch update {
-            case .event(let event, let relay):
+            case let .event(event, relay):
                 eventCount += 1
                 print("   Event from \(relay): \(String(event.id.prefix(16)))")
-            case .eose(let relay):
+            case let .eose(relay):
                 eoseCount += 1
                 print("   EOSE from \(relay)")
             case .aggregatedEose:
                 aggregatedEose = true
                 print("   AGGREGATED EOSE received")
-            case .closed(let relay):
+            case let .closed(relay):
                 closedCount += 1
                 print("   Closed on \(relay)")
             }
@@ -453,7 +453,7 @@ func testEventFiltering() async throws {
     print("   Matching event: \(matches1)")
     print("   Non-matching event: \(matches2)")
 
-    if matches1 && !matches2 {
+    if matches1, !matches2 {
         printSuccess("Filter matching works correctly")
     } else {
         printFailure("Filter matching failed")
@@ -491,7 +491,7 @@ func testEventFiltering() async throws {
     print("   Event with tag: \(tagMatches1)")
     print("   Event without tag: \(tagMatches2)")
 
-    if tagMatches1 && !tagMatches2 {
+    if tagMatches1, !tagMatches2 {
         printSuccess("Tag filtering works correctly")
     } else {
         printFailure("Tag filtering failed")
@@ -536,7 +536,7 @@ func testEventFiltering() async throws {
     print("   Recent event in range: \(timeMatches1)")
     print("   Old event outside range: \(timeMatches2)")
 
-    if timeMatches1 && !timeMatches2 {
+    if timeMatches1, !timeMatches2 {
         printSuccess("Time range filtering works correctly")
     } else {
         printFailure("Time range filtering failed")

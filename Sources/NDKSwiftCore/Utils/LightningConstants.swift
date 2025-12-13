@@ -1,10 +1,9 @@
 import Foundation
 
 /// Constants for Lightning Network protocol
-public struct LightningConstants {
-
+public enum LightningConstants {
     /// Lightning invoice prefixes for different networks
-    public struct Prefixes {
+    public enum Prefixes {
         /// Bitcoin mainnet invoice prefix
         public static let mainnet = "lnbc"
 

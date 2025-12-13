@@ -1,13 +1,12 @@
 /// Consolidated Nostr protocol constants for consistent usage across the codebase
 public enum NostrConstants {
-
     // MARK: - Protocol Prefixes
 
     public static let nostrPrefix = "nostr:"
     public static let nostrPrefixLength = 6
-    
+
     // MARK: - NIP-05 Constants
-    
+
     /// NIP-05 related error messages and formats
     public enum NIP05 {
         public static let expectedFormat = "Expected format: name@domain"
@@ -24,7 +23,7 @@ public enum NostrConstants {
     public static let naddrPrefix = "naddr1"
 
     // MARK: - Cryptographic Constants
-    
+
     /// Cashu public key prefix for compressed keys
     public static let cashuCompressedKeyPrefix = "02"
 
@@ -169,10 +168,10 @@ public enum NostrConstants {
 
         /// Uppercase kind tag ("K") - used in comment threads
         public static let uppercaseKind = "K"
-        
+
         /// Client tag ("client") - for NIP-89 client identification
         public static let client = "client"
-        
+
         /// Private key tag ("privkey") - for encrypted private key storage
         public static let privkey = "privkey"
     }

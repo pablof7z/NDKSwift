@@ -2,7 +2,6 @@ import Foundation
 
 /// Centralized error message constants and helpers to ensure consistency
 public enum ErrorMessageConstants {
-
     // MARK: - Common Error Prefixes
 
     /// Failed to perform an operation
@@ -46,12 +45,12 @@ public enum ErrorMessageConstants {
     // MARK: - Specific Error Messages
 
     /// Common error messages used throughout the codebase
-    public struct Messages {
+    public enum Messages {
         /// Signer-related errors
         public static let noSignerConfigured = "No signer configured"
         public static let noSignerAvailable = "No signer available"
         public static let signerNotAvailable = "Signer not available"
-        
+
         /// NDK-related errors
         public static let noNDKConfigured = "No NDK instance configured"
 
@@ -80,7 +79,7 @@ public enum ErrorMessageConstants {
         public static let requestFailed = "Request failed"
         public static let timeout = "Request timed out"
         public static let serverError = "Server error"
-        
+
         /// Blossom-specific errors
         public static let blossomAuthorizationFailed = "Blossom authorization failed"
         public static let blossomServerNotResponding = "Blossom server not responding"

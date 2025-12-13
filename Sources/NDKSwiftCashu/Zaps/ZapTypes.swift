@@ -13,15 +13,15 @@ public enum ZapType {
 /// Nutzap payment request - includes accepted mints
 public struct NutzapPaymentRequest: PaymentRequest {
     public let amountSats: Int64
-    public let recipientPubkey: String  // Nostr pubkey for the p tag
-    public let recipientP2PK: String    // P2PK key for locking proofs
-    public let acceptedMints: [URL]     // All mints the recipient accepts
+    public let recipientPubkey: String // Nostr pubkey for the p tag
+    public let recipientP2PK: String // P2PK key for locking proofs
+    public let acceptedMints: [URL] // All mints the recipient accepts
     public let comment: String?
 
     public init(amountSats: Int64, recipientPubkey: String, recipientP2PK: String, acceptedMints: [URL], comment: String? = nil) {
         self.amountSats = amountSats
-        self.recipientPubkey = recipientPubkey  // Nostr pubkey
-        self.recipientP2PK = recipientP2PK      // P2PK key
+        self.recipientPubkey = recipientPubkey // Nostr pubkey
+        self.recipientP2PK = recipientP2PK // P2PK key
         self.acceptedMints = acceptedMints
         self.comment = comment
     }
@@ -73,11 +73,11 @@ public enum ZapError: LocalizedError {
             return "Recipient does not support zaps"
         case .noLNURL:
             return "Recipient has no Lightning address configured"
-        case .invalidLNURL(let details):
+        case let .invalidLNURL(details):
             return ErrorMessageConstants.withContext(ErrorMessageConstants.invalid("LNURL"), context: details)
-        case .invoiceFetchFailed(let reason):
+        case let .invoiceFetchFailed(reason):
             return ErrorMessageConstants.operationFailed("fetch invoice", reason: reason)
-        case .lnurlProviderError(let message):
+        case let .lnurlProviderError(message):
             return "LNURL provider error: \(message)"
         case .nutzapPreferencesNotFound:
             return "Recipient has not configured Nutzap preferences"
@@ -89,25 +89,25 @@ public enum ZapError: LocalizedError {
             return ErrorMessageConstants.invalid("payment confirmation")
         case .noWalletConfigured:
             return "No wallet configured for payment"
-        case .paymentFailed(let reason):
+        case let .paymentFailed(reason):
             return "Payment failed: \(reason)"
         case .timeoutWaitingForReceipt:
             return "Timeout waiting for zap receipt"
         case .invalidZapReceipt:
             return ErrorMessageConstants.invalid("zap receipt")
-        case .mintConnectionFailed(let mint, let reason):
+        case let .mintConnectionFailed(mint, reason):
             return ErrorMessageConstants.operationFailed("connect to mint \(mint)", reason: reason)
-        case .mintQuoteFailed(let mint, let reason):
+        case let .mintQuoteFailed(mint, reason):
             return ErrorMessageConstants.operationFailed("get quote from mint \(mint)", reason: reason)
-        case .mintTokenCreationFailed(let mint, let reason):
+        case let .mintTokenCreationFailed(mint, reason):
             return ErrorMessageConstants.operationFailed("create tokens at mint \(mint)", reason: reason)
-        case .allMintsFailed(let attempts):
+        case let .allMintsFailed(attempts):
             return "All \(attempts) mint(s) failed to process the payment"
-        case .noCommonMints(let wallet, let recipient):
+        case let .noCommonMints(wallet, recipient):
             return "No common mints between wallet (\(wallet.joined(separator: ", "))) and recipient (\(recipient.joined(separator: ", ")))"
         case .endpointDoesNotSupportZaps:
             return "Endpoint does not support zaps"
-        case .amountOutOfRange(let min, let max):
+        case let .amountOutOfRange(min, max):
             return "Amount out of range: \(min) - \(max) sats"
         case .signerNotAvailable:
             return "No signer available to create zap request"

@@ -21,17 +21,18 @@ struct AsciiCharacter: ExpressibleByStringLiteral, CustomStringConvertible, Equa
 
     init?(_ cchar: CChar) {
         guard cchar < 127 else { return nil }
-        self.value = UInt8(cchar)
+        value = UInt8(cchar)
     }
 
     init?(_ character: Character) {
         guard let asciiValue = character.asciiValue, asciiValue < 128 else {
             return nil
         }
-        self.value = asciiValue
+        value = asciiValue
     }
 
     // MARK: - ExpressibleByStringLiteral conformance
+
     init(stringLiteral value: StringLiteralType) {
         guard value.count == 1, let character = value.first, let ascii = AsciiCharacter(character) else {
             fatalError("Invalid ASCII character initialization.")

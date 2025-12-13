@@ -25,7 +25,7 @@ public extension NDK {
             }
         }
     }
-    
+
     /// Require a signer and return the current user
     /// Throws an error if no signer is configured
     func requireCurrentUser() async throws -> NDKUser {

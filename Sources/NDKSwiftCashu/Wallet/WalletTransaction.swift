@@ -1,6 +1,6 @@
+import CashuSwift
 import Foundation
 import NDKSwiftCore
-import CashuSwift
 
 // MARK: - WalletTransaction
 
@@ -70,19 +70,19 @@ public struct WalletTransaction: Identifiable, Sendable {
         errorDetails: String? = nil
     ) -> WalletTransaction {
         return WalletTransaction(
-            id: self.id,  // Keep the same ID
-            type: self.type,
-            amount: self.amount,
-            direction: self.direction,
+            id: id, // Keep the same ID
+            type: type,
+            amount: amount,
+            direction: direction,
             status: status ?? self.status,
             memo: memo ?? self.memo,
-            mint: self.mint,
-            timestamp: self.timestamp,
+            mint: mint,
+            timestamp: timestamp,
             events: events ?? self.events,
-            lookupKeys: self.lookupKeys,
-            nutzapData: self.nutzapData,
-            lightningData: self.lightningData,
-            ecashTokenData: self.ecashTokenData,
+            lookupKeys: lookupKeys,
+            nutzapData: nutzapData,
+            lightningData: lightningData,
+            ecashTokenData: ecashTokenData,
             errorDetails: errorDetails ?? self.errorDetails
         )
     }
@@ -92,10 +92,10 @@ public struct WalletTransaction: Identifiable, Sendable {
 
 /// Tracks which Nostr events are associated with this transaction
 public struct TransactionEvents: Sendable {
-    public let spendingHistoryId: String?  // kind 7376
-    public let nutzapEventId: String?       // kind 9321
-    public let tokenEventIds: [String]      // kind 7375
-    public let quoteEventId: String?        // kind 7374
+    public let spendingHistoryId: String? // kind 7376
+    public let nutzapEventId: String? // kind 9321
+    public let tokenEventIds: [String] // kind 7375
+    public let quoteEventId: String? // kind 7374
 
     public init(
         spendingHistoryId: String? = nil,
@@ -130,11 +130,11 @@ public struct TransactionEvents: Sendable {
 
 /// Keys for efficiently finding transactions
 public struct TransactionLookupKeys: Sendable {
-    public let nutzapEventId: String?      // For finding by 9321 event
-    public let spendingHistoryId: String?  // For finding by 7376 event
-    public let quoteId: String?            // For finding by mint quote
-    public let paymentHash: String?        // For finding by Lightning invoice
-    public let recipientPubkey: String?    // For finding outgoing nutzaps
+    public let nutzapEventId: String? // For finding by 9321 event
+    public let spendingHistoryId: String? // For finding by 7376 event
+    public let quoteId: String? // For finding by mint quote
+    public let paymentHash: String? // For finding by Lightning invoice
+    public let recipientPubkey: String? // For finding outgoing nutzaps
 
     public init(
         nutzapEventId: String? = nil,
@@ -154,13 +154,13 @@ public struct TransactionLookupKeys: Sendable {
 // MARK: - Transaction Types
 
 public enum WalletTransactionType: String, Sendable, CaseIterable {
-    case mint = "mint"           // Lightning -> Ecash (deposit)
-    case melt = "melt"           // Ecash -> Lightning (withdrawal)
-    case send = "send"           // Send ecash token
-    case receive = "receive"     // Receive ecash token
-    case nutzapSent = "nutzap_sent"       // Sent a nutzap
-    case nutzapReceived = "nutzap_received"  // Received a nutzap
-    case swap = "swap"           // Swap between mints
+    case mint // Lightning -> Ecash (deposit)
+    case melt // Ecash -> Lightning (withdrawal)
+    case send // Send ecash token
+    case receive // Receive ecash token
+    case nutzapSent = "nutzap_sent" // Sent a nutzap
+    case nutzapReceived = "nutzap_received" // Received a nutzap
+    case swap // Swap between mints
 
     public var displayName: String {
         switch self {
@@ -190,24 +190,24 @@ public enum WalletTransactionType: String, Sendable, CaseIterable {
 public enum TransactionDirection: String, Sendable {
     case incoming = "in"
     case outgoing = "out"
-    case neutral = "neutral"  // For swaps
+    case neutral // For swaps
 }
 
 public enum TransactionStatus: String, Sendable {
-    case pending = "pending"        // Created but no events yet
-    case processing = "processing"  // Partial events (e.g., 9321 but no 7376)
-    case completed = "completed"    // All expected events present
-    case failed = "failed"
-    case expired = "expired"
+    case pending // Created but no events yet
+    case processing // Partial events (e.g., 9321 but no 7376)
+    case completed // All expected events present
+    case failed
+    case expired
 }
 
 // MARK: - Type-Specific Data
 
 /// Data specific to nutzap transactions
 public struct NutzapData: Sendable {
-    public let senderPubkey: String?     // For received nutzaps
-    public let recipientPubkey: String?  // For sent nutzaps
-    public let nutzapEventId: String     // The 9321 event
+    public let senderPubkey: String? // For received nutzaps
+    public let recipientPubkey: String? // For sent nutzaps
+    public let nutzapEventId: String // The 9321 event
     public let comment: String?
     public let eventBeingZapped: String? // Optional event ID being zapped
 
@@ -241,7 +241,7 @@ public struct LightningData: Sendable {
 
 /// Data specific to ecash token transactions
 public struct EcashTokenData: Sendable {
-    public let tokenString: String?  // For offline tokens
+    public let tokenString: String? // For offline tokens
     public let proofCount: Int
 
     public init(tokenString: String? = nil, proofCount: Int) {
@@ -252,9 +252,9 @@ public struct EcashTokenData: Sendable {
 
 // MARK: - Convenience Extensions
 
-extension WalletTransaction {
+public extension WalletTransaction {
     /// The effective amount considering direction
-    public var signedAmount: Int64 {
+    var signedAmount: Int64 {
         switch direction {
         case .incoming: return amount
         case .outgoing: return -amount
@@ -263,7 +263,7 @@ extension WalletTransaction {
     }
 
     /// A display-friendly description
-    public var displayDescription: String {
+    var displayDescription: String {
         if let memo = memo, !memo.isEmpty {
             return memo
         }
@@ -290,19 +290,19 @@ extension WalletTransaction {
 
 // MARK: - Sorting
 
-extension Array where Element == WalletTransaction {
+public extension Array where Element == WalletTransaction {
     /// Sort transactions by timestamp (newest first)
-    public func sortedByDate() -> [WalletTransaction] {
-        self.sorted { $0.timestamp > $1.timestamp }
+    func sortedByDate() -> [WalletTransaction] {
+        sorted { $0.timestamp > $1.timestamp }
     }
 
     /// Filter by transaction type
-    public func filtered(by types: Set<WalletTransactionType>) -> [WalletTransaction] {
-        self.filter { types.contains($0.type) }
+    func filtered(by types: Set<WalletTransactionType>) -> [WalletTransaction] {
+        filter { types.contains($0.type) }
     }
 
     /// Filter by direction
-    public func filtered(by direction: TransactionDirection) -> [WalletTransaction] {
-        self.filter { $0.direction == direction }
+    func filtered(by direction: TransactionDirection) -> [WalletTransaction] {
+        filter { $0.direction == direction }
     }
 }

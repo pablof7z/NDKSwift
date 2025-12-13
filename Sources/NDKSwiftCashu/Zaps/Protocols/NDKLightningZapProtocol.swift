@@ -66,7 +66,8 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         // 2. Validate amount
         let amountMillisats = PaymentConstants.satsToMillisats(amountSats)
         guard amountMillisats >= endpoint.minSendable,
-              amountMillisats <= endpoint.maxSendable else {
+              amountMillisats <= endpoint.maxSendable
+        else {
             throw ZapError.amountOutOfRange(
                 min: PaymentConstants.millisatsToSats(endpoint.minSendable),
                 max: PaymentConstants.millisatsToSats(endpoint.maxSendable)
@@ -105,7 +106,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         let metadata: [String: Any] = [
             "zapRequest": zapRequest,
             "endpoint": endpoint,
-            "relays": recipientRelays
+            "relays": recipientRelays,
         ]
 
         return PreparedZap(
@@ -119,11 +120,12 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
 
     public func completeZap(
         prepared: PreparedZap,
-        confirmation: PaymentConfirmation
+        confirmation _: PaymentConfirmation
     ) async throws -> ZapResult {
         // Extract metadata
         guard let zapRequest = prepared.metadata["zapRequest"] as? NDKZapRequest,
-              let endpoint = prepared.metadata["endpoint"] as? LNURLPayEndpoint else {
+              let endpoint = prepared.metadata["endpoint"] as? LNURLPayEndpoint
+        else {
             throw NDKError.missingRequired("zapRequest and endpoint", in: "metadata")
         }
 
@@ -187,7 +189,8 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
             // Check if this receipt matches our zap request
             let receiptZapRequestId = receipt.zapRequestId
             if let zapRequestId = zapRequestId,
-               receiptZapRequestId == zapRequestId {
+               receiptZapRequestId == zapRequestId
+            {
                 // Validate the receipt if we have provider pubkey
                 if let providerPubkey = providerPubkey {
                     let isValid = receipt.validate(lnurlProviderPubkey: providerPubkey)
@@ -227,7 +230,6 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
     }
 
     private func resolveLNURL(address lnurlString: String) async throws -> LNURLPayEndpoint {
-
         // Convert Lightning address to URL if needed
         let url: URL
         if lnurlString.contains("@") {
@@ -253,7 +255,8 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
                 // Convert data to string
                 let data = Data(decoded.data)
                 guard let decodedString = String(data: data, encoding: .utf8),
-                      let lnurlURL = URL(string: decodedString) else {
+                      let lnurlURL = URL(string: decodedString)
+                else {
                     throw ZapError.invalidLNURL(ErrorMessageConstants.invalid("LNURL data"))
                 }
                 url = lnurlURL
@@ -313,13 +316,14 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
 
         // Build callback URL with parameters
         guard let callbackURL = URL(string: endpoint.callback),
-              var components = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false) else {
+              var components = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)
+        else {
             throw ZapError.invoiceFetchFailed(ErrorMessageConstants.withContext(ErrorMessageConstants.invalid("callback URL"), context: endpoint.callback))
         }
-        
+
         components.queryItems = [
             URLQueryItem(name: "amount", value: String(amountMillisats)),
-            URLQueryItem(name: "nostr", value: zapRequestJSON)
+            URLQueryItem(name: "nostr", value: zapRequestJSON),
         ]
 
         if let lnurl = zapRequest.lnurl {
@@ -338,7 +342,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
 
         // Parse response
         struct InvoiceResponse: Codable {
-            let pr: String  // Payment request (invoice)
+            let pr: String // Payment request (invoice)
         }
 
         let invoiceResponse = try JSONCoding.decode(InvoiceResponse.self, from: data)

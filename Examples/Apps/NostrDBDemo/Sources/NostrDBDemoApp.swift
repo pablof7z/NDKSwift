@@ -1,5 +1,5 @@
-import SwiftUI
 import NDKSwift
+import SwiftUI
 
 @main
 struct NostrDBDemoApp: App {
@@ -67,23 +67,23 @@ class NostrDBViewModel: ObservableObject {
             var cacheToUse: NDKCache
 
             #if targetEnvironment(simulator)
-            log("Running on Simulator - using SQLite cache (NostrDB not supported)")
-            let sqliteCache = try await NDKSQLiteCache(path: documentsPath.appendingPathComponent("ndk_cache.sqlite").path)
-            cacheToUse = sqliteCache
-            cacheType = "SQLite"
-            #else
-            do {
-                let nostrDB = try await NDKNostrDBCache(path: dbPath)
-                nostrDBCache = nostrDB
-                cacheToUse = nostrDB
-                cacheType = "NostrDB"
-                log("Using NostrDB cache backend")
-            } catch {
-                log("NostrDB unavailable (\(error.localizedDescription)), using SQLite fallback")
+                log("Running on Simulator - using SQLite cache (NostrDB not supported)")
                 let sqliteCache = try await NDKSQLiteCache(path: documentsPath.appendingPathComponent("ndk_cache.sqlite").path)
                 cacheToUse = sqliteCache
                 cacheType = "SQLite"
-            }
+            #else
+                do {
+                    let nostrDB = try await NDKNostrDBCache(path: dbPath)
+                    nostrDBCache = nostrDB
+                    cacheToUse = nostrDB
+                    cacheType = "NostrDB"
+                    log("Using NostrDB cache backend")
+                } catch {
+                    log("NostrDB unavailable (\(error.localizedDescription)), using SQLite fallback")
+                    let sqliteCache = try await NDKSQLiteCache(path: documentsPath.appendingPathComponent("ndk_cache.sqlite").path)
+                    cacheToUse = sqliteCache
+                    cacheType = "SQLite"
+                }
             #endif
 
             cache = cacheToUse
@@ -97,7 +97,7 @@ class NostrDBViewModel: ObservableObject {
                 relayUrls: [
                     "wss://relay.damus.io/",
                     "wss://nos.lol/",
-                    "wss://relay.nostr.band/"
+                    "wss://relay.nostr.band/",
                 ],
                 cache: cacheToUse
             )
@@ -308,7 +308,7 @@ class NostrDBViewModel: ObservableObject {
     private func createTestEvents(count: Int) -> [NDKEvent] {
         let testPubkey = "82341f882b6eabcd2ba7f1ef90aad961cf074af15b9ef44a09f9d2a8fbfbe6a2"
 
-        return (0..<count).map { i in
+        return (0 ..< count).map { i in
             NDKEvent(
                 id: String(format: "%064x", i),
                 pubkey: testPubkey,

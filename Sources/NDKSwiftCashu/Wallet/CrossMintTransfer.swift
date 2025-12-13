@@ -1,17 +1,16 @@
+import CashuSwift
 import Foundation
 import NDKSwiftCore
-import CashuSwift
 
 /// Functions for handling cross-mint transfers and payment routing
 public enum CrossMintTransfer {
-
     // MARK: - Mint Finding
 
     /// Find a mint that has sufficient balance and is in the intersection of accepted mints
     public static func findMintWithSufficientBalance(
         acceptedMints: Set<String>,
         requiredAmount: Int64,
-        mints: MintManager,
+        mints _: MintManager,
         proofStateManager: ProofStateManager,
         blacklistedMints: Set<String> = []
     ) async -> String? {
@@ -38,7 +37,7 @@ public enum CrossMintTransfer {
     public static func findAllMintsWithSufficientBalance(
         acceptedMints: Set<String>,
         requiredAmount: Int64,
-        mints: MintManager,
+        mints _: MintManager,
         proofStateManager: ProofStateManager,
         blacklistedMints: Set<String> = []
     ) async -> [String] {
@@ -60,7 +59,7 @@ public enum CrossMintTransfer {
     public static func findSourceMintForTransfer(
         amount: Int64,
         targetMint: String,
-        mints: MintManager,
+        mints _: MintManager,
         proofStateManager: ProofStateManager,
         feeBuffer: Int64 = PaymentConstants.defaultCashuFeeBuffer,
         blacklistedMints: Set<String> = []
@@ -71,7 +70,7 @@ public enum CrossMintTransfer {
         let proofsByMint = await proofStateManager.getAvailableProofsByMint()
 
         // Find mint with highest balance that can cover the transfer
-        var bestMint: (url: String, balance: Int64)? = nil
+        var bestMint: (url: String, balance: Int64)?
 
         for (mintURL, proofs) in proofsByMint {
             // Skip the target mint (no self-transfer) and blacklisted mints
@@ -129,7 +128,8 @@ public enum CrossMintTransfer {
             ) {
                 // Estimate fees for the transfer
                 if let sourceURL = URL(string: sourceMint),
-                   let targetURL = URL(string: targetMint) {
+                   let targetURL = URL(string: targetMint)
+                {
                     do {
                         let fees = try await estimateTransferFees(
                             amount: amount,
@@ -272,7 +272,7 @@ public enum CrossMintTransfer {
 
     /// Get total balance across all mints that actually have proofs
     private static func getTotalBalance(
-        mints: MintManager,
+        mints _: MintManager,
         proofStateManager: ProofStateManager
     ) async -> Int64 {
         // Get mints with actual proofs, not configured mints
@@ -291,4 +291,3 @@ public enum CrossMintTransfer {
         return total
     }
 }
-

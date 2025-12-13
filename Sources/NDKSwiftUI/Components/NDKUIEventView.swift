@@ -1,8 +1,8 @@
-import SwiftUI
 import NDKSwiftCore
+import SwiftUI
 
 #if canImport(UIKit)
-import UIKit
+    import UIKit
 #endif
 
 // MARK: - NDKUIEventView
@@ -34,7 +34,6 @@ import UIKit
 /// }
 /// ```
 public struct NDKUIEventView: View {
-
     // MARK: - Properties
 
     private let ndk: NDK
@@ -49,11 +48,11 @@ public struct NDKUIEventView: View {
     // MARK: - Supporting Types
 
     public enum EventStyle {
-        case full           // Full event display with all details
-        case feed           // Optimized for feed scrolling
-        case compact        // Minimal display for previews
-        case thread         // Optimized for thread views
-        case embedded       // For embedding in other content
+        case full // Full event display with all details
+        case feed // Optimized for feed scrolling
+        case compact // Minimal display for previews
+        case thread // Optimized for thread views
+        case embedded // For embedding in other content
     }
 
     // MARK: - Initialization
@@ -288,7 +287,8 @@ public struct NDKLongFormArticleView: View {
 
     private func extractPublishedAt() -> Timestamp? {
         if let publishedAtString = event.tagValue("published_at"),
-           let timestamp = Timestamp(publishedAtString) {
+           let timestamp = Timestamp(publishedAtString)
+        {
             return timestamp
         }
         return nil
@@ -497,7 +497,7 @@ private struct PictureGrid: View {
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
             }
-        case 3...4:
+        case 3 ... 4:
             GridImageView(urls: Array(imageURLs.prefix(4)), style: style)
         default:
             GridImageView(urls: Array(imageURLs.prefix(4)), style: style)
@@ -647,15 +647,15 @@ public struct NDKGenericEventView: View {
 // MARK: - Preview
 
 #if DEBUG
-struct NDKUIEventView_Previews: PreviewProvider {
-    static var previews: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                // Mock events for preview
-                // Note: These would need actual NDKEvent instances in real usage
+    struct NDKUIEventView_Previews: PreviewProvider {
+        static var previews: some View {
+            ScrollView {
+                VStack(spacing: 16) {
+                    // Mock events for preview
+                    // Note: These would need actual NDKEvent instances in real usage
+                }
+                .padding()
             }
-            .padding()
         }
     }
-}
 #endif

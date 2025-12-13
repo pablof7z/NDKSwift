@@ -13,7 +13,7 @@ public struct NDKContactEntry {
     }
 
     public init(pubkey: String, relayURL: String? = nil, petname: String? = nil) {
-        self.user = NDKUser(pubkey: pubkey)
+        user = NDKUser(pubkey: pubkey)
         self.relayURL = relayURL
         self.petname = petname
     }
@@ -54,9 +54,9 @@ public class NDKContactList: NDKList {
     public static let kind = EventKind.contacts
 
     /// Initialize a new contact list
-    public override init(ndk: NDK? = nil) {
+    override public init(ndk: NDK? = nil) {
         super.init(ndk: ndk)
-        self.kind = EventKind.contacts
+        kind = EventKind.contacts
     }
 
     /// Create an NDKContactList from an existing NDKEvent
@@ -88,7 +88,7 @@ public class NDKContactList: NDKList {
         var users: [NDKUser] = []
         for contact in contacts {
             let user = contact.user
-            if let ndk = self.ndk {
+            if let ndk = ndk {
                 await user.setNdk(ndk)
             }
             users.append(user)

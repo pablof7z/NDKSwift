@@ -1,6 +1,6 @@
+import CashuSwift
 import Foundation
 import NDKSwiftCore
-import CashuSwift
 
 // MARK: - NIP-60 Token Event Structure
 
@@ -8,7 +8,7 @@ import CashuSwift
 public struct NIP60TokenEvent: Codable {
     public let mint: String
     public let proofs: [CashuSwift.Proof]
-    public let del: [String]?  // Array of deleted event IDs
+    public let del: [String]? // Array of deleted event IDs
 
     public init(mint: String, proofs: [CashuSwift.Proof], del: [String]? = nil) {
         self.mint = mint
@@ -290,7 +290,8 @@ public struct NDKCashuWalletEvent: NDKPublishableEvent {
         )
 
         guard let tagsData = decryptedContent.data(using: .utf8),
-              let walletTags = JSONCoding.safeDecode([[String]].self, from: tagsData) else {
+              let walletTags = JSONCoding.safeDecode([[String]].self, from: tagsData)
+        else {
             throw NDKError.invalidContent("Failed to parse wallet configuration")
         }
 
@@ -368,7 +369,7 @@ public struct NDKCashuWalletBackupEvent: NDKPublishableEvent {
         let builder = NDKEventBuilder(ndk: ndk)
             .content(plaintext)
             .kind(EventKind.cashuWalletBackup)
-            .tag(["p", userPubkey])  // Add public key tag for easy retrieval
+            .tag(["p", userPubkey]) // Add public key tag for easy retrieval
 
         // Add relay tags (unencrypted according to NIP-60)
         if let relays = relays {
@@ -420,7 +421,8 @@ public struct NDKCashuWalletBackupEvent: NDKPublishableEvent {
         )
 
         guard let tagsData = decryptedContent.data(using: .utf8),
-              let walletTags = JSONCoding.safeDecode([[String]].self, from: tagsData) else {
+              let walletTags = JSONCoding.safeDecode([[String]].self, from: tagsData)
+        else {
             throw NDKError.invalidContent("Failed to parse wallet backup")
         }
 
@@ -593,7 +595,8 @@ public struct NDKCashuSpendingHistory {
         )
 
         guard let tagsData = decryptedContent.data(using: .utf8),
-              let tags = JSONCoding.safeDecode([[String]].self, from: tagsData) else {
+              let tags = JSONCoding.safeDecode([[String]].self, from: tagsData)
+        else {
             throw NDKError.invalidContent("Failed to parse spending history tags")
         }
 
@@ -652,7 +655,7 @@ public struct NDKCashuMintList: NDKPublishableEvent {
         relays: [String]? = nil
     ) async throws -> NDKCashuMintList {
         let builder = NDKEventBuilder(ndk: ndk)
-            .kind(10019)  // NIP-60 mint list kind
+            .kind(10019) // NIP-60 mint list kind
 
         // Add mint tags
         for mint in mints {
@@ -748,7 +751,7 @@ public struct NDKCashuMintAnnouncement {
         tags.append(["n", network])
 
         let builder = NDKEventBuilder(ndk: ndk)
-            .kind(38172)  // NIP-87 Cashu Mint Announcement
+            .kind(38172) // NIP-87 Cashu Mint Announcement
             .tags(tags)
 
         // Add optional content (description)
@@ -792,7 +795,8 @@ public struct NDKCashuMintAnnouncement {
         // Try to parse content as JSON first
         if let data = event.content.data(using: .utf8),
            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let description = json["description"] as? String {
+           let description = json["description"] as? String
+        {
             return description
         }
 
@@ -805,7 +809,8 @@ public struct NDKCashuMintAnnouncement {
         guard !event.content.isEmpty,
               let data = event.content.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let name = json["name"] as? String else {
+              let name = json["name"] as? String
+        else {
             return nil
         }
         return name
@@ -918,13 +923,14 @@ public struct NDKNutzapEvent: NDKPublishableEvent {
         var proofs: [CashuSwift.Proof] = []
         for proofTag in proofTags {
             guard let proofJSON = proofTag[1].data(using: .utf8),
-                  let proof = JSONCoding.safeDecode(CashuSwift.Proof.self, from: proofJSON) else {
+                  let proof = JSONCoding.safeDecode(CashuSwift.Proof.self, from: proofJSON)
+            else {
                 continue
             }
             proofs.append(proof)
         }
 
-        guard !proofs.isEmpty, let mintURL = self.mintURL else { return nil }
+        guard !proofs.isEmpty, let mintURL = mintURL else { return nil }
 
         // Create token with proofs grouped by mint
         return CashuSwift.Token(
@@ -1023,7 +1029,7 @@ public struct NDKMintRecommendation {
         tags.append(["a", "38172:\(mintAnnouncementEvent.event.pubkey):\(mintAnnouncementEvent.event.id)"])
 
         let builder = NDKEventBuilder(ndk: ndk)
-            .kind(38000)  // NIP-87 Mint Recommendation
+            .kind(38000) // NIP-87 Mint Recommendation
             .tags(tags)
 
         // Add optional reason as content

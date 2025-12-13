@@ -1,10 +1,9 @@
 import Foundation
 
 /// Encoder for Negentropy protocol messages
-public struct NegentropyEncoder {
-
+public enum NegentropyEncoder {
     /// Encode initial message - just the protocol version
-    public static func encodeInitialMessage(fingerprint: Data, count: Int) throws -> Data {
+    public static func encodeInitialMessage(fingerprint _: Data, count _: Int) throws -> Data {
         var data = Data()
 
         // Protocol version byte (0x61 for Negentropy v1)
@@ -33,7 +32,7 @@ public struct NegentropyEncoder {
 
         // Encode each range
         for range in ranges {
-            data.append(try encodeRange(range))
+            try data.append(encodeRange(range))
         }
 
         // Encode have IDs
@@ -136,8 +135,7 @@ public struct NegentropyEncoder {
 }
 
 /// Decoder for Negentropy protocol messages
-public struct NegentropyDecoder {
-
+public enum NegentropyDecoder {
     /// Decode a message from data
     public static func decode(_ data: Data) throws -> NegentropyMessage {
         guard !data.isEmpty else {
@@ -201,7 +199,7 @@ public struct NegentropyDecoder {
         guard data.distance(from: index, to: data.endIndex) >= 32 else {
             throw NegentropyError.decodingError
         }
-        let fingerprint = data[index..<data.index(index, offsetBy: 32)]
+        let fingerprint = data[index ..< data.index(index, offsetBy: 32)]
         index = data.index(index, offsetBy: 32)
 
         return .initial(fingerprint: Data(fingerprint), count: Int(count))
@@ -213,7 +211,7 @@ public struct NegentropyDecoder {
 
         // Decode ranges
         var ranges: [NegentropyRange] = []
-        for _ in 0..<rangeCount {
+        for _ in 0 ..< rangeCount {
             let range = try decodeRange(data: data, index: &index)
             ranges.append(range)
         }
@@ -221,7 +219,7 @@ public struct NegentropyDecoder {
         // Decode have IDs
         let haveCount = try decodeVarint(data: data, index: &index)
         var haveIds: [Data] = []
-        for _ in 0..<haveCount {
+        for _ in 0 ..< haveCount {
             let idPrefix = try decodeIdPrefix(data: data, index: &index)
             haveIds.append(idPrefix)
         }
@@ -229,7 +227,7 @@ public struct NegentropyDecoder {
         // Decode need IDs
         let needCount = try decodeVarint(data: data, index: &index)
         var needIds: [Data] = []
-        for _ in 0..<needCount {
+        for _ in 0 ..< needCount {
             let idPrefix = try decodeIdPrefix(data: data, index: &index)
             needIds.append(idPrefix)
         }
@@ -241,11 +239,11 @@ public struct NegentropyDecoder {
         // Decode have IDs (full 32 bytes)
         let haveCount = try decodeVarint(data: data, index: &index)
         var haveIds: [Data] = []
-        for _ in 0..<haveCount {
+        for _ in 0 ..< haveCount {
             guard data.distance(from: index, to: data.endIndex) >= 32 else {
                 throw NegentropyError.decodingError
             }
-            let id = data[index..<data.index(index, offsetBy: 32)]
+            let id = data[index ..< data.index(index, offsetBy: 32)]
             haveIds.append(Data(id))
             index = data.index(index, offsetBy: 32)
         }
@@ -253,11 +251,11 @@ public struct NegentropyDecoder {
         // Decode need IDs (full 32 bytes)
         let needCount = try decodeVarint(data: data, index: &index)
         var needIds: [Data] = []
-        for _ in 0..<needCount {
+        for _ in 0 ..< needCount {
             guard data.distance(from: index, to: data.endIndex) >= 32 else {
                 throw NegentropyError.decodingError
             }
-            let id = data[index..<data.index(index, offsetBy: 32)]
+            let id = data[index ..< data.index(index, offsetBy: 32)]
             needIds.append(Data(id))
             index = data.index(index, offsetBy: 32)
         }
@@ -300,7 +298,7 @@ public struct NegentropyDecoder {
         guard data.distance(from: index, to: data.endIndex) >= 8 else {
             throw NegentropyError.decodingError
         }
-        let fingerprintPrefix = data[index..<data.index(index, offsetBy: 8)]
+        let fingerprintPrefix = data[index ..< data.index(index, offsetBy: 8)]
         index = data.index(index, offsetBy: 8)
 
         // Using the fingerprint prefix directly (8 bytes)
@@ -339,7 +337,7 @@ public struct NegentropyDecoder {
         guard data.distance(from: index, to: data.endIndex) >= 8 else {
             throw NegentropyError.decodingError
         }
-        let prefix = data[index..<data.index(index, offsetBy: 8)]
+        let prefix = data[index ..< data.index(index, offsetBy: 8)]
         index = data.index(index, offsetBy: 8)
         return Data(prefix)
     }

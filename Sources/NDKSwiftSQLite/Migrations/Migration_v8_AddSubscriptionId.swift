@@ -1,6 +1,6 @@
 import Foundation
-import NDKSwiftCore
 import GRDB
+import NDKSwiftCore
 
 extension NDKSQLiteCache {
     static func registerV8AddSubscriptionIdMigration(_ migrator: inout DatabaseMigrator) {
@@ -17,9 +17,9 @@ extension NDKSQLiteCache {
 
                 // Add index for subscription_id
                 try db.create(index: "idx_relay_sources_subscription",
-                             on: "relay_sources",
-                             columns: ["subscription_id"],
-                             ifNotExists: true)
+                              on: "relay_sources",
+                              columns: ["subscription_id"],
+                              ifNotExists: true)
             }
         }
     }

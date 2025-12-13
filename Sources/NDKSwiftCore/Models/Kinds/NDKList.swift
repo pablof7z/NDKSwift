@@ -74,13 +74,13 @@ public class NDKList {
         EventKind.categorizedPeopleList, // Categorized people list
         EventKind.categorizedBookmarkList, // Categorized bookmark list
         EventKind.relayListMetadata, // Relay list metadata
-        EventKind.blossomServerList // Blossom server list
+        EventKind.blossomServerList, // Blossom server list
     ]
 
     /// Initialize a new list
     public init(ndk: NDK? = nil) {
         self.ndk = ndk
-        self.createdAt = Timestamp.now
+        createdAt = Timestamp.now
     }
 
     /// Initialize a new list with the specified kind
@@ -422,7 +422,7 @@ public class NDKList {
         let parts = value.split(separator: ":")
         guard parts.count >= 2,
               let kind = Int(parts[0]) else { return nil }
-        
+
         let pubkey = String(parts[1])
         guard !pubkey.isEmpty else { return nil }
 
@@ -440,7 +440,7 @@ public class NDKList {
 
         let aTagGroups = Dictionary(grouping: parsedATags) { $0.kind }
 
-        return aTagGroups.map { (kind, items) in
+        return aTagGroups.map { kind, items in
             let authors = items.map { $0.pubkey }
             let filter = NDKFilter(authors: authors, kinds: [kind])
 
@@ -488,7 +488,7 @@ public class NDKList {
 
         // Use NDKEventBuilder for signing
         let signedEvent = try await NDKEventBuilder(ndk: ndk)
-            .pubkey(try await signer.pubkey)
+            .pubkey(await signer.pubkey)
             .createdAt(event.createdAt)
             .kind(event.kind)
             .tags(event.tags)
@@ -496,9 +496,9 @@ public class NDKList {
             .build(signer: signer)
 
         // Update our properties with signed values
-        self.id = signedEvent.id
-        self.signature = signedEvent.sig
-        self.pubkey = signedEvent.pubkey
+        id = signedEvent.id
+        signature = signedEvent.sig
+        pubkey = signedEvent.pubkey
     }
 
     /// Publish this list
@@ -522,7 +522,7 @@ extension NDKUser: NDKListItem {
 
     public var reference: String {
         get async {
-            return pubkey
+            pubkey
         }
     }
 }
@@ -561,7 +561,7 @@ extension NDKRelay: NDKListItem {
 
     public var reference: String {
         get async {
-            return url
+            url
         }
     }
 }
@@ -582,7 +582,7 @@ public struct NDKStringListItem: NDKListItem {
 
     public var reference: String {
         get async {
-            return value
+            value
         }
     }
 }

@@ -1,4 +1,5 @@
 import NDKSwiftCore
+
 //
 //  UnownedNdbNote.swift
 //  damus
@@ -45,35 +46,35 @@ import NDKSwiftCore
 enum NdbNoteLender: Sendable {
     case ndbNoteKey(Ndb, NoteKey)
     case owned(NdbNote)
-    
+
     init(ndb: Ndb, noteKey: NoteKey) {
         self = .ndbNoteKey(ndb, noteKey)
     }
-    
+
     init(ownedNdbNote: NdbNote) {
         self = .owned(ownedNdbNote)
     }
-    
+
     /// Borrows the note temporarily
     func borrow<T>(_ lendingFunction: (_: borrowing UnownedNdbNote) throws -> T) throws -> T {
         switch self {
-        case .ndbNoteKey(let ndb, let noteKey):
+        case let .ndbNoteKey(ndb, noteKey):
             guard !ndb.is_closed else { throw LendingError.ndbClosed }
             guard let ndbNoteTxn = ndb.lookup_note_by_key(noteKey) else { throw LendingError.errorLoadingNote }
             guard let unownedNote = UnownedNdbNote(ndbNoteTxn) else { throw LendingError.errorLoadingNote }
             return try lendingFunction(unownedNote)
-        case .owned(let note):
+        case let .owned(note):
             return try lendingFunction(UnownedNdbNote(note))
         }
     }
-    
+
     /// Gets an owned copy of the note
     func getCopy() throws -> NdbNote {
-        return try self.borrow({ ev in
-            return ev.toOwned()
-        })
+        return try borrow { ev in
+            ev.toOwned()
+        }
     }
-    
+
     /// A lenient and simple function to just use a copy, where implementing custom error handling is unfeasible or too burdensome and failures should not stop flow.
     ///
     /// Since the errors related to borrowing and copying are unlikely, instead of implementing custom error handling, a simple default error handling logic may be used.
@@ -82,10 +83,10 @@ enum NdbNoteLender: Sendable {
     /// - On debug builds, it will throw an assertion to alert developers that something is off
     /// - On production builds, an error will be printed to the logs.
     func justUseACopy<T>(_ useFunction: (_: NdbNote) throws -> T) rethrows -> T? {
-        guard let event = self.justGetACopy() else { return nil }
+        guard let event = justGetACopy() else { return nil }
         return try useFunction(event)
     }
-    
+
     /// A lenient and simple function to just use a copy, where implementing custom error handling is unfeasible or too burdensome and failures should not stop flow.
     ///
     /// Since the errors related to borrowing and copying are unlikely, instead of implementing custom error handling, a simple default error handling logic may be used.
@@ -94,10 +95,10 @@ enum NdbNoteLender: Sendable {
     /// - On debug builds, it will throw an assertion to alert developers that something is off
     /// - On production builds, an error will be printed to the logs.
     func justUseACopy<T>(_ useFunction: (_: NdbNote) async throws -> T) async rethrows -> T? {
-        guard let event = self.justGetACopy() else { return nil }
+        guard let event = justGetACopy() else { return nil }
         return try await useFunction(event)
     }
-    
+
     /// A lenient and simple function to just get a copy, where implementing custom error handling is unfeasible or too burdensome and failures should not stop flow.
     ///
     /// Since the errors related to borrowing and copying are unlikely, instead of implementing custom error handling, a simple default error handling logic may be used.
@@ -107,39 +108,37 @@ enum NdbNoteLender: Sendable {
     /// - On production builds, an error will be printed to the logs.
     func justGetACopy() -> NdbNote? {
         do {
-            return try self.getCopy()
-        }
-        catch {
+            return try getCopy()
+        } catch {
 //            assertionFailure("Unexpected error while fetching a copy of an NdbNote: \(error.localizedDescription)")
             Log.error("Unexpected error while fetching a copy of an NdbNote: %s", for: .ndb, error.localizedDescription)
         }
         return nil
     }
-    
+
     enum LendingError: Error {
         case errorLoadingNote
         case ndbClosed
     }
 }
 
-
 /// A wrapper to NdbNote that allows unowned NdbNotes to be safely handled
 struct UnownedNdbNote: ~Copyable {
     private let _ndbNote: NdbNote
-    
+
     init(_ txn: NdbTxn<NdbNote>) {
-        self._ndbNote = txn.unsafeUnownedValue
+        _ndbNote = txn.unsafeUnownedValue
     }
-    
+
     init?(_ txn: NdbTxn<NdbNote?>) {
         guard let note = txn.unsafeUnownedValue else { return nil }
-        self._ndbNote = note
+        _ndbNote = note
     }
-    
+
     init(_ ndbNote: NdbNote) {
-        self._ndbNote = ndbNote
+        _ndbNote = ndbNote
     }
-    
+
     var kind: UInt32 { _ndbNote.kind }
     var known_kind: NostrKind? { _ndbNote.known_kind }
     var content: String { _ndbNote.content }
@@ -148,7 +147,7 @@ struct UnownedNdbNote: ~Copyable {
     var createdAt: UInt32 { _ndbNote.created_at }
     var id: NoteId { _ndbNote.id }
     var sig: NdbSignature { _ndbNote.sig }
-    
+
     func toOwned() -> NdbNote {
         return _ndbNote.to_owned()
     }

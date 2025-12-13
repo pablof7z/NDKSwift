@@ -5,7 +5,7 @@ public enum NDKRelayAccess: String, CaseIterable {
     case write
 
     public var marker: String? {
-        return self.rawValue
+        return rawValue
     }
 }
 
@@ -20,7 +20,7 @@ public struct NDKRelayListEntry {
     }
 
     public init(url: String, access: Set<NDKRelayAccess> = [.read, .write]) {
-        self.relay = NDKRelay(url: url)
+        relay = NDKRelay(url: url)
         self.access = access
     }
 
@@ -50,9 +50,9 @@ public class NDKRelayList: NDKList {
     public static let kind: Kind = EventKind.relayList
 
     /// Initialize a new relay list
-    public override init(ndk: NDK? = nil) {
+    override public init(ndk: NDK? = nil) {
         super.init(ndk: ndk)
-        self.kind = NDKRelayList.kind
+        kind = NDKRelayList.kind
     }
 
     /// Create an NDKRelayList from an existing NDKEvent

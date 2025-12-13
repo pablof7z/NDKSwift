@@ -22,7 +22,6 @@ public enum ContentEntity: Equatable {
 /// - Tag reference resolution (#[0], #[1], etc.)
 /// - Current user mention detection
 public enum ContentParser {
-
     /// Parse content for simple entity extraction (used by NDKEventBuilder)
     ///
     /// - Parameter content: The content to parse
@@ -72,8 +71,8 @@ public enum ContentParser {
 
             for match in matches.reversed() {
                 if let range = Range(match.range, in: content),
-                   let indexRange = Range(match.range(at: 1), in: content) {
-
+                   let indexRange = Range(match.range(at: 1), in: content)
+                {
                     let indexString = String(content[indexRange])
                     if let index = Int(indexString) {
                         // Check if it's a user mention
@@ -112,7 +111,7 @@ public enum ContentParser {
             // Hashtags
             (#"(?<=\s|^)(#[^\s!@#$%^&*()=+./,\[{\]};:'"?><]+)"#, "hashtag"),
             // URLs
-            (#"https?://[^\s<>"{}|\\^`\[\]]+"#, "url")
+            (#"https?://[^\s<>"{}|\\^`\[\]]+"#, "url"),
         ]
 
         var allMatches: [(range: Range<String.Index>, type: String, value: String)] = []
@@ -143,7 +142,7 @@ public enum ContentParser {
 
             // Add text component before this match
             if lastIndex < match.range.lowerBound {
-                let textRange = lastIndex..<match.range.lowerBound
+                let textRange = lastIndex ..< match.range.lowerBound
                 let text = String(modifiedContent[textRange])
                 if !text.isEmpty {
                     entities.append(.text(text))
@@ -250,9 +249,9 @@ public enum ContentParser {
         let isMentioningCurrentUser = currentUser.map { user in
             entities.contains { entity in
                 switch entity {
-                case .userMention(let pubkey, _):
+                case let .userMention(pubkey, _):
                     return pubkey == user.pubkey
-                case .npub(let npub):
+                case let .npub(npub):
                     do {
                         guard let pubkey = try String.fromNpub(npub) else {
                             NDKLogger.log(.warning, category: .event, "Failed to decode npub for current user check: nil result")

@@ -58,8 +58,8 @@ public actor NegentropyReconciler {
     ///   - frameSizeLimit: Maximum message size in bytes (default: 60KB)
     ///
     /// - Important: Create a new instance for each reconciliation session
-    public init(storage: NegentropyStorage, frameSizeLimit: Int = 60_000) {
-        self.negentropy = Negentropy(storage: storage, frameSizeLimit: frameSizeLimit)
+    public init(storage: NegentropyStorage, frameSizeLimit: Int = 60000) {
+        negentropy = Negentropy(storage: storage, frameSizeLimit: frameSizeLimit)
     }
 
     /// Initiates reconciliation as the initiator.
@@ -142,7 +142,7 @@ public enum NegentropyResponse {
 
 /// Message types for Negentropy protocol
 public enum NegentropyMessage {
-    case protocolVersion  // Just 0x61
+    case protocolVersion // Just 0x61
     case initial(fingerprint: Data, count: Int)
     case reconciliation(ranges: [NegentropyRange], haveIds: [Data], needIds: [Data])
     case termination(haveIds: [Data], needIds: [Data])

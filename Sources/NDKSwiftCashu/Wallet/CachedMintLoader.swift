@@ -1,6 +1,6 @@
+import CashuSwift
 import Foundation
 import NDKSwiftCore
-import CashuSwift
 
 // MARK: - Cache Constants
 
@@ -29,7 +29,7 @@ public actor CachedMintLoader {
         mintInfoMaxAge: TimeInterval = CacheConstants.defaultMintInfoMaxAge,
         keysetMaxAge: TimeInterval = CacheConstants.defaultKeysetMaxAge
     ) {
-        self.cacheHelper = CashuCacheHelper(cache: cache)
+        cacheHelper = CashuCacheHelper(cache: cache)
         self.mintInfoMaxAge = mintInfoMaxAge
         self.keysetMaxAge = keysetMaxAge
     }

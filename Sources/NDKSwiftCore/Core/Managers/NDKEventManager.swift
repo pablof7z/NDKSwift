@@ -4,7 +4,7 @@ import Foundation
 public actor NDKEventManager {
     private weak var ndk: NDK?
     private let cache: NDKCache
-    
+
     /// Track events that failed due to auth requirements per relay
     private var pendingAuthEvents: [RelayURL: [NDKEvent]] = [:]
 
@@ -141,7 +141,7 @@ public actor NDKEventManager {
                 }
             }
 
-            for await (relay, success) in group {
+            for await(relay, success) in group {
                 if success {
                     publishedRelays.insert(relay)
 
@@ -210,11 +210,11 @@ public actor NDKEventManager {
 
         return results
     }
-    
+
     // MARK: - Authentication-Related Methods
-    
+
     /// Track an event that failed due to auth requirements
-    internal func trackPendingAuthEvent(_ event: NDKEvent, for relay: RelayURL) {
+    func trackPendingAuthEvent(_ event: NDKEvent, for relay: RelayURL) {
         var pending = pendingAuthEvents[relay] ?? []
         if !pending.contains(where: { $0.id == event.id }) {
             pending.append(event)
@@ -222,20 +222,20 @@ public actor NDKEventManager {
             NDKLogger.log(.debug, category: .auth, "Tracked event \(event.id) pending auth for \(relay)")
         }
     }
-    
+
     /// Get and clear pending auth events for a relay
-    internal func getPendingAuthEvents(for relay: RelayURL) -> [NDKEvent] {
+    func getPendingAuthEvents(for relay: RelayURL) -> [NDKEvent] {
         return pendingAuthEvents.removeValue(forKey: relay) ?? []
     }
-    
+
     /// Retry events that were pending authentication for a specific relay
-    internal func retryAuthenticatedEvents(for relay: NDKRelay) async {
+    func retryAuthenticatedEvents(for relay: NDKRelay) async {
         let pendingEvents = getPendingAuthEvents(for: relay.url)
-        
+
         guard !pendingEvents.isEmpty else { return }
-        
+
         NDKLogger.log(.info, category: .auth, "Retrying \(pendingEvents.count) events after authentication on \(relay.url)")
-        
+
         for event in pendingEvents {
             do {
                 let result = try await relay.publish(event)
@@ -252,12 +252,12 @@ public actor NDKEventManager {
     }
 
     /// Publish queued events for a specific relay (called by NDKPool when relay connects)
-    internal func publishQueuedEvents(for relay: NDKRelay) async {
+    func publishQueuedEvents(for relay: NDKRelay) async {
         let unpublishedEvents = await cache.getUnpublishedEvents(maxAge: TimeConstants.hour, limit: nil)
-        
+
         // Count events targeted for this relay
         let eventsForRelay = unpublishedEvents.filter { $0.targetRelays.contains(relay.url) }
-        
+
         // Only log if there are events to publish
         if !eventsForRelay.isEmpty {
             NDKLogger.log(.debug, category: .relay, "📤 Publishing \(eventsForRelay.count) queued events for newly connected relay: \(relay.url)")

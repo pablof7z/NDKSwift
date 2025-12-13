@@ -23,7 +23,7 @@ import NDKSwift
 
 // MARK: - Test Configuration
 
-let TIMEOUT_SHORT = 2_000_000_000  // 2 seconds
+let TIMEOUT_SHORT = 2_000_000_000 // 2 seconds
 let TIMEOUT_MEDIUM = 5_000_000_000 // 5 seconds
 
 let TEST_RELAYS = ["wss://relay.primal.net"]
@@ -116,7 +116,7 @@ func testNIP04Encryption() async throws {
     print("   Alice -> Bob: '\(roundtripMessage)' -> '\(dec1)'")
     print("   Bob -> Alice: '\(bobResponse)' -> '\(dec2)'")
 
-    if dec1 == roundtripMessage && dec2 == bobResponse {
+    if dec1 == roundtripMessage, dec2 == bobResponse {
         printSuccess("Round-trip encryption works")
     } else {
         printFailure("Round-trip failed")
@@ -243,7 +243,7 @@ func testEncryptionSchemeComparison() async throws {
 
     let alice = try NDKPrivateKeySigner.generate()
     let bob = try NDKPrivateKeySigner.generate()
-    let bobUser = NDKUser(pubkey: try await bob.pubkey)
+    let bobUser = try NDKUser(pubkey: await bob.pubkey)
 
     let testMessage = "Comparing encryption schemes"
 
@@ -270,10 +270,10 @@ func testEncryptionSchemeComparison() async throws {
 
     // Test 3.3: Cannot decrypt NIP-04 with NIP-44
     printTest("Cross-scheme decryption (should fail)")
-    let aliceUser = NDKUser(pubkey: try await alice.pubkey)
+    let aliceUser = try NDKUser(pubkey: await alice.pubkey)
     do {
         // Try to decrypt NIP-04 message with NIP-44
-        let _ = try await bob.decrypt(sender: aliceUser, value: nip04Enc, scheme: .nip44)
+        _ = try await bob.decrypt(sender: aliceUser, value: nip04Enc, scheme: .nip44)
         printFailure("Should not be able to decrypt NIP-04 with NIP-44")
     } catch {
         printSuccess("Correctly fails when using wrong encryption scheme")
@@ -385,13 +385,13 @@ func testErrorHandling() async throws {
 
     let alice = try NDKPrivateKeySigner.generate()
     let bob = try NDKPrivateKeySigner.generate()
-    let bobUser = NDKUser(pubkey: try await bob.pubkey)
+    let bobUser = try NDKUser(pubkey: await bob.pubkey)
 
     // Test 5.1: Invalid encrypted string
     printTest("Decrypt invalid encrypted string")
     do {
-        let aliceUser = NDKUser(pubkey: try await alice.pubkey)
-        let _ = try await bob.decrypt(
+        let aliceUser = try NDKUser(pubkey: await alice.pubkey)
+        _ = try await bob.decrypt(
             sender: aliceUser,
             value: "invalid_encrypted_string",
             scheme: .nip04
@@ -410,8 +410,8 @@ func testErrorHandling() async throws {
     let encrypted = try await alice.encrypt(recipient: bobUser, value: message, scheme: .nip04)
 
     do {
-        let aliceUser = NDKUser(pubkey: try await alice.pubkey)
-        let _ = try await charlie.decrypt(
+        let aliceUser = try NDKUser(pubkey: await alice.pubkey)
+        _ = try await charlie.decrypt(
             sender: aliceUser,
             value: encrypted,
             scheme: .nip04
@@ -425,8 +425,8 @@ func testErrorHandling() async throws {
     // Test 5.3: Malformed base64
     printTest("Decrypt malformed base64")
     do {
-        let aliceUser = NDKUser(pubkey: try await alice.pubkey)
-        let _ = try await bob.decrypt(
+        let aliceUser = try NDKUser(pubkey: await alice.pubkey)
+        _ = try await bob.decrypt(
             sender: aliceUser,
             value: "not?base64!",
             scheme: .nip04
@@ -442,8 +442,8 @@ func testEncryptionEdgeCases() async throws {
 
     let alice = try NDKPrivateKeySigner.generate()
     let bob = try NDKPrivateKeySigner.generate()
-    let bobUser = NDKUser(pubkey: try await bob.pubkey)
-    let aliceUser = NDKUser(pubkey: try await alice.pubkey)
+    let bobUser = try NDKUser(pubkey: await bob.pubkey)
+    let aliceUser = try NDKUser(pubkey: await alice.pubkey)
 
     // Test 6.1: Special characters
     printTest("Special characters")

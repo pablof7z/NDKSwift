@@ -34,4 +34,3 @@ public protocol RelayProtocol: AnyObject, Sendable {
     /// - Throws: If the relay is not connected or other network errors occur
     func publish(_ event: NDKEvent) async throws -> (success: Bool, message: String?)
 }
-

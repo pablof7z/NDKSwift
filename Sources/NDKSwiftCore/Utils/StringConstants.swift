@@ -1,6 +1,5 @@
 /// Common string constants used throughout NDKSwift
 public enum StringConstants {
-
     /// Operation names for logging and debugging
     public enum Operations {
         public static let publishEvent = "Publish event"

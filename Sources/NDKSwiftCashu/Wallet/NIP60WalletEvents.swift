@@ -31,7 +31,7 @@ public struct NIP60WalletEvent {
 
     init(type: EventType) {
         self.type = type
-        self.timestamp = Date()
+        timestamp = Date()
     }
 }
 

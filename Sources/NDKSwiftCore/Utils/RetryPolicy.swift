@@ -74,7 +74,7 @@ public final class RetryPolicy {
 
     public init(configuration: RetryPolicyConfiguration = .relayConnection) {
         self.configuration = configuration
-        self.currentDelay = configuration.initialDelay
+        currentDelay = configuration.initialDelay
     }
 
     /// Reset the retry policy to initial state
@@ -93,7 +93,8 @@ public final class RetryPolicy {
         queue.sync {
             // Check if we've exceeded max attempts
             if let maxAttempts = configuration.maxAttempts,
-               attemptCount >= maxAttempts {
+               attemptCount >= maxAttempts
+            {
                 return nil
             }
 
@@ -102,7 +103,7 @@ public final class RetryPolicy {
 
             // Add jitter
             let jitterRange = baseDelay * configuration.jitterFactor
-            let jitter = Double.random(in: -jitterRange...jitterRange)
+            let jitter = Double.random(in: -jitterRange ... jitterRange)
             let delayWithJitter = max(0, baseDelay + jitter)
 
             // Update for next iteration
@@ -151,9 +152,9 @@ public final class RetryPolicy {
 }
 
 /// Async/await support for RetryPolicy
-extension RetryPolicy {
+public extension RetryPolicy {
     /// Execute an async operation with retry logic
-    public func execute<T>(
+    func execute<T>(
         operation: @escaping () async throws -> T,
         shouldRetry: @escaping (Error) -> Bool = { _ in true }
     ) async throws -> T {
@@ -180,7 +181,7 @@ extension RetryPolicy {
     }
 
     /// Execute an async operation with retry logic and timeout
-    public func executeWithTimeout<T>(
+    func executeWithTimeout<T>(
         timeout: TimeInterval,
         operation: @escaping () async throws -> T,
         shouldRetry: @escaping (Error) -> Bool = { _ in true }

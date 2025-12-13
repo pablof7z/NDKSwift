@@ -1,6 +1,6 @@
-import SwiftUI
-import NDKSwiftCore
 import Foundation
+import NDKSwiftCore
+import SwiftUI
 
 // MARK: - NDKRichText
 
@@ -26,7 +26,6 @@ import Foundation
 ///     }
 /// ```
 public struct NDKRichText: View {
-
     // MARK: - Properties
 
     private let content: String
@@ -110,22 +109,22 @@ public struct NDKRichText: View {
             var attributedSegment: AttributedString
 
             switch segment {
-            case .text(let text):
+            case let .text(text):
                 attributedSegment = AttributedString(text)
 
-            case .link(let text, _):
+            case let .link(text, _):
                 attributedSegment = AttributedString(text)
                 attributedSegment.foregroundColor = linkColor
                 attributedSegment.underlineStyle = .single
                 // Note: Tap handling would need to be implemented with UIViewRepresentable
                 // for full link interaction in real implementation
 
-            case .hashtag(let tag):
+            case let .hashtag(tag):
                 attributedSegment = AttributedString("#\(tag)")
                 attributedSegment.foregroundColor = hashtagColor
                 attributedSegment.font = .body.weight(.semibold)
 
-            case .mention(let pubkey, let displayName):
+            case let .mention(pubkey, displayName):
                 let displayText = displayName ?? "@\(pubkey.prefix(8))..."
                 attributedSegment = AttributedString(displayText)
                 attributedSegment.foregroundColor = mentionColor
@@ -151,7 +150,7 @@ public struct NDKRichText: View {
 
                 // Add text before URL if any
                 if currentIndex < urlStartIndex {
-                    let textBefore = String(content[currentIndex..<urlStartIndex])
+                    let textBefore = String(content[currentIndex ..< urlStartIndex])
                     segments.append(.text(textBefore))
                 }
 
@@ -164,7 +163,7 @@ public struct NDKRichText: View {
 
                 // Add text before hashtag if any
                 if currentIndex < hashtagStartIndex {
-                    let textBefore = String(content[currentIndex..<hashtagStartIndex])
+                    let textBefore = String(content[currentIndex ..< hashtagStartIndex])
                     segments.append(.text(textBefore))
                 }
 
@@ -200,7 +199,7 @@ public struct NDKRichText: View {
                 return URLMatch(
                     text: urlString,
                     url: url,
-                    range: match.range.location..<match.range.location + match.range.length
+                    range: match.range.location ..< match.range.location + match.range.length
                 )
             }
         }
@@ -222,7 +221,7 @@ public struct NDKRichText: View {
 
             return HashtagMatch(
                 tag: tag,
-                range: match.range.location..<match.range.location + match.range.length
+                range: match.range.location ..< match.range.location + match.range.length
             )
         }
 
@@ -253,18 +252,18 @@ private struct HashtagMatch {
 // MARK: - Preview
 
 #if DEBUG
-struct NDKRichText_Previews: PreviewProvider {
-    static var previews: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            NDKRichText(content: "Hello world!")
+    struct NDKRichText_Previews: PreviewProvider {
+        static var previews: some View {
+            VStack(alignment: .leading, spacing: 16) {
+                NDKRichText(content: "Hello world!")
 
-            NDKRichText(content: "Check out https://nostr.com for more info")
+                NDKRichText(content: "Check out https://nostr.com for more info")
 
-            NDKRichText(content: "Love #nostr and #bitcoin!")
+                NDKRichText(content: "Love #nostr and #bitcoin!")
 
-            NDKRichText(content: "Complex text with https://example.com and #hashtags mixed together")
+                NDKRichText(content: "Complex text with https://example.com and #hashtags mixed together")
+            }
+            .padding()
         }
-        .padding()
     }
-}
 #endif

@@ -5,19 +5,19 @@ import PackageDescription
 let package = Package(
     name: "NegentropyHarness",
     platforms: [
-        .macOS(.v14)
+        .macOS(.v14),
     ],
     dependencies: [
-        .package(path: "../..")
+        .package(path: "../.."),
     ],
     targets: [
         .executableTarget(
             name: "NegentropyHarness",
             dependencies: [
-                .product(name: "NDKSwift", package: "negentropy")
+                .product(name: "NDKSwift", package: "negentropy"),
             ],
             path: ".",
             sources: ["main.swift"]
-        )
+        ),
     ]
 )

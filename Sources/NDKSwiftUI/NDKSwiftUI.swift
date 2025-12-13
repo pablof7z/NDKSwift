@@ -1,5 +1,5 @@
-import SwiftUI
 import NDKSwiftCore
+import SwiftUI
 
 // MARK: - NDKSwiftUI Main Export
 
@@ -39,11 +39,10 @@ import NDKSwiftCore
 ///     }
 /// }
 /// ```
-public struct NDKSwiftUI {
+public enum NDKSwiftUI {
     /// The version of NDKSwiftUI
     public static let version = "0.13"
 }
-
 
 // MARK: - Public Exports
 

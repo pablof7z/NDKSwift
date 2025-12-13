@@ -1,9 +1,8 @@
 
-import SwiftUI
 import NDKSwift
+import SwiftUI
 
 struct ContentView: View {
-    
     @State private var privateKey: String = ""
     @State private var status = "Not connected"
     @State private var ndk: NDK?
@@ -17,27 +16,27 @@ struct ContentView: View {
             VStack {
                 Text("NDKSwift Test App")
                     .font(.largeTitle)
-                
+
                 Text("Disclaimer: This is a test application. Do not use your personal private key.")
                     .foregroundColor(.red)
                     .padding()
-                
+
                 TextField("Enter your private key (hex format)", text: $privateKey)
                     .padding()
                     .border(Color.gray, width: 1)
-                
+
                 Button("Login / Generate new key") {
                     setupNDK()
                 }
-                
+
                 if let user = user {
                     NavigationLink(destination: UserProfileView(user: user)) {
                         Text("View Profile")
                     }
                 }
-                
+
                 Text(status)
-                
+
                 Button("Publish Test Note") {
                     Task {
                         do {
@@ -48,26 +47,25 @@ struct ContentView: View {
 
                             _ = try await ndk.addRelay(url: relayURL)
                             try await ndk.connect()
-                            
+
                             let event = try await ndk.publish(
                                 NDKEventBuilder(ndk: ndk)
                                     .kind(1)
                                     .content("Hello from NDKSwiftTestApp! \(UUID().uuidString)")
                             )
-                            
+
                             status = "Published event with ID: \(event.id)"
-                            
+
                         } catch {
                             status = "Error: \(error.localizedDescription)"
                         }
                     }
                 }
                 .disabled(ndk == nil)
-                
+
                 List(events, id: \.id) {
                     Text($0.content)
                 }
-                
             }
             .padding()
             .onAppear(perform: setupNDK)
@@ -76,7 +74,7 @@ struct ContentView: View {
             }
         }
     }
-    
+
     private func setupNDK() {
         var signer: NDKSigner
         if !privateKey.isEmpty {
@@ -87,7 +85,7 @@ struct ContentView: View {
             privateKey = newKeypair.privateKey!
             status = "Generated a new private key."
         }
-        
+
         ndk = NDK(signer: signer)
         Task {
             self.user = NDKUser(pubkey: signer.pubkey)
@@ -97,18 +95,18 @@ struct ContentView: View {
         }
 
         status = "Logged in successfully!"
-        
+
         subscribeToEvents()
     }
-    
+
     private func subscribeToEvents() {
         guard let ndk = ndk else { return }
-        
+
         Task {
             do {
                 _ = try await ndk.addRelay(url: relayURL)
                 try await ndk.connect()
-                
+
                 let filter = NDKFilter(kinds: [1], limit: 20)
                 ndk.subscribe(filter) { event in
                     // This closure will be called for each event
@@ -119,7 +117,6 @@ struct ContentView: View {
                             self.events.append(event)
                             self.events.sort { $0.createdAt > $1.createdAt }
                         }
-                        
                     }
                 }
                 status = "Subscribed to events"

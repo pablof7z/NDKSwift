@@ -1,5 +1,5 @@
-import XCTest
 @testable import NDKSwiftCore
+import XCTest
 
 // TODO: These tests need to be updated to work without internal API access
 // They were testing fallback relay behavior which requires internal subscription manager access

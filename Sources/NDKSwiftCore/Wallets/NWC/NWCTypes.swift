@@ -17,7 +17,7 @@ public enum NWCMethod: String, CaseIterable {
 // MARK: - NWC Capabilities
 
 public enum NWCCapability: String {
-    case notifications = "notifications"
+    case notifications
     case paymentReceived = "payment_received"
     case paymentSent = "payment_sent"
 }
@@ -414,7 +414,7 @@ public struct AnyCodable: Codable, @unchecked Sendable {
         } else if let value = try? container.decode([AnyCodable].self) {
             self.value = value.map { $0.value }
         } else if container.decodeNil() {
-            self.value = NSNull()
+            value = NSNull()
         } else {
             throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode value")
         }

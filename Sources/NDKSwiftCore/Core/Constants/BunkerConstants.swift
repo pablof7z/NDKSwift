@@ -4,13 +4,13 @@ import Foundation
 public enum BunkerConstants {
     /// Error domain for bunker errors
     public static let errorDomain = "BunkerError"
-    
+
     /// Relay name used in errors
     public static let relayName = "bunker"
-    
+
     /// URL scheme for bunker
     public static let urlScheme = "bunker"
-    
+
     /// Error messages
     public enum ErrorMessages {
         public static let pubkeyNotSet = "Bunker pubkey not set"

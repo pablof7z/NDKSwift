@@ -1,23 +1,24 @@
-import SwiftUI
 import NDKSwiftCore
+import SwiftUI
 
 // MARK: - NDKUIConnectionStatusBadge
+
 /// A reusable view that displays relay connection status with both visual indicator and text
 public struct NDKUIConnectionStatusBadge: View {
     let state: NDKRelayConnectionState
     let style: BadgeStyle
-    
+
     public enum BadgeStyle {
-        case full        // Shows dot + text + background
-        case compact     // Shows only dot
-        case text        // Shows only text
+        case full // Shows dot + text + background
+        case compact // Shows only dot
+        case text // Shows only text
     }
-    
+
     public init(state: NDKRelayConnectionState, style: BadgeStyle = .full) {
         self.state = state
         self.style = style
     }
-    
+
     public var body: some View {
         switch style {
         case .full:
@@ -25,7 +26,7 @@ public struct NDKUIConnectionStatusBadge: View {
                 Circle()
                     .fill(statusColor)
                     .frame(width: 8, height: 8)
-                
+
                 Text(statusText)
                     .font(.caption)
                     .fontWeight(.medium)
@@ -34,12 +35,12 @@ public struct NDKUIConnectionStatusBadge: View {
             .padding(.vertical, 2)
             .background(statusColor.opacity(OpacityConstants.lightBackground))
             .cornerRadius(12)
-            
+
         case .compact:
             Circle()
                 .fill(statusColor)
                 .frame(width: 6, height: 6)
-                
+
         case .text:
             Text(statusText)
                 .font(.caption)
@@ -47,7 +48,7 @@ public struct NDKUIConnectionStatusBadge: View {
                 .foregroundColor(statusColor)
         }
     }
-    
+
     private var statusColor: Color {
         switch state {
         case .connected:
@@ -70,7 +71,7 @@ public struct NDKUIConnectionStatusBadge: View {
             return .gray
         }
     }
-    
+
     private var statusText: String {
         switch state {
         case .connected:
@@ -96,6 +97,7 @@ public struct NDKUIConnectionStatusBadge: View {
 }
 
 // MARK: - NDKUIRelayRowView
+
 /// A row view for displaying relay information with connection status
 public struct NDKUIRelayRowView: View {
     let url: String
@@ -103,10 +105,10 @@ public struct NDKUIRelayRowView: View {
     let lastSeen: Date?
     let showDeleteButton: Bool
     let onDelete: (() -> Void)?
-    
+
     public init(
-        url: String, 
-        state: NDKRelayConnectionState, 
+        url: String,
+        state: NDKRelayConnectionState,
         lastSeen: Date? = nil,
         showDeleteButton: Bool = false,
         onDelete: (() -> Void)? = nil
@@ -117,25 +119,25 @@ public struct NDKUIRelayRowView: View {
         self.showDeleteButton = showDeleteButton
         self.onDelete = onDelete
     }
-    
+
     public var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text(displayUrl)
                     .font(.system(.body, design: .monospaced))
                     .lineLimit(1)
-                
+
                 if let lastSeen = lastSeen {
                     Text("Last seen \(lastSeen, style: .relative)")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
             }
-            
+
             Spacer()
-            
+
             NDKUIConnectionStatusBadge(state: state, style: .full)
-            
+
             if showDeleteButton, let onDelete = onDelete {
                 Button(action: onDelete) {
                     Image(systemName: "trash")
@@ -146,7 +148,7 @@ public struct NDKUIRelayRowView: View {
         }
         .padding(.vertical, 4)
     }
-    
+
     private var displayUrl: String {
         url.replacingOccurrences(of: "wss://", with: "")
             .replacingOccurrences(of: "ws://", with: "")
@@ -155,18 +157,19 @@ public struct NDKUIRelayRowView: View {
 }
 
 // MARK: - NDKUIRelayStatsView
+
 /// A view that displays relay statistics and health information
 public struct NDKUIRelayStatsView: View {
     let totalRelays: Int
     let connectedRelays: Int
     let pendingMessages: Int
-    
+
     public init(totalRelays: Int, connectedRelays: Int, pendingMessages: Int = 0) {
         self.totalRelays = totalRelays
         self.connectedRelays = connectedRelays
         self.pendingMessages = pendingMessages
     }
-    
+
     public var body: some View {
         VStack(spacing: 16) {
             // Connection summary
@@ -176,13 +179,13 @@ public struct NDKUIRelayStatsView: View {
                     value: "\(totalRelays)",
                     color: .primary
                 )
-                
+
                 StatItem(
                     title: "Connected",
                     value: "\(connectedRelays)",
                     color: connectedRelays > 0 ? .green : .red
                 )
-                
+
                 if pendingMessages > 0 {
                     StatItem(
                         title: "Pending",
@@ -191,7 +194,7 @@ public struct NDKUIRelayStatsView: View {
                     )
                 }
             }
-            
+
             // Connection health indicator
             NDKUIConnectionHealthBar(
                 connected: connectedRelays,
@@ -202,19 +205,19 @@ public struct NDKUIRelayStatsView: View {
         .background(Color.ndkSecondaryBackground)
         .cornerRadius(12)
     }
-    
+
     struct StatItem: View {
         let title: String
         let value: String
         let color: Color
-        
+
         var body: some View {
             VStack(spacing: 4) {
                 Text(value)
                     .font(.title2)
                     .fontWeight(.semibold)
                     .foregroundColor(color)
-                
+
                 Text(title)
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -224,48 +227,49 @@ public struct NDKUIRelayStatsView: View {
 }
 
 // MARK: - NDKUIConnectionHealthBar
+
 /// A visual indicator of relay connection health
 public struct NDKUIConnectionHealthBar: View {
     let connected: Int
     let total: Int
-    
+
     private var percentage: Double {
         guard total > 0 else { return 0 }
         return Double(connected) / Double(total)
     }
-    
+
     private var healthColor: Color {
         switch percentage {
-        case 0.8...1.0:
+        case 0.8 ... 1.0:
             return .green
-        case 0.5..<0.8:
+        case 0.5 ..< 0.8:
             return .orange
         default:
             return .red
         }
     }
-    
+
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text("Connection Health")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                
+
                 Spacer()
-                
+
                 Text("\(Int(percentage * 100))%")
                     .font(.caption)
                     .fontWeight(.medium)
                     .foregroundColor(healthColor)
             }
-            
+
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 4)
                         .fill(Color.ndkGray5)
                         .frame(height: 8)
-                    
+
                     RoundedRectangle(cornerRadius: 4)
                         .fill(healthColor)
                         .frame(width: geometry.size.width * percentage, height: 8)
@@ -278,16 +282,17 @@ public struct NDKUIConnectionHealthBar: View {
 }
 
 // MARK: - NDKUIRelayIconView
+
 /// A reusable view that displays a relay icon with fallback
 public struct NDKUIRelayIconView: View {
     let icon: Image?
     let size: CGFloat
-    
+
     public init(icon: Image? = nil, size: CGFloat = 40) {
         self.icon = icon
         self.size = size
     }
-    
+
     public var body: some View {
         Group {
             if let icon = icon {
@@ -309,21 +314,22 @@ public struct NDKUIRelayIconView: View {
 }
 
 // MARK: - NDKUIRelayInfoView
+
 /// A view that displays NIP-11 information for a relay
 public struct NDKUIRelayInfoView: View {
     let info: NDKRelayInformation
     let style: InfoStyle
-    
+
     public enum InfoStyle {
-        case compact    // Just software/version
-        case full       // All available info
+        case compact // Just software/version
+        case full // All available info
     }
-    
+
     public init(info: NDKRelayInformation, style: InfoStyle = .compact) {
         self.info = info
         self.style = style
     }
-    
+
     public var body: some View {
         switch style {
         case .compact:
@@ -339,7 +345,7 @@ public struct NDKUIRelayInfoView: View {
                         .foregroundColor(Color.secondary.opacity(OpacityConstants.dimmed))
                 }
             }
-            
+
         case .full:
             VStack(alignment: .leading, spacing: 8) {
                 if let name = info.name {
@@ -363,27 +369,28 @@ public struct NDKUIRelayInfoView: View {
 }
 
 // MARK: - Preview
+
 #if DEBUG
-struct NDKUIRelayStatusViews_Previews: PreviewProvider {
-    static var previews: some View {
-        VStack(spacing: 20) {
-            NDKUIConnectionStatusBadge(state: .connected, style: .full)
-            NDKUIConnectionStatusBadge(state: .connecting, style: .compact)
-            NDKUIConnectionStatusBadge(state: .failed("Connection error"), style: .text)
-            
-            NDKUIRelayRowView(
-                url: "wss://relay.damus.io",
-                state: .connected,
-                lastSeen: Date()
-            )
-            
-            NDKUIRelayStatsView(
-                totalRelays: 8,
-                connectedRelays: 6,
-                pendingMessages: 3
-            )
+    struct NDKUIRelayStatusViews_Previews: PreviewProvider {
+        static var previews: some View {
+            VStack(spacing: 20) {
+                NDKUIConnectionStatusBadge(state: .connected, style: .full)
+                NDKUIConnectionStatusBadge(state: .connecting, style: .compact)
+                NDKUIConnectionStatusBadge(state: .failed("Connection error"), style: .text)
+
+                NDKUIRelayRowView(
+                    url: "wss://relay.damus.io",
+                    state: .connected,
+                    lastSeen: Date()
+                )
+
+                NDKUIRelayStatsView(
+                    totalRelays: 8,
+                    connectedRelays: 6,
+                    pendingMessages: 3
+                )
+            }
+            .padding()
         }
-        .padding()
     }
-}
 #endif

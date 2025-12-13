@@ -13,11 +13,11 @@ typealias NoteKey = UInt64
 typealias ProfileKey = UInt64
 
 // Stub for Damus Log
-internal enum Log {
+enum Log {
     enum LogCategory { case storage, ndb }
-    static func error(_ msg: String, for cat: LogCategory, _ args: CVarArg...) {}
-    static func debug(_ msg: String, for cat: LogCategory, _ args: CVarArg...) {}
-    static func info(_ msg: String, for cat: LogCategory, _ args: CVarArg...) {}
+    static func error(_: String, for _: LogCategory, _: CVarArg...) {}
+    static func debug(_: String, for _: LogCategory, _: CVarArg...) {}
+    static func info(_: String, for _: LogCategory, _: CVarArg...) {}
 }
 
 enum NdbSearchOrder {
@@ -137,7 +137,6 @@ public struct NdbStat: Sendable {
     }
 }
 
-
 enum DatabaseError: Error {
     case failed_open
 
@@ -161,13 +160,13 @@ class Ndb: @unchecked Sendable {
     var generation: Int
     private var closed: Bool
     private var callbackHandler: Ndb.CallbackHandler
-    
-    private static let DEFAULT_WRITER_SCRATCH_SIZE: Int32 = 2097152;  // 2mb scratch size for the writer thread, it should match with the one specified in nostrdb.c
+
+    private static let DEFAULT_WRITER_SCRATCH_SIZE: Int32 = 2_097_152 // 2mb scratch size for the writer thread, it should match with the one specified in nostrdb.c
 
     var is_closed: Bool {
-        self.closed || self.ndb.ndb == nil
+        closed || ndb.ndb == nil
     }
-    
+
     static func safemode() -> Ndb? {
         guard let path = db_path() ?? old_db_path else { return nil }
 
@@ -187,7 +186,7 @@ class Ndb: @unchecked Sendable {
     }
 
     // NostrDB used to be stored on the app container's document directory
-    static private var old_db_path: String? {
+    private static var old_db_path: String? {
         guard let path = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.absoluteString else {
             return nil
         }
@@ -197,7 +196,8 @@ class Ndb: @unchecked Sendable {
     static func db_path(appGroupIdentifier: String? = nil) -> String? {
         // Use app group container if available, otherwise fall back to documents directory
         if let appGroup = appGroupIdentifier,
-           let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup) {
+           let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup)
+        {
             return remove_file_prefix(containerURL.absoluteString)
         }
         // Fallback to documents directory
@@ -206,20 +206,20 @@ class Ndb: @unchecked Sendable {
         }
         return remove_file_prefix(path)
     }
-    
-    static private var db_files: [String] = ["data.mdb", "lock.mdb"]
+
+    private static var db_files: [String] = ["data.mdb", "lock.mdb"]
 
     static var empty: Ndb {
         print("txn: NOSTRDB EMPTY")
         return Ndb(ndb: ndb_t(ndb: nil))
     }
-    
+
     static func open(path: String? = nil, owns_db_file: Bool = true, callbackHandler: Ndb.CallbackHandler) -> ndb_t? {
-        var ndb_p: OpaquePointer? = nil
+        var ndb_p: OpaquePointer?
 
         let ingest_threads: Int32 = 4
-        var mapsize: Int = 1024 * 1024 * 1024 * 32
-        
+        var mapsize = 1024 * 1024 * 1024 * 32
+
         // Determine the effective path to use
         let effectivePath: String
         if let customPath = path {
@@ -230,8 +230,7 @@ class Ndb: @unchecked Sendable {
             if owns_db_file {
                 do {
                     try Self.migrate_db_location_if_needed()
-                }
-                catch {
+                } catch {
                     Log.error("Error migrating NostrDB to new file container", for: .storage)
                 }
             }
@@ -241,7 +240,7 @@ class Ndb: @unchecked Sendable {
             }
 
             // If caller doesn't own DB, files must already exist
-            if !owns_db_file && !Self.db_files_exist(path: defaultPath) {
+            if !owns_db_file, !Self.db_files_exist(path: defaultPath) {
                 return nil
             }
 
@@ -250,9 +249,9 @@ class Ndb: @unchecked Sendable {
 
         let ok = effectivePath.withCString { testdir in
             var ok = false
-            while !ok && mapsize > 1024 * 1024 * 700 {
+            while !ok, mapsize > 1024 * 1024 * 700 {
                 var cfg = ndb_config(flags: 0, ingester_threads: ingest_threads, writer_scratch_buffer_size: DEFAULT_WRITER_SCRATCH_SIZE, mapsize: mapsize, filter_context: nil, ingest_filter: nil, sub_cb_ctx: nil, sub_cb: nil)
-                
+
                 // Here we hook up the global callback function for subscription callbacks.
                 // We do an "unretained" pass here because the lifetime of the callback handler is larger than the lifetime of the nostrdb monitor in the C code.
                 // The NostrDB monitor that makes the callbacks should in theory _never_ outlive the callback handler.
@@ -264,9 +263,9 @@ class Ndb: @unchecked Sendable {
                 // Therefore, we do not need to increase reference count to callbackHandler. The tightly coupled lifetimes will ensure that it is always alive when the ndb_monitor is alive.
                 let ctx: UnsafeMutableRawPointer = Unmanaged.passUnretained(callbackHandler).toOpaque()
                 ndb_config_set_subscription_callback(&cfg, subscription_callback, ctx)
-                
-                let res = ndb_init(&ndb_p, testdir, &cfg);
-                ok = res != 0;
+
+                let res = ndb_init(&ndb_p, testdir, &cfg)
+                ok = res != 0
                 if !ok {
                     Log.error("ndb_init failed: %d, reducing mapsize from %d to %d", for: .storage, res, mapsize, mapsize / 2)
                     mapsize /= 2
@@ -278,7 +277,7 @@ class Ndb: @unchecked Sendable {
         if !ok {
             return nil
         }
-        
+
         let ndb_instance = ndb_t(ndb: ndb_p)
         Task { await callbackHandler.set(ndb: ndb_instance) }
         return ndb_instance
@@ -289,15 +288,15 @@ class Ndb: @unchecked Sendable {
         guard let db = Self.open(path: path, owns_db_file: owns_db_file, callbackHandler: callbackHandler) else {
             return nil
         }
-        
-        self.generation = 0
+
+        generation = 0
         self.path = path
-        self.owns_db = owns_db_file
-        self.ndb = db
-        self.closed = false
+        owns_db = owns_db_file
+        ndb = db
+        closed = false
         self.callbackHandler = callbackHandler
     }
-    
+
     private static func migrate_db_location_if_needed() throws {
         guard let old_db_path, let db_path = db_path() else {
             throw Errors.cannot_find_db_path
@@ -307,7 +306,7 @@ class Ndb: @unchecked Sendable {
 
         let old_db_files_exist = Self.db_files_exist(path: old_db_path)
         let new_db_files_exist = Self.db_files_exist(path: db_path)
-        
+
         // Migration rules:
         // 1. If DB files exist in the old path but not the new one, move files to the new path
         // 2. If files do not exist anywhere, do nothing (let new DB be initialized)
@@ -316,7 +315,7 @@ class Ndb: @unchecked Sendable {
         // Scenario 4 likely means that user has downgraded and re-upgraded.
         // Although it might make sense to get the most recent DB, it might lead to data loss.
         // If we leave both intact, it makes it easier to fix later, as no data loss would occur.
-        if old_db_files_exist && !new_db_files_exist {
+        if old_db_files_exist, !new_db_files_exist {
             Log.info("Migrating NostrDB to new file location…", for: .storage)
             do {
                 try db_files.forEach { db_file in
@@ -330,45 +329,46 @@ class Ndb: @unchecked Sendable {
             }
         }
     }
-    
+
     private static func db_files_exist(path: String) -> Bool {
         return db_files.allSatisfy { FileManager.default.fileExists(atPath: "\(path)/\($0)") }
     }
 
     init(ndb: ndb_t) {
         self.ndb = ndb
-        self.generation = 0
-        self.path = nil
-        self.owns_db = true
-        self.closed = false
+        generation = 0
+        path = nil
+        owns_db = true
+        closed = false
         // This simple initialization will cause subscriptions not to be ever called. Probably fine because this initializer is used only for empty example ndb instances.
-        self.callbackHandler = Ndb.CallbackHandler()
+        callbackHandler = Ndb.CallbackHandler()
     }
-    
+
     func close() {
-        guard !self.is_closed else { return }
-        self.closed = true
+        guard !is_closed else { return }
+        closed = true
         print("txn: CLOSING NOSTRDB")
-        ndb_destroy(self.ndb.ndb)
-        self.generation += 1
+        ndb_destroy(ndb.ndb)
+        generation += 1
         print("txn: NOSTRDB CLOSED")
     }
 
     func reopen() -> Bool {
-        guard self.is_closed,
-              let db = Self.open(path: self.path, owns_db_file: self.owns_db, callbackHandler: self.callbackHandler) else {
+        guard is_closed,
+              let db = Self.open(path: path, owns_db_file: owns_db, callbackHandler: callbackHandler)
+        else {
             return false
         }
-        
+
         print("txn: NOSTRDB REOPENED (gen \(generation))")
 
-        self.closed = false
-        self.ndb = db
+        closed = false
+        ndb = db
         return true
     }
-    
+
     func lookup_blocks_by_key_with_txn(_ key: NoteKey, txn: RawNdbTxnAccessible) -> NdbBlockGroup.BlocksMetadata? {
-        guard let blocks = ndb_get_blocks_by_key(self.ndb.ndb, &txn.txn, key) else {
+        guard let blocks = ndb_get_blocks_by_key(ndb.ndb, &txn.txn, key) else {
             return nil
         }
 
@@ -382,7 +382,7 @@ class Ndb: @unchecked Sendable {
     }
 
     func lookup_note_by_key_with_txn<Y>(_ key: NoteKey, txn: NdbTxn<Y>) -> NdbNote? {
-        var size: Int = 0
+        var size = 0
         guard let note_p = ndb_get_note_by_key(&txn.txn, key, &size) else {
             return nil
         }
@@ -404,7 +404,7 @@ class Ndb: @unchecked Sendable {
         }
 
         var note_ids = [NoteKey]()
-        for i in 0..<results.num_results {
+        for i in 0 ..< results.num_results {
             // seriously wtf
             switch i {
             case 0: note_ids.append(results.results.0.key.note_id)
@@ -566,7 +566,7 @@ class Ndb: @unchecked Sendable {
     }
 
     private func lookup_profile_by_key_inner<Y>(_ key: ProfileKey, txn: NdbTxn<Y>) -> NdbCachedProfile? {
-        var size: Int = 0
+        var size = 0
         guard let profile_p = ndb_get_profile_by_key(&txn.txn, key, &size) else {
             return nil
         }
@@ -574,7 +574,7 @@ class Ndb: @unchecked Sendable {
         return profile_flatbuf_to_record(ptr: profile_p, size: size, key: key)
     }
 
-    private func profile_flatbuf_to_record(ptr: UnsafeMutableRawPointer, size: Int, key: UInt64) -> NdbCachedProfile? {
+    private func profile_flatbuf_to_record(ptr: UnsafeMutableRawPointer, size: Int, key _: UInt64) -> NdbCachedProfile? {
         do {
             var buf = ByteBuffer(assumingMemoryBound: ptr, capacity: size)
             let rec: NdbProfile = try getDebugCheckedRoot(byteBuffer: &buf)
@@ -589,9 +589,10 @@ class Ndb: @unchecked Sendable {
     private func lookup_note_with_txn_inner<Y>(id: NdbNoteId, txn: NdbTxn<Y>) -> NdbNote? {
         return id.data.withUnsafeBytes { (ptr: UnsafeRawBufferPointer) -> NdbNote? in
             var key: UInt64 = 0
-            var size: Int = 0
+            var size = 0
             guard let baseAddress = ptr.baseAddress,
-                  let note_p = ndb_get_note_by_id(&txn.txn, baseAddress, &size, &key) else {
+                  let note_p = ndb_get_note_by_id(&txn.txn, baseAddress, &size, &key)
+            else {
                 return nil
             }
             let ptr = ndb_note_ptr(ptr: note_p)
@@ -601,7 +602,7 @@ class Ndb: @unchecked Sendable {
 
     private func lookup_profile_with_txn_inner<Y>(pubkey: NdbPubkey, txn: NdbTxn<Y>) -> NdbCachedProfile? {
         return pubkey.data.withUnsafeBytes { (ptr: UnsafeRawBufferPointer) -> NdbCachedProfile? in
-            var size: Int = 0
+            var size = 0
             var key: UInt64 = 0
 
             guard let baseAddress = ptr.baseAddress,
@@ -688,17 +689,17 @@ class Ndb: @unchecked Sendable {
     func lookup_profile_with_txn<Y>(_ pubkey: NdbPubkey, txn: NdbTxn<Y>) -> NdbCachedProfile? {
         lookup_profile_with_txn_inner(pubkey: pubkey, txn: txn)
     }
-    
+
     func process_client_event(_ str: String) -> Bool {
-        guard !self.is_closed else { return false }
+        guard !is_closed else { return false }
         return str.withCString { cstr in
-            return ndb_process_client_event(ndb.ndb, cstr, Int32(str.utf8.count)) != 0
+            ndb_process_client_event(ndb.ndb, cstr, Int32(str.utf8.count)) != 0
         }
     }
 
     func write_profile_last_fetched(pubkey: Pubkey, fetched_at: UInt64) {
         guard !closed else { return }
-        let _ = pubkey.id.withUnsafeBytes { (ptr: UnsafeRawBufferPointer) -> () in
+        _ = pubkey.id.withUnsafeBytes { (ptr: UnsafeRawBufferPointer) in
             guard let p = ptr.baseAddress else { return }
             ndb_write_last_profile_fetch(ndb.ndb, p, fetched_at)
         }
@@ -721,11 +722,11 @@ class Ndb: @unchecked Sendable {
         guard !is_closed else { return false }
         guard let originRelayURL else {
             return str.withCString { cstr in
-                return ndb_process_event(ndb.ndb, cstr, Int32(str.utf8.count)) != 0
+                ndb_process_event(ndb.ndb, cstr, Int32(str.utf8.count)) != 0
             }
         }
         return str.withCString { cstr in
-            return originRelayURL.withCString { originRelayCString in
+            originRelayURL.withCString { originRelayCString in
                 let meta = UnsafeMutablePointer<ndb_ingest_meta>.allocate(capacity: 1)
                 defer { meta.deallocate() }
                 ndb_ingest_meta_init(meta, 0, originRelayCString)
@@ -737,7 +738,7 @@ class Ndb: @unchecked Sendable {
     func process_events(_ str: String) -> Bool {
         guard !is_closed else { return false }
         return str.withCString { cstr in
-            return ndb_process_events(ndb.ndb, cstr, str.utf8.count) != 0
+            ndb_process_events(ndb.ndb, cstr, str.utf8.count) != 0
         }
     }
 
@@ -749,7 +750,7 @@ class Ndb: @unchecked Sendable {
         guard !is_closed else { return nil }
 
         var cStat = ndb_stat()
-        let result = ndb_stat(self.ndb.ndb, &cStat)
+        let result = ndb_stat(ndb.ndb, &cStat)
         guard result == 1 else { return nil }
 
         // Convert C struct to Swift types
@@ -798,7 +799,7 @@ class Ndb: @unchecked Sendable {
     }
 
     func search_profile<Y>(_ search: String, limit: Int, txn: NdbTxn<Y>) -> [Pubkey] {
-        var pks = Array<Pubkey>()
+        var pks = [Pubkey]()
 
         return search.withCString { q in
             var s = ndb_search()
@@ -822,9 +823,9 @@ class Ndb: @unchecked Sendable {
             return pks
         }
     }
-    
+
     // MARK: NdbFilter queries and subscriptions
-    
+
     /// Safe wrapper around the `ndb_query` C function
     /// - Parameters:
     ///   - txn: Database transaction
@@ -833,30 +834,30 @@ class Ndb: @unchecked Sendable {
     /// - Returns: Array of note keys matching the filters
     /// - Throws: NdbStreamError if the query fails
     func query<Y>(with txn: NdbTxn<Y>, filters: [NdbFilter], maxResults: Int) throws(NdbStreamError) -> [NoteKey] {
-        guard !self.is_closed else { throw .ndbClosed }
+        guard !is_closed else { throw .ndbClosed }
         let filtersPointer = UnsafeMutablePointer<ndb_filter>.allocate(capacity: filters.count)
         defer { filtersPointer.deallocate() }
-        
+
         for (index, ndbFilter) in filters.enumerated() {
             filtersPointer.advanced(by: index).pointee = ndbFilter.ndbFilter
         }
-        
+
         let count = UnsafeMutablePointer<Int32>.allocate(capacity: 1)
         defer { count.deallocate() }
-        
+
         let results = UnsafeMutablePointer<ndb_query_result>.allocate(capacity: maxResults)
         defer { results.deallocate() }
-        
-        guard !self.is_closed else { throw .ndbClosed }
+
+        guard !is_closed else { throw .ndbClosed }
         guard ndb_query(&txn.txn, filtersPointer, Int32(filters.count), results, Int32(maxResults), count) == 1 else {
             throw NdbStreamError.initialQueryFailed
         }
-        
+
         var noteIds: [NoteKey] = []
-        for i in 0..<count.pointee {
+        for i in 0 ..< count.pointee {
             noteIds.append(results.advanced(by: Int(i)).pointee.note_id)
         }
-        
+
         return noteIds
     }
 
@@ -877,11 +878,11 @@ class Ndb: @unchecked Sendable {
 
         func markTerminated() -> Bool {
             if terminationStarted {
-                return false  // Already terminated
+                return false // Already terminated
             }
             terminationStarted = true
             streaming = false
-            return true  // First termination
+            return true // First termination
         }
 
         func getSubid() -> UInt64 {
@@ -963,24 +964,24 @@ class Ndb: @unchecked Sendable {
             }
         }
     }
-    
+
     func subscribe(filters: [NdbFilter], maxSimultaneousResults: Int = 1000) throws(NdbStreamError) -> AsyncStream<StreamItem> {
-        guard !self.is_closed else { throw .ndbClosed }
-        
+        guard !is_closed else { throw .ndbClosed }
+
         do { try Task.checkCancellation() } catch { throw .cancelled }
-        
+
         // CRITICAL: Create the subscription FIRST before querying to avoid race condition
         // This ensures that any events indexed after subscription but before query won't be missed
         let newEventsStream = ndbSubscribe(filters: filters)
-        
+
         // Now fetch initial results after subscription is registered
         guard let txn = NdbTxn(ndb: self) else { throw .cannotOpenTransaction }
-        
+
         // Use our safe wrapper instead of direct C function call
         let noteIds = try query(with: txn, filters: filters, maxResults: maxSimultaneousResults)
-        
+
         do { try Task.checkCancellation() } catch { throw .cancelled }
-        
+
         // Create a cascading stream that combines initial results with new events
         return AsyncStream<StreamItem> { continuation in
             // Stream all results already present in the database
@@ -988,10 +989,10 @@ class Ndb: @unchecked Sendable {
                 if Task.isCancelled { return }
                 continuation.yield(.event(noteId))
             }
-            
+
             // Indicate this is the end of the results currently present in the database
             continuation.yield(.eose)
-            
+
             // Create a task to forward events from the subscription stream
             let forwardingTask = Task {
                 for await noteKey in newEventsStream {
@@ -1000,51 +1001,50 @@ class Ndb: @unchecked Sendable {
                 }
                 continuation.finish()
             }
-            
+
             // Handle termination by canceling the forwarding task
             continuation.onTermination = { @Sendable _ in
                 forwardingTask.cancel()
             }
         }
     }
-    
-    
+
     /// Determines if a given note was seen on a specific relay URL
-    func was(noteKey: NoteKey, seenOn relayUrl: String, txn: SafeNdbTxn<()>? = nil) throws -> Bool {
+    func was(noteKey: NoteKey, seenOn relayUrl: String, txn: SafeNdbTxn<Void>? = nil) throws -> Bool {
         guard let txn = txn ?? SafeNdbTxn.new(on: self) else { throw NdbLookupError.cannotOpenTransaction }
-        return relayUrl.withCString({ relayCString in
-            return ndb_note_seen_on_relay(&txn.txn, noteKey, relayCString) == 1
-        })
+        return relayUrl.withCString { relayCString in
+            ndb_note_seen_on_relay(&txn.txn, noteKey, relayCString) == 1
+        }
     }
-    
+
     /// Determines if a given note was seen on any of the listed relay URLs
-    func was(noteKey: NoteKey, seenOnAnyOf relayUrls: [String], txn: SafeNdbTxn<()>? = nil) throws -> Bool {
+    func was(noteKey: NoteKey, seenOnAnyOf relayUrls: [String], txn: SafeNdbTxn<Void>? = nil) throws -> Bool {
         guard let txn = txn ?? SafeNdbTxn.new(on: self) else { throw NdbLookupError.cannotOpenTransaction }
         for relayUrl in relayUrls {
-            if try self.was(noteKey: noteKey, seenOn: relayUrl, txn: txn) {
+            if try was(noteKey: noteKey, seenOn: relayUrl, txn: txn) {
                 return true
             }
         }
         return false
     }
-    
+
     // MARK: Internal ndb callback interfaces
-    
-    internal func setContinuation(for subscriptionId: UInt64, continuation: AsyncStream<NoteKey>.Continuation) async {
-        await self.callbackHandler.set(continuation: continuation, for: subscriptionId)
+
+    func setContinuation(for subscriptionId: UInt64, continuation: AsyncStream<NoteKey>.Continuation) async {
+        await callbackHandler.set(continuation: continuation, for: subscriptionId)
     }
-    
-    internal func unsetContinuation(subscriptionId: UInt64) async {
-        await self.callbackHandler.unset(subid: subscriptionId)
+
+    func unsetContinuation(subscriptionId: UInt64) async {
+        await callbackHandler.unset(subid: subscriptionId)
     }
-    
+
     // MARK: Helpers
-    
+
     enum Errors: Error {
         case cannot_find_db_path
         case db_file_migration_error
     }
-    
+
     // MARK: Deinitialization
 
     deinit {
@@ -1052,7 +1052,6 @@ class Ndb: @unchecked Sendable {
         self.close()
     }
 }
-
 
 // MARK: - Extensions and helper structures and functions
 
@@ -1062,14 +1061,14 @@ extension Ndb {
     /// This is a separate class from `Ndb` because it simplifies the initialization logic
     actor CallbackHandler {
         /// Holds the ndb instance in the C codebase. Should be shared with `Ndb`
-        var ndb: ndb_t? = nil
+        var ndb: ndb_t?
         /// A map from nostrdb subscription ids to stream continuations, which allows publishing note keys to active listeners
         var subscriptionContinuationMap: [UInt64: AsyncStream<NoteKey>.Continuation] = [:]
         /// A map from nostrdb subscription ids to queued note keys (for when there are no active listeners)
         var subscriptionQueueMap: [UInt64: [NoteKey]] = [:]
         /// Maximum number of items to queue per subscription when no one is listening
         let maxQueueItemsPerSubscription: Int = 2000
-        
+
         func set(continuation: AsyncStream<NoteKey>.Continuation, for subid: UInt64) {
             // Flush any queued items to the new continuation
             if let queuedItems = subscriptionQueueMap[subid] {
@@ -1078,50 +1077,50 @@ extension Ndb {
                 }
                 subscriptionQueueMap[subid] = nil
             }
-            
+
             subscriptionContinuationMap[subid] = continuation
         }
-        
+
         func unset(subid: UInt64) {
             subscriptionContinuationMap[subid] = nil
             subscriptionQueueMap[subid] = nil
         }
-        
+
         func set(ndb: ndb_t?) {
             self.ndb = ndb
         }
-        
+
         /// Handles callbacks from nostrdb subscriptions, and routes them to the correct continuation or queue
         func handleSubscriptionCallback(subId: UInt64, maxCapacity: Int32 = 1000) {
             let result = UnsafeMutablePointer<UInt64>.allocate(capacity: Int(maxCapacity))
-            defer { result.deallocate() }  // Ensure we deallocate memory before leaving the function to avoid memory leaks
-            
+            defer { result.deallocate() } // Ensure we deallocate memory before leaving the function to avoid memory leaks
+
             guard let ndb else { return }
-            
+
             let numberOfNotes = ndb_poll_for_notes(ndb.ndb, subId, result, maxCapacity)
-            
-            for i in 0..<numberOfNotes {
+
+            for i in 0 ..< numberOfNotes {
                 let noteKey = result.advanced(by: Int(i)).pointee
-                
+
                 if let continuation = subscriptionContinuationMap[subId] {
                     // Send directly to the active listener stream
                     continuation.yield(noteKey)
                 } else {
                     // No one is listening, queue it for later
                     var queue = subscriptionQueueMap[subId] ?? []
-                    
+
                     // Ensure queue stays within the desired size
                     while queue.count >= maxQueueItemsPerSubscription {
                         queue.removeFirst()
                     }
-                    
+
                     queue.append(noteKey)
                     subscriptionQueueMap[subId] = queue
                 }
             }
         }
     }
-    
+
     /// An item that comes out of a subscription stream
     enum StreamItem {
         /// End of currently stored events
@@ -1129,7 +1128,7 @@ extension Ndb {
         /// An event in NostrDB available at the given note key
         case event(NoteKey)
     }
-    
+
     /// An error that may happen during nostrdb streaming
     enum NdbStreamError: Error {
         case cannotOpenTransaction
@@ -1139,7 +1138,7 @@ extension Ndb {
         case cancelled
         case ndbClosed
     }
-    
+
     /// An error that may happen when looking something up
     enum NdbLookupError: Error {
         case cannotOpenTransaction
@@ -1148,7 +1147,7 @@ extension Ndb {
         case timeout
         case notFound
     }
-    
+
     enum OperationError: Error {
         case genericError
     }
@@ -1171,16 +1170,15 @@ public func subscription_callback(ctx: UnsafeMutableRawPointer?, subid: UInt64) 
 }
 
 #if DEBUG
-func getDebugCheckedRoot<T: FlatBufferObject>(byteBuffer: inout ByteBuffer) throws -> T {
-    return getRoot(byteBuffer: &byteBuffer)
-}
+    func getDebugCheckedRoot<T: FlatBufferObject>(byteBuffer: inout ByteBuffer) throws -> T {
+        return getRoot(byteBuffer: &byteBuffer)
+    }
 #else
-func getDebugCheckedRoot<T: FlatBufferObject>(byteBuffer: inout ByteBuffer) throws -> T {
-    return getRoot(byteBuffer: &byteBuffer)
-}
+    func getDebugCheckedRoot<T: FlatBufferObject>(byteBuffer: inout ByteBuffer) throws -> T {
+        return getRoot(byteBuffer: &byteBuffer)
+    }
 #endif
 
 func remove_file_prefix(_ str: String) -> String {
     return str.replacingOccurrences(of: "file://", with: "")
 }
-

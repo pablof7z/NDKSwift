@@ -1,4 +1,5 @@
 import NDKSwiftCore
+
 // MARK: - Common Wallet Imports
 
 /// This file provides common imports for wallet-related functionality.
@@ -9,8 +10,8 @@ import NDKSwiftCore
 /// import WalletImports
 /// ```
 
-@_exported import Foundation
 import CashuSwift
+@_exported import Foundation
 
 // MARK: - Type Aliases
 
@@ -27,16 +28,16 @@ public typealias CashuMint = CashuSwift.Mint
 public enum WalletConstants {
     /// Default unit for ecash transactions
     public static let defaultUnit = "sat"
-    
+
     /// Maximum retry attempts for mint operations
     public static let maxMintRetries = 3
-    
+
     /// Default timeout for mint operations
     public static let mintTimeout: TimeInterval = 30
-    
+
     /// Maximum proofs per transaction (for batching)
     public static let maxProofsPerTransaction = 100
-    
+
     /// Cache duration for mint info
     public static let mintInfoCacheDuration: TimeInterval = 3600 // 1 hour
 }

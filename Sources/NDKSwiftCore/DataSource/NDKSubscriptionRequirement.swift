@@ -15,34 +15,34 @@ actor NDKSubscriptionRequirement {
 
     // Event deduplication
     private var seenEventIds = Set<EventID>()
-    
+
     // Observers
     private var observers: [(id: RequirementID, stream: AsyncStream<NDKEvent>, continuation: AsyncStream<NDKEvent>.Continuation, filter: NDKFilter)] = []
-    
+
     // Relay update observers
     private var relayUpdateObservers: [(id: RequirementID, stream: AsyncStream<RelayUpdate>, continuation: AsyncStream<RelayUpdate>.Continuation)] = []
-    
+
     // Active relay subscriptions (for outbox model)
     private var relaySubscriptions: [RelayURL: RelaySubscription] = [:]
-    
+
     // Track which authors each relay subscription covers
     private var relayAuthorCoverage: [RelayURL: Set<String>] = [:]
-    
+
     // Enhanced requirements created by NDKSubscriptionManager
     private var enhancedRequirements: [NDKSubscriptionRequirementHandle] = []
-    
+
     // EOSE tracking
     private let eoseTracker: EOSETracker
     private var eoseTask: Task<Void, Never>?
-    
+
     init(
         filter: NDKFilter,
         subscriptionId: String,
         internalSubscription: NDKSubscriptionCoordinator,
         cache: any NDKCache,
         ndk: NDK,
-        relays: Set<RelayURL>?,
-        exclusiveRelays: Bool,
+        relays _: Set<RelayURL>?,
+        exclusiveRelays _: Bool,
         closeOnEose: Bool,
         relayStrategy: InternalRelaySelectionStrategy,
         shouldFetchFromNetwork: Bool = true,
@@ -57,23 +57,23 @@ actor NDKSubscriptionRequirement {
         self.relayStrategy = relayStrategy
         self.shouldFetchFromNetwork = shouldFetchFromNetwork
         self.cachePolicy = cachePolicy
-        self.eoseTracker = EOSETracker(subscriptionId: subscriptionId)
+        eoseTracker = EOSETracker(subscriptionId: subscriptionId)
     }
-    
+
     /// Add an observer for events matching this requirement
     func addObserver(id: RequirementID, individualFilter: NDKFilter) -> AsyncStream<NDKEvent> {
         let (stream, continuation) = AsyncStream<NDKEvent>.makeStream()
         observers.append((id: id, stream: stream, continuation: continuation, filter: individualFilter))
         return stream
     }
-    
+
     /// Add an observer for relay updates
     func addRelayUpdateObserver(id: RequirementID) -> AsyncStream<RelayUpdate> {
         let (stream, continuation) = AsyncStream<RelayUpdate>.makeStream()
         relayUpdateObservers.append((id: id, stream: stream, continuation: continuation))
         return stream
     }
-    
+
     /// Start processing events
     func startProcessing() async {
         // Set up cache observation only if policy allows it
@@ -95,25 +95,25 @@ actor NDKSubscriptionRequirement {
                     }
                 } catch {
                     NDKLogger.log(.error, category: .subscription,
-                                 "❌ Cache observation error for '\(self.subscriptionId)': \(error)")
+                                  "❌ Cache observation error for '\(self.subscriptionId)': \(error)")
                 }
             }
         }
-        
+
         // Only set up network operations if we should fetch from network
         if shouldFetchFromNetwork {
             // Apply relay strategy
             await applyRelayStrategy()
-            
+
             // Set up subscription event handling
             await internalSubscription.setOnEvent { [weak self] event, relay in
                 await self?.handleNetworkEvent(event, from: relay)
             }
-            
+
             await internalSubscription.setOnEOSE { [weak self] relay in
                 await self?.handleEOSE(from: relay)
             }
-            
+
             // Start the subscription
             await internalSubscription.start()
         } else {
@@ -122,119 +122,119 @@ actor NDKSubscriptionRequirement {
             await internalSubscription.setOnEvent { [weak self] event, relay in
                 await self?.handleNetworkEvent(event, from: relay)
             }
-            
+
             // Don't start the subscription (no network activity)
-            NDKLogger.log(.debug, category: .subscription, 
-                         "📚 Cache-only subscription '\(subscriptionId)' created without network fetch")
+            NDKLogger.log(.debug, category: .subscription,
+                          "📚 Cache-only subscription '\(subscriptionId)' created without network fetch")
         }
-        
+
         // Start EOSE monitoring
         eoseTask = Task { [weak self] in
             await self?.monitorEOSE()
         }
     }
-    
+
     /// Apply the relay selection strategy
     private func applyRelayStrategy() async {
         switch relayStrategy {
-        case .explicit(let relays):
+        case let .explicit(relays):
             // Simple case: use explicit relays
             await eoseTracker.setExpectedRelays(relays)
             await createSubscriptions(for: filter, on: relays)
-            
-        case .outbox(let strategy):
+
+        case let .outbox(strategy):
             // Complex case: split filters by relay
             let allRelays = Set(strategy.filtersByRelay.keys)
             await eoseTracker.setExpectedRelays(allRelays)
             await applyOutboxStrategy(strategy)
-            
-        case .default(let relays):
+
+        case let .default(relays):
             // Use default relays
             await eoseTracker.setExpectedRelays(relays)
             await createSubscriptions(for: filter, on: relays)
         }
     }
-    
+
     /// Apply outbox strategy with filter splitting
     private func applyOutboxStrategy(_ strategy: OutboxFilterStrategy) async {
         // Create subscriptions for each relay with its specific filter
         for (relay, relayFilter) in strategy.filtersByRelay {
             await createSubscription(for: relayFilter, on: relay)
         }
-        
+
         // If there are unknown authors, use fallback relays
         if !strategy.unknownAuthors.isEmpty {
             var fallbackFilter = filter
             fallbackFilter.authors = Array(strategy.unknownAuthors)
-            
+
             // Get fallback relays (explicit relays, not outbox relays)
             if let pool = ndk?.pool {
                 let allConnectedRelays = await pool.connectedRelayURLs
                 // Normalize outbox relay URLs to match the format of connected relays
                 let normalizedOutboxRelays = Set((ndk?.outboxConfig.outboxRelays ?? []).map { $0.normalizedRelayURL })
                 let fallbackRelayURLs = allConnectedRelays.subtracting(normalizedOutboxRelays)
-                
+
                 NDKLogger.log(.debug, category: .subscription,
-                             "📍 Using \(fallbackRelayURLs.count) fallback relays for \(strategy.unknownAuthors.count) unknown authors")
-                
+                              "📍 Using \(fallbackRelayURLs.count) fallback relays for \(strategy.unknownAuthors.count) unknown authors")
+
                 for relay in fallbackRelayURLs {
                     await createSubscription(for: fallbackFilter, on: relay)
                 }
             }
         }
     }
-    
+
     /// Create subscriptions on specific relays
     private func createSubscriptions(for filter: NDKFilter, on relays: Set<RelayURL>) async {
         for relay in relays {
             await createSubscription(for: filter, on: relay)
         }
     }
-    
+
     /// Create a subscription on a specific relay
     private func createSubscription(for filter: NDKFilter, on relayURL: RelayURL) async {
         guard let ndk = ndk else { return }
-        
+
         // Get or create relay
         var relay = await ndk.pool.relay(for: relayURL)
-        
+
         // If relay doesn't exist in pool, add and connect to it
         if relay == nil {
             NDKLogger.log(.info, category: .subscription,
-                         "🔌 Relay not in pool, adding and connecting: \(relayURL)")
+                          "🔌 Relay not in pool, adding and connecting: \(relayURL)")
             // Try to determine origin from filter authors
             let originAuthor = filter.authors?.first ?? "unknown"
             relay = await ndk.pool.addRelay(relayURL, origin: .outbox(authorPubkey: originAuthor))
         }
-        
+
         guard let relay = relay else {
             NDKLogger.log(.warning, category: .subscription,
-                         "⚠️ Failed to add relay to pool: \(relayURL)")
+                          "⚠️ Failed to add relay to pool: \(relayURL)")
             return
         }
-        
+
         // Add subscription to relay using relay-level grouping
         await relay.addSubscription(internalSubscription, filters: [filter])
-        
+
         // Update the InternalSubscriptionManager's relay mapping for subscription replay
         await ndk.internalSubscriptionManager.updateRelayAssociation(subscription: internalSubscription, relay: relayURL)
-        
+
         // Track this relay subscription
         relaySubscriptions[relayURL] = RelaySubscription(relay: relay, filter: filter)
-        
+
         // Track which authors this relay subscription covers
         if let authors = filter.authors {
             relayAuthorCoverage[relayURL] = Set(authors)
-            NDKLogger.log(.debug, category: .subscription, 
-                         "📊 Relay \(relayURL) now covers \(authors.count) authors: \(authors.prefix(3).joined(separator: ", "))\(authors.count > 3 ? "..." : "")")
+            NDKLogger.log(.debug, category: .subscription,
+                          "📊 Relay \(relayURL) now covers \(authors.count) authors: \(authors.prefix(3).joined(separator: ", "))\(authors.count > 3 ? "..." : "")")
         }
     }
-    
+
     /// Handle event from cache
     private func handleCacheEvent(_ event: NDKEvent) async {
         guard !seenEventIds.contains(event.id) else { return }
         seenEventIds.insert(event.id)
-        
+
         // Notify observers whose filters match
         for (_, _, continuation, individualFilter) in observers {
             if individualFilter.matches(event: event) {
@@ -242,12 +242,12 @@ actor NDKSubscriptionRequirement {
             }
         }
     }
-    
+
     /// Handle event from network
     func handleNetworkEvent(_ event: NDKEvent, from relay: NDKRelay?) async {
         // Update EOSE tracker
         await eoseTracker.trackEventReceived()
-        
+
         guard !seenEventIds.contains(event.id) else { return }
         seenEventIds.insert(event.id)
 
@@ -257,14 +257,14 @@ actor NDKSubscriptionRequirement {
         } catch {
             NDKLogger.log(.warning, category: .cache, "Failed to save event \(event.id.prefix(8)) to cache: \(error.localizedDescription)")
         }
-        
+
         // Notify relay update observers if we have relay info
         if let relay = relay {
             for (_, _, continuation) in relayUpdateObservers {
                 continuation.yield(.event(event, relay: relay.url))
             }
         }
-        
+
         // Notify observers whose filters match
         for (_, _, continuation, individualFilter) in observers {
             if individualFilter.matches(event: event) {
@@ -272,79 +272,79 @@ actor NDKSubscriptionRequirement {
             }
         }
     }
-    
+
     /// Handle EOSE from relay
     private func handleEOSE(from relay: NDKRelay) async {
         // First, notify relay update observers about individual EOSE
         for (_, _, continuation) in relayUpdateObservers {
             continuation.yield(.eose(relay: relay.url))
         }
-        
+
         await eoseTracker.trackEOSE(from: relay.url)
-        
+
         // Check if we should emit aggregated EOSE
         if await eoseTracker.shouldEmitEOSE(events: seenEventIds, filter: filter) {
             // Notify all relay update observers about aggregated EOSE
             for (_, _, continuation) in relayUpdateObservers {
                 continuation.yield(.aggregatedEose)
             }
-            
+
             // Close if configured to do so
             if closeOnEose {
                 await cancel()
             }
         }
     }
-    
+
     /// Get the observer count for this requirement
     func getObserverCount() -> Int {
         return observers.count
     }
-    
+
     /// Get the active relays being used by this requirement
     func getActiveRelays() -> Set<RelayURL> {
         return Set(relaySubscriptions.keys)
     }
-    
+
     /// Get relays that are serving specific authors
     func getRelaysServingAuthors(_ authors: Set<String>) -> Set<RelayURL> {
         var servingRelays = Set<RelayURL>()
-        
+
         for (relay, coveredAuthors) in relayAuthorCoverage {
             // Check if this relay covers any of the requested authors
             if !authors.isDisjoint(with: coveredAuthors) {
                 servingRelays.insert(relay)
             }
         }
-        
+
         NDKLogger.log(.debug, category: .subscription,
-                     "🎯 Found \(servingRelays.count) relays serving authors \(authors.prefix(3).joined(separator: ", ")): \(servingRelays)")
-        
+                      "🎯 Found \(servingRelays.count) relays serving authors \(authors.prefix(3).joined(separator: ", ")): \(servingRelays)")
+
         return servingRelays
     }
-    
+
     /// Handle newly discovered relays (for outbox model)
-    func handleRelayDiscovery(authors: Set<String>, relays: Set<RelayURL>) async {
+    func handleRelayDiscovery(authors: Set<String>, relays _: Set<RelayURL>) async {
         // Only relevant if we're using outbox strategy
-        guard case .outbox(let strategy) = relayStrategy else { return }
-        
+        guard case let .outbox(strategy) = relayStrategy else { return }
+
         // Check if any discovered authors are in our unknown authors set
         let relevantAuthors = authors.intersection(strategy.unknownAuthors)
         guard !relevantAuthors.isEmpty else { return }
-        
+
         NDKLogger.log(.info, category: .subscription,
-                     "📡 Discovered relays for \(relevantAuthors.count) authors in requirement")
-        
+                      "📡 Discovered relays for \(relevantAuthors.count) authors in requirement")
+
         // According to Outbox.md, we should NOT modify this requirement
         // Instead, the NDKSubscriptionManager will create new requirements
         // This method now just logs for debugging
     }
-    
+
     /// Add an enhanced requirement handle
     func addEnhancedRequirement(_ handle: NDKSubscriptionRequirementHandle) {
         enhancedRequirements.append(handle)
     }
-    
+
     /// Monitor EOSE status and emit when appropriate
     private func monitorEOSE() async {
         for await shouldEmit in eoseTracker.eoseUpdates {
@@ -354,15 +354,15 @@ actor NDKSubscriptionRequirement {
                 let filterDescription = filter.description
                 let relayCount = relaySubscriptions.count
                 let activeRelays = Array(relaySubscriptions.keys).sorted()
-                
+
                 NDKLogger.log(.info, category: .subscription,
-                             "📊 Emitting aggregated EOSE for requirement | ID: '\(subscriptionId)' | Filter: \(filterDescription) | Active relays: \(relayCount) \(activeRelays)")
-                
+                              "📊 Emitting aggregated EOSE for requirement | ID: '\(subscriptionId)' | Filter: \(filterDescription) | Active relays: \(relayCount) \(activeRelays)")
+
                 // Notify all relay update observers about aggregated EOSE
                 for (_, _, continuation) in relayUpdateObservers {
                     continuation.yield(.aggregatedEose)
                 }
-                
+
                 if closeOnEose {
                     await cancel()
                 }
@@ -370,27 +370,27 @@ actor NDKSubscriptionRequirement {
             }
         }
     }
-    
+
     /// Cancel this requirement
     func cancel() async {
         // Cancel EOSE monitoring
         eoseTask?.cancel()
-        
+
         // Cancel internal subscription
         await internalSubscription.close()
-        
+
         // Cancel all enhanced requirements
         for handle in enhancedRequirements {
             await handle.cancel()
         }
         enhancedRequirements.removeAll()
-        
+
         // Finish all observer streams
         for (_, _, continuation, _) in observers {
             continuation.finish()
         }
         observers.removeAll()
-        
+
         // Finish all relay update observer streams
         for (_, _, continuation) in relayUpdateObservers {
             continuation.finish()
@@ -406,4 +406,3 @@ private struct RelaySubscription {
     let relay: NDKRelay
     let filter: NDKFilter
 }
-

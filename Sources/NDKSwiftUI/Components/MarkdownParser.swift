@@ -24,7 +24,7 @@ enum MarkdownInline {
     case hashtag(String)
 }
 
-struct MarkdownList {
+enum MarkdownList {
     struct Item {
         let content: [MarkdownInline]
         let subItems: [Item]
@@ -33,7 +33,7 @@ struct MarkdownList {
 
 // MARK: - Markdown Parser
 
-struct MarkdownParser {
+enum MarkdownParser {
     static func parse(_ content: String) -> [MarkdownBlock] {
         let lines = content.components(separatedBy: .newlines)
         var blocks: [MarkdownBlock] = []
@@ -71,8 +71,9 @@ struct MarkdownParser {
                 }
                 index = newIndex
             } else if line.trimmed == "---" ||
-                      line.trimmed == "***" ||
-                      line.trimmed == "___" {
+                line.trimmed == "***" ||
+                line.trimmed == "___"
+            {
                 blocks.append(.horizontalRule)
                 index += 1
             } else {
@@ -97,12 +98,12 @@ struct MarkdownParser {
             var level = 0
             var index = trimmed.startIndex
 
-            while index < trimmed.endIndex && trimmed[index] == "#" {
+            while index < trimmed.endIndex, trimmed[index] == "#" {
                 level += 1
                 index = trimmed.index(after: index)
             }
 
-            if level > 0 && level <= 6 && index < trimmed.endIndex && trimmed[index] == " " {
+            if level > 0, level <= 6, index < trimmed.endIndex, trimmed[index] == " " {
                 let text = String(trimmed[trimmed.index(after: index)...])
                     .trimmed
                 return .heading(level: level, text: text)
@@ -113,7 +114,7 @@ struct MarkdownParser {
     }
 
     private static func parseCodeBlock(lines: [String], startIndex: Int) -> (MarkdownBlock?, Int) {
-        guard startIndex < lines.count && lines[startIndex].starts(with: "```") else {
+        guard startIndex < lines.count, lines[startIndex].starts(with: "```") else {
             return (nil, startIndex + 1)
         }
 
@@ -141,7 +142,7 @@ struct MarkdownParser {
         var quoteLines: [String] = []
         var index = startIndex
 
-        while index < lines.count && lines[index].starts(with: ">") {
+        while index < lines.count, lines[index].starts(with: ">") {
             let content = String(lines[index].dropFirst()).trimmed
             quoteLines.append(String(content))
             index += 1
@@ -176,7 +177,7 @@ struct MarkdownParser {
     }
 
     private static func parseList(lines: [String], startIndex: Int) -> (MarkdownBlock?, Int) {
-        guard startIndex < lines.count && isListItem(lines[startIndex]) else {
+        guard startIndex < lines.count, isListItem(lines[startIndex]) else {
             return (nil, startIndex + 1)
         }
 
@@ -192,7 +193,7 @@ struct MarkdownParser {
 
             if trimmed.isEmpty {
                 // Check if next line continues the list
-                if index + 1 < lines.count && isListItem(lines[index + 1]) {
+                if index + 1 < lines.count, isListItem(lines[index + 1]) {
                     index += 1
                     continue
                 } else {
@@ -208,7 +209,8 @@ struct MarkdownParser {
             let content: String
             if isOrdered {
                 if let _ = trimmed.firstIndex(of: "."),
-                   let spaceIndex = trimmed.firstIndex(of: " ") {
+                   let spaceIndex = trimmed.firstIndex(of: " ")
+                {
                     content = String(trimmed[trimmed.index(after: spaceIndex)...])
                 } else {
                     content = trimmed
@@ -239,11 +241,12 @@ struct MarkdownParser {
 
             // Stop at empty lines or block markers
             if trimmed.isEmpty ||
-               trimmed.starts(with: "#") ||
-               trimmed.starts(with: "```") ||
-               trimmed.starts(with: ">") ||
-               isListItem(line) ||
-               trimmed == "---" || trimmed == "***" || trimmed == "___" {
+                trimmed.starts(with: "#") ||
+                trimmed.starts(with: "```") ||
+                trimmed.starts(with: ">") ||
+                isListItem(line) ||
+                trimmed == "---" || trimmed == "***" || trimmed == "___"
+            {
                 break
             }
 
@@ -288,7 +291,8 @@ struct MarkdownParser {
 
             // Check for bold
             if index < text.index(text.endIndex, offsetBy: -1) &&
-               text[index] == "*" && text[text.index(after: index)] == "*" {
+                text[index] == "*" && text[text.index(after: index)] == "*"
+            {
                 if !currentText.isEmpty {
                     result.append(.text(currentText))
                     currentText = ""
@@ -325,7 +329,8 @@ struct MarkdownParser {
 
             // Check for images and links
             if text[index] == "!" && index < text.index(text.endIndex, offsetBy: -1) &&
-               text[text.index(after: index)] == "[" {
+                text[text.index(after: index)] == "["
+            {
                 if !currentText.isEmpty {
                     result.append(.text(currentText))
                     currentText = ""
@@ -362,8 +367,9 @@ struct MarkdownParser {
 
             // Check for Nostr entities
             if text[index] == "@" || text[index] == "#" ||
-               (index < text.index(text.endIndex, offsetBy: -4) &&
-                String(text[index..<text.index(index, offsetBy: 5)]).starts(with: "nostr")) {
+                (index < text.index(text.endIndex, offsetBy: -4) &&
+                    String(text[index ..< text.index(index, offsetBy: 5)]).starts(with: "nostr"))
+            {
                 if !currentText.isEmpty {
                     result.append(.text(currentText))
                     currentText = ""
@@ -411,7 +417,8 @@ struct MarkdownParser {
     private static func parseBold(_ text: String, from startIndex: String.Index) -> ([MarkdownInline]?, String.Index) {
         guard startIndex < text.index(text.endIndex, offsetBy: -3),
               text[startIndex] == "*",
-              text[text.index(after: startIndex)] == "*" else {
+              text[text.index(after: startIndex)] == "*"
+        else {
             return (nil, startIndex)
         }
 
@@ -419,7 +426,7 @@ struct MarkdownParser {
         var content = ""
 
         while index < text.index(text.endIndex, offsetBy: -1) {
-            if text[index] == "*" && text[text.index(after: index)] == "*" {
+            if text[index] == "*", text[text.index(after: index)] == "*" {
                 let inlines = parseInline(content)
                 return (inlines, text.index(index, offsetBy: 2))
             }
@@ -456,18 +463,18 @@ struct MarkdownParser {
         var linkText = ""
 
         // Parse link text
-        while index < text.endIndex && text[index] != "]" {
+        while index < text.endIndex, text[index] != "]" {
             linkText.append(text[index])
             index = text.index(after: index)
         }
 
-        guard index < text.endIndex && text[index] == "]" else {
+        guard index < text.endIndex, text[index] == "]" else {
             return (nil, startIndex)
         }
 
         index = text.index(after: index)
 
-        guard index < text.endIndex && text[index] == "(" else {
+        guard index < text.endIndex, text[index] == "(" else {
             return (nil, startIndex)
         }
 
@@ -475,12 +482,12 @@ struct MarkdownParser {
         var urlString = ""
 
         // Parse URL
-        while index < text.endIndex && text[index] != ")" {
+        while index < text.endIndex, text[index] != ")" {
             urlString.append(text[index])
             index = text.index(after: index)
         }
 
-        guard index < text.endIndex && text[index] == ")" else {
+        guard index < text.endIndex, text[index] == ")" else {
             return (nil, startIndex)
         }
 
@@ -494,7 +501,8 @@ struct MarkdownParser {
     private static func parseImage(_ text: String, from startIndex: String.Index) -> (MarkdownInline?, String.Index) {
         guard startIndex < text.index(text.endIndex, offsetBy: -1),
               text[startIndex] == "!",
-              text[text.index(after: startIndex)] == "[" else {
+              text[text.index(after: startIndex)] == "["
+        else {
             return (nil, startIndex)
         }
 
@@ -502,18 +510,18 @@ struct MarkdownParser {
         var altText = ""
 
         // Parse alt text
-        while index < text.endIndex && text[index] != "]" {
+        while index < text.endIndex, text[index] != "]" {
             altText.append(text[index])
             index = text.index(after: index)
         }
 
-        guard index < text.endIndex && text[index] == "]" else {
+        guard index < text.endIndex, text[index] == "]" else {
             return (nil, startIndex)
         }
 
         index = text.index(after: index)
 
-        guard index < text.endIndex && text[index] == "(" else {
+        guard index < text.endIndex, text[index] == "(" else {
             return (nil, startIndex)
         }
 
@@ -521,12 +529,12 @@ struct MarkdownParser {
         var urlString = ""
 
         // Parse URL
-        while index < text.endIndex && text[index] != ")" {
+        while index < text.endIndex, text[index] != ")" {
             urlString.append(text[index])
             index = text.index(after: index)
         }
 
-        guard index < text.endIndex && text[index] == ")" else {
+        guard index < text.endIndex, text[index] == ")" else {
             return (nil, startIndex)
         }
 
@@ -546,8 +554,9 @@ struct MarkdownParser {
             var index = text.index(after: startIndex)
             var mention = ""
 
-            while index < text.endIndex &&
-                  (text[index].isLetter || text[index].isNumber || text[index] == "_") {
+            while index < text.endIndex,
+                  text[index].isLetter || text[index].isNumber || text[index] == "_"
+            {
                 mention.append(text[index])
                 index = text.index(after: index)
             }
@@ -558,14 +567,15 @@ struct MarkdownParser {
         }
 
         // Check for hashtags (#)
-        if text[startIndex] == "#" && startIndex < text.index(text.endIndex, offsetBy: -1) {
+        if text[startIndex] == "#", startIndex < text.index(text.endIndex, offsetBy: -1) {
             let nextChar = text[text.index(after: startIndex)]
             if nextChar.isLetter || nextChar.isNumber {
                 var index = text.index(after: startIndex)
                 var tag = ""
 
-                while index < text.endIndex &&
-                      (text[index].isLetter || text[index].isNumber || text[index] == "_") {
+                while index < text.endIndex,
+                      text[index].isLetter || text[index].isNumber || text[index] == "_"
+                {
                     tag.append(text[index])
                     index = text.index(after: index)
                 }
@@ -583,19 +593,19 @@ struct MarkdownParser {
         if let entity = entities.first {
             let entityLength: Int
             switch entity {
-            case .text(let str):
+            case let .text(str):
                 entityLength = str.count
-            case .npub(let id), .nprofile(let id), .note(let id),
-                 .nevent(let id), .naddr(let id):
+            case let .npub(id), let .nprofile(id), let .note(id),
+                 let .nevent(id), let .naddr(id):
                 // These entities include their prefix in the parsed content
                 entityLength = id.count + 4 // prefix length
-            case .hashtag(let tag):
+            case let .hashtag(tag):
                 entityLength = tag.count + 1 // include #
-            case .url(let url):
+            case let .url(url):
                 entityLength = url.absoluteString.count
-            case .userMention(_, let npub):
+            case let .userMention(_, npub):
                 entityLength = npub.count
-            case .eventMention(let id):
+            case let .eventMention(id):
                 entityLength = id.count
             }
             let endIndex = text.index(startIndex, offsetBy: min(entityLength, text.distance(from: startIndex, to: text.endIndex)))

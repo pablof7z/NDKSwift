@@ -1,8 +1,9 @@
+import CashuSwift
 import Foundation
 import NDKSwiftCore
-import CashuSwift
 
 // MARK: - Extensions for CashuSwift.Proof to support Set operations
+
 extension CashuSwift.Proof: @retroactive Hashable {
     public func hash(into hasher: inout Hasher) {
         // Use the proof's C value as the unique identifier for hashing
@@ -21,8 +22,8 @@ public actor ProofStateManager {
 
     public enum ProofState: Equatable {
         case available
-        case reserved   // For concurrent operations
-        case deleted    // Spent proofs
+        case reserved // For concurrent operations
+        case deleted // Spent proofs
     }
 
     public struct ProofEntry {
@@ -49,7 +50,7 @@ public actor ProofStateManager {
                     // Existing owner is newer, don't update ownership
                     NDKLogger.log(.debug, category: .wallet, "ProofStateManager.addProof - Proof \(proof.C) already exists with newer owner (existing: \(existingTimestamp), new: \(newTimestamp))")
                     return
-                } else if newTimestamp == existingTimestamp && existing.state == state {
+                } else if newTimestamp == existingTimestamp, existing.state == state {
                     // Same timestamp and same state, no need to update
                     NDKLogger.log(.debug, category: .wallet, "ProofStateManager.addProof - Proof \(proof.C) already exists with same owner and state")
                     return
@@ -156,7 +157,7 @@ public actor ProofStateManager {
         let availableProofsByMint = getAvailableProofsByMint()
 
         return availableProofsByMint
-            .compactMap { (mintURL, proofs) in
+            .compactMap { mintURL, proofs in
                 let balance = proofs.reduce(0) { $0 + Int64($1.amount) }
                 return balance >= amount ? (mint: mintURL, balance: balance) : nil
             }
@@ -233,7 +234,7 @@ public actor ProofStateManager {
 
         for (proofC, entry) in proofState {
             // Only delete if this event still owns the proof
-            if entry.ownerEventId == eventId && entry.state != .deleted {
+            if entry.ownerEventId == eventId, entry.state != .deleted {
                 var updatedEntry = entry
                 updatedEntry.state = .deleted
                 proofState[proofC] = updatedEntry
@@ -297,7 +298,8 @@ public actor ProofStateManager {
 
         for proof in proofs {
             if let entry = proofState[proof.C],
-               let ownerEventId = entry.ownerEventId {
+               let ownerEventId = entry.ownerEventId
+            {
                 ownerIds.insert(ownerEventId)
             }
         }
@@ -339,7 +341,7 @@ enum ProofStateError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .proofNotAvailable(let proofC):
+        case let .proofNotAvailable(proofC):
             return "Proof not available for reservation: \(proofC)"
         }
     }
@@ -350,7 +352,7 @@ enum ProofStateError: LocalizedError {
 extension NDKError {
     static func fromProofStateError(_ error: ProofStateError) -> NDKError {
         switch error {
-        case .proofNotAvailable(let proofC):
+        case let .proofNotAvailable(proofC):
             return NDKError.invalidProof("Proof not available for reservation: \(proofC)")
         }
     }

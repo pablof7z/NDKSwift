@@ -36,7 +36,7 @@ public extension NDKError {
             "sign": NDKError.signingFailed,
             "verification": NDKError.verificationFailed,
             "verify": NDKError.verificationFailed,
-            "key derivation": NDKError.keyDerivationFailed
+            "key derivation": NDKError.keyDerivationFailed,
         ]
 
         let lowercased = operation.lowercased()
@@ -50,5 +50,4 @@ public extension NDKError {
     static func configurationError(_ message: String) -> NDKError {
         return .notConfigured(message)
     }
-    
 }

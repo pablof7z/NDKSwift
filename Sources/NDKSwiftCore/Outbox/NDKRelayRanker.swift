@@ -134,7 +134,8 @@ actor NDKRelayRanker {
         var authorCoverage = 0
         for pubkey in pubkeys {
             if let item = await tracker.getRelaysSyncFor(pubkey: pubkey, type: .both),
-               item.allRelayURLs.contains(relayURL) {
+               item.allRelayURLs.contains(relayURL)
+            {
                 authorCoverage += 1
             }
         }

@@ -4,14 +4,14 @@ import Foundation
 struct GettingStarted {
     static func main() async throws {
         let args = CommandLine.arguments
-        
+
         guard args.count > 1 else {
             printUsage()
             return
         }
-        
+
         let example = args[1]
-        
+
         switch example {
         case "1", "01", "connect":
             try await Example01_ConnectToRelay.run()
@@ -40,14 +40,14 @@ struct GettingStarted {
             printUsage()
         }
     }
-    
+
     static func printUsage() {
         print("""
         NDKSwift Getting Started Examples
         =================================
-        
+
         Usage: swift run GettingStarted <example>
-        
+
         Examples:
           1 or connect    - Connect to a relay
           2 or publish    - Publish an event
@@ -60,7 +60,7 @@ struct GettingStarted {
           7 or multiple   - Test multiple observers on same filter
           8 or nip46      - Publish with NIP-46 remote signer (bunker/nostrconnect)
           9 or nutzaps    - Test nutzaps and transaction history
-        
+
         Example: swift run GettingStarted 1
         """)
     }

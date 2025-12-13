@@ -1,6 +1,6 @@
+import CashuSwift
 import Foundation
 import NDKSwiftCore
-import CashuSwift
 
 /// NIP-61 Nutzap (kind: 9321)
 /// A Nutzap is a P2PK Cashu token event where the payment itself is the receipt.
@@ -106,7 +106,7 @@ public struct NDKNutzap {
     /// - Returns: true if valid, false otherwise
     public func validate(recipientPreferences: NDKNutzapPreferences) async -> Bool {
         // 1. Check that the mint is in the recipient's accepted list
-        guard let mintURL = self.mintURL else {
+        guard let mintURL = mintURL else {
             return false
         }
 
@@ -186,11 +186,12 @@ public struct NDKNutzapPreferences {
     /// Get configured mints
     public var mints: [MintConfig] {
         get async {
-            return event.tags
+            event.tags
                 .filter { $0.first == NostrConstants.TagName.mint }
                 .compactMap { tag in
                     guard let urlString = tag[safe: 1],
-                          let url = URL(string: urlString) else {
+                          let url = URL(string: urlString)
+                    else {
                         return nil
                     }
 
@@ -214,4 +215,5 @@ public struct NDKNutzapPreferences {
 }
 
 // MARK: - Helper Extensions
+
 // Note: The isLockedTo implementation is now in CashuTypes.swift

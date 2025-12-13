@@ -1,6 +1,5 @@
 /// Extensions to NDKEvent for outbox model support
 public extension NDKEvent {
-
     /// Extract p tags (mentioned pubkeys)
     var pTags: [String] {
         return tags.compactMap { tag in

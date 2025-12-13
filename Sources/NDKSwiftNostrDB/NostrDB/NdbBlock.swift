@@ -20,7 +20,7 @@ enum NdbBlockType: UInt32 {
 
 extension ndb_mention_bech32_block {
     var bech32_type: NdbBech32Type? {
-        NdbBech32Type(rawValue: self.bech32.type.rawValue)
+        NdbBech32Type(rawValue: bech32.type.rawValue)
     }
 }
 
@@ -41,7 +41,7 @@ enum NdbBech32Type: UInt32 {
 // Extension for converting ndb_str_block to Swift String
 extension ndb_str_block {
     func as_str() -> String {
-        let buf = UnsafeBufferPointer(start: self.str, count: Int(self.len))
+        let buf = UnsafeBufferPointer(start: str, count: Int(len))
         let uint8Buf = buf.map { UInt8(bitPattern: $0) }
         return String(decoding: uint8Buf, as: UTF8.self)
     }
@@ -50,14 +50,14 @@ extension ndb_str_block {
 // Extension for accessing union members and converting to String
 extension ndb_block_ptr {
     func as_str() -> String {
-        guard let str_block = ndb_block_str(self.ptr) else {
+        guard let str_block = ndb_block_str(ptr) else {
             return ""
         }
         return str_block.pointee.as_str()
     }
 
     var block: ndb_block.__Unnamed_union_block {
-        self.ptr.pointee.block
+        ptr.pointee.block
     }
 }
 
@@ -92,7 +92,7 @@ func parse_invoice_description(b11: ndb_invoice) -> ParsedInvoiceDescription? {
 
 extension ndb_invoice_block {
     func as_invoice() -> ParsedLightningInvoice? {
-        let b11 = self.invoice
+        let b11 = invoice
         let invstr = self.invstr.as_str()
 
         guard let description = parse_invoice_description(b11: b11) else {
@@ -124,18 +124,18 @@ enum NdbBlock: ~Copyable {
             return nil
         }
         switch type {
-        case .hashtag:       self = .hashtag(ptr.block.str)
-        case .text:          self = .text(ptr.block.str)
-        case .invoice:       self = .invoice(ptr.block.invoice)
-        case .url:           self = .url(ptr.block.str)
+        case .hashtag: self = .hashtag(ptr.block.str)
+        case .text: self = .text(ptr.block.str)
+        case .invoice: self = .invoice(ptr.block.invoice)
+        case .url: self = .url(ptr.block.str)
         case .mention_bech32: self = .mention(ptr.block.mention_bech32)
         case .mention_index: self = .mention_index(ptr.block.mention_index)
         }
     }
-    
+
     var is_previewable: Bool {
         switch self {
-        case .mention(let m):
+        case let .mention(m):
             switch m.bech32_type {
             case .note, .nevent: return true
             default: return false
@@ -148,7 +148,7 @@ enum NdbBlock: ~Copyable {
             return false
         }
     }
-    
+
     static func convertToStringCopy(from block: str_block_t) -> String? {
         guard let cString = block.str else {
             return nil
@@ -170,7 +170,7 @@ struct NdbBlockGroup: ~Copyable {
     var words: Int {
         return metadata.borrow { $0.words }
     }
-    
+
     /// Gets the parsed blocks from a specific note.
     ///
     /// This function will:
@@ -179,18 +179,16 @@ struct NdbBlockGroup: ~Copyable {
     static func from(event: NdbNote, using ndb: Ndb, and keypair: Keypair) throws(NdbBlocksError) -> Self {
         if event.is_content_encrypted() {
             return try parse(event: event, keypair: keypair)
-        }
-        else if event.known_kind == .highlight {
+        } else if event.known_kind == .highlight {
             return try parse(event: event, keypair: keypair)
-        }
-        else {
+        } else {
             guard let offsets = event.block_offsets(ndb: ndb) else {
                 return try parse(event: event, keypair: keypair)
             }
             return .init(metadata: .txn(offsets), rawTextContent: event.content)
         }
     }
-    
+
     /// Parses the note contents on-demand from a specific note.
     ///
     /// Prioritize using `from(event: NdbNote, using ndb: Ndb, and keypair: Keypair)` when possible.
@@ -202,7 +200,7 @@ struct NdbBlockGroup: ~Copyable {
             rawTextContent: content
         )
     }
-    
+
     /// Parses the note contents on-demand from a specific text.
     static func parse(content: String) throws(NdbBlocksError) -> Self {
         guard let metadata = BlocksMetadata.parseContent(content: content) else { throw NdbBlocksError.parseError }
@@ -216,17 +214,16 @@ struct NdbBlockGroup: ~Copyable {
 enum MaybeTxn<T: ~Copyable>: ~Copyable {
     case pure(T)
     case txn(SafeNdbTxn<T>)
-    
+
     func borrow<Y>(_ borrowFunction: (borrowing T) throws -> Y) rethrows -> Y {
         switch self {
-        case .pure(let item):
+        case let .pure(item):
             return try borrowFunction(item)
-        case .txn(let txn):
+        case let .txn(txn):
             return try borrowFunction(txn.val)
         }
     }
 }
-
 
 // MARK: - Helper structs
 
@@ -239,23 +236,23 @@ extension NdbBlockGroup {
     struct BlocksMetadata: ~Copyable {
         private let blocks_ptr: ndb_blocks_ptr
         private let buffer: UnsafeMutableRawPointer?
-        
+
         init(ptr: OpaquePointer?, buffer: UnsafeMutableRawPointer? = nil) {
-            self.blocks_ptr = ndb_blocks_ptr(ptr: ptr)
+            blocks_ptr = ndb_blocks_ptr(ptr: ptr)
             self.buffer = buffer
         }
-        
+
         var words: Int {
             Int(ndb_blocks_word_count(blocks_ptr.ptr))
         }
-        
+
         /// Gets the opaque pointer
         ///
         /// **Implementation note:** This is marked `fileprivate` because we want to minimize the exposure of raw pointers to Swift code outside these wrapper structs.
         fileprivate func as_ptr() -> OpaquePointer? {
-            return self.blocks_ptr.ptr
+            return blocks_ptr.ptr
         }
-        
+
         /// Parses text content and returns the parsed block metadata if successful
         ///
         /// **Implementation notes:** This is `fileprivate` because it makes no sense for outside Swift code to use this directly. Use `NdbBlockGroup` instead.
@@ -264,9 +261,9 @@ extension NdbBlockGroup {
             guard let buffer = malloc(MAX_NOTE_SIZE) else {
                 return nil
             }
-            
+
             var blocks: OpaquePointer? = nil
-            
+
             // Call the C parsing function and check its success status
             let success = content.withCString { contentPtr -> Bool in
                 let contentLen = content.utf8.count
@@ -278,7 +275,7 @@ extension NdbBlockGroup {
                     &blocks
                 ) == 1
             }
-            
+
             if !success || blocks == nil {
                 // Something failed
                 free(buffer)
@@ -292,14 +289,14 @@ extension NdbBlockGroup {
 
             return BlocksMetadata(ptr: blocks, buffer: buffer)
         }
-        
+
         deinit {
             if let buffer {
                 free(buffer)
             }
         }
     }
-    
+
     /// Models specific errors that may happen when parsing or constructing an `NdbBlocks` object
     enum NdbBlocksError: Error {
         case parseError
@@ -307,12 +304,11 @@ extension NdbBlockGroup {
     }
 }
 
-
 // MARK: - Enumeration support
 
 extension NdbBlockGroup {
     typealias NdbBlockList = NonCopyableLinkedList<NdbBlock>
-    
+
     /// Borrows all blocks in the group one by one and runs a function defined by the caller.
     ///
     /// **Implementation note:**
@@ -321,10 +317,10 @@ extension NdbBlockGroup {
     /// - Parameter borrowingFunction: The function to be run on each iteration. Takes in two parameters: The index of the item in the list (zero-indexed), and the block itself.
     /// - Returns: The `Y` value returned by the provided function, when such function returns `.loopReturn(Y)`
     @discardableResult
-    func forEachBlock<Y>(_ borrowingFunction: ((Int, borrowing NdbBlock) throws -> NdbBlockList.LoopCommand<Y>)) rethrows -> Y?  {
-        return try withList({ try $0.forEachItem(borrowingFunction) })
+    func forEachBlock<Y>(_ borrowingFunction: (Int, borrowing NdbBlock) throws -> NdbBlockList.LoopCommand<Y>) rethrows -> Y? {
+        return try withList { try $0.forEachItem(borrowingFunction) }
     }
-    
+
     /// Borrows all blocks in the group one by one and runs a function defined by the caller, in reverse order
     ///
     /// **Implementation note:**
@@ -333,32 +329,33 @@ extension NdbBlockGroup {
     /// - Parameter borrowingFunction: The function to be run on each iteration. Takes in two parameters: The index of the item in the list (zero-indexed), and the block itself.
     /// - Returns: The `Y` value returned by the provided function, when such function returns `.loopReturn(Y)`
     @discardableResult
-    func forEachBlockReversed<Y>(_ borrowingFunction: ((Int, borrowing NdbBlock) throws -> NdbBlockList.LoopCommand<Y>)) rethrows -> Y?  {
-        return try withList({ try $0.forEachItemReversed(borrowingFunction) })
+    func forEachBlockReversed<Y>(_ borrowingFunction: (Int, borrowing NdbBlock) throws -> NdbBlockList.LoopCommand<Y>) rethrows -> Y? {
+        return try withList { try $0.forEachItemReversed(borrowingFunction) }
     }
-    
+
     /// Iterates over each item of the list, updating a final value, and returns the final result at the end.
-    func reduce<Y>(initialResult: Y, _ borrowingFunction: ((_ index: Int, _ partialResult: Y, _ item: borrowing NdbBlock) throws -> NdbBlockList.LoopCommand<Y>)) rethrows -> Y?  {
-        return try withList({ try $0.reduce(initialResult: initialResult, borrowingFunction) })
+    func reduce<Y>(initialResult: Y, _ borrowingFunction: (_ index: Int, _ partialResult: Y, _ item: borrowing NdbBlock) throws -> NdbBlockList.LoopCommand<Y>) rethrows -> Y? {
+        return try withList { try $0.reduce(initialResult: initialResult, borrowingFunction) }
     }
-    
+
     /// Borrows the block list for processing
     func withList<Y>(_ borrowingFunction: (borrowing NdbBlockList) throws -> Y) rethrows -> Y {
         var linkedList: NdbBlockList = .init()
-        
-        return try self.rawTextContent.withCString { cptr in
+
+        return try rawTextContent.withCString { cptr in
             var iter = ndb_block_iterator(content: cptr, blocks: nil, block: ndb_block(), p: nil)
-            
+
             // Start the iteration
             return try self.metadata.borrow { value in
                 ndb_blocks_iterate_start(cptr, value.as_ptr(), &iter)
-                
+
                 // Collect blocks into array
                 outerLoop: while let ptr = ndb_blocks_iterate_next(&iter),
-                      let block = NdbBlock(ndb_block_ptr(ptr: ptr)) {
+                                 let block = NdbBlock(ndb_block_ptr(ptr: ptr))
+                {
                     linkedList.add(item: block)
                 }
-                
+
                 return try borrowingFunction(linkedList)
             }
         }

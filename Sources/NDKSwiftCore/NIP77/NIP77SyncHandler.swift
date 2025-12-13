@@ -2,9 +2,9 @@ import Foundation
 
 /// Direction of sync operations
 public enum SyncDirection {
-    case send     // Only upload events to relay
-    case receive  // Only download events from relay
-    case both     // Bidirectional sync (default)
+    case send // Only upload events to relay
+    case receive // Only download events from relay
+    case both // Bidirectional sync (default)
 }
 
 /// Handles NIP-77 Negentropy sync operations
@@ -33,8 +33,8 @@ public actor NIP77SyncHandler {
         let negentropy: Negentropy
         var messageRounds: Int = 0
         var bytesTransferred: Int = 0
-        var negentropyBytes: Int = 0  // Just Negentropy protocol
-        var eventFetchBytes: Int = 0   // REQ/EVENT/EOSE for downloads
+        var negentropyBytes: Int = 0 // Just Negentropy protocol
+        var eventFetchBytes: Int = 0 // REQ/EVENT/EOSE for downloads
         var eventPublishBytes: Int = 0 // EVENT messages for uploads
         var downloadedEventIds: Set<String> = []
         var uploadedEventIds: Set<String> = []
@@ -45,12 +45,12 @@ public actor NIP77SyncHandler {
     public init(ndk: NDK, cache: any NDKCache) {
         self.ndk = ndk
         self.cache = cache
-        self.storage = NDKCacheNegentropyStorage(cache: cache)
+        storage = NDKCacheNegentropyStorage(cache: cache)
     }
 
     /// Set the sync direction
     public func setSyncDirection(_ direction: SyncDirection) {
-        self.syncDirection = direction
+        syncDirection = direction
     }
 
     /// Start a sync operation with a relay
@@ -164,7 +164,7 @@ public actor NIP77SyncHandler {
             } else {
                 // Reconciliation complete
                 // Handle downloads based on sync direction
-                if !session.downloadedEventIds.isEmpty && syncDirection != .send {
+                if !session.downloadedEventIds.isEmpty, syncDirection != .send {
                     let (downloadedEvents, fetchBytes) = await fetchMissingEvents(
                         ids: Array(session.downloadedEventIds),
                         relayURL: session.relayURL
@@ -172,12 +172,12 @@ public actor NIP77SyncHandler {
                     session.actualDownloadedEvents = downloadedEvents
                     session.eventFetchBytes = fetchBytes
                     session.bytesTransferred += fetchBytes
-                } else if !session.downloadedEventIds.isEmpty && syncDirection == .send {
+                } else if !session.downloadedEventIds.isEmpty, syncDirection == .send {
                     NDKLogger.log(.info, category: .network, "\(logPrefix) Relay has \(session.downloadedEventIds.count) events we don't have, but sync direction is send-only")
                 }
 
                 // Handle uploads based on sync direction
-                if !session.uploadedEventIds.isEmpty && syncDirection != .receive {
+                if !session.uploadedEventIds.isEmpty, syncDirection != .receive {
                     let (uploadedEvents, publishBytes) = await sendEvents(
                         ids: Array(session.uploadedEventIds),
                         relayURL: session.relayURL
@@ -185,7 +185,7 @@ public actor NIP77SyncHandler {
                     session.actualUploadedEvents = uploadedEvents
                     session.eventPublishBytes = publishBytes
                     session.bytesTransferred += publishBytes
-                } else if !session.uploadedEventIds.isEmpty && syncDirection == .receive {
+                } else if !session.uploadedEventIds.isEmpty, syncDirection == .receive {
                     NDKLogger.log(.info, category: .network, "\(logPrefix) Relay requested \(session.uploadedEventIds.count) events, but sync direction is receive-only")
                 }
 
@@ -206,7 +206,7 @@ public actor NIP77SyncHandler {
                 // Move to completed sessions
                 completedSessions[subscriptionId] = session
                 activeSessions.removeValue(forKey: subscriptionId)
-                
+
                 // Remove self from NDKPool's static map to prevent memory leak
                 await ndk.pool.removeSyncHandler(for: session.relayURL)
             }
@@ -219,7 +219,7 @@ public actor NIP77SyncHandler {
             }
             throw NIP77Error.relayError(error)
 
-        case .negClose(_):
+        case .negClose:
             // Relay closed the sync
             if let session = activeSessions.removeValue(forKey: subscriptionId) {
                 // Remove self from NDKPool's static map to prevent memory leak

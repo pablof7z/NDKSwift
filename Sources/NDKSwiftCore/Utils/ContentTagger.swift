@@ -43,7 +43,7 @@ extension Tag {
     /// Returns the tag name (first element)
     /// Example: For tag ["p", "pubkey"], returns "p"
     var name: String? {
-        return self.first
+        return first
     }
 
     /// Returns the primary value (second element)
@@ -105,7 +105,6 @@ public struct DecodedNostrEntity {
 /// This utility provides functionality for parsing and extracting Nostr entities from text content,
 /// including npubs, notes, hashtags, and URLs. It also generates the appropriate tags for events.
 public enum ContentTagger {
-
     /// Result of parsing content without fetching entities
     public struct ParseResult {
         /// Array of parsed segments representing different content types
@@ -142,7 +141,7 @@ public enum ContentTagger {
             // Hashtags
             (#"(?<=\s|^)(#[^\s!@#$%^&*()=+./,\[{\]};:'"?><]+)"#, "hashtag"),
             // URLs
-            (#"https?://[^\s<>"{}|\\^`\[\]]+"#, "url")
+            (#"https?://[^\s<>"{}|\\^`\[\]]+"#, "url"),
         ]
 
         var allMatches: [(range: Range<String.Index>, type: String, value: String)] = []
@@ -169,7 +168,7 @@ public enum ContentTagger {
 
             // Add text segment before this match
             if lastIndex < match.range.lowerBound {
-                let textRange = lastIndex..<match.range.lowerBound
+                let textRange = lastIndex ..< match.range.lowerBound
                 let text = String(content[textRange])
                 if !text.isEmpty {
                     segments.append(.text(text))
@@ -255,6 +254,7 @@ public enum ContentTagger {
 
         return ParseResult(segments: segments, tags: uniqueTags)
     }
+
     /// Generate hashtags from content
     ///
     /// Extracts all unique hashtags from the content, maintaining case sensitivity
@@ -573,22 +573,21 @@ public enum ContentTagger {
     }
 }
 
-
 // MARK: - Filter Tag Helpers
 
-extension NDKFilter {
+public extension NDKFilter {
     /// Adds a hashtag filter
-    public mutating func addHashtagFilter(_ hashtags: String...) {
+    mutating func addHashtagFilter(_ hashtags: String...) {
         addTagFilter("t", values: hashtags.map { $0.lowercased() })
     }
 
     /// Adds a URL filter
-    public mutating func addURLFilter(_ urls: String...) {
+    mutating func addURLFilter(_ urls: String...) {
         addTagFilter("r", values: urls)
     }
 
     /// Checks if this filter includes a specific tag type
-    public func hasTagFilter(_ tagName: String) -> Bool {
+    func hasTagFilter(_ tagName: String) -> Bool {
         return tagFilter(tagName) != nil
     }
 }

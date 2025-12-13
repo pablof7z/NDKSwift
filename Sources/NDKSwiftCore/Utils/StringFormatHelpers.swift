@@ -2,7 +2,6 @@ import Foundation
 
 /// Common string formatting helpers to reduce duplication
 public enum StringFormatHelpers {
-
     // MARK: - Validation Message Formatting
 
     /// Format a validation error message
@@ -50,7 +49,8 @@ public enum StringFormatHelpers {
         if let sourceData = source as? Data {
             // If source is already Data, try to parse it first to ensure it's valid JSON
             guard let object = try? JSONSerialization.jsonObject(with: sourceData),
-                  let prettyData = try? JSONSerialization.data(withJSONObject: object, options: .prettyPrinted) else {
+                  let prettyData = try? JSONSerialization.data(withJSONObject: object, options: .prettyPrinted)
+            else {
                 return nil
             }
             data = prettyData
@@ -81,9 +81,9 @@ public enum StringFormatHelpers {
         formatter.allowedUnits = [.year, .month, .day, .hour, .minute, .second]
         return formatter.string(from: interval) ?? "\(Int(interval)) seconds"
     }
-    
+
     // MARK: - General String Formatting
-    
+
     /// Truncate any string for display with ellipsis
     public static func truncate(_ string: String, maxLength: Int, ellipsis: String = "...") -> String {
         guard string.count > maxLength else { return string }
@@ -91,7 +91,7 @@ public enum StringFormatHelpers {
         guard adjustedLength > 0 else { return ellipsis }
         return String(string.prefix(adjustedLength)) + ellipsis
     }
-    
+
     /// Truncate with prefix and suffix (e.g., "abc...xyz")
     public static func truncateMiddle(_ string: String, prefixLength: Int = 8, suffixLength: Int = 4) -> String {
         guard string.count > prefixLength + suffixLength + 3 else { return string }

@@ -1,5 +1,5 @@
-import Foundation
 import CashuSwift
+import Foundation
 import NDKSwiftCore
 
 /// Helper for storing Cashu-related data in NDKCache's generic KV store
@@ -92,7 +92,7 @@ public struct CashuCacheHelper: Sendable {
 
     public func getKeysets(mintUrl: String) async -> [CashuSwift.Keyset] {
         let keysets = await cache.getValues(namespace: namespace, keyPrefix: "keyset:\(mintUrl):")
-        return keysets.compactMap { (key, data) in
+        return keysets.compactMap { key, data in
             do {
                 let wrapper = try JSONDecoder().decode(KeysetWrapper.self, from: data)
                 return wrapper.keyset

@@ -25,9 +25,9 @@ public enum PaymentRoute {
     /// Get the mint to use for payment (nil if impossible)
     public var paymentMint: String? {
         switch self {
-        case .direct(let mint):
+        case let .direct(mint):
             return mint
-        case .crossMint(_, let targetMint, _):
+        case let .crossMint(_, targetMint, _):
             return targetMint
         case .impossible:
             return nil
