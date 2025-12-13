@@ -333,8 +333,6 @@ actor NDKSubscriptionCoordinator: Hashable {
     nonisolated let groupableDelay: TimeInterval?
     nonisolated let groupableDelayType: NDKSubscriptionDelayType?
 
-    @available(*, deprecated, message: "Use onEvent callback or async stream instead")
-    private var eventHandlers: [(NDKEvent) async -> Void] = []
     private var eoseHandlers: [(String) async -> Void] = [] // Changed to include relay URL
     var isActive = false
 

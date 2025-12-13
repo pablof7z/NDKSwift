@@ -600,7 +600,9 @@ final class CacheObservationIntegrationTests: XCTestCase {
                         break
                     }
                 }
-            } catch {}
+            } catch {
+                XCTFail("Stream failed with error: \(error)")
+            }
         }
 
         // Concurrent saves from multiple tasks
