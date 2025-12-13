@@ -1454,7 +1454,7 @@ These components are internal implementation details and should not be used dire
 let dataSource = ndk.subscribe(filter: filter)
 ```
 
-For more information on internal components, see the [Architecture Documentation](ARCHITECTURE.md#internal-components).
+For more information on internal components, see the [Architecture Documentation](../Architecture/Overview.md#internal-components).
 
 ```
 
