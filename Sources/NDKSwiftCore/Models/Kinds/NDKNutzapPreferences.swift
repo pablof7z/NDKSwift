@@ -1,5 +1,4 @@
 import Foundation
-import NDKSwiftCore
 
 /// Nutzap preferences (kind: 10019)
 public struct NDKNutzapPreferences {

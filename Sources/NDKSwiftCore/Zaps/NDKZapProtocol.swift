@@ -1,5 +1,4 @@
 import Foundation
-import NDKSwiftCore
 
 /// Handles the Nostr-side logic of a zap (e.g., NIP-57, NIP-61)
 public protocol NDKZapProtocol {

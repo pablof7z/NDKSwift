@@ -1,5 +1,4 @@
 import Foundation
-import NDKSwiftCore
 import CryptoKit
 import CashuSwift
 
