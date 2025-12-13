@@ -51,7 +51,7 @@ The built-in Cashu wallet offers privacy and offline capabilities.
 ```swift
 // Initialize NIP-60 Wallet
 let cashuWallet = try NIP60Wallet(ndk: ndk)
-try await cashuWallet.load()
+try await cashuWallet.load()  // Automatically registers fallback handler
 
 // Register with Zap Manager
 ndk.zapManager.register(provider: cashuWallet)
@@ -59,6 +59,8 @@ ndk.zapManager.register(provider: cashuWallet)
 // Register Nutzap Protocol (required for NIP-61 support)
 ndk.zapManager.register(protocol: NDKNutzapProtocol(ndk: ndk))
 ```
+
+**Note:** The `load()` method automatically registers a `CashuZapFallbackHandler` that enables Lightning-to-Nutzap conversions. If you have a Lightning wallet but the recipient only accepts Nutzaps, the fallback handler will automatically mint Cashu tokens via a Lightning payment.
 
 ### 3. Spark Wallet / Greenlight
 
@@ -123,12 +125,24 @@ try await event.zap(
 
 ## 🔄 Cross-Protocol Zaps
 
-NDKSwift handles cross-protocol complexity for you.
+NDKSwift handles cross-protocol complexity for you through the **Fallback Handler** system.
 
 *   **Lightning to Lightning**: Standard NIP-57.
 *   **Cashu to Cashu**: NIP-61 Nutzap (Instant, private, no fees).
-*   **Lightning to Cashu**: If you have a Lightning wallet but the recipient wants Nutzaps, NDKSwift can automatically mint tokens via Lightning invoice (if fallback handler is configured).
+*   **Lightning to Cashu**: If you have a Lightning wallet but the recipient wants Nutzaps, the `CashuZapFallbackHandler` automatically mints tokens via Lightning invoice.
 *   **Cashu to Lightning**: Use the Cashu wallet to pay the Lightning invoice (melt).
+
+### How Fallback Handlers Work
+
+When a direct zap fails (e.g., you want to send a Nutzap but only have a Lightning wallet), NDKSwift tries registered fallback handlers in order. The `CashuZapFallbackHandler`:
+
+1. Detects when a Nutzap payment request can't be fulfilled directly
+2. Creates a mint quote at one of the recipient's accepted mints
+3. Pays the mint's Lightning invoice using your Lightning wallet (NWC, etc.)
+4. Mints P2PK-locked Cashu tokens for the recipient
+5. Publishes the Nutzap event with the minted tokens
+
+This happens **automatically** when you call `cashuWallet.load()` - no manual configuration needed.
 
 ## 🛠 Implementing a Custom Wallet
 

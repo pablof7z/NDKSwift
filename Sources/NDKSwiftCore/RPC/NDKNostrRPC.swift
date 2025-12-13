@@ -141,10 +141,10 @@ public actor NDKNostrRPC {
         NDKLogger.log(.debug, category: .auth, "Created and signed event - id: \(event.id)")
 
         // Prepare target relays
-        let targetRelayUrls = relayUrls.setOrNil
+        let targetRelayUrls = relayURLs.setOrNil
 
         // Publish event
-        let publishDescription = targetRelayUrls != nil ? "to specific relays: \(relayUrls)" : "to all connected relays"
+        let publishDescription = targetRelayUrls != nil ? "to specific relays: \(relayURLs)" : "to all connected relays"
         NDKLogger.log(.info, category: .auth, "Publishing \(publishDescription)")
 
         let publishedRelays = try await ndk.publish(event, to: targetRelayUrls)
@@ -152,9 +152,9 @@ public actor NDKNostrRPC {
         NDKLogger.log(.info, category: .auth, "Published to relays: \(publishedRelays.map { $0.url })")
 
         // If publishing to specific relays failed, try direct send as fallback
-        if !relayUrls.isEmpty, publishedRelays.isEmpty {
+        if !relayURLs.isEmpty, publishedRelays.isEmpty {
             NDKLogger.log(.warning, category: .auth, "\(ErrorMessageConstants.failedTo("publish to any relay"))! Attempting direct send fallback...")
-            await attemptDirectSend(event: event, to: relayUrls)
+            await attemptDirectSend(event: event, to: relayURLs)
         }
     }
 
@@ -235,7 +235,7 @@ public actor NDKNostrRPC {
     }
 
     private func attemptDirectSend(event: NDKEvent, to relayURLs: [String]) async {
-        for url in relayUrls {
+        for url in relayURLs {
             if let relay = (await ndk.relays).first(where: { $0.url == url }) {
                 NDKLogger.log(.debug, category: .auth, "Attempting direct send to \(url)")
                 do {
