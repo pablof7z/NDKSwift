@@ -624,7 +624,7 @@ This major version bump aligns NDKSwift's naming with ndk-core, making it easier
 - Updated documentation version references from 0.6.2 to 0.7.3 in README
 - Cleaned up and improved consistency across documentation files
 - Added missing NIPs (17, 42, 59) to the supported NIPs table in README
-- Added comprehensive documentation for `NDKFilter` convenience methods in API_REFERENCE.md
+- Added comprehensive documentation for `NDKFilter` convenience methods in Reference/API.md
 
 ### Improved
 - DRY principle by creating `NDKSubscriptionProtocol` to standardize error handling in SwiftUI data sources
@@ -963,7 +963,7 @@ _Note: This release contains breaking changes. NDKAuthView has been removed from
 - **BREAKING**: Removed `NDKAuthView` and `NDKAuthConstants` from NDKSwift
   - Apps should implement their own authentication UI using `NDKAuthManager` directly
   - This follows the Single Responsibility Principle and gives apps full control over their auth UI/UX
-  - See the updated [Authentication Guide](Documentation/AUTHENTICATION.md) for migration examples
+  - See the updated [Authentication Guide](Documentation/Guides/Authentication.md) for migration examples
 
 ### Changed
 - `NDKAuthManager.createSession()` now immediately activates the created session, preventing UI race conditions

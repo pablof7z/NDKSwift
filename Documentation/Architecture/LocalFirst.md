@@ -171,8 +171,8 @@ Start building local-first Nostr apps today. Your users will thank you.
 
 ## Learn More
 
-- [Optimistic Publishing Guide](./OPTIMISTIC_PUBLISHING.md) - Deep dive into offline-first features
-- [Architecture Overview](./ARCHITECTURE.md) - Understand the implementation
+- [Optimistic Publishing Guide](OptimisticPublishing.md) - Deep dive into offline-first features
+- [Architecture Overview](Overview.md) - Understand the implementation
 - [Examples](../Examples/) - See local-first in action
 
 ---

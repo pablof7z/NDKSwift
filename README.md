@@ -174,7 +174,7 @@ try event.sign(with: signer)
 
 ## 📚 Learn More
 
-**Documentation**: [Full docs](Documentation/) including [Getting Started](Documentation/GETTING_STARTED.md), [API Reference](Documentation/API_REFERENCE.md), and [Architecture](Documentation/ARCHITECTURE.md)
+**Documentation**: [Full docs](Documentation/) including [Getting Started](Documentation/GettingStarted/Guide.md), [API Reference](Documentation/Reference/API.md), and [Architecture](Documentation/Architecture/Overview.md)
 
 **Examples**: Check out the [Examples](Examples/) directory for runnable demos
 
@@ -210,7 +210,7 @@ swift test --verbose
 
 ## 🤝 Contributing
 
-We welcome contributions! Check out our [Architecture Overview](Documentation/ARCHITECTURE.md) to understand the codebase structure.
+We welcome contributions! Check out our [Architecture Overview](Documentation/Architecture/Overview.md) to understand the codebase structure.
 
 ## 📄 License
 
