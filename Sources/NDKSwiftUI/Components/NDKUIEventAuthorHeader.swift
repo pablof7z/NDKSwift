@@ -362,7 +362,7 @@ private struct InteractionButton: View {
     struct NDKUIEventAuthorHeader_Previews: PreviewProvider {
         static var previews: some View {
             // Create a mock NDK for preview
-            let mockNDK = NDK(relayUrls: [])
+            let mockNDK = NDK(relayURLs: [])
 
             VStack(spacing: 20) {
                 NDKUIEventAuthorHeader(

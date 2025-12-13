@@ -117,7 +117,7 @@ private class ProfileState: ObservableObject {
     struct NDKUIUsername_Previews: PreviewProvider {
         static var previews: some View {
             // Create a mock NDK for preview
-            let mockNDK = NDK(relayUrls: [])
+            let mockNDK = NDK(relayURLs: [])
 
             VStack(spacing: 16) {
                 // With NIP-05
