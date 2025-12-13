@@ -170,7 +170,7 @@ public actor NDKEventManager {
     }
 
     /// Build and publish an event in one step
-    public func publish(_ builder: (NDKEventBuilder) -> NDKEventBuilder) async throws -> (event: NDKEvent, relays: Set<NDKRelay>) {
+    public func publish(_ builder: @Sendable (NDKEventBuilder) -> NDKEventBuilder) async throws -> (event: NDKEvent, relays: Set<NDKRelay>) {
         guard let ndk = ndk else {
             throw NDKError.notConfigured(ErrorMessageConstants.Messages.ndkReferenceLost)
         }

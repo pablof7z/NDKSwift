@@ -397,7 +397,7 @@ public final class NDK: @unchecked Sendable {
         }
     }
 
-    public func publish(_ builder: (NDKEventBuilder) -> NDKEventBuilder) async throws -> (event: NDKEvent, relays: Set<NDKRelay>) {
+    public func publish(_ builder: @Sendable (NDKEventBuilder) -> NDKEventBuilder) async throws -> (event: NDKEvent, relays: Set<NDKRelay>) {
         try await eventManager.publish(builder)
     }
 
