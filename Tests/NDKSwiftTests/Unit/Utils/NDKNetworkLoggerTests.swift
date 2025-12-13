@@ -2,22 +2,22 @@
 import XCTest
 
 final class NDKNetworkLoggerTests: XCTestCase {
-    override func setUp() async throws {
-        try await super.setUp()
-        await NDKLoggerConfig.shared.setLogLevel(.trace)
-        await NDKLoggerConfig.shared.setLogNetworkTraffic(true)
+    override func setUp() {
+        super.setUp()
+        NDKLogger.setLogLevel(.trace)
+        NDKLogger.setLogNetworkTraffic(true)
     }
 
-    override func tearDown() async throws {
-        await NDKLogger.setLogHandler(nil)
-        await NDKLoggerConfig.shared.setLogLevel(.off)
-        await NDKLoggerConfig.shared.setLogNetworkTraffic(false)
-        try await super.tearDown()
+    override func tearDown() {
+        NDKLogger.setLogHandler(nil)
+        NDKLogger.setLogLevel(.off)
+        NDKLogger.setLogNetworkTraffic(false)
+        super.tearDown()
     }
 
-    func testLogNetworkSend() async throws {
+    func testLogNetworkSend() {
         var capturedOutput: String?
-        await NDKLogger.setLogHandler { output in
+        NDKLogger.setLogHandler { output in
             capturedOutput = output
         }
 
@@ -26,15 +26,14 @@ final class NDKNetworkLoggerTests: XCTestCase {
 
         NDKNetworkLogger.logNetworkSend(to: testURL, message: message)
 
-        try await Task.sleep(nanoseconds: 100_000_000)
         XCTAssertNotNil(capturedOutput)
         XCTAssertTrue(capturedOutput!.contains("📤 SENDING TO relay.example.com"))
         XCTAssertTrue(capturedOutput!.contains(message))
     }
 
-    func testLogNetworkReceive() async throws {
+    func testLogNetworkReceive() {
         var capturedOutput: String?
-        await NDKLogger.setLogHandler { output in
+        NDKLogger.setLogHandler { output in
             capturedOutput = output
         }
 
@@ -43,15 +42,14 @@ final class NDKNetworkLoggerTests: XCTestCase {
 
         NDKNetworkLogger.logNetworkReceive(from: testURL, message: message)
 
-        try await Task.sleep(nanoseconds: 100_000_000)
         XCTAssertNotNil(capturedOutput)
         XCTAssertTrue(capturedOutput!.contains("📥 RECEIVED FROM relay.example.com"))
         XCTAssertTrue(capturedOutput!.contains(message))
     }
 
-    func testLogNetworkParseError() async throws {
+    func testLogNetworkParseError() {
         var capturedOutput: String?
-        await NDKLogger.setLogHandler { output in
+        NDKLogger.setLogHandler { output in
             capturedOutput = output
         }
 
@@ -61,50 +59,47 @@ final class NDKNetworkLoggerTests: XCTestCase {
 
         NDKNetworkLogger.logNetworkParseError(from: testURL, message: message, error: error)
 
-        try await Task.sleep(nanoseconds: 100_000_000)
         XCTAssertNotNil(capturedOutput)
         XCTAssertTrue(capturedOutput!.contains("📥 RECEIVED FROM relay.example.com"))
         XCTAssertTrue(capturedOutput!.contains("❌ PARSE ERROR:"))
         XCTAssertTrue(capturedOutput!.contains("Invalid JSON"))
     }
 
-    func testLogNetworkTrafficDisabled() async throws {
+    func testLogNetworkTrafficDisabled() {
         var capturedOutput: String?
-        await NDKLogger.setLogHandler { output in
+        NDKLogger.setLogHandler { output in
             capturedOutput = output
         }
 
-        await NDKLoggerConfig.shared.setLogNetworkTraffic(false)
+        NDKLogger.setLogNetworkTraffic(false)
 
         let testURL = URL(string: "wss://relay.example.com")!
         let message = "[\"REQ\",\"sub123\",{\"kinds\":[1]}]"
 
         NDKNetworkLogger.logNetworkSend(to: testURL, message: message)
 
-        try await Task.sleep(nanoseconds: 100_000_000)
         XCTAssertNil(capturedOutput)
     }
 
-    func testLoggerDisabled() async throws {
+    func testLoggerDisabled() {
         var capturedOutput: String?
-        await NDKLogger.setLogHandler { output in
+        NDKLogger.setLogHandler { output in
             capturedOutput = output
         }
 
-        await NDKLoggerConfig.shared.setLogLevel(.off)
+        NDKLogger.setLogLevel(.off)
 
         let testURL = URL(string: "wss://relay.example.com")!
         let message = "[\"REQ\",\"sub123\",{\"kinds\":[1]}]"
 
         NDKNetworkLogger.logNetworkSend(to: testURL, message: message)
 
-        try await Task.sleep(nanoseconds: 100_000_000)
         XCTAssertNil(capturedOutput)
     }
 
-    func testLogParsedMessage_Event() async throws {
+    func testLogParsedMessage_Event() {
         var capturedOutput: String?
-        await NDKLogger.setLogHandler { output in
+        NDKLogger.setLogHandler { output in
             capturedOutput = output
         }
 
@@ -113,7 +108,6 @@ final class NDKNetworkLoggerTests: XCTestCase {
 
         NDKNetworkLogger.logParsedMessage(message)
 
-        try await Task.sleep(nanoseconds: 100_000_000)
         XCTAssertNotNil(capturedOutput)
         XCTAssertTrue(capturedOutput!.contains("TYPE: EVENT"))
         XCTAssertTrue(capturedOutput!.contains("SUBSCRIPTION: sub123"))
@@ -121,9 +115,9 @@ final class NDKNetworkLoggerTests: XCTestCase {
         XCTAssertTrue(capturedOutput!.contains("CONTENT: Hello, world!"))
     }
 
-    func testLogParsedMessage_REQ() async throws {
+    func testLogParsedMessage_REQ() {
         var capturedOutput: String?
-        await NDKLogger.setLogHandler { output in
+        NDKLogger.setLogHandler { output in
             capturedOutput = output
         }
 
@@ -132,7 +126,6 @@ final class NDKNetworkLoggerTests: XCTestCase {
 
         NDKNetworkLogger.logParsedMessage(message)
 
-        try await Task.sleep(nanoseconds: 100_000_000)
         XCTAssertNotNil(capturedOutput)
         XCTAssertTrue(capturedOutput!.contains("TYPE: REQ"))
         XCTAssertTrue(capturedOutput!.contains("SUBSCRIPTION: sub123"))
@@ -142,9 +135,9 @@ final class NDKNetworkLoggerTests: XCTestCase {
         XCTAssertTrue(capturedOutput!.contains("UNTIL:"))
     }
 
-    func testLogParsedMessage_OK() async throws {
+    func testLogParsedMessage_OK() {
         var capturedOutput: String?
-        await NDKLogger.setLogHandler { output in
+        NDKLogger.setLogHandler { output in
             capturedOutput = output
         }
 
@@ -152,7 +145,6 @@ final class NDKNetworkLoggerTests: XCTestCase {
 
         NDKNetworkLogger.logParsedMessage(message)
 
-        try await Task.sleep(nanoseconds: 100_000_000)
         XCTAssertNotNil(capturedOutput)
         XCTAssertTrue(capturedOutput!.contains("TYPE: OK"))
         XCTAssertTrue(capturedOutput!.contains("EVENT ID: event123"))
@@ -160,9 +152,9 @@ final class NDKNetworkLoggerTests: XCTestCase {
         XCTAssertTrue(capturedOutput!.contains("MESSAGE: Event published successfully"))
     }
 
-    func testLogParsedMessage_EOSE() async throws {
+    func testLogParsedMessage_EOSE() {
         var capturedOutput: String?
-        await NDKLogger.setLogHandler { output in
+        NDKLogger.setLogHandler { output in
             capturedOutput = output
         }
 
@@ -170,15 +162,14 @@ final class NDKNetworkLoggerTests: XCTestCase {
 
         NDKNetworkLogger.logParsedMessage(message)
 
-        try await Task.sleep(nanoseconds: 100_000_000)
         XCTAssertNotNil(capturedOutput)
         XCTAssertTrue(capturedOutput!.contains("TYPE: EOSE (End of Stored Events)"))
         XCTAssertTrue(capturedOutput!.contains("SUBSCRIPTION: sub123"))
     }
 
-    func testLogParsedMessage_ContentTruncation() async throws {
+    func testLogParsedMessage_ContentTruncation() {
         var capturedOutput: String?
-        await NDKLogger.setLogHandler { output in
+        NDKLogger.setLogHandler { output in
             capturedOutput = output
         }
 
@@ -188,7 +179,6 @@ final class NDKNetworkLoggerTests: XCTestCase {
 
         NDKNetworkLogger.logParsedMessage(message)
 
-        try await Task.sleep(nanoseconds: 100_000_000)
         XCTAssertNotNil(capturedOutput)
         XCTAssertTrue(capturedOutput!.contains("CONTENT:"))
         XCTAssertTrue(capturedOutput!.contains("..."))

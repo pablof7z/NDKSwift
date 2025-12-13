@@ -10,7 +10,7 @@ import NDKSwift
 enum Example03_2_GroupedSubscriptions {
     static func run() async throws {
         // Disable verbose logging for cleaner output
-        NDKLogger.logLevel = .error
+        NDKLogger.setLogLevel(.error)
 
         print("=== Example 03.2: Grouped Subscriptions ===")
         print("Testing that grouped subscriptions don't mix results...")

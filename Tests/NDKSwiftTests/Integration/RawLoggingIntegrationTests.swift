@@ -14,7 +14,7 @@ final class RawLoggingIntegrationTest: XCTestCase {
         }
 
         // Enable network traffic logging
-        NDKLogger.logNetworkTraffic = true
+        NDKLogger.setLogNetworkTraffic(true)
 
         // Run the entire test with a timeout to prevent hanging
         try await runWithTimeout(timeout: 15.0) {

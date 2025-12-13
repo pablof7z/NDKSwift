@@ -11,7 +11,7 @@ import NDKSwift
 enum Example03_1_SimpleObserver {
     static func run() async throws {
         // Disable verbose logging for cleaner output
-        NDKLogger.logLevel = .error
+        NDKLogger.setLogLevel(.error)
 
         print("=== Example 03.1: Simple Observer ===")
         print("Connecting to relay.primal.net...")

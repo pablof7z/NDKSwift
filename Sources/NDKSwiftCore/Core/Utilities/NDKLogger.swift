@@ -1,148 +1,5 @@
 import Foundation
-
-// MARK: - Log Entry
-
-/// A single log entry for the developer tools log viewer
-public struct NDKLogEntry: Identifiable, Sendable {
-    public let id: UUID
-    public let timestamp: Date
-    public let level: NDKLogLevel
-    public let category: NDKLogCategory
-    public let message: String
-
-    public init(timestamp: Date = Date(), level: NDKLogLevel, category: NDKLogCategory, message: String) {
-        id = UUID()
-        self.timestamp = timestamp
-        self.level = level
-        self.category = category
-        self.message = message
-    }
-}
-
-/// A network message for protocol-level debugging
-public struct NDKNetworkMessage: Identifiable, Sendable {
-    public enum Direction: String, Sendable {
-        case inbound = "←"
-        case outbound = "→"
-    }
-
-    public let id: UUID
-    public let timestamp: Date
-    public let relay: String
-    public let direction: Direction
-    public let messageType: String
-    public let raw: String
-
-    public init(timestamp: Date = Date(), relay: String, direction: Direction, messageType: String, raw: String) {
-        id = UUID()
-        self.timestamp = timestamp
-        self.relay = relay
-        self.direction = direction
-        self.messageType = messageType
-        self.raw = raw
-    }
-}
-
-// MARK: - Log Buffer
-
-/// Thread-safe log buffer for the developer tools
-public actor NDKLogBuffer {
-    public static let shared = NDKLogBuffer()
-
-    private var entries: [NDKLogEntry] = []
-    private var networkMessages: [NDKNetworkMessage] = []
-
-    public var maxLogEntries: Int = 1000
-    public var maxNetworkMessages: Int = 500
-
-    /// Callback for real-time log updates
-    public var onLogEntry: (@Sendable (NDKLogEntry) -> Void)?
-    /// Callback for real-time network message updates
-    public var onNetworkMessage: (@Sendable (NDKNetworkMessage) -> Void)?
-
-    private init() {}
-
-    public func setOnLogEntry(_ callback: (@Sendable (NDKLogEntry) -> Void)?) {
-        onLogEntry = callback
-    }
-
-    public func setOnNetworkMessage(_ callback: (@Sendable (NDKNetworkMessage) -> Void)?) {
-        onNetworkMessage = callback
-    }
-
-    public func addEntry(_ entry: NDKLogEntry) {
-        entries.append(entry)
-        if entries.count > maxLogEntries {
-            entries.removeFirst(entries.count - maxLogEntries)
-        }
-        onLogEntry?(entry)
-    }
-
-    public func addNetworkMessage(_ message: NDKNetworkMessage) {
-        networkMessages.append(message)
-        if networkMessages.count > maxNetworkMessages {
-            networkMessages.removeFirst(networkMessages.count - maxNetworkMessages)
-        }
-        onNetworkMessage?(message)
-    }
-
-    public func getEntries() -> [NDKLogEntry] {
-        return entries
-    }
-
-    public func getNetworkMessages() -> [NDKNetworkMessage] {
-        return networkMessages
-    }
-
-    public func getEntries(level: NDKLogLevel? = nil, category: NDKLogCategory? = nil, search: String? = nil) -> [NDKLogEntry] {
-        var filtered = entries
-
-        if let level = level {
-            filtered = filtered.filter { $0.level == level }
-        }
-
-        if let category = category {
-            filtered = filtered.filter { $0.category == category }
-        }
-
-        if let search = search, !search.isEmpty {
-            filtered = filtered.filter { $0.message.localizedCaseInsensitiveContains(search) }
-        }
-
-        return filtered
-    }
-
-    public func getNetworkMessages(relay: String? = nil, direction: NDKNetworkMessage.Direction? = nil, messageType: String? = nil) -> [NDKNetworkMessage] {
-        var filtered = networkMessages
-
-        if let relay = relay {
-            filtered = filtered.filter { $0.relay == relay }
-        }
-
-        if let direction = direction {
-            filtered = filtered.filter { $0.direction == direction }
-        }
-
-        if let messageType = messageType {
-            filtered = filtered.filter { $0.messageType == messageType }
-        }
-
-        return filtered
-    }
-
-    public func clearLogs() {
-        entries.removeAll()
-    }
-
-    public func clearNetworkMessages() {
-        networkMessages.removeAll()
-    }
-
-    public func clearAll() {
-        entries.removeAll()
-        networkMessages.removeAll()
-    }
-}
+import os
 
 // MARK: - Log Levels
 
@@ -158,7 +15,34 @@ public enum NDKLogLevel: Int, Comparable, Sendable {
     public static func < (lhs: NDKLogLevel, rhs: NDKLogLevel) -> Bool {
         lhs.rawValue < rhs.rawValue
     }
+
+    /// Map to os.Logger level
+    var osLogType: OSLogType {
+        switch self {
+        case .off: return .debug // Won't be used when off
+        case .error: return .error
+        case .warning: return .default
+        case .info: return .info
+        case .debug: return .debug
+        case .trace: return .debug
+        }
+    }
 }
+
+extension NDKLogLevel: CustomStringConvertible {
+    public var description: String {
+        switch self {
+        case .off: return "OFF"
+        case .error: return "ERROR"
+        case .warning: return "WARNING"
+        case .info: return "INFO"
+        case .debug: return "DEBUG"
+        case .trace: return "TRACE"
+        }
+    }
+}
+
+// MARK: - Log Categories
 
 /// Categories for NDK logging
 public enum NDKLogCategory: String, CaseIterable, Sendable {
@@ -170,23 +54,29 @@ public enum NDKLogCategory: String, CaseIterable, Sendable {
     case auth = "AUTH"
     case wallet = "WALLET"
     case general = "GENERAL"
+    case connection = "CONNECTION"
+    case outbox = "OUTBOX"
+    case signer = "SIGNER"
+    case sync = "SYNC"
+    case performance = "PERFORMANCE"
+    case security = "SECURITY"
+    case database = "DATABASE"
+    case signature = "SIGNATURE"
 
-    // New categories for complex areas
-    case connection = "CONNECTION" // WebSocket lifecycle, retry logic
-    case outbox = "OUTBOX" // Relay selection, scoring, NIP-65
-    case signer = "SIGNER" // Signing flows, NWC, Bunker
-    case sync = "SYNC" // Negentropy, sync operations
-    case performance = "PERFORMANCE" // Timing, throughput, latency
-    case security = "SECURITY" // Encryption, key management
-    case database = "DATABASE" // SQL operations, migrations
-    case signature = "SIGNATURE" // Signature verification
+    /// Get the os.Logger for this category
+    var logger: os.Logger {
+        os.Logger(subsystem: "ndk", category: rawValue.lowercased())
+    }
 }
 
-/// Thread-safe configuration for NDK Logger
-public actor NDKLoggerConfig {
-    public static let shared = NDKLoggerConfig()
+// MARK: - Logger
 
-    public var logLevel: NDKLogLevel = {
+/// NDK Logger - synchronous, os.Logger-based logging
+public enum NDKLogger {
+    private static let lock = OSAllocatedUnfairLock()
+
+    // Thread-safe configuration storage
+    nonisolated(unsafe) private static var _level: NDKLogLevel = {
         #if DEBUG
             return .info
         #else
@@ -194,42 +84,57 @@ public actor NDKLoggerConfig {
         #endif
     }()
 
-    public var logNetworkTraffic: Bool = false
-    public var prettyPrintNetworkMessages: Bool = true
-    public var enabledCategories: Set<NDKLogCategory> = {
+    nonisolated(unsafe) private static var _enabledCategories: Set<NDKLogCategory> = {
         var categories = Set(NDKLogCategory.allCases)
         categories.remove(.database)
         categories.remove(.performance)
         return categories
     }()
-    public var logHandler: (@Sendable (String) -> Void)?
 
-    public func setLogLevel(_ level: NDKLogLevel) {
-        logLevel = level
+    nonisolated(unsafe) private static var _logNetworkTraffic: Bool = false
+    nonisolated(unsafe) private static var _handler: (@Sendable (String) -> Void)?
+
+    // MARK: - Configuration
+
+    /// Set the minimum log level
+    public static func setLogLevel(_ level: NDKLogLevel) {
+        lock.withLock { _level = level }
     }
 
-    public func setEnabledCategories(_ categories: Set<NDKLogCategory>) {
-        enabledCategories = categories
+    /// Get the current log level
+    public static var logLevel: NDKLogLevel {
+        lock.withLock { _level }
     }
 
-    public func setLogNetworkTraffic(_ enabled: Bool) {
-        logNetworkTraffic = enabled
+    /// Set enabled categories
+    public static func setEnabledCategories(_ categories: Set<NDKLogCategory>) {
+        lock.withLock { _enabledCategories = categories }
     }
 
-    public func setLogHandler(_ handler: (@Sendable (String) -> Void)?) {
-        logHandler = handler
+    /// Get enabled categories
+    public static var enabledCategories: Set<NDKLogCategory> {
+        lock.withLock { _enabledCategories }
     }
 
-    private init() {}
-}
+    /// Enable or disable network traffic logging
+    public static func setLogNetworkTraffic(_ enabled: Bool) {
+        lock.withLock { _logNetworkTraffic = enabled }
+    }
 
-/// NDK Logger for configurable logging
-public enum NDKLogger {
-    /// Check if logging is enabled (log level is not off)
+    /// Check if network traffic logging is enabled
+    public static var logNetworkTraffic: Bool {
+        lock.withLock { _logNetworkTraffic }
+    }
+
+    /// Set custom log handler (primarily for tests)
+    public static func setLogHandler(_ handler: (@Sendable (String) -> Void)?) {
+        lock.withLock { _handler = handler }
+        NDKNetworkLogger.setHandler(handler)
+    }
+
+    /// Check if logging is enabled
     public static var isEnabled: Bool {
-        get async {
-            await NDKLoggerConfig.shared.logLevel != .off
-        }
+        lock.withLock { _level != .off }
     }
 
     /// Configure the logger
@@ -237,131 +142,46 @@ public enum NDKLogger {
         logLevel: NDKLogLevel? = nil,
         enabledCategories: Set<NDKLogCategory>? = nil,
         logNetworkTraffic: Bool? = nil
-    ) async {
-        if let level = logLevel {
-            await NDKLoggerConfig.shared.setLogLevel(level)
-        }
-        if let categories = enabledCategories {
-            await NDKLoggerConfig.shared.setEnabledCategories(categories)
-        }
-        if let traffic = logNetworkTraffic {
-            await NDKLoggerConfig.shared.setLogNetworkTraffic(traffic)
+    ) {
+        lock.withLock {
+            if let level = logLevel {
+                _level = level
+            }
+            if let categories = enabledCategories {
+                _enabledCategories = categories
+            }
+            if let traffic = logNetworkTraffic {
+                _logNetworkTraffic = traffic
+            }
         }
     }
 
-    /// Set custom log handler for external integration
-    public static func setLogHandler(_ handler: (@Sendable (String) -> Void)?) async {
-        await NDKLoggerConfig.shared.setLogHandler(handler)
-    }
+    // MARK: - Logging
 
-    /// Log a message at the specified level
+    /// Log a message at the specified level - synchronous, no await needed
     public static func log(_ level: NDKLogLevel, category: NDKLogCategory, _ message: String) {
-        Task {
-            let config = NDKLoggerConfig.shared
-            let currentLogLevel = await config.logLevel
-            guard level <= currentLogLevel else { return }
-            let enabledCategories = await config.enabledCategories
-            guard enabledCategories.contains(category) else { return }
+        // Fast path: check level without lock
+        guard level.rawValue <= _level.rawValue else { return }
 
-            let now = Date()
-            let timestamp = DateFormatters.iso8601.string(from: now)
+        let (enabled, handler) = lock.withLock {
+            (_enabledCategories.contains(category), _handler)
+        }
+        guard enabled else { return }
+
+        // Primary: os.Logger
+        category.logger.log(level: level.osLogType, "\(message, privacy: .public)")
+
+        // Secondary: handler for tests
+        if let handler {
+            let timestamp = DateFormatters.iso8601.string(from: Date())
             let emoji = NDKLogFormatter.emojiForCategory(category)
             let formattedMessage = "[\(timestamp)] [\(category.rawValue)] [\(level)] \(emoji) \(message)"
-
-            // Add to log buffer for developer tools
-            let entry = NDKLogEntry(timestamp: now, level: level, category: category, message: message)
-            await NDKLogBuffer.shared.addEntry(entry)
-
-            if let handler = await config.logHandler {
-                handler(formattedMessage)
-            } else {
-                #if DEBUG
-                    print(formattedMessage)
-                #endif
-            }
-        }
-    }
-
-    /// Log a network message for protocol-level debugging
-    public static func logNetwork(relay: String, direction: NDKNetworkMessage.Direction, messageType: String, raw: String) {
-        Task {
-            guard await NDKLoggerConfig.shared.logNetworkTraffic else { return }
-
-            let message = NDKNetworkMessage(relay: relay, direction: direction, messageType: messageType, raw: raw)
-            await NDKLogBuffer.shared.addNetworkMessage(message)
-
-            // Also log to regular log if network category is enabled
-            if await NDKLoggerConfig.shared.enabledCategories.contains(.network) {
-                let dirSymbol = direction.rawValue
-                log(.debug, category: .network, "\(dirSymbol) [\(relay)] \(messageType)")
-            }
+            handler(formattedMessage)
         }
     }
 
     /// Log a message with correlation ID for tracking across components
     public static func log(_ level: NDKLogLevel, category: NDKLogCategory, _ message: String, correlationId: String) {
-        let messageWithCorrelation = "[\(correlationId)] \(message)"
-        log(level, category: category, messageWithCorrelation)
-    }
-
-    /// Log structured data for searchable logs
-    public static func logStructured(_ level: NDKLogLevel, category: NDKLogCategory, _ data: [String: Any]) {
-        Task {
-            let config = NDKLoggerConfig.shared
-            let currentLogLevel = await config.logLevel
-            guard level <= currentLogLevel else { return }
-            let enabledCategories = await config.enabledCategories
-            guard enabledCategories.contains(category) else { return }
-
-            let jsonData = try? JSONSerialization.data(withJSONObject: data, options: [.sortedKeys])
-            let jsonString = jsonData.flatMap { String(data: $0, encoding: .utf8) } ?? "<invalid JSON>"
-            log(level, category: category, jsonString)
-        }
-    }
-
-    /// Log performance timing automatically
-    public static func logTiming<T>(_ level: NDKLogLevel, category: NDKLogCategory, operation: String, correlationId: String? = nil, _ block: () throws -> T) rethrows -> T {
-        let startTime = CFAbsoluteTimeGetCurrent()
-        let result = try block()
-        logTimingResult(startTime: startTime, level: level, category: category, operation: operation, correlationId: correlationId)
-        return result
-    }
-
-    /// Log performance timing for async operations
-    public static func logTiming<T>(_ level: NDKLogLevel, category: NDKLogCategory, operation: String, correlationId: String? = nil, _ block: () async throws -> T) async rethrows -> T {
-        let startTime = CFAbsoluteTimeGetCurrent()
-        let result = try await block()
-        logTimingResult(startTime: startTime, level: level, category: category, operation: operation, correlationId: correlationId)
-        return result
-    }
-
-    // MARK: - Private Helpers
-
-    private static func logTimingResult(startTime: CFAbsoluteTime, level: NDKLogLevel, category: NDKLogCategory, operation: String, correlationId: String?) {
-        let duration = CFAbsoluteTimeGetCurrent() - startTime
-        let durationMs = String(format: "%.2f", duration * 1000)
-        let message = "⏱️ \(operation) completed in \(durationMs)ms"
-
-        if let correlationId = correlationId {
-            log(level, category: category, message, correlationId: correlationId)
-        } else {
-            log(level, category: category, message)
-        }
-    }
-}
-
-// CaseIterable conformance already added to the enum declaration
-
-// Extension for NDKLogLevel string representation
-extension NDKLogLevel: CustomStringConvertible {
-    public var description: String {
-        switch self {
-        case .off: return "OFF"
-        case .error: return "ERROR"
-        case .warning: return "WARNING"
-        case .info: return "INFO"
-        case .debug: return "DEBUG"
-        case .trace: return "TRACE"
-        }
+        log(level, category: category, "[\(correlationId)] \(message)")
     }
 }

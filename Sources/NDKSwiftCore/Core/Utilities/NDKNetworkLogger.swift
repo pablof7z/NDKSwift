@@ -1,56 +1,66 @@
 import Foundation
+import os
 
-/// Network traffic logging for NDK
+/// Network traffic logging for NDK - synchronous, no Tasks
 public enum NDKNetworkLogger {
-    /// Log network traffic (special handling)
-    public static func logNetworkSend(to relay: URL, message: String, parsed _: NostrMessage? = nil) {
-        Task {
-            let config = NDKLoggerConfig.shared
-            guard await config.logNetworkTraffic else { return }
-            guard await NDKLogger.isEnabled else { return }
+    private static let logger = os.Logger(subsystem: "ndk", category: "network-traffic")
 
-            let output = "\n📤 SENDING TO \(relay.host ?? relay.absoluteString):\n" +
-                "   RAW: \(NDKLogFormatter.truncateMessage(message))"
+    /// Log network traffic being sent
+    public static func logNetworkSend(to relay: URL, message: String, parsed: NostrMessage? = nil) {
+        guard NDKLogger.logNetworkTraffic else { return }
+        guard NDKLogger.isEnabled else { return }
 
-            await config.logHandler?(output)
+        let host = relay.host ?? relay.absoluteString
+        let output = "\n📤 SENDING TO \(host):\n" +
+            "   RAW: \(NDKLogFormatter.truncateMessage(message))"
+
+        logger.debug("\(output, privacy: .public)")
+
+        if let handler = getHandler() {
+            handler(output)
         }
     }
 
     /// Log received network traffic
-    public static func logNetworkReceive(from relay: URL, message: String, parsed _: NostrMessage? = nil) {
-        Task {
-            let config = NDKLoggerConfig.shared
-            guard await config.logNetworkTraffic else { return }
-            guard await NDKLogger.isEnabled else { return }
+    public static func logNetworkReceive(from relay: URL, message: String, parsed: NostrMessage? = nil) {
+        guard NDKLogger.logNetworkTraffic else { return }
+        guard NDKLogger.isEnabled else { return }
 
-            let output = "\n📥 RECEIVED FROM \(relay.host ?? relay.absoluteString):\n" +
-                "   RAW: \(NDKLogFormatter.truncateMessage(message))"
+        let host = relay.host ?? relay.absoluteString
+        let output = "\n📥 RECEIVED FROM \(host):\n" +
+            "   RAW: \(NDKLogFormatter.truncateMessage(message))"
 
-            await config.logHandler?(output)
+        logger.debug("\(output, privacy: .public)")
+
+        if let handler = getHandler() {
+            handler(output)
         }
     }
 
     /// Log parsing errors
     public static func logNetworkParseError(from relay: URL, message: String, error: Error) {
-        Task {
-            let config = NDKLoggerConfig.shared
-            guard await config.logNetworkTraffic else { return }
-            guard await NDKLogger.isEnabled else { return }
+        guard NDKLogger.logNetworkTraffic else { return }
+        guard NDKLogger.isEnabled else { return }
 
-            let output = "\n📥 RECEIVED FROM \(relay.host ?? relay.absoluteString):\n" +
-                "   RAW: \(NDKLogFormatter.truncateMessage(message))\n" +
-                "   ❌ PARSE ERROR: \(error)"
+        let host = relay.host ?? relay.absoluteString
+        let output = "\n📥 RECEIVED FROM \(host):\n" +
+            "   RAW: \(NDKLogFormatter.truncateMessage(message))\n" +
+            "   ❌ PARSE ERROR: \(error)"
 
-            await config.logHandler?(output)
+        logger.error("\(output, privacy: .public)")
+
+        if let handler = getHandler() {
+            handler(output)
         }
     }
 
     /// Log parsed message details
     public static func logParsedMessage(_ message: NostrMessage) {
-        Task {
-            var output = ""
+        guard NDKLogger.logNetworkTraffic else { return }
 
-            switch message {
+        var output = ""
+
+        switch message {
         case let .event(subscriptionId, event):
             output += "   TYPE: EVENT\n"
             if let subId = subscriptionId {
@@ -135,10 +145,26 @@ public enum NDKNetworkLogger {
             output += "   TYPE: NEG-ERR\n"
             output += "   SUBSCRIPTION: \(subscriptionId)\n"
             output += "   ERROR: \(error)"
-            }
-
-            let config = NDKLoggerConfig.shared
-            await config.logHandler?(output)
         }
+
+        logger.debug("\(output, privacy: .public)")
+
+        if let handler = getHandler() {
+            handler(output)
+        }
+    }
+
+    // MARK: - Handler
+
+    private static let handlerLock = OSAllocatedUnfairLock()
+    nonisolated(unsafe) private static var _handler: (@Sendable (String) -> Void)?
+
+    private static func getHandler() -> (@Sendable (String) -> Void)? {
+        handlerLock.withLock { _handler }
+    }
+
+    /// Set the network log handler (called by NDKLogger.setLogHandler)
+    internal static func setHandler(_ handler: (@Sendable (String) -> Void)?) {
+        handlerLock.withLock { _handler = handler }
     }
 }

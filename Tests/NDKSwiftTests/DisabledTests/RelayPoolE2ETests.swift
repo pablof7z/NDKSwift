@@ -6,8 +6,8 @@ final class RelayPoolE2ETests: XCTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
-        NDKLogger.logLevel = .debug
-        NDKLogger.logNetworkTraffic = false
+        NDKLogger.setLogLevel(.debug)
+        NDKLogger.setLogNetworkTraffic(false)
     }
 
     func testRelayConnectionManagement() async throws {

@@ -12,8 +12,8 @@ final class UserProfileE2ETests: XCTestCase {
         try await super.setUp()
 
         // Configure logging for debugging
-        NDKLogger.logLevel = .debug
-        NDKLogger.logNetworkTraffic = false // Too verbose for profile tests
+        NDKLogger.setLogLevel(.debug)
+        NDKLogger.setLogNetworkTraffic(false) // Too verbose for profile tests
     }
 
     override func tearDown() async throws {
