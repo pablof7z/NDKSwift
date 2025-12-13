@@ -80,7 +80,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
     private let ndk: NDK
     private var userPubkey: String?
     private var bunkerPubkey: String?
-    private var relayUrls: [String]
+    private var relayURLs: [String]
     private var secret: String?
     private let localSigner: NDKPrivateKeySigner
     private var subscriptionTask: Task<Void, Never>?
@@ -164,7 +164,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         self.ndk = ndk
         self.connectionType = connectionType
         self.localSigner = localSigner
-        relayUrls = []
+        relayURLs = []
 
         switch connectionType {
         case let .bunker(token):
@@ -182,12 +182,12 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         let (bunkerPubkey, userPubkey, relays, secret) = parser.parse()
         self.bunkerPubkey = bunkerPubkey
         self.userPubkey = userPubkey
-        relayUrls = relays
+        relayURLs = relays
         self.secret = secret
     }
 
     private func initNostrConnect(relays: [String], options: NostrConnectOptions?, pubkey: String) {
-        relayUrls = relays
+        relayURLs = relays
         nostrConnectSecret = generateNostrConnectSecret()
         nostrConnectUri = generateNostrConnectUri(pubkey: pubkey, relays: relays, options: options)
     }
@@ -242,7 +242,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
             userPubkey = user.pubkey
             let nip46Urls = await user.nip46Urls
             if let nip46Urls = nip46Urls {
-                relayUrls = nip46Urls
+                relayURLs = nip46Urls
             }
             if bunkerPubkey == nil {
                 bunkerPubkey = user.pubkey
@@ -269,7 +269,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         }
 
         // Initialize RPC client
-        let rpcClient = NDKNostrRPC(ndk: ndk, localSigner: localSigner, relayUrls: relayUrls)
+        let rpcClient = NDKNostrRPC(ndk: ndk, localSigner: localSigner, relayURLs: relayUrls)
         self.rpcClient = rpcClient
 
         // Start listening for responses
@@ -590,7 +590,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
 
         guard let bunkerPubkey = payload["bunkerPubkey"] as? String,
               let userPubkey = payload["userPubkey"] as? String,
-              let relayUrls = payload["relayUrls"] as? [String],
+              let relayURLs = payload["relayUrls"] as? [String],
               let secret = payload[NostrConstants.JSONField.secret] as? String,
               let localSignerData = payload["localSignerData"] as? Data,
               let connectionTypeRaw = payload["connectionType"] as? String

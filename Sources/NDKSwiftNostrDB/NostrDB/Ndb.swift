@@ -1018,7 +1018,7 @@ class Ndb: @unchecked Sendable {
     }
 
     /// Determines if a given note was seen on any of the listed relay URLs
-    func was(noteKey: NoteKey, seenOnAnyOf relayUrls: [String], txn: SafeNdbTxn<Void>? = nil) throws -> Bool {
+    func was(noteKey: NoteKey, seenOnAnyOf relayURLs: [String], txn: SafeNdbTxn<Void>? = nil) throws -> Bool {
         guard let txn = txn ?? SafeNdbTxn.new(on: self) else { throw NdbLookupError.cannotOpenTransaction }
         for relayUrl in relayUrls {
             if try was(noteKey: noteKey, seenOn: relayUrl, txn: txn) {

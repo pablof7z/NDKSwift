@@ -25,7 +25,7 @@ import Observation
 ///     let authManager: NDKAuthManager
 ///
 ///     init() {
-///         self.ndk = NDK(relayUrls: ["wss://relay.damus.io"], cache: MemoryCache())
+///         self.ndk = NDK(relayURLs: ["wss://relay.damus.io"], cache: MemoryCache())
 ///         self.authManager = NDKAuthManager(ndk: ndk)
 ///     }
 /// }

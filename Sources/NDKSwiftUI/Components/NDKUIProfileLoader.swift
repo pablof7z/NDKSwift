@@ -295,7 +295,7 @@ public struct NDKUINip05Badge: View {
 #if DEBUG
     struct NDKUIProfileLoader_Previews: PreviewProvider {
         static var previews: some View {
-            let mockNDK = NDK(relayUrls: [])
+            let mockNDK = NDK(relayURLs: [])
 
             VStack(spacing: 20) {
                 // Single profile loader
