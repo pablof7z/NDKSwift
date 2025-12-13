@@ -1,47 +1,54 @@
 import Foundation
 
-/// Actor for thread-safe user state management
-actor UserStateActor {
-    weak var ndk: NDK?
-    var relayList: [NDKRelayInfo] = []
-    var nip46Urls: [String]?
-
-    func getNdk() -> NDK? { ndk }
-    func setNdk(_ newNdk: NDK?) { ndk = newNdk }
-
-    func getRelayList() -> [NDKRelayInfo] { relayList }
-    func setRelayList(_ newList: [NDKRelayInfo]) { relayList = newList }
-
-    func getNip46Urls() -> [String]? { nip46Urls }
-    func setNip46Urls(_ urls: [String]?) { nip46Urls = urls }
-}
-
 /// Represents a Nostr user
 public final class NDKUser: Equatable, Hashable, Sendable {
     /// User's public key
     public let pubkey: PublicKey
 
-    /// Internal state actor that manages all mutable state
-    private let stateActor = UserStateActor()
+    /// Thread-safe mutable state (protected via actor)
+    private let state = UserState()
+
+    private actor UserState {
+        weak var ndk: NDK?
+        var relayList: [NDKRelayInfo] = []
+        var nip46Urls: [String]?
+
+        func getNdk() -> NDK? { ndk }
+        func setNdk(_ newNdk: NDK?) { ndk = newNdk }
+        func getRelayList() -> [NDKRelayInfo] { relayList }
+        func setRelayList(_ newList: [NDKRelayInfo]) { relayList = newList }
+        func getNip46Urls() -> [String]? { nip46Urls }
+        func setNip46Urls(_ urls: [String]?) { nip46Urls = urls }
+    }
 
     /// Reference to NDK instance (thread-safe via actor)
     public var ndk: NDK? {
-        get async { await stateActor.getNdk() }
+        get async { await state.getNdk() }
     }
 
     /// Set the NDK instance (thread-safe via actor)
     public func setNdk(_ ndk: NDK?) async {
-        await stateActor.setNdk(ndk)
+        await state.setNdk(ndk)
     }
 
     /// Relay list (NIP-65)
     public var relayList: [NDKRelayInfo] {
-        get async { await stateActor.getRelayList() }
+        get async { await state.getRelayList() }
+    }
+
+    /// Set relay list (thread-safe via actor)
+    private func setRelayList(_ relays: [NDKRelayInfo]) async {
+        await state.setRelayList(relays)
     }
 
     /// NIP-46 relay URLs (for remote signing)
     public var nip46Urls: [String]? {
-        get async { await stateActor.getNip46Urls() }
+        get async { await state.getNip46Urls() }
+    }
+
+    /// Set NIP-46 URLs (thread-safe via actor)
+    private func setNip46Urls(_ urls: [String]?) async {
+        await state.setNip46Urls(urls)
     }
 
     // MARK: - Initialization
@@ -73,7 +80,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
         if let cached = await ndk.cache.getNIP05Entry(nip05.lowercased()),
            let nip46Relays = cached.nip46Relays
         {
-            await user.stateActor.setNip46Urls(nip46Relays)
+            await user.setNip46Urls(nip46Relays)
         }
 
         return user
@@ -84,10 +91,9 @@ public final class NDKUser: Equatable, Hashable, Sendable {
     /// Fetch user's relay list (NIP-65)
     @discardableResult
     public func fetchRelayList() async throws -> [NDKRelayInfo] {
-        let ndk = try GuardHelpers.unwrap(
-            await self.ndk,
-            error: NDKError.configurationError(ErrorMessageConstants.Messages.ndkInstanceNotSet)
-        )
+        guard let ndk = await self.ndk else {
+            throw NDKError.configurationError(ErrorMessageConstants.Messages.ndkInstanceNotSet)
+        }
 
         // Create filter for kind 10002 events
         let filter = NDKFilter(
@@ -120,7 +126,7 @@ public final class NDKUser: Equatable, Hashable, Sendable {
                     return NDKRelayInfo(url: url, read: read, write: write)
                 }
 
-            await stateActor.setRelayList(relays)
+            await setRelayList(relays)
             return relays
         }
 
@@ -131,10 +137,9 @@ public final class NDKUser: Equatable, Hashable, Sendable {
 
     /// Get users this user follows
     public func follows() async throws -> Set<NDKUser> {
-        let ndk = try GuardHelpers.unwrap(
-            await self.ndk,
-            error: NDKError.configurationError(ErrorMessageConstants.Messages.ndkInstanceNotSet)
-        )
+        guard let ndk = await self.ndk else {
+            throw NDKError.configurationError(ErrorMessageConstants.Messages.ndkInstanceNotSet)
+        }
 
         // Create filter for kind 3 events
         let filter = NDKFilter(
@@ -214,10 +219,9 @@ public final class NDKUser: Equatable, Hashable, Sendable {
     /// - Parameter maxAge: Maximum age before re-verification is needed (default: 24 hours)
     /// - Returns: True if the NIP-05 is verified and belongs to this user
     public func verifyNIP05(maxAge: TimeInterval = TimeConstants.day) async throws -> Bool {
-        let ndk = try GuardHelpers.unwrap(
-            await self.ndk,
-            error: NDKError.configurationError(ErrorMessageConstants.Messages.ndkInstanceNotSet)
-        )
+        guard let ndk = await self.ndk else {
+            throw NDKError.configurationError(ErrorMessageConstants.Messages.ndkInstanceNotSet)
+        }
 
         return try await ndk.verifyNIP05(for: self, maxAge: maxAge)
     }

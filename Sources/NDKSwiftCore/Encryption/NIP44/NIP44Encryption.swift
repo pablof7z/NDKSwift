@@ -83,10 +83,9 @@ public enum NIP44 {
 
     /// Pad plaintext according to NIP-44
     static func pad(_ plaintext: String) throws -> Data {
-        let unpadded = try GuardHelpers.unwrap(
-            plaintext.data(using: .utf8),
-            error: Crypto.CryptoError.invalidPoint
-        )
+        guard let unpadded = plaintext.data(using: .utf8) else {
+            throw Crypto.CryptoError.invalidPoint
+        }
 
         let unpaddedLen = unpadded.count
         guard unpaddedLen >= Constants.minPlaintextSize &&
@@ -128,10 +127,9 @@ public enum NIP44 {
         }
 
         let unpadded = padded[2 ..< (2 + unpaddedLen)]
-        let plaintext = try GuardHelpers.unwrap(
-            String(data: unpadded, encoding: .utf8),
-            error: NIP44Error.invalidPadding
-        )
+        guard let plaintext = String(data: unpadded, encoding: .utf8) else {
+            throw NIP44Error.invalidPadding
+        }
 
         return plaintext
     }
@@ -259,10 +257,9 @@ public enum NIP44 {
         }
 
         // Decode base64
-        let data = try GuardHelpers.unwrap(
-            Data(base64Encoded: payload),
-            error: NIP44Error.invalidPayloadSize
-        )
+        guard let data = Data(base64Encoded: payload) else {
+            throw NIP44Error.invalidPayloadSize
+        }
 
         let dlen = data.count
         guard dlen >= Constants.minDataSize && dlen <= Constants.maxDataSize else {
