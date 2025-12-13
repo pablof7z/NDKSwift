@@ -336,6 +336,7 @@ actor NDKSubscriptionCoordinator: Hashable {
     nonisolated let groupableDelay: TimeInterval?
     nonisolated let groupableDelayType: NDKSubscriptionDelayType?
 
+    @available(*, deprecated, message: "Use onEvent callback or async stream instead")
     private var eventHandlers: [(NDKEvent) async -> Void] = []
     private var eoseHandlers: [(String) async -> Void] = [] // Changed to include relay URL
     var isActive = false
@@ -449,11 +450,6 @@ actor NDKSubscriptionCoordinator: Hashable {
             await onEvent(event, ndkRelay)
         }
 
-        // Call legacy handlers
-        for handler in eventHandlers {
-            await handler(event)
-        }
-
         // Stream to AsyncSequence
         eventContinuation?.yield((event: event, relay: relay.url))
     }
@@ -512,8 +508,7 @@ actor NDKSubscriptionCoordinator: Hashable {
         eventContinuation = nil
         eventStream = nil
 
-        // Clear event handlers
-        eventHandlers.removeAll()
+        // Clear EOSE handlers
         eoseHandlers.removeAll()
 
         // Clear active relays
