@@ -185,7 +185,13 @@ public enum NDKLogCategory: String, CaseIterable, Sendable {
 /// NDK Logger for configurable logging
 public enum NDKLogger {
     /// Current log level
-    public static var logLevel: NDKLogLevel = {
+    ///
+    /// **Concurrency Safety**: `nonisolated(unsafe)` is acceptable here because:
+    /// - Typically set once at app startup, rarely modified during runtime
+    /// - Logging is a cross-cutting concern that shouldn't require `await`
+    /// - Worst case: a log message uses stale config value (acceptable for logging)
+    /// - Standard practice in logging libraries to accept this trade-off
+    public nonisolated(unsafe) static var logLevel: NDKLogLevel = {
         #if DEBUG
             return .info
         #else

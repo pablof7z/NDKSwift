@@ -1,0 +1,6 @@
+framework module NostrDB {
+  umbrella header "/Users/pablofernandez/10x/NDKSwift-z94ws0/master/Sources/NostrDB/include/NostrDB.h"
+
+  export *
+  module * { export * }
+}
