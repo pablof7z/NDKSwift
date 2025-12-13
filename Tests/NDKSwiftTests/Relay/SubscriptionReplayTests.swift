@@ -2,8 +2,8 @@ import Combine
 @testable import NDKSwiftCore
 import XCTest
 
-// TODO: These tests need to be rewritten to work with the new API
-// They were testing subscription replay behavior using direct MockRelay access
+// Tests for subscription replay behavior require rewriting for the current API
+// Previous implementation used direct MockRelay access which is no longer available
 /*
  final class SubscriptionReplayTests: XCTestCase {
      private var ndk: NDK!
@@ -23,8 +23,8 @@ import XCTest
          try await super.tearDown()
      }
 
-     // TODO: This test needs to be rewritten to work with the new API
-     // It was testing subscription replay on reconnect using direct MockRelay access
+     // Test for subscription replay on reconnect - requires rewriting for new API
+     // Previous implementation used direct MockRelay access
      // func testSubscriptionReplayOnReconnect() async throws {
          // Create a test relay URL
          let relayURL = "wss://test.relay.example"
@@ -77,7 +77,7 @@ import XCTest
          _ = await task.result
      }
 
-     // TODO: This test needs to be rewritten to work with the new API
+     // Test for subscription replay with explicit relays - requires rewriting for new API
      // func testSubscriptionReplayWithExplicitRelays() async throws {
          // Create test relay URLs
          let relay1URL = "wss://relay1.example"

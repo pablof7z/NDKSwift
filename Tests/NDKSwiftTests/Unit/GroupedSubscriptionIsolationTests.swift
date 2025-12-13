@@ -8,7 +8,7 @@ final class GroupedSubscriptionIsolationTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         // Reduce logging noise for tests
-        NDKLogger.logLevel = .error
+        NDKLogger.setLogLevel(.error)
     }
 
     /// Test that two observers with same kind but different authors don't mix results

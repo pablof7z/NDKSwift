@@ -1786,13 +1786,10 @@ NDKSwift provides comprehensive logging capabilities through `NDKLogger` to help
 
 ```swift
 // Enable network traffic logging
-NDKLogger.logNetworkTraffic = true
+NDKLogger.setLogNetworkTraffic(true)
 
 // Set overall log level
-NDKLogger.logLevel = .trace  // Most verbose (.off, .error, .warning, .info, .debug, .trace)
-
-// Control pretty printing of network messages
-NDKLogger.prettyPrintNetworkMessages = true  // Default: true
+NDKLogger.setLogLevel(.trace)  // Most verbose (.off, .error, .warning, .info, .debug, .trace)
 ```
 
 **Log Categories:**
@@ -1801,11 +1798,7 @@ Enable or disable specific logging categories:
 
 ```swift
 // Enable only specific categories
-NDKLogger.enabledCategories = [.network, .relay, .subscription]
-
-// Or disable noisy categories
-NDKLogger.enabledCategories.remove(.database)
-NDKLogger.enabledCategories.remove(.performance)
+NDKLogger.setEnabledCategories([.network, .relay, .subscription])
 
 // Available categories:
 // .network - WebSocket traffic

@@ -5,7 +5,7 @@ final class RelayConnectionRaceConditionTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         // Reduce logging noise in tests
-        NDKLogger.logLevel = .error
+        NDKLogger.setLogLevel(.error)
     }
 
     func testConcurrentConnectionAttempts() async throws {

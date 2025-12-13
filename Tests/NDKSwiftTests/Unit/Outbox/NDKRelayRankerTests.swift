@@ -158,7 +158,7 @@ final class NDKRelayRankerTests: XCTestCase {
 
     // MARK: - Calculate Relay Score Tests
 
-    // TODO: These tests use private methods - need public API
+    // NOTE: These tests use private methods and need refactoring to use public API
     /*
      func testCalculateRelayScoreConnectionBonus() async {
          // Given

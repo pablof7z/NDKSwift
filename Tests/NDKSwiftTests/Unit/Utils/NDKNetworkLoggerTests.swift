@@ -4,20 +4,20 @@ import XCTest
 final class NDKNetworkLoggerTests: XCTestCase {
     override func setUp() {
         super.setUp()
-        NDKLogger.logLevel = .trace // Enable logging
-        NDKLogger.logNetworkTraffic = true
+        NDKLogger.setLogLevel(.trace)
+        NDKLogger.setLogNetworkTraffic(true)
     }
 
     override func tearDown() {
-        NDKLogger.logHandler = nil
-        NDKLogger.logLevel = .off // Disable logging
-        NDKLogger.logNetworkTraffic = false
+        NDKLogger.setLogHandler(nil)
+        NDKLogger.setLogLevel(.off)
+        NDKLogger.setLogNetworkTraffic(false)
         super.tearDown()
     }
 
     func testLogNetworkSend() {
         var capturedOutput: String?
-        NDKLogger.logHandler = { output in
+        NDKLogger.setLogHandler { output in
             capturedOutput = output
         }
 
@@ -33,7 +33,7 @@ final class NDKNetworkLoggerTests: XCTestCase {
 
     func testLogNetworkReceive() {
         var capturedOutput: String?
-        NDKLogger.logHandler = { output in
+        NDKLogger.setLogHandler { output in
             capturedOutput = output
         }
 
@@ -49,7 +49,7 @@ final class NDKNetworkLoggerTests: XCTestCase {
 
     func testLogNetworkParseError() {
         var capturedOutput: String?
-        NDKLogger.logHandler = { output in
+        NDKLogger.setLogHandler { output in
             capturedOutput = output
         }
 
@@ -67,11 +67,11 @@ final class NDKNetworkLoggerTests: XCTestCase {
 
     func testLogNetworkTrafficDisabled() {
         var capturedOutput: String?
-        NDKLogger.logHandler = { output in
+        NDKLogger.setLogHandler { output in
             capturedOutput = output
         }
 
-        NDKLogger.logNetworkTraffic = false
+        NDKLogger.setLogNetworkTraffic(false)
 
         let testURL = URL(string: "wss://relay.example.com")!
         let message = "[\"REQ\",\"sub123\",{\"kinds\":[1]}]"
@@ -83,11 +83,11 @@ final class NDKNetworkLoggerTests: XCTestCase {
 
     func testLoggerDisabled() {
         var capturedOutput: String?
-        NDKLogger.logHandler = { output in
+        NDKLogger.setLogHandler { output in
             capturedOutput = output
         }
 
-        NDKLogger.logLevel = .off
+        NDKLogger.setLogLevel(.off)
 
         let testURL = URL(string: "wss://relay.example.com")!
         let message = "[\"REQ\",\"sub123\",{\"kinds\":[1]}]"
@@ -99,7 +99,7 @@ final class NDKNetworkLoggerTests: XCTestCase {
 
     func testLogParsedMessage_Event() {
         var capturedOutput: String?
-        NDKLogger.logHandler = { output in
+        NDKLogger.setLogHandler { output in
             capturedOutput = output
         }
 
@@ -117,7 +117,7 @@ final class NDKNetworkLoggerTests: XCTestCase {
 
     func testLogParsedMessage_REQ() {
         var capturedOutput: String?
-        NDKLogger.logHandler = { output in
+        NDKLogger.setLogHandler { output in
             capturedOutput = output
         }
 
@@ -137,7 +137,7 @@ final class NDKNetworkLoggerTests: XCTestCase {
 
     func testLogParsedMessage_OK() {
         var capturedOutput: String?
-        NDKLogger.logHandler = { output in
+        NDKLogger.setLogHandler { output in
             capturedOutput = output
         }
 
@@ -154,7 +154,7 @@ final class NDKNetworkLoggerTests: XCTestCase {
 
     func testLogParsedMessage_EOSE() {
         var capturedOutput: String?
-        NDKLogger.logHandler = { output in
+        NDKLogger.setLogHandler { output in
             capturedOutput = output
         }
 
@@ -169,7 +169,7 @@ final class NDKNetworkLoggerTests: XCTestCase {
 
     func testLogParsedMessage_ContentTruncation() {
         var capturedOutput: String?
-        NDKLogger.logHandler = { output in
+        NDKLogger.setLogHandler { output in
             capturedOutput = output
         }
 

@@ -10,8 +10,8 @@ final class EncryptedDME2ETests: XCTestCase {
         try await super.setUp()
 
         // Configure logging for debugging
-        NDKLogger.logLevel = .debug
-        NDKLogger.logNetworkTraffic = false
+        NDKLogger.setLogLevel(.debug)
+        NDKLogger.setLogNetworkTraffic(false)
     }
 
     override func tearDown() async throws {
