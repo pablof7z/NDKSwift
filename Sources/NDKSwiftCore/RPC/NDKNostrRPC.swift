@@ -37,15 +37,15 @@ public struct NDKRPCResponse {
 public actor NDKNostrRPC {
     private let ndk: NDK
     private let localSigner: NDKPrivateKeySigner
-    private let relayUrls: [String]
+    private let relayURLs: [String]
     private var encryptionScheme: NDKEncryptionScheme = .nip44
     private var pendingRequests: [String: CheckedContinuation<NDKRPCResponse, Error>] = [:]
     private var timeoutTasks: [String: Task<Void, Never>] = [:]
 
-    init(ndk: NDK, localSigner: NDKPrivateKeySigner, relayUrls: [String]) {
+    init(ndk: NDK, localSigner: NDKPrivateKeySigner, relayURLs: [String]) {
         self.ndk = ndk
         self.localSigner = localSigner
-        self.relayUrls = relayUrls
+        self.relayURLs = relayURLs
     }
 
     deinit {
@@ -234,7 +234,7 @@ public actor NDKNostrRPC {
         timeoutTasks.removeValue(forKey: id)
     }
 
-    private func attemptDirectSend(event: NDKEvent, to relayUrls: [String]) async {
+    private func attemptDirectSend(event: NDKEvent, to relayURLs: [String]) async {
         for url in relayUrls {
             if let relay = (await ndk.relays).first(where: { $0.url == url }) {
                 NDKLogger.log(.debug, category: .auth, "Attempting direct send to \(url)")

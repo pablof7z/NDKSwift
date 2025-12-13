@@ -40,7 +40,7 @@ public actor NDKEventManager {
         NDKLogger.log(.debug, category: .event, "Event kind: \(event.kind), Selected \(targetRelayUrls.count) relays for publishing: \(targetRelayUrls)")
 
         // Use common publish implementation
-        return try await publishToRelays(event: event, relayUrls: targetRelayUrls, logRawJSON: logRawJSON, useOptimistic: true)
+        return try await publishToRelays(event: event, relayURLs: targetRelayUrls, logRawJSON: logRawJSON, useOptimistic: true)
     }
 
     /// Publish an event to specific relays
@@ -50,26 +50,26 @@ public actor NDKEventManager {
     ///
     /// - Parameters:
     ///   - event: The event to publish (must be signed)
-    ///   - relayUrls: Set of relay URLs to publish to
+    ///   - relayURLs: Set of relay URLs to publish to
     ///   - logRawJSON: If true, logs the raw JSON of the event for debugging
     /// - Returns: Set of relays that successfully accepted the event
     /// - Throws: `NDKError.invalidContent` if the event is not signed,
     ///           `NDKError.notConfigured` if NDK reference is lost,
     ///           `NDKError.publishError` if publishing fails
-    public func publish(event: NDKEvent, to relayUrls: Set<String>, logRawJSON: Bool = false) async throws -> Set<NDKRelay> {
+    public func publish(event: NDKEvent, to relayURLs: Set<String>, logRawJSON: Bool = false) async throws -> Set<NDKRelay> {
         // Use common publish implementation without optimistic publishing for explicit relay selection
-        return try await publishToRelays(event: event, relayUrls: relayUrls, logRawJSON: logRawJSON, useOptimistic: false)
+        return try await publishToRelays(event: event, relayURLs: relayURLs, logRawJSON: logRawJSON, useOptimistic: false)
     }
 
     /// Common implementation for publishing events
     ///
     /// - Parameters:
     ///   - event: The event to publish
-    ///   - relayUrls: Target relay URLs
+    ///   - relayURLs: Target relay URLs
     ///   - logRawJSON: Whether to log raw JSON
     ///   - useOptimistic: Whether to use optimistic publishing
     /// - Returns: Set of relays that accepted the event
-    private func publishToRelays(event: NDKEvent, relayUrls: Set<String>, logRawJSON: Bool, useOptimistic: Bool) async throws -> Set<NDKRelay> {
+    private func publishToRelays(event: NDKEvent, relayURLs: Set<String>, logRawJSON: Bool, useOptimistic: Bool) async throws -> Set<NDKRelay> {
         guard let ndk = ndk else {
             throw NDKError.notConfigured(ErrorMessageConstants.Messages.ndkReferenceLost)
         }
@@ -89,7 +89,7 @@ public actor NDKEventManager {
         // Always handle optimistic publishing (except for relay lists)
         if useOptimistic && event.kind != 10002 {
             do {
-                try await cache.addUnpublishedEvent(event, relays: relayUrls)
+                try await cache.addUnpublishedEvent(event, relays: relayURLs)
             } catch {
                 NDKLogger.log(.warning, category: .cache, "Failed to add unpublished event to cache: \(error)")
             }
@@ -108,7 +108,7 @@ public actor NDKEventManager {
         }
 
         // Prepare relays for publishing (add to pool and start connecting)
-        let targetRelays = await ndk.pool.prepareRelays(Array(relayUrls), autoConnect: true)
+        let targetRelays = await ndk.pool.prepareRelays(Array(relayURLs), autoConnect: true)
 
         // Publish to relays
         var publishedRelays = Set<NDKRelay>()

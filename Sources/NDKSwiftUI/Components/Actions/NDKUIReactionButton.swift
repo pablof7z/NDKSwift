@@ -366,7 +366,7 @@ public extension NDKUIReactionButton {
 #if DEBUG
     struct NDKUIReactionButton_Previews: PreviewProvider {
         static var previews: some View {
-            let mockNDK = NDK(relayUrls: [])
+            let mockNDK = NDK(relayURLs: [])
 
             VStack(spacing: 20) {
                 // Different styles

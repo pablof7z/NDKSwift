@@ -170,7 +170,7 @@ public struct NDKUIDisplayName: View {
     struct NDKUIDisplayName_Previews: PreviewProvider {
         static var previews: some View {
             // Create a mock NDK for preview
-            let mockNDK = NDK(relayUrls: [])
+            let mockNDK = NDK(relayURLs: [])
 
             VStack(alignment: .leading, spacing: 16) {
                 Group {

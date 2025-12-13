@@ -193,7 +193,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
                 ]
 
                 // Use resolved wallet relays
-                let relayUrls: Set<String>? = resolvedWalletRelays.setOrNil
+                let relayURLs: Set<String>? = resolvedWalletRelays.setOrNil
 
                 NDKLogger.log(.debug, category: .wallet, "📡 Starting wallet event subscription with \(resolvedWalletRelays.isEmpty ? "default" : "\(resolvedWalletRelays.count) resolved") relays")
 
