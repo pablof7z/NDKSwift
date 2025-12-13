@@ -464,6 +464,7 @@ private class ZapState: ObservableObject {
                 to: recipient,
                 amountSats: Int64(amount),
                 comment: nil, // Could be made configurable
+                preferredType: nil,
                 preferredProvider: preferredProvider
             )
 
