@@ -209,11 +209,8 @@ actor InternalSubscriptionManager {
 
     /// Start monitoring relay connection events
     private func startRelayMonitoring() async {
-        // Ensure pool is available before starting monitoring
-        guard let pool = ndk.pool else {
-            NDKLogger.log(.warning, category: .subscription, "⚠️ [InternalSubManager] Pool not available, skipping relay monitoring")
-            return
-        }
+        // Pool is always available
+        let pool = ndk.pool
 
         relayMonitorTask = Task {
             NDKLogger.log(.info, category: .subscription, "🔍 [InternalSubManager] Starting relay connection monitoring")

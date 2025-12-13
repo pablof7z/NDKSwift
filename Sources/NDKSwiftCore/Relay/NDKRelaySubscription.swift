@@ -166,7 +166,7 @@ actor NDKRelaySubscription {
         // where events arrive before the mapping is established
         NDKLogger.log(.debug, category: .subscription,
                       "📌 [SubGroup] Requesting manager to track subscription ID '\(subId)' for group '\(fingerprint)'")
-        await relay.subscriptionManager?.trackGroupSubscriptionId(self)
+        await relay.subscriptionManager.trackGroupSubscriptionId(self)
 
         // Record REQ message metrics
         await NDKSubscriptionMetrics.recordReqMessage(groupSize: items.count, relay: relay.url)
@@ -295,7 +295,7 @@ actor NDKRelaySubscription {
         }
 
         // Notify manager
-        await relay.subscriptionManager?.onGroupClosed(self)
+        await relay.subscriptionManager.onGroupClosed(self)
     }
 }
 

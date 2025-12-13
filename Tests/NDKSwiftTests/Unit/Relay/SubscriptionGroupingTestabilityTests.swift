@@ -13,8 +13,7 @@ final class SubscriptionGroupingTestabilityTests: XCTestCase {
         ndk = NDK()
         relay = NDKRelay(url: "wss://test.relay.com")
         relay.ndk = ndk
-        manager = NDKRelaySubscriptionManager(relay: relay)
-        relay.subscriptionManager = manager
+        manager = relay.subscriptionManager
     }
 
     override func tearDown() async throws {

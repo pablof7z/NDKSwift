@@ -223,11 +223,11 @@ public final class NDKSubscription<T> {
         isLoading = true
         error = nil
 
-        // Use the new data requirement manager if available
-        if let requirementManager = ndk.dataRequirementManager {
-            NDKLogger.log(.debug, category: .subscription, "✅ Found dataRequirementManager, registering requirement", correlationId: correlationId)
+        // Use the data requirement manager
+        let requirementManager = ndk.dataRequirementManager
+        NDKLogger.log(.debug, category: .subscription, "✅ Using dataRequirementManager, registering requirement", correlationId: correlationId)
 
-            let (handle, eventStream, relayUpdateStream) = await requirementManager.registerRequirement(
+        let (handle, eventStream, relayUpdateStream) = await requirementManager.registerRequirement(
                 filter: filter,
                 maxAge: maxAge,
                 cachePolicy: cachePolicy,
@@ -258,13 +258,6 @@ public final class NDKSubscription<T> {
             }
 
             NDKLogger.log(.trace, category: .subscription, "✅ Requirement registered with handle", correlationId: correlationId)
-        } else {
-            // No data requirement manager available
-            NDKLogger.log(.error, category: .subscription, "❌ No data requirement manager available! Data source will not receive events", correlationId: correlationId)
-            if ndk.debugMode {
-                NDKLogger.log(.warning, category: .general, "[NDKSubscription] No data requirement manager available")
-            }
-        }
 
         isLoading = false
     }

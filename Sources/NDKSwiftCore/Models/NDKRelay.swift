@@ -342,7 +342,7 @@ actor RelayStateActor {
 ///     print("Relay state: \(state)")
 /// }
 /// ```
-public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable, @unchecked Sendable {
+public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
     public var id: String { url }
     /// Relay URL
     public let url: RelayURL
@@ -382,7 +382,10 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable, @
     private let stateActor = RelayStateActor()
 
     /// Subscription manager for this relay (handles grouping and merging)
-    var subscriptionManager: NDKRelaySubscriptionManager?
+    /// Lazy to avoid initialization order issues with self
+    lazy var subscriptionManager: NDKRelaySubscriptionManager = {
+        NDKRelaySubscriptionManager(relay: self)
+    }()
 
     /// Get the current connection (internal use only)
     var connection: NDKRelayConnection? {
@@ -395,7 +398,6 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable, @
 
     public init(url: RelayURL) {
         self.url = url
-        subscriptionManager = NDKRelaySubscriptionManager(relay: self)
     }
 
     // MARK: - Public Properties (Async)
@@ -731,7 +733,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable, @
         if let subId = subscriptionId {
             NDKLogger.log(.trace, category: .subscription,
                           "🔄 [Relay] Routing EVENT for subscription '\(subId)' to relay subscription manager")
-            await subscriptionManager?.routeEvent(event, subscriptionId: subId, from: self)
+            await subscriptionManager.routeEvent(event, subscriptionId: subId, from: self)
         }
 
         // Also route to NDK for global subscription management
@@ -753,7 +755,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable, @
                       "🔚 [Relay] Received EOSE for subscription '\(subscriptionId)' on relay \(url)")
 
         // Route through relay subscription manager first
-        await subscriptionManager?.routeEOSE(subscriptionId: subscriptionId)
+        await subscriptionManager.routeEOSE(subscriptionId: subscriptionId)
 
         // Also route to NDK for global subscription management
         if let ndk = ndk {
@@ -866,7 +868,7 @@ extension NDKRelay: NDKRelayConnectionDelegate {
             await fetchRelayInformation()
 
             // Handle relay reconnection for subscription manager
-            await subscriptionManager?.handleRelayReconnection()
+            await subscriptionManager.handleRelayReconnection()
         }
     }
 
@@ -877,7 +879,7 @@ extension NDKRelay: NDKRelayConnectionDelegate {
             await self.stateActor.clearAllSubscriptions()
 
             // Handle relay disconnection for subscription manager
-            await subscriptionManager?.handleRelayDisconnection()
+            await subscriptionManager.handleRelayDisconnection()
 
             if let error = error {
                 await handleConnectionFailure(error)
@@ -964,12 +966,12 @@ public extension NDKRelay {
 
     /// Add a subscription to this relay's subscription manager
     internal func addSubscription(_ subscription: NDKSubscriptionCoordinator, filters: [NDKFilter]) async {
-        await subscriptionManager?.addSubscription(subscription, filters: filters)
+        await subscriptionManager.addSubscription(subscription, filters: filters)
     }
 
     /// Remove a subscription from this relay's subscription manager
     internal func removeSubscription(_ subscription: NDKSubscriptionCoordinator) async {
-        await subscriptionManager?.removeSubscription(subscription)
+        await subscriptionManager.removeSubscription(subscription)
     }
 
     /// Track a subscription group (called by NDKRelaySubscription)
