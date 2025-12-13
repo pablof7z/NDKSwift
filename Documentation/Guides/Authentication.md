@@ -594,6 +594,6 @@ The authentication API has been simplified:
 
 ## Next Steps
 
-- Learn about [NDK Signers](API_REFERENCE.md#signers) for different authentication methods
-- Explore [Profile Management](API_REFERENCE.md#ndkuser) for user profiles
-- See [Examples](EXAMPLES.md) for more authentication patterns
+- Learn about [NDK Signers](../Reference/API.md#signers) for different authentication methods
+- Explore [Profile Management](../Reference/API.md#ndkuser) for user profiles
+- See [Examples](../Examples/) for more authentication patterns

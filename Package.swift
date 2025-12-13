@@ -23,6 +23,7 @@ let package = Package(
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "6.29.3"),
         .package(url: "https://github.com/pablof7z/CashuSwift.git", branch: "main"),
         .package(url: "https://github.com/21-DOT-DEV/swift-secp256k1", from: "0.19.0"),
+        .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.0.0"),
     ],
     targets: [
         .target(

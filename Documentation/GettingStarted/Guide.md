@@ -512,9 +512,9 @@ for relay in health.filter({ !$0.isHealthy }) {
 
 ## Next Steps
 
-- Check out the [API Reference](API_REFERENCE.md) for detailed documentation
-- See [Examples](EXAMPLES.md) for more code samples
-- Learn about [Architecture](ARCHITECTURE.md) for advanced usage
+- Check out the [API Reference](../Reference/API.md) for detailed documentation
+- See [Examples](../Examples/) for more code samples
+- Learn about [Architecture](../Architecture/Overview.md) for advanced usage
 - Explore the [Examples directory](../Examples/) for runnable demos
 
 ## Troubleshooting
