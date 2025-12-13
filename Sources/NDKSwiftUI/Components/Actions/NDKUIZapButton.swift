@@ -439,7 +439,10 @@ private class ZapState: ObservableObject {
     }
 
     func sendZap(ndk: NDK, event: NDKEvent, amount: Int) async {
-        let zapManager = ndk.zapManager
+        guard let zapManager = ndk.zapManager else {
+            lastError = ZapError.zapManagerNotAvailable
+            return
+        }
 
         isLoading = true
         lastError = nil
@@ -454,7 +457,9 @@ private class ZapState: ObservableObject {
                 event: event,
                 to: recipient,
                 amountSats: Int64(amount),
-                comment: nil // Could be made configurable
+                comment: nil, // Could be made configurable
+                preferredType: nil,
+                preferredProvider: nil
             )
 
             lastZapSucceeded = true

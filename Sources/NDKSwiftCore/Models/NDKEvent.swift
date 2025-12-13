@@ -413,4 +413,28 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
         // Use nevent if the event has non-standard kind or has important tags
         return kind != EventKind.textNote || !referencedEventIds.isEmpty || !referencedPubkeys.isEmpty
     }
+
+    /// Zap this event (requires NDK instance with zap manager)
+    public func zap(
+        with ndk: NDK,
+        amountSats: Int64,
+        comment: String? = nil,
+        preferredType: ZapType? = nil
+    ) async throws -> ZapResult {
+        guard let zapManager = ndk.zapManager else {
+            throw NDKError.configurationError("No zap manager configured")
+        }
+
+        let author = NDKUser(pubkey: pubkey)
+        await author.setNdk(ndk)
+
+        return try await zapManager.zap(
+            event: self,
+            to: author,
+            amountSats: amountSats,
+            comment: comment,
+            preferredType: preferredType,
+            preferredProvider: nil
+        )
+    }
 }

@@ -66,6 +66,7 @@ public enum ZapError: LocalizedError {
     case endpointDoesNotSupportZaps
     case amountOutOfRange(min: Int64, max: Int64)
     case signerNotAvailable
+    case zapManagerNotAvailable
 
     public var errorDescription: String? {
         switch self {
@@ -111,6 +112,8 @@ public enum ZapError: LocalizedError {
             return "Amount out of range: \(min) - \(max) sats"
         case .signerNotAvailable:
             return "No signer available to create zap request"
+        case .zapManagerNotAvailable:
+            return "Zap manager is not available"
         }
     }
 }

@@ -26,6 +26,7 @@ public enum RelayUpdate {
 /// Primary API for declarative data access in NDKSwift
 /// Automatically manages subscriptions, caching, and lifecycle
 @Observable
+@MainActor
 public final class NDKSubscription<T> {
     public private(set) var data: [T] = []
     public private(set) var isLoading: Bool = false
@@ -41,7 +42,7 @@ public final class NDKSubscription<T> {
 
     private var filter: NDKFilter
     private let ndk: NDK
-    private let transform: (NDKEvent) -> T?
+    private let transform: @Sendable (NDKEvent) -> T?
     private let maxAge: TimeInterval
     private let cachePolicy: CachePolicy
     private let relays: Set<RelayURL>?
@@ -75,7 +76,7 @@ public final class NDKSubscription<T> {
     private let stateManager = StateManager()
 
     /// Initialize a data source for NDKEvent objects
-    public convenience init(
+    public convenience nonisolated init(
         ndk: NDK,
         filter: NDKFilter,
         maxAge: TimeInterval = 0,
@@ -109,7 +110,7 @@ public final class NDKSubscription<T> {
     ///   - relays: Optional set of specific relay URLs to query
     ///   - subscriptionId: Optional custom subscription ID to use (for debugging/tracing)
     ///   - transform: Optional transform to convert NDKEvent to custom type
-    public init(
+    public nonisolated init(
         ndk: NDK,
         filter: NDKFilter,
         maxAge: TimeInterval = 0,
@@ -118,7 +119,7 @@ public final class NDKSubscription<T> {
         exclusiveRelays: Bool = false,
         subscriptionId: String? = nil,
         closeOnEose: Bool = false,
-        transform: @escaping (NDKEvent) -> T?
+        transform: @escaping @Sendable (NDKEvent) -> T?
     ) {
         self.ndk = ndk
         self.filter = filter
@@ -163,11 +164,11 @@ public final class NDKSubscription<T> {
     ///   - filter: The NDKFilter describing the data requirement
     ///   - options: Subscription configuration options
     ///   - transform: Optional transform to convert NDKEvent to custom type
-    public init(
+    public nonisolated init(
         ndk: NDK,
         filter: NDKFilter,
         options: NDKSubscriptionOptions,
-        transform: @escaping (NDKEvent) -> T? = { $0 as? T }
+        transform: @escaping @Sendable (NDKEvent) -> T? = { $0 as? T }
     ) {
         self.ndk = ndk
         self.filter = filter

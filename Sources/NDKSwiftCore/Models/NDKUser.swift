@@ -224,6 +224,34 @@ public final class NDKUser: Equatable, Hashable, Sendable {
 
     // MARK: - Payments
 
+    /// Zap this user
+    /// - Parameters:
+    ///   - amountSats: Amount in satoshis
+    ///   - comment: Optional comment
+    ///   - preferredType: Preferred zap type (lightning or nutzap)
+    /// - Returns: Result of the zap operation
+    public func zap(
+        amountSats: Int64,
+        comment: String? = nil,
+        preferredType: ZapType? = nil
+    ) async throws -> ZapResult {
+        guard let ndk = await ndk else {
+            throw NDKError.configurationError(ErrorMessageConstants.Messages.ndkInstanceNotSet)
+        }
+        guard let zapManager = ndk.zapManager else {
+            throw NDKError.configurationError("No zap manager configured")
+        }
+
+        return try await zapManager.zap(
+            event: nil,
+            to: self,
+            amountSats: amountSats,
+            comment: comment,
+            preferredType: preferredType,
+            preferredProvider: nil
+        )
+    }
+
     /// Pay this user using the configured wallet
     /// - Parameters:
     ///   - amount: Amount in satoshis

@@ -25,6 +25,9 @@ public final class NDK: @unchecked Sendable {
     /// Active session data for reactive filters
     public internal(set) var sessionData: NDKSessionData?
 
+    /// Zap manager for handling payments and zaps
+    public var zapManager: (any ZapManaging)?
+
     /// Cache for storing events (always present, defaults to in-memory)
     public var cache: NDKCache
 
@@ -446,7 +449,7 @@ public final class NDK: @unchecked Sendable {
     @MainActor
     public func dataSource<T>(
         filter: NDKFilter,
-        transform: @escaping (NDKEvent) -> T?
+        transform: @escaping @Sendable (NDKEvent) -> T?
     ) -> NDKSubscription<T> {
         NDKSubscription(ndk: self, filter: filter, transform: transform)
     }
@@ -535,7 +538,7 @@ public final class NDK: @unchecked Sendable {
         exclusiveRelays: Bool = false,
         subscriptionId: String? = nil,
         closeOnEose: Bool? = nil,
-        transform: @escaping (NDKEvent) -> T?
+        transform: @escaping @Sendable (NDKEvent) -> T?
     ) -> NDKSubscription<T> {
         // Smart default: close on EOSE if maxAge > 0, otherwise stay open
         let shouldCloseOnEose = closeOnEose ?? (maxAge > 0)
