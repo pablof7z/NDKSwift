@@ -179,7 +179,7 @@ actor NDKRelaySubscription {
 
         // CRITICAL: Register the relay-specific subscription ID with NDKSubscriptionCoordinatorManager
         // This allows events arriving with the relay-generated ID to be routed to the correct subscriptions
-        if let ndk = relay.ndk {
+        if let ndk = await relay.ndk {
             NDKLogger.log(.debug, category: .subscription,
                           "🔗 [SubGroup] Registering relay ID '\(subId)' → fingerprint '\(fingerprint)' with NDKSubscriptionCoordinatorManager")
             await ndk.internalSubscriptionManager.registerRelayIdMapping(relayId: subId, fingerprint: fingerprint)
@@ -286,7 +286,7 @@ actor NDKRelaySubscription {
             await relay.closeSubscription(id: subId)
 
             // Clean up relay ID mapping from NDKSubscriptionCoordinatorManager
-            if relay.ndk != nil {
+            if await relay.ndk != nil {
                 // Note: We would need to add a method to remove the mapping
                 // For now, the mapping will be cleaned up when the subscription is removed
                 NDKLogger.log(.debug, category: .subscription,

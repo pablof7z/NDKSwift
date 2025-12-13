@@ -278,7 +278,7 @@ actor NDKPublishingStrategy {
 
         // Try to connect
         let relay = await ndk.pool.addRelay(normalizedUrl)
-        relay.ndk = ndk
+        await relay.setNDK(ndk)
         do {
             try await relay.connect()
         } catch {

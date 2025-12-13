@@ -197,7 +197,7 @@ public actor NDKPool {
         // Create new relay
         let relay = NDKRelay(url: normalizedUrl)
         if let ndk = ndk {
-            relay.setNDK(ndk)
+            await relay.setNDK(ndk)
         }
         await relay.setOrigin(origin)
         relayMap[normalizedUrl] = relay
