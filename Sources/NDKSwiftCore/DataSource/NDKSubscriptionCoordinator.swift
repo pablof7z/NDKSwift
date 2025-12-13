@@ -440,7 +440,13 @@ actor NDKSubscriptionCoordinator: Hashable {
     func handleEvent(_ event: NDKEvent, from relay: RelayProtocol) async {
         // Call callback if set (new architecture)
         if let onEvent = onEvent {
-            await onEvent(event, relay as! NDKRelay)
+            // Only pass NDKRelay instances to maintain type safety
+            // For other RelayProtocol implementations, we can't guarantee full NDKRelay functionality
+            guard let ndkRelay = relay as? NDKRelay else {
+                NDKLogger.log(.warning, category: .subscription, "Received event from non-NDKRelay relay: \(relay.url)")
+                return
+            }
+            await onEvent(event, ndkRelay)
         }
 
         // Call legacy handlers
@@ -456,7 +462,11 @@ actor NDKSubscriptionCoordinator: Hashable {
     func handleEOSE(from relay: RelayProtocol) async {
         // Call callback if set (new architecture)
         if let onEOSE = onEOSE {
-            await onEOSE(relay as! NDKRelay)
+            guard let ndkRelay = relay as? NDKRelay else {
+                NDKLogger.log(.warning, category: .subscription, "Received EOSE from non-NDKRelay relay: \(relay.url)")
+                return
+            }
+            await onEOSE(ndkRelay)
         }
 
         // Call legacy handlers
