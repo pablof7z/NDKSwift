@@ -107,7 +107,7 @@ public final class NDK: @unchecked Sendable {
     var dataRequirementManager: NDKSubscriptionManager?
 
     /// Initial relay URLs to add after construction
-    private var initialRelayUrls: [RelayURL] = []
+    private var initialRelayURLs: [RelayURL] = []
 
     /// Track whether connect() has been called
     private var hasConnected = false
@@ -156,12 +156,12 @@ public final class NDK: @unchecked Sendable {
 
     /// Initialize NDK with a custom cache instance
     /// - Parameters:
-    ///   - relayUrls: Initial relay URLs to connect to
+    ///   - relayURLs: Initial relay URLs to connect to
     ///   - signer: Optional signer for signing events
     ///   - cache: Custom cache instance. If nil, uses MemoryCache
     ///   - signatureVerificationConfig: Configuration for signature verification
     public init(
-        relayUrls: [RelayURL] = [],
+        relayURLs: [RelayURL] = [],
         signer: NDKSigner? = nil,
         cache: NDKCache? = nil,
         signatureVerificationConfig: NDKSignatureVerificationConfig = .default
@@ -199,7 +199,7 @@ public final class NDK: @unchecked Sendable {
         NDKEventBuilder.setSharedNDK(self)
 
         // Store relay URLs for later initialization
-        initialRelayUrls = relayUrls
+        initialRelayURLs = relayURLs
     }
 
     // MARK: - Relay Management (Delegated to Pool)
@@ -340,18 +340,18 @@ public final class NDK: @unchecked Sendable {
     /// Initialize relays that were passed to the constructor
     /// This should be called before connect() to ensure relays are added
     public func initializeRelays() async {
-        for url in initialRelayUrls {
+        for url in initialRelayURLs {
             await addRelay(url)
         }
-        initialRelayUrls.removeAll() // Clear after adding
+        initialRelayURLs.removeAll() // Clear after adding
     }
 
     /// Initiates WebSocket connections to all relays in the pool.
     /// Connections are managed automatically with reconnection logic.
     public func connect() async {
         // Ensure initial relays are added first
-        if !initialRelayUrls.isEmpty {
-            NDKLogger.log(.info, category: .relay, "Adding \(initialRelayUrls.count) initial relay(s) from configuration")
+        if !initialRelayURLs.isEmpty {
+            NDKLogger.log(.info, category: .relay, "Adding \(initialRelayURLs.count) initial relay(s) from configuration")
             await initializeRelays()
         }
 
