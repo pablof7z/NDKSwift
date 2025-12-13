@@ -8,9 +8,9 @@ final class EventDeletionE2ETests: XCTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
-        NDKLogger.logLevel = .debug
-        NDKLogger.logNetworkTraffic = true
-        NDKLogger.enabledCategories = [.event, .relay, .network, .subscription]
+        NDKLogger.setLogLevel(.debug)
+        NDKLogger.setLogNetworkTraffic(true)
+        NDKLogger.setEnabledCategories([.event, .relay, .network, .subscription])
     }
 
     // MARK: - Basic Deletion Flow

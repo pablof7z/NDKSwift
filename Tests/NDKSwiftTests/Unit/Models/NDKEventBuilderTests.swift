@@ -236,7 +236,7 @@ final class NDKEventBuilderTests: XCTestCase {
         }
     }
 
-    // TODO: Implement addMedia method in NDKEventBuilder
+    // NOTE: addMedia method not yet implemented in NDKEventBuilder
     /*
      func testAddMediaFromBlossomBlob() async throws {
          let blob = BlossomBlob(
@@ -269,7 +269,7 @@ final class NDKEventBuilderTests: XCTestCase {
      }
      */
 
-    // TODO: Implement addMedia method in NDKEventBuilder
+    // NOTE: addMedia method not yet implemented in NDKEventBuilder
     /*
      func testAddMediaWithCustomParameters() async throws {
          let event = try await builder

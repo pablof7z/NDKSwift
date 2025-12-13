@@ -9,8 +9,8 @@ final class BlossomE2ETests: XCTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
-        NDKLogger.logLevel = .debug
-        NDKLogger.enabledCategories = [.general, .network, .event]
+        NDKLogger.setLogLevel(.debug)
+        NDKLogger.setEnabledCategories([.general, .network, .event])
     }
 
     // MARK: - Basic Upload/Download Flow
@@ -37,13 +37,11 @@ final class BlossomE2ETests: XCTestCase {
         // Upload to Blossom
         NDKLogger.log(.info, category: .general, "Uploading file to Blossom servers...")
 
-        let blobs = try await NDKLogger.logTiming(.debug, category: .general, operation: "Blossom upload") {
-            try await ndk.uploadToBlossom(
-                data: testData,
-                mimeType: "text/plain",
-                servers: testBlossomServers
-            )
-        }
+        let blobs = try await ndk.uploadToBlossom(
+            data: testData,
+            mimeType: "text/plain",
+            servers: testBlossomServers
+        )
 
         XCTAssertFalse(blobs.isEmpty, "Should have at least one successful upload")
         NDKLogger.log(.info, category: .general, "✅ Uploaded to \(blobs.count) servers")
@@ -66,9 +64,7 @@ final class BlossomE2ETests: XCTestCase {
 
         let blossomClient = ndk.blossomClient
 
-        let downloadedData = try await NDKLogger.logTiming(.debug, category: .general, operation: "Blossom download") {
-            try await blossomClient.download(sha256: sha256, from: testBlossomServers[0])
-        }
+        let downloadedData = try await blossomClient.download(sha256: sha256, from: testBlossomServers[0])
 
         // Verify content
         let downloadedContent = String(data: downloadedData, encoding: .utf8)

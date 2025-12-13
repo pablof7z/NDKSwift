@@ -291,7 +291,7 @@ class MockAuthRelay: MockRelayProtocol, @unchecked Sendable {
     func simulateAuthSuccess() async {
         updateConnectionState(.authenticated)
         // Trigger retry of pending events
-        // TODO: retryPendingAuthEvents method is not available in NDKEventManager
+        // NOTE: retryPendingAuthEvents method is not available in NDKEventManager
         // if let ndk = ndk {
         //     await ndk.eventManager.retryPendingAuthEvents(for: url)
         // }

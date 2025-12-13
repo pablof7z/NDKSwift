@@ -18,8 +18,8 @@ struct RealDeclarativeDemo {
         print("============================\n")
 
         // Enable reasonable logging
-        NDKLogger.logLevel = .info
-        NDKLogger.logNetworkTraffic = false
+        NDKLogger.setLogLevel(.info)
+        NDKLogger.setLogNetworkTraffic(false)
 
         print("1. Creating NDK instance...")
         let ndk = NDK(relayUrls: [

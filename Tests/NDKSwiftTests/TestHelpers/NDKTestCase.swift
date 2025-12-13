@@ -20,8 +20,8 @@ open class NDKTestCase: XCTestCase {
         try await super.setUp()
 
         // Configure logging for tests
-        NDKLogger.logLevel = .warning // Reduce noise in tests
-        NDKLogger.logNetworkTraffic = false
+        NDKLogger.setLogLevel(.warning) // Reduce noise in tests
+        NDKLogger.setLogNetworkTraffic(false)
 
         // Create temp directory
         tempDirectory = FileManager.default.temporaryDirectory
@@ -197,7 +197,7 @@ open class NDKIntegrationTestCase: NDKTestCase {
         try await super.setUp()
 
         // Enable more logging for integration tests
-        NDKLogger.logLevel = .info
+        NDKLogger.setLogLevel(.info)
     }
 
     /// Creates and connects to test relays
@@ -268,8 +268,8 @@ open class NDKPerformanceTestCase: NDKTestCase {
         try await super.setUp()
 
         // Disable logging for performance tests
-        NDKLogger.logLevel = .off
-        NDKLogger.logNetworkTraffic = false
+        NDKLogger.setLogLevel(.off)
+        NDKLogger.setLogNetworkTraffic(false)
     }
 
     /// Measures performance of an async operation

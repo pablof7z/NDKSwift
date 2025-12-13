@@ -3,7 +3,7 @@ import XCTest
 
 final class RawLoggingIntegrationTest: XCTestCase {
     func testRawLoggingOutput() async throws {
-        // FIXME: This test hangs forever when it can't connect to relays
+        // NOTE: This test may hang if unable to connect to relays
         // The timeout mechanism doesn't seem to work properly
         // See test-suite-improvements.md for details
         throw XCTSkip("Temporarily disabled: Test hangs forever - needs proper timeout mechanism")
@@ -14,7 +14,7 @@ final class RawLoggingIntegrationTest: XCTestCase {
         }
 
         // Enable network traffic logging
-        NDKLogger.logNetworkTraffic = true
+        NDKLogger.setLogNetworkTraffic(true)
 
         // Run the entire test with a timeout to prevent hanging
         try await runWithTimeout(timeout: 15.0) {

@@ -25,7 +25,7 @@ class MockRelayConnectionDelegate: NDKRelayConnectionDelegate {
 final class NDKRelayConnectionTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
-        NDKLogger.logLevel = .debug
+        NDKLogger.setLogLevel(.debug)
     }
 
     // MARK: - Initialization Tests

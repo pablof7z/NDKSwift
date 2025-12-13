@@ -399,41 +399,6 @@ public final class NDK {
 
     // MARK: - Declarative Data Access
 
-    /// Create a declarative data source for observing events
-    ///
-    /// The returned data source automatically manages subscriptions, caching,
-    /// and lifecycle. It's the primary API for accessing Nostr data.
-    ///
-    /// ## Usage
-    /// ```swift
-    /// let profileData = NDKSubscription<NDKUserMetadata>(
-    ///     ndk: ndk,
-    ///     filter: NDKFilter(authors: [pubkey], kinds: [0])
-    /// ) { event in
-    ///     // Transform event to metadata
-    ///     NDKUserMetadata(event: event)
-    /// }
-    /// ```
-    ///
-    /// - Parameters:
-    ///   - filter: The filter to match events against
-    ///   - transform: Optional transform function to convert NDKEvent to custom type
-    /// - Returns: A data source that can be observed for changes
-    @MainActor
-    public func dataSource(
-        filter: NDKFilter
-    ) -> NDKSubscription<NDKEvent> {
-        NDKSubscription(ndk: self, filter: filter) { $0 }
-    }
-
-    @MainActor
-    public func dataSource<T>(
-        filter: NDKFilter,
-        transform: @escaping (NDKEvent) -> T?
-    ) -> NDKSubscription<T> {
-        NDKSubscription(ndk: self, filter: filter, transform: transform)
-    }
-
     /// Observe events matching a filter with automatic subscription management
     ///
     /// This is the primary API for declarative data access in NDKSwift.
