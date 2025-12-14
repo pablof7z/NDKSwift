@@ -48,7 +48,7 @@ public struct NDKClientTagConfig {
 ///     .tag(["t", "nostr"])
 ///     .build()
 /// ```
-public final class NDKEventBuilder {
+public final class NDKEventBuilder: @unchecked Sendable {
     private var pubkey: PublicKey = ""
     private var createdAt: Timestamp = .now
     public private(set) var kind: Kind = EventKind.textNote
