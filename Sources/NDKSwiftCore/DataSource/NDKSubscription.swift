@@ -295,6 +295,8 @@ public final class NDKSubscription<T> {
             flushTask = Task { [weak self] in
                 // Wait 1ms for more events to arrive
                 try? await Task.sleep(for: .milliseconds(1))
+                // Check cancellation after sleep (deinit may have cancelled us)
+                guard !Task.isCancelled else { return }
                 await self?.flushBatch()
             }
         } else {
@@ -312,8 +314,10 @@ public final class NDKSubscription<T> {
         flushTask = nil
 
         // Single MainActor update for entire batch
-        await MainActor.run {
-            data.append(contentsOf: batch)
+        // Use weak self to prevent crash if subscription is deallocated
+        // during the await (race between deinit and MainActor scheduling)
+        await MainActor.run { [weak self] in
+            self?.data.append(contentsOf: batch)
         }
     }
 
