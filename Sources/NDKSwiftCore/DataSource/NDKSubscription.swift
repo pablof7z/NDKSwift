@@ -74,6 +74,12 @@ public final class NDKSubscription<T> {
         }
     }
 
+    /// Batch buffer for MainActor updates
+    /// Accumulates events and flushes them in a single MainActor operation
+    /// This eliminates UI flickering when loading bulk data from cache
+    private var pendingBatch: [T] = []
+    private var flushTask: Task<Void, Never>?
+
     /// Initialize a data source for NDKEvent objects
     public convenience init(
         ndk: NDK,
@@ -209,6 +215,7 @@ public final class NDKSubscription<T> {
     deinit {
         NDKLogger.log(.trace, category: .subscription, "🔚 NDKSubscription deinit - Cleaning up resources", correlationId: correlationId)
         task?.cancel()
+        flushTask?.cancel()
         eventsContinuation.finish()
         relayUpdatesContinuation.finish()
         let handle = requirementHandle
@@ -276,15 +283,37 @@ public final class NDKSubscription<T> {
         }
 
         if let transformed = transform(event) {
-            // Yield to AsyncStream
+            // Yield to AsyncStream immediately (for programmatic consumers)
             eventsContinuation.yield(transformed)
 
-            // Update @Published property on MainActor
-            await MainActor.run {
-                data.append(transformed)
+            // Add to pending batch for UI update
+            pendingBatch.append(transformed)
+
+            // Cancel previous flush task and schedule new one
+            // Events arriving within 1ms get batched together
+            flushTask?.cancel()
+            flushTask = Task { [weak self] in
+                // Wait 1ms for more events to arrive
+                try? await Task.sleep(for: .milliseconds(1))
+                await self?.flushBatch()
             }
         } else {
             NDKLogger.log(.debug, category: .subscription, "❌ [NDKSubscription] Transform failed - event not added to data - id: \(event.id.prefix(10)), correlationId: \(correlationId)")
+        }
+    }
+
+    /// Flush pending batch to MainActor
+    /// Updates the observable data array in a single operation
+    private func flushBatch() async {
+        guard !pendingBatch.isEmpty else { return }
+
+        let batch = pendingBatch
+        pendingBatch.removeAll()
+        flushTask = nil
+
+        // Single MainActor update for entire batch
+        await MainActor.run {
+            data.append(contentsOf: batch)
         }
     }
 
@@ -304,6 +333,11 @@ public final class NDKSubscription<T> {
         NDKLogger.log(.info, category: .subscription, "🔄 Refreshing data source", correlationId: correlationId)
         data.removeAll()
         await processedEventIds.clear()
+
+        // Clear pending batch
+        flushTask?.cancel()
+        flushTask = nil
+        pendingBatch.removeAll()
 
         if let handle = requirementHandle {
             NDKLogger.log(.trace, category: .subscription, "Releasing existing requirement handle", correlationId: correlationId)
@@ -555,6 +589,11 @@ public final class NDKSubscription<T> {
 
         // Clear processed events (thread-safe via actor)
         await processedEventIds.clear()
+
+        // Clear pending batch
+        flushTask?.cancel()
+        flushTask = nil
+        pendingBatch.removeAll()
 
         // Clear current data
         await MainActor.run {
