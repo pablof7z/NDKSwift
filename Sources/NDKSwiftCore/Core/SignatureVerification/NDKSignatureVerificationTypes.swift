@@ -105,7 +105,7 @@ public enum NDKSignatureVerificationResult: Sendable {
 ///         print("Invalid signature detected from \(relay.url)")
 ///         // Log to analytics, notify user, etc.
 ///     }
-///     
+///
 ///     func relayBlacklisted(_ relay: RelayProtocol) {
 ///         print("Relay blacklisted: \(relay.url)")
 ///         // Update UI, save to persistent blacklist, etc.
@@ -114,7 +114,7 @@ public enum NDKSignatureVerificationResult: Sendable {
 /// ```
 public protocol NDKSignatureVerificationDelegate: AnyObject, Sendable {
     /// Called when an invalid signature is detected
-    /// 
+    ///
     /// This method is called on the main thread when signature verification fails.
     /// The event will not be processed further by NDK.
     ///
@@ -124,7 +124,7 @@ public protocol NDKSignatureVerificationDelegate: AnyObject, Sendable {
     func signatureVerificationFailed(for event: NDKEvent, from relay: RelayProtocol)
 
     /// Called when a relay is blacklisted for providing invalid signatures
-    /// 
+    ///
     /// This occurs when `autoBlacklistInvalidRelays` is enabled in the configuration
     /// and a relay provides an event with an invalid signature.
     ///

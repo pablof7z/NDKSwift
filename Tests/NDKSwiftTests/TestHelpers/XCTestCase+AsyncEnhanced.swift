@@ -1,5 +1,5 @@
-import XCTest
 @testable import NDKSwiftCore
+import XCTest
 
 // MARK: - Enhanced Async Test Utilities
 
@@ -19,7 +19,7 @@ extension XCTestCase {
         _ condition: @escaping () async throws -> Bool
     ) async {
         let deadline = Date().addingTimeInterval(timeout)
-        
+
         while Date() < deadline {
             do {
                 if try await condition() {
@@ -28,15 +28,15 @@ extension XCTestCase {
             } catch {
                 // Continue polling even if condition throws
             }
-            
+
             try? await Task.sleep(nanoseconds: UInt64(pollingInterval * 1_000_000_000))
         }
-        
+
         // Timeout reached
         let failureMessage = message ?? "Condition did not become true within \(timeout) seconds"
         XCTFail(failureMessage, file: file, line: line)
     }
-    
+
     /// Asserts that an AsyncSequence produces the expected number of elements
     func assertAsyncSequenceCount<S: AsyncSequence>(
         _ sequence: S,
@@ -48,14 +48,14 @@ extension XCTestCase {
     ) async where S.Element: Sendable {
         var count = 0
         let deadline = Date().addingTimeInterval(timeout)
-        
+
         do {
             for try await _ in sequence {
                 count += 1
                 if count >= expectedCount {
                     return // Success
                 }
-                
+
                 if Date() > deadline {
                     break
                 }
@@ -65,11 +65,11 @@ extension XCTestCase {
             XCTFail(failureMessage, file: file, line: line)
             return
         }
-        
+
         let failureMessage = message ?? "Expected \(expectedCount) elements but got \(count) within \(timeout) seconds"
         XCTFail(failureMessage, file: file, line: line)
     }
-    
+
     /// Collects elements from an AsyncSequence until a condition is met or timeout
     func collectFromAsyncSequence<S: AsyncSequence>(
         _ sequence: S,
@@ -80,23 +80,23 @@ extension XCTestCase {
     ) async throws -> [S.Element] where S.Element: Sendable {
         var collected: [S.Element] = []
         let deadline = Date().addingTimeInterval(timeout)
-        
+
         for try await element in sequence {
             collected.append(element)
-            
+
             if await condition(element) {
                 return collected
             }
-            
+
             if Date() > deadline {
                 XCTFail("Timeout waiting for condition in AsyncSequence", file: file, line: line)
                 return collected
             }
         }
-        
+
         return collected
     }
-    
+
     /// Waits for the first element from an AsyncSequence
     func firstFromAsyncSequence<S: AsyncSequence>(
         _ sequence: S,
@@ -110,19 +110,19 @@ extension XCTestCase {
             }
             return nil
         }
-        
+
         let timeoutTask = Task {
             try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
             task.cancel()
         }
-        
+
         let result = try await task.value
         timeoutTask.cancel()
-        
+
         if task.isCancelled && result == nil {
             XCTFail("Timeout waiting for first element from AsyncSequence", file: file, line: line)
         }
-        
+
         return result
     }
 }
@@ -140,22 +140,22 @@ extension XCTestCase {
     ) async -> [T] {
         var events: [T] = []
         let deadline = Date().addingTimeInterval(timeout)
-        
+
         for await event in dataSource.events {
             events.append(event)
             if events.count >= count {
                 return events
             }
-            
+
             if Date() > deadline {
                 break
             }
         }
-        
+
         XCTFail("Expected \(count) events but received \(events.count) within \(timeout) seconds", file: file, line: line)
         return events
     }
-    
+
     /// Waits for EOSE from a data source
     func waitForEOSE(
         from dataSource: NDKSubscription<NDKEvent>,
@@ -164,30 +164,30 @@ extension XCTestCase {
         line: UInt = #line
     ) async {
         var eoseReceived = false
-        
+
         let deadline = Date().addingTimeInterval(timeout)
-        
+
         for await update in dataSource.relayUpdates {
             if case .eose = update {
                 eoseReceived = true
                 break
             }
-            
+
             if case .aggregatedEose = update {
                 eoseReceived = true
                 break
             }
-            
+
             if Date() > deadline {
                 break
             }
         }
-        
+
         if !eoseReceived {
             XCTFail("EOSE not received within \(timeout) seconds", file: file, line: line)
         }
     }
-    
+
     /// Publishes an event and waits for it to be confirmed by at least one relay
     func publishAndWaitForConfirmation(
         event: NDKEvent,
@@ -197,15 +197,15 @@ extension XCTestCase {
         line: UInt = #line
     ) async throws {
         let publishedRelays = try await ndk.publish(event)
-        
+
         if publishedRelays.isEmpty {
             XCTFail("Event was not published to any relays", file: file, line: line)
             return
         }
-        
+
         // Create a filter for the published event
         let filter = NDKFilter(ids: [event.id])
-        
+
         // Wait for the event to be retrievable using the new observe API
         await assertEventually(timeout: timeout, file: file, line: line) {
             let dataSource = ndk.subscribe(filter: filter, maxAge: 0)
@@ -213,7 +213,7 @@ extension XCTestCase {
             return firstEvent != nil
         }
     }
-    
+
     /// Waits for NDK to connect to a minimum number of relays
     func waitForRelayConnections(
         ndk: NDK,
@@ -226,7 +226,7 @@ extension XCTestCase {
             minimumRelays: minimumRelays,
             timeout: timeout
         )
-        
+
         XCTAssertGreaterThanOrEqual(
             connected,
             minimumRelays,
@@ -249,20 +249,20 @@ extension XCTestCase {
     ) async throws -> T {
         var lastError: Error?
         var delay = initialDelay
-        
-        for attempt in 1...maxAttempts {
+
+        for attempt in 1 ... maxAttempts {
             do {
                 return try await operation()
             } catch {
                 lastError = error
-                
+
                 if attempt < maxAttempts {
                     try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
                     delay = min(delay * 2, maxDelay) // Exponential backoff
                 }
             }
         }
-        
+
         throw lastError ?? NSError(domain: "TestRetry", code: 0, userInfo: [NSLocalizedDescriptionKey: "Retry failed"])
     }
 }
@@ -280,7 +280,7 @@ extension XCTestCase {
                     try await operation()
                 }
             }
-            
+
             var results: [T] = []
             for try await result in group {
                 results.append(result)
@@ -288,13 +288,13 @@ extension XCTestCase {
             return results
         }
     }
-    
+
     /// Executes multiple async operations in parallel with a specific type
     func runInParallel<T>(
         _ operation: @escaping (Int) async throws -> T,
         count: Int
     ) async throws -> [T] {
-        let operations = (0..<count).map { index in
+        let operations = (0 ..< count).map { index in
             { try await operation(index) }
         }
         return try await runInParallel(operations: operations)

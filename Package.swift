@@ -17,12 +17,14 @@ let package = Package(
         .library(name: "NDKSwiftNostrDB", targets: ["NDKSwiftNostrDB"]),
         .library(name: "NDKSwiftCashu", targets: ["NDKSwiftCashu"]),
         .library(name: "NDKSwiftUI", targets: ["NDKSwiftUI"]),
+        .library(name: "NDKSwiftTesting", targets: ["NDKSwiftTesting"]),
     ],
     dependencies: [
         .package(url: "https://github.com/krzyzanowskim/CryptoSwift.git", from: "1.8.0"),
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "6.29.3"),
         .package(url: "https://github.com/pablof7z/CashuSwift.git", branch: "main"),
         .package(url: "https://github.com/21-DOT-DEV/swift-secp256k1", from: "0.19.0"),
+        .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.0.0"),
     ],
     targets: [
         .target(
@@ -116,6 +118,12 @@ let package = Package(
                 "NDKSwiftCashu",
             ]
         ),
+        .target(
+            name: "NDKSwiftTesting",
+            dependencies: [
+                "NDKSwiftCore",
+            ]
+        ),
         .testTarget(
             name: "NDKSwiftTests",
             dependencies: [
@@ -123,6 +131,7 @@ let package = Package(
                 "NDKSwiftSQLite",
                 "NDKSwiftNostrDB",
                 "NDKSwiftCashu",
+                "NDKSwiftUI",
             ],
             exclude: ["DisabledTests"],
             resources: [

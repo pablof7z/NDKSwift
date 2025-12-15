@@ -21,8 +21,8 @@ extension NDKSQLiteCache {
             while let row = try cursor.next() {
                 if let jsonString = row["json"] as? String,
                    let jsonData = jsonString.data(using: .utf8),
-                   let profileDict = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] {
-
+                   let profileDict = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any]
+                {
                     // Update display_name if present
                     if let displayName = profileDict["display_name"] as? String {
                         try db.execute(

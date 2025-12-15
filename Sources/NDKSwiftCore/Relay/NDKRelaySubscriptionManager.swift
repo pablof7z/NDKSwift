@@ -12,18 +12,18 @@ actor NDKRelaySubscriptionManager {
     private var subscriptionGroups: [String: NDKRelaySubscription] = [:]
     /// Maps subscription IDs to their groups for event routing
     private var subscriptionIdToGroup: [String: NDKRelaySubscription] = [:]
-    
+
     init(relay: NDKRelay) {
         self.relay = relay
     }
-    
+
     /// Adds a subscription to the manager
     func addSubscription(_ subscription: NDKSubscriptionCoordinator, filters: [NDKFilter]) async {
         guard let relay = relay else { return }
-        
+
         // Record subscription in metrics
         await NDKSubscriptionMetrics.recordSubscription(isGroupable: subscription.isGroupable)
-        
+
         if !subscription.isGroupable {
             // Non-groupable subscriptions execute immediately
             let group = NDKRelaySubscription(
@@ -40,10 +40,11 @@ actor NDKRelaySubscriptionManager {
                 filters,
                 closeOnEose: subscription.closeOnEose
             )
-            
+
             // Find existing group or create new one
             if let existingGroup = subscriptionGroups[fingerprint],
-               await existingGroup.canAcceptNewItems() {
+               await existingGroup.canAcceptNewItems()
+            {
                 await existingGroup.addItem(subscription, filters: filters)
                 // Record that this subscription was grouped
                 await NDKSubscriptionMetrics.recordGroupedSubscription()
@@ -55,7 +56,7 @@ actor NDKRelaySubscriptionManager {
                 )
                 await newGroup.addItem(subscription, filters: filters)
                 subscriptionGroups[fingerprint] = newGroup
-                
+
                 // Schedule execution with delay
                 // Note: These properties are nonisolated on NDKSubscriptionCoordinator
                 let delay = subscription.groupableDelay ?? 0.1
@@ -67,7 +68,7 @@ actor NDKRelaySubscriptionManager {
             }
         }
     }
-    
+
     /// Removes a subscription from the manager
     func removeSubscription(_ subscription: NDKSubscriptionCoordinator) async {
         for (fingerprint, group) in subscriptionGroups {
@@ -81,7 +82,7 @@ actor NDKRelaySubscriptionManager {
             }
         }
     }
-    
+
     /// Called when a group closes
     func onGroupClosed(_ group: NDKRelaySubscription) async {
         subscriptionGroups.removeValue(forKey: group.fingerprint)
@@ -89,49 +90,49 @@ actor NDKRelaySubscriptionManager {
         if let subId = await group.subId {
             subscriptionIdToGroup.removeValue(forKey: subId)
             NDKLogger.log(.debug, category: .subscription,
-                         "🗑️ [SubManager] Removed subscription ID '\(subId)' for closed group '\(group.fingerprint)'")
+                          "🗑️ [SubManager] Removed subscription ID '\(subId)' for closed group '\(group.fingerprint)'")
         }
     }
-    
+
     /// Called when a group starts executing (to track subscription ID)
     func trackGroupSubscriptionId(_ group: NDKRelaySubscription) async {
         if let subId = await group.subId {
             subscriptionIdToGroup[subId] = group
             NDKLogger.log(.debug, category: .subscription,
-                         "📋 [SubManager] Tracking subscription ID '\(subId)' for group '\(group.fingerprint)'")
+                          "📋 [SubManager] Tracking subscription ID '\(subId)' for group '\(group.fingerprint)'")
         }
     }
-    
+
     /// Route an incoming event to the appropriate group
     func routeEvent(_ event: NDKEvent, subscriptionId: String, from relay: NDKRelay) async {
         guard let group = subscriptionIdToGroup[subscriptionId] else {
             NDKLogger.log(.warning, category: .subscription,
-                         "⚠️ No group found for subscription \(subscriptionId)")
+                          "⚠️ No group found for subscription \(subscriptionId)")
             return
         }
-        
+
         await group.handleEvent(event, from: relay)
     }
-    
+
     /// Route EOSE to the appropriate group
     func routeEOSE(subscriptionId: String) async {
         guard let group = subscriptionIdToGroup[subscriptionId] else {
             // Could be an old subscription
             return
         }
-        
+
         await group.handleEOSE(subscriptionId: subscriptionId)
     }
-    
+
     /// Route CLOSED to the appropriate group
     func routeClosed(subscriptionId: String, message: String) async {
         guard let group = subscriptionIdToGroup[subscriptionId] else {
             return
         }
-        
+
         await group.handleClosed(subscriptionId: subscriptionId, message: message)
     }
-    
+
     /// Handles relay disconnection
     func handleRelayDisconnection() async {
         // Cancel all pending executions
@@ -139,7 +140,7 @@ actor NDKRelaySubscriptionManager {
             await group.cancelPendingExecution()
         }
     }
-    
+
     /// Handles relay reconnection
     func handleRelayReconnection() async {
         // Re-execute all active groups
@@ -154,43 +155,43 @@ actor NDKRelaySubscriptionManager {
 // MARK: - Testing Support
 
 #if DEBUG
-extension NDKRelaySubscriptionManager {
-    /// Get current grouping state for testing
-    func debugGroupingState() async -> [String: [String]] {
-        var state: [String: [String]] = [:]
-        for (fingerprint, group) in subscriptionGroups {
-            // Get subscription IDs from the group
-            let subscriptionIds = await group.getSubscriptionIds()
-            state[fingerprint] = subscriptionIds
+    extension NDKRelaySubscriptionManager {
+        /// Get current grouping state for testing
+        func debugGroupingState() async -> [String: [String]] {
+            var state: [String: [String]] = [:]
+            for (fingerprint, group) in subscriptionGroups {
+                // Get subscription IDs from the group
+                let subscriptionIds = await group.getSubscriptionIds()
+                state[fingerprint] = subscriptionIds
+            }
+            return state
         }
-        return state
-    }
-    
-    /// Get count of active subscription groups
-    func debugGroupCount() async -> Int {
-        subscriptionGroups.count
-    }
-    
-    /// Force immediate execution of all pending groups (for testing)
-    func flushPendingGroups() async {
-        for group in subscriptionGroups.values {
-            await group.executeNow()
+
+        /// Get count of active subscription groups
+        func debugGroupCount() async -> Int {
+            subscriptionGroups.count
+        }
+
+        /// Force immediate execution of all pending groups (for testing)
+        func flushPendingGroups() async {
+            for group in subscriptionGroups.values {
+                await group.executeNow()
+            }
+        }
+
+        /// Get detailed information about a specific group
+        func debugInspectGroup(fingerprint: String) async -> GroupInspectionData? {
+            guard let group = subscriptionGroups[fingerprint] else { return nil }
+            return await group.inspectForTesting()
+        }
+
+        /// Debug information about a subscription group
+        struct GroupInspectionData: Sendable {
+            public let fingerprint: String
+            public let isGroupable: Bool
+            public let itemCount: Int
+            public let status: String
+            public let subId: String?
         }
     }
-    
-    /// Get detailed information about a specific group
-    func debugInspectGroup(fingerprint: String) async -> GroupInspectionData? {
-        guard let group = subscriptionGroups[fingerprint] else { return nil }
-        return await group.inspectForTesting()
-    }
-    
-    /// Debug information about a subscription group
-    struct GroupInspectionData: Sendable {
-        public let fingerprint: String
-        public let isGroupable: Bool
-        public let itemCount: Int
-        public let status: String
-        public let subId: String?
-    }
-}
 #endif

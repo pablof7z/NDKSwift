@@ -1,8 +1,8 @@
-import SwiftUI
 import NDKSwiftCore
+import SwiftUI
 
 #if canImport(UIKit)
-import UIKit
+    import UIKit
 #endif
 
 // MARK: - NDKUIFollowButton
@@ -31,7 +31,6 @@ import UIKit
 /// NDKUIFollowButton(ndk: ndk, pubkey: user.pubkey, style: .compact, showFollowText: false)
 /// ```
 public struct NDKUIFollowButton: View {
-
     // MARK: - Properties
 
     private let ndk: NDK
@@ -47,9 +46,9 @@ public struct NDKUIFollowButton: View {
     // MARK: - Supporting Types
 
     public enum ButtonStyle {
-        case standard       // Full button with text
-        case compact        // Icon-based button
-        case minimal        // Text-only button
+        case standard // Full button with text
+        case compact // Icon-based button
+        case minimal // Text-only button
     }
 
     // MARK: - Initialization
@@ -75,7 +74,7 @@ public struct NDKUIFollowButton: View {
         self.confirmUnfollow = confirmUnfollow
 
         // Initialize follow state
-        self._followState = StateObject(wrappedValue: FollowState(targetPubkey: pubkey))
+        _followState = StateObject(wrappedValue: FollowState(targetPubkey: pubkey))
     }
 
     // MARK: - Body
@@ -138,8 +137,8 @@ public struct NDKUIFollowButton: View {
 
         // Haptic feedback
         #if canImport(UIKit)
-        let impact = UIImpactFeedbackGenerator(style: .medium)
-        impact.impactOccurred()
+            let impact = UIImpactFeedbackGenerator(style: .medium)
+            impact.impactOccurred()
         #endif
     }
 
@@ -150,8 +149,8 @@ public struct NDKUIFollowButton: View {
 
             // Success haptic
             #if canImport(UIKit)
-            let feedback = UINotificationFeedbackGenerator()
-            feedback.notificationOccurred(.success)
+                let feedback = UINotificationFeedbackGenerator()
+                feedback.notificationOccurred(.success)
             #endif
         }
     }
@@ -163,8 +162,8 @@ public struct NDKUIFollowButton: View {
 
             // Success haptic
             #if canImport(UIKit)
-            let feedback = UINotificationFeedbackGenerator()
-            feedback.notificationOccurred(.success)
+                let feedback = UINotificationFeedbackGenerator()
+                feedback.notificationOccurred(.success)
             #endif
         }
     }
@@ -271,7 +270,6 @@ public struct NDKUIFollowButton: View {
 /// Observable state for managing follow relationships and contact list updates
 @MainActor
 private class FollowState: ObservableObject {
-
     @Published var isFollowing: Bool = false
     @Published var isLoading: Bool = false
     @Published var error: Error?
@@ -334,9 +332,9 @@ private class FollowState: ObservableObject {
         }
 
         // Update state
-        self.currentContactList = contacts
-        self.currentContactListEvent = latestEvent
-        self.isFollowing = contacts.contains(self.targetPubkey)
+        currentContactList = contacts
+        currentContactListEvent = latestEvent
+        isFollowing = contacts.contains(targetPubkey)
     }
 
     func toggleFollow(ndk: NDK) async {
@@ -409,7 +407,6 @@ private class FollowState: ObservableObject {
         signer: NDKSigner,
         contacts: [String]
     ) async throws -> NDKEvent {
-
         let eventBuilder = NDKEventBuilder(ndk: ndk)
             .kind(EventKind.contacts) // Contact list
             .content(currentContactListEvent?.content ?? "") // Preserve existing content
@@ -435,7 +432,6 @@ private class FollowState: ObservableObject {
 // MARK: - Convenience Extensions
 
 public extension NDKUIFollowButton {
-
     /// Create a compact follow button (icon only)
     static func compact(ndk: NDK, pubkey: String) -> NDKUIFollowButton {
         NDKUIFollowButton(ndk: ndk, pubkey: pubkey, style: .compact, showFollowText: false)
@@ -450,46 +446,46 @@ public extension NDKUIFollowButton {
 // MARK: - Preview
 
 #if DEBUG
-struct NDKUIFollowButton_Previews: PreviewProvider {
-    static var previews: some View {
-        let mockNDK = NDK(relayUrls: [])
-        
-        VStack(spacing: 20) {
-            // Different styles
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Standard Styles")
-                    .font(.headline)
+    struct NDKUIFollowButton_Previews: PreviewProvider {
+        static var previews: some View {
+            let mockNDK = NDK(relayURLs: [])
 
-                HStack(spacing: 16) {
-                    NDKUIFollowButton(ndk: mockNDK, pubkey: "mock_pubkey", style: .standard)
-                    NDKUIFollowButton(ndk: mockNDK, pubkey: "mock_pubkey", style: .compact)
-                    NDKUIFollowButton(ndk: mockNDK, pubkey: "mock_pubkey", style: .minimal)
+            VStack(spacing: 20) {
+                // Different styles
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Standard Styles")
+                        .font(.headline)
+
+                    HStack(spacing: 16) {
+                        NDKUIFollowButton(ndk: mockNDK, pubkey: "mock_pubkey", style: .standard)
+                        NDKUIFollowButton(ndk: mockNDK, pubkey: "mock_pubkey", style: .compact)
+                        NDKUIFollowButton(ndk: mockNDK, pubkey: "mock_pubkey", style: .minimal)
+                    }
+                }
+
+                // Compact variations
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Compact Variations")
+                        .font(.headline)
+
+                    HStack(spacing: 16) {
+                        NDKUIFollowButton.compact(ndk: mockNDK, pubkey: "mock_pubkey")
+                        NDKUIFollowButton(ndk: mockNDK, pubkey: "mock_pubkey", style: .compact, showFollowText: true)
+                    }
+                }
+
+                // Different states (would need state management for proper preview)
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Different States")
+                        .font(.headline)
+
+                    HStack(spacing: 16) {
+                        NDKUIFollowButton(ndk: mockNDK, pubkey: "mock_pubkey") // Not following
+                        // NDKUIFollowButton(ndk: mockNDK, pubkey: "mock_pubkey") // Following (would need state)
+                    }
                 }
             }
-
-            // Compact variations
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Compact Variations")
-                    .font(.headline)
-
-                HStack(spacing: 16) {
-                    NDKUIFollowButton.compact(ndk: mockNDK, pubkey: "mock_pubkey")
-                    NDKUIFollowButton(ndk: mockNDK, pubkey: "mock_pubkey", style: .compact, showFollowText: true)
-                }
-            }
-
-            // Different states (would need state management for proper preview)
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Different States")
-                    .font(.headline)
-
-                HStack(spacing: 16) {
-                    NDKUIFollowButton(ndk: mockNDK, pubkey: "mock_pubkey") // Not following
-                    // NDKUIFollowButton(ndk: mockNDK, pubkey: "mock_pubkey") // Following (would need state)
-                }
-            }
+            .padding()
         }
-        .padding()
     }
-}
 #endif

@@ -17,7 +17,7 @@ public enum NWCMethod: String, CaseIterable {
 // MARK: - NWC Capabilities
 
 public enum NWCCapability: String {
-    case notifications = "notifications"
+    case notifications
     case paymentReceived = "payment_received"
     case paymentSent = "payment_sent"
 }
@@ -391,30 +391,75 @@ public struct PaymentNotification: Codable {
 
 // MARK: - Helper for Any Codable
 
-public struct AnyCodable: Codable, @unchecked Sendable {
-    let value: Any
+@frozen
+public enum AnyCodable: Codable, Sendable {
+    case bool(Bool)
+    case int(Int64)
+    case double(Double)
+    case string(String)
+    case dictionary([String: AnyCodable])
+    case array([AnyCodable])
+    case null
+
+    public var value: Any {
+        switch self {
+        case let .bool(value):
+            return value
+        case let .int(value):
+            return value
+        case let .double(value):
+            return value
+        case let .string(value):
+            return value
+        case let .dictionary(value):
+            return value.mapValues { $0.value }
+        case let .array(value):
+            return value.map { $0.value }
+        case .null:
+            return NSNull()
+        }
+    }
 
     public init(_ value: Any) {
-        self.value = value
+        switch value {
+        case let value as Bool:
+            self = .bool(value)
+        case let value as Int64:
+            self = .int(value)
+        case let value as Int:
+            self = .int(Int64(value))
+        case let value as Double:
+            self = .double(value)
+        case let value as String:
+            self = .string(value)
+        case let value as [String: Any]:
+            self = .dictionary(value.mapValues { AnyCodable($0) })
+        case let value as [Any]:
+            self = .array(value.map { AnyCodable($0) })
+        case is NSNull:
+            self = .null
+        default:
+            self = .null
+        }
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
 
         if let value = try? container.decode(Bool.self) {
-            self.value = value
+            self = .bool(value)
         } else if let value = try? container.decode(Int64.self) {
-            self.value = value
+            self = .int(value)
         } else if let value = try? container.decode(Double.self) {
-            self.value = value
+            self = .double(value)
         } else if let value = try? container.decode(String.self) {
-            self.value = value
+            self = .string(value)
         } else if let value = try? container.decode([String: AnyCodable].self) {
-            self.value = value.mapValues { $0.value }
+            self = .dictionary(value)
         } else if let value = try? container.decode([AnyCodable].self) {
-            self.value = value.map { $0.value }
+            self = .array(value)
         } else if container.decodeNil() {
-            self.value = NSNull()
+            self = .null
         } else {
             throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode value")
         }
@@ -423,23 +468,21 @@ public struct AnyCodable: Codable, @unchecked Sendable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
 
-        switch value {
-        case let value as Bool:
+        switch self {
+        case let .bool(value):
             try container.encode(value)
-        case let value as Int64:
+        case let .int(value):
             try container.encode(value)
-        case let value as Double:
+        case let .double(value):
             try container.encode(value)
-        case let value as String:
+        case let .string(value):
             try container.encode(value)
-        case let value as [String: Any]:
-            try container.encode(value.mapValues { AnyCodable($0) })
-        case let value as [Any]:
-            try container.encode(value.map { AnyCodable($0) })
-        case is NSNull:
+        case let .dictionary(value):
+            try container.encode(value)
+        case let .array(value):
+            try container.encode(value)
+        case .null:
             try container.encodeNil()
-        default:
-            throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: container.codingPath, debugDescription: "Cannot encode value"))
         }
     }
 }

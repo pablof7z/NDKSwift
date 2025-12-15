@@ -55,24 +55,30 @@ public final class NDKSubscription<T> {
     private let correlationId: String
     private let subscriptionId: String?
 
-    // Actor for thread-safe state management
-    private actor StateManager {
-        var processedEventIds = Set<String>()
+    /// Thread-safe set of processed event IDs (protected via actor)
+    private let processedEventIds = ProcessedEventIds()
 
-        func isProcessed(_ eventId: String) -> Bool {
-            processedEventIds.contains(eventId)
+    private actor ProcessedEventIds {
+        private var ids: Set<String> = []
+
+        func contains(_ id: String) -> Bool {
+            ids.contains(id)
         }
 
-        func markProcessed(_ eventId: String) {
-            processedEventIds.insert(eventId)
+        func insert(_ id: String) {
+            ids.insert(id)
         }
 
-        func clearProcessed() {
-            processedEventIds.removeAll()
+        func clear() {
+            ids.removeAll()
         }
     }
 
-    private let stateManager = StateManager()
+    /// Batch buffer for MainActor updates
+    /// Accumulates events and flushes them in a single MainActor operation
+    /// This eliminates UI flickering when loading bulk data from cache
+    private var pendingBatch: [T] = []
+    private var flushTask: Task<Void, Never>?
 
     /// Initialize a data source for NDKEvent objects
     public convenience init(
@@ -128,27 +134,27 @@ public final class NDKSubscription<T> {
         self.relays = relays
         self.exclusiveRelays = exclusiveRelays
         self.closeOnEose = closeOnEose
-        self.groupable = true
-        self.groupableDelay = nil
-        self.groupableDelayType = nil
-        self.correlationId = IDGenerator.randomId(length: 8)
+        groupable = true
+        groupableDelay = nil
+        groupableDelayType = nil
+        correlationId = IDGenerator.randomId(length: 8)
         self.subscriptionId = subscriptionId
 
         NDKLogger.log(.trace, category: .subscription, "🏗️ NDKSubscription init - filter: \(filter), maxAge: \(maxAge), cachePolicy: \(cachePolicy)", correlationId: correlationId)
 
         // Set up the AsyncStream for events
         var continuation: AsyncStream<T>.Continuation!
-        self.events = AsyncStream { cont in
+        events = AsyncStream { cont in
             continuation = cont
         }
-        self.eventsContinuation = continuation
+        eventsContinuation = continuation
 
         // Set up the AsyncStream for relay updates
         var relayUpdatesCont: AsyncStream<RelayUpdate>.Continuation!
-        self.relayUpdates = AsyncStream { cont in
+        relayUpdates = AsyncStream { cont in
             relayUpdatesCont = cont
         }
-        self.relayUpdatesContinuation = relayUpdatesCont
+        relayUpdatesContinuation = relayUpdatesCont
 
         // Start observing immediately
         task = Task { [weak self] in
@@ -172,32 +178,32 @@ public final class NDKSubscription<T> {
         self.ndk = ndk
         self.filter = filter
         self.transform = transform
-        self.maxAge = options.maxAge
-        self.cachePolicy = options.cachePolicy
-        self.relays = options.relays
-        self.exclusiveRelays = options.exclusiveRelays
-        self.closeOnEose = options.closeOnEose ?? false
-        self.groupable = options.groupable
-        self.groupableDelay = options.groupableDelay
-        self.groupableDelayType = options.groupableDelayType
-        self.correlationId = IDGenerator.randomId(length: 8)
-        self.subscriptionId = options.subscriptionId
+        maxAge = options.maxAge
+        cachePolicy = options.cachePolicy
+        relays = options.relays
+        exclusiveRelays = options.exclusiveRelays
+        closeOnEose = options.closeOnEose ?? false
+        groupable = options.groupable
+        groupableDelay = options.groupableDelay
+        groupableDelayType = options.groupableDelayType
+        correlationId = IDGenerator.randomId(length: 8)
+        subscriptionId = options.subscriptionId
 
         NDKLogger.log(.trace, category: .subscription, "🏗️ NDKSubscription init with options - filter: \(filter), maxAge: \(maxAge), cachePolicy: \(cachePolicy)", correlationId: correlationId)
 
         // Set up the AsyncStream for events
         var continuation: AsyncStream<T>.Continuation!
-        self.events = AsyncStream { cont in
+        events = AsyncStream { cont in
             continuation = cont
         }
-        self.eventsContinuation = continuation
+        eventsContinuation = continuation
 
         // Set up the AsyncStream for relay updates
         var relayUpdatesCont: AsyncStream<RelayUpdate>.Continuation!
-        self.relayUpdates = AsyncStream { cont in
+        relayUpdates = AsyncStream { cont in
             relayUpdatesCont = cont
         }
-        self.relayUpdatesContinuation = relayUpdatesCont
+        relayUpdatesContinuation = relayUpdatesCont
 
         // Start observing immediately
         task = Task { [weak self] in
@@ -209,6 +215,7 @@ public final class NDKSubscription<T> {
     deinit {
         NDKLogger.log(.trace, category: .subscription, "🔚 NDKSubscription deinit - Cleaning up resources", correlationId: correlationId)
         task?.cancel()
+        flushTask?.cancel()
         eventsContinuation.finish()
         relayUpdatesContinuation.finish()
         let handle = requirementHandle
@@ -219,15 +226,15 @@ public final class NDKSubscription<T> {
 
     private func startObserving() async {
         NDKLogger.log(.info, category: .subscription, "🔍 NDKSubscription.startObserving() called - filter: \(filter), subscriptionId: \(subscriptionId ?? "auto")", correlationId: correlationId)
-        
+
         isLoading = true
         error = nil
 
-        // Use the new data requirement manager if available
-        if let requirementManager = ndk.dataRequirementManager {
-            NDKLogger.log(.debug, category: .subscription, "✅ Found dataRequirementManager, registering requirement", correlationId: correlationId)
-            
-            let (handle, eventStream, relayUpdateStream) = await requirementManager.registerRequirement(
+        // Use the data requirement manager
+        let requirementManager = ndk.dataRequirementManager
+        NDKLogger.log(.debug, category: .subscription, "✅ Using dataRequirementManager, registering requirement", correlationId: correlationId)
+
+        let (handle, eventStream, relayUpdateStream) = await requirementManager.registerRequirement(
                 filter: filter,
                 maxAge: maxAge,
                 cachePolicy: cachePolicy,
@@ -240,7 +247,7 @@ public final class NDKSubscription<T> {
                 groupableDelayType: groupableDelayType
             )
             requirementHandle = handle
-            
+
             // Process events from the stream
             Task { [weak self] in
                 guard let self = self else { return }
@@ -248,7 +255,7 @@ public final class NDKSubscription<T> {
                     await self.handleEvent(event)
                 }
             }
-            
+
             // Process relay updates from the stream
             Task { [weak self] in
                 guard let self = self else { return }
@@ -256,15 +263,8 @@ public final class NDKSubscription<T> {
                     self.relayUpdatesContinuation.yield(update)
                 }
             }
-            
+
             NDKLogger.log(.trace, category: .subscription, "✅ Requirement registered with handle", correlationId: correlationId)
-        } else {
-            // No data requirement manager available
-            NDKLogger.log(.error, category: .subscription, "❌ No data requirement manager available! Data source will not receive events", correlationId: correlationId)
-            if ndk.debugMode {
-                NDKLogger.log(.warning, category: .general, "[NDKSubscription] No data requirement manager available")
-            }
-        }
 
         isLoading = false
     }
@@ -272,23 +272,52 @@ public final class NDKSubscription<T> {
     // MARK: - Event Handling
 
     private func handleEvent(_ event: NDKEvent) async {
-        // Check if we've already processed this event
-        guard await !stateManager.isProcessed(event.id) else {
+        // Check if we've already processed this event (thread-safe via actor)
+        let alreadyProcessed = await processedEventIds.contains(event.id)
+        if !alreadyProcessed {
+            await processedEventIds.insert(event.id)
+        }
+
+        guard !alreadyProcessed else {
             return
         }
-        await stateManager.markProcessed(event.id)
 
         if let transformed = transform(event) {
-
-            // Yield to AsyncStream
+            // Yield to AsyncStream immediately (for programmatic consumers)
             eventsContinuation.yield(transformed)
 
-            // Update @Published property on MainActor
-            await MainActor.run {
-                data.append(transformed)
+            // Add to pending batch for UI update
+            pendingBatch.append(transformed)
+
+            // Cancel previous flush task and schedule new one
+            // Events arriving within 1ms get batched together
+            flushTask?.cancel()
+            flushTask = Task { [weak self] in
+                // Wait 1ms for more events to arrive
+                try? await Task.sleep(for: .milliseconds(1))
+                // Check cancellation after sleep (deinit may have cancelled us)
+                guard !Task.isCancelled else { return }
+                await self?.flushBatch()
             }
         } else {
             NDKLogger.log(.debug, category: .subscription, "❌ [NDKSubscription] Transform failed - event not added to data - id: \(event.id.prefix(10)), correlationId: \(correlationId)")
+        }
+    }
+
+    /// Flush pending batch to MainActor
+    /// Updates the observable data array in a single operation
+    private func flushBatch() async {
+        guard !pendingBatch.isEmpty else { return }
+
+        let batch = pendingBatch
+        pendingBatch.removeAll()
+        flushTask = nil
+
+        // Single MainActor update for entire batch
+        // Use weak self to prevent crash if subscription is deallocated
+        // during the await (race between deinit and MainActor scheduling)
+        await MainActor.run { [weak self] in
+            self?.data.append(contentsOf: batch)
         }
     }
 
@@ -296,7 +325,7 @@ public final class NDKSubscription<T> {
     /// This needs to be called by the internal subscription system
     public func handleRelayUpdate(_ update: RelayUpdate) async {
         relayUpdatesContinuation.yield(update)
-        
+
         // Also process events directly
         if case let .event(event, _) = update {
             await handleEvent(event)
@@ -307,7 +336,12 @@ public final class NDKSubscription<T> {
     public func refresh() async {
         NDKLogger.log(.info, category: .subscription, "🔄 Refreshing data source", correlationId: correlationId)
         data.removeAll()
-        await stateManager.clearProcessed()
+        await processedEventIds.clear()
+
+        // Clear pending batch
+        flushTask?.cancel()
+        flushTask = nil
+        pendingBatch.removeAll()
 
         if let handle = requirementHandle {
             NDKLogger.log(.trace, category: .subscription, "Releasing existing requirement handle", correlationId: correlationId)
@@ -360,12 +394,12 @@ public final class NDKSubscription<T> {
                         // An event arrived, the event monitoring task will handle it
                         break
 
-                    case .eose(let relay):
+                    case let .eose(relay):
                         activeRelays.insert(relay)
                         eoseReceived.insert(relay)
 
                         // If all active relays sent EOSE and no events
-                        if !activeRelays.isEmpty && activeRelays == eoseReceived && self.data.isEmpty {
+                        if !activeRelays.isEmpty, activeRelays == eoseReceived, self.data.isEmpty {
                             return nil
                         }
 
@@ -406,11 +440,11 @@ public final class NDKSubscription<T> {
     /// // Collect all text notes from the last hour
     /// let subscription = ndk.subscribe(filter: NDKFilter(kinds: [1]), maxAge: 3600)
     /// let events = await subscription.collect(timeout: 5.0)
-    /// 
+    ///
     /// // Collect up to 100 events
     /// let limitedEvents = await subscription.collect(limit: 100)
     /// ```
-    /// 
+    ///
     /// - Note: This method returns immediately when aggregated EOSE is received (using smart timeout logic from ndk-core)
     public func collect(timeout: TimeInterval = 10.0, limit: Int? = nil) async -> [T] {
         var collected: [T] = []
@@ -546,19 +580,24 @@ public final class NDKSubscription<T> {
     /// ## Usage
     /// ```swift
     /// let subscription = ndk.subscribe(filter: NDKFilter(kinds: [1]))
-    /// 
+    ///
     /// // Later, update to show only events from specific authors
     /// await subscription.updateFilter(NDKFilter(kinds: [1], authors: ["pubkey1", "pubkey2"]))
     /// ```
     public func updateFilter(_ newFilter: NDKFilter) async {
         // Update the filter property
-        self.filter = newFilter
+        filter = newFilter
 
         // Cancel current task
         task?.cancel()
 
-        // Clear processed events
-        await stateManager.clearProcessed()
+        // Clear processed events (thread-safe via actor)
+        await processedEventIds.clear()
+
+        // Clear pending batch
+        flushTask?.cancel()
+        flushTask = nil
+        pendingBatch.removeAll()
 
         // Clear current data
         await MainActor.run {
@@ -628,7 +667,7 @@ public final class NDKSubscription<T> {
 
         // Process events from the nested subscription
         for await event in subscription.events {
-            await self.handleEvent(event)
+            await handleEvent(event)
         }
     }
 }

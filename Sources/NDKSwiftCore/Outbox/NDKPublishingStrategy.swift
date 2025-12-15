@@ -132,7 +132,7 @@ actor NDKPublishingStrategy {
             let lastUpdated = await item.getLastUpdated()
 
             // Keep if not completed or recent
-            if status != .succeeded && status != .failed {
+            if status != .succeeded, status != .failed {
                 itemsToKeep[key] = item
             } else if lastUpdated > cutoffDate {
                 itemsToKeep[key] = item
@@ -198,7 +198,6 @@ actor NDKPublishingStrategy {
                 await updateOverallStatus(for: item)
                 return
 
-
             case .rateLimited:
                 await item.updateRelayStatus(relayURL, status: .rateLimited)
                 // Exponential backoff
@@ -263,7 +262,6 @@ actor NDKPublishingStrategy {
         }
     }
 
-
     private func handleAuthChallenge(relay _: NDKRelay) async -> Bool {
         // This would implement NIP-42 auth
         // For now, returning false as auth implementation is relay-specific
@@ -280,7 +278,7 @@ actor NDKPublishingStrategy {
 
         // Try to connect
         let relay = await ndk.pool.addRelay(normalizedUrl)
-        relay.ndk = ndk
+        await relay.setNDK(ndk)
         do {
             try await relay.connect()
         } catch {
@@ -321,31 +319,31 @@ actor NDKPublishingStrategy {
         alreadyPublishedTo: Set<String>
     ) async {
         NDKLogger.log(.info, category: .outbox, "🔍 Waiting for relay discovery for \(missingPubkeys.count) pubkeys for event \(event.id.prefix(8))")
-        
+
         // Create a timeout task
         let timeoutTask = Task {
             try? await Task.sleep(nanoseconds: UInt64(OutboxConstants.relayDiscoveryTimeout * Double(TimeConstants.nanosecondsPerSecond)))
         }
-        
+
         // Track which pubkeys we still need
         var remainingPubkeys = missingPubkeys
         var discoveredRelays = Set<String>()
-        
+
         // Listen for discoveries
         let tracker = ndk.outbox
-        
+
         let discoveryTask = Task {
             for await discovery in tracker.relayDiscoveriesInternal {
                 // Check if this is one of our missing pubkeys
                 if remainingPubkeys.contains(discovery.pubkey) {
                     NDKLogger.log(.debug, category: .outbox, "📡 Found relay info for \(discovery.pubkey.prefix(8))")
-                    
+
                     // Add write relays (for publishing)
                     discoveredRelays.formUnion(discovery.writeRelays)
-                    
+
                     // Remove from remaining
                     remainingPubkeys.remove(discovery.pubkey)
-                    
+
                     // If we found all pubkeys, we're done
                     if remainingPubkeys.isEmpty {
                         break
@@ -353,23 +351,23 @@ actor NDKPublishingStrategy {
                 }
             }
         }
-        
+
         // Wait for either timeout or discovery completion
         await withTaskGroup(of: Void.self) { group in
             group.addTask { await timeoutTask.value }
             group.addTask { await discoveryTask.value }
-            
+
             // Wait for first to complete
             await group.next()
             group.cancelAll()
         }
-        
+
         // Filter out relays we already published to
         let newRelays = discoveredRelays.subtracting(alreadyPublishedTo)
-        
+
         if !newRelays.isEmpty {
             NDKLogger.log(.info, category: .outbox, "📤 Publishing event \(event.id.prefix(8)) to \(newRelays.count) newly discovered relays")
-            
+
             // Publish to the new relays
             for relayURL in newRelays {
                 await publishToRelay(item: OutboxItem(
@@ -383,7 +381,6 @@ actor NDKPublishingStrategy {
             NDKLogger.log(.warning, category: .outbox, "⏱️ Relay discovery timed out for \(remainingPubkeys.count) pubkeys")
         }
     }
-
 }
 
 // MARK: - Supporting Types
@@ -452,7 +449,6 @@ actor OutboxItem {
     func setFailureCount(_ count: Int) {
         failureCount = count
     }
-
 
     func setLastUpdated(_ date: Date) {
         lastUpdated = date
@@ -640,7 +636,7 @@ public struct PublishResult: Sendable {
             return nil
         })
     }
-    
+
     public var willRepublishOnDiscovery: Bool {
         !missingRelayInfoPubkeys.isEmpty
     }

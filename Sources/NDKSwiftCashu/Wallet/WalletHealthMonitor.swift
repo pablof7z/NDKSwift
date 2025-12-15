@@ -1,6 +1,6 @@
+import CashuSwift
 import Foundation
 import NDKSwiftCore
-import CashuSwift
 
 /// Monitors wallet health and relay synchronization status
 /// This component tracks relay event consistency and wallet state health
@@ -11,7 +11,7 @@ public actor WalletHealthMonitor {
         public let relay: NDKRelay
         public let knownEvents: Int
         public let missingEvents: [String]
-        public let extraEvents: [String]  // Events that were deleted but relay still has
+        public let extraEvents: [String] // Events that were deleted but relay still has
         public let isHealthy: Bool
 
         public init(relay: NDKRelay, knownEvents: Int, missingEvents: [String], extraEvents: [String], isHealthy: Bool) {

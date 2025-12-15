@@ -1,6 +1,6 @@
 import Foundation
-import NDKSwiftCore
 import GRDB
+import NDKSwiftCore
 
 extension NDKSQLiteCache {
     static func registerV2MintCachingMigration(_ migrator: inout DatabaseMigrator) {

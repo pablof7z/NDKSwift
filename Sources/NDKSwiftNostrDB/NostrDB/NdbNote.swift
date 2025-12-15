@@ -5,16 +5,16 @@
 //  Created by William Casarin on 2023-07-21.
 //
 
-import Foundation
-import NDKSwiftCore
-import NaturalLanguage
 import CommonCrypto
 import CryptoKit
+import Foundation
+import NaturalLanguage
+import NDKSwiftCore
 import NostrDB
 
 // Stub types for Damus dependencies - will be replaced by NDK layer
 // These are internal to avoid conflicts with NDKSwift types
-internal struct NdbPubkey: Equatable, Hashable, Codable {
+struct NdbPubkey: Equatable, Hashable, Codable {
     let data: Data
     init(_ data: Data) { self.data = data }
 
@@ -25,7 +25,8 @@ internal struct NdbPubkey: Equatable, Hashable, Codable {
         try data.withUnsafeBytes { try body($0.baseAddress!) }
     }
 }
-internal struct NdbNoteId: Equatable, Hashable, Codable {
+
+struct NdbNoteId: Equatable, Hashable, Codable {
     let data: Data
     init(_ data: Data) { self.data = data }
 
@@ -35,26 +36,31 @@ internal struct NdbNoteId: Equatable, Hashable, Codable {
         try data.withUnsafeBytes { try body($0.baseAddress!) }
     }
 }
-internal struct NdbSignature: Codable {
+
+struct NdbSignature: Codable {
     let data: Data
     init(_ data: Data) { self.data = data }
 }
+
 // NdbProfileRecord is defined in NdbProfile.swift as a FlatBuffer type
 // We'll use a different name for our wrapper to avoid conflicts
-internal struct NdbCachedProfile {
+struct NdbCachedProfile {
     let profile: NdbProfile
     let lastFetch: Date
     let receivedAt: Date
 }
-internal struct NdbKeypair {
+
+struct NdbKeypair {
     let pubkey: NdbPubkey
     let privkey: NdbPrivkey?
 }
-internal struct NdbPrivkey {
+
+struct NdbPrivkey {
     let id: Data
     var bytes: [UInt8] { Array(id) }
 }
-internal struct NostrKind: Equatable {
+
+struct NostrKind: Equatable {
     let rawValue: UInt32
     static let text = NostrKind(rawValue: 1)
     static let chat = NostrKind(rawValue: 42)
@@ -68,35 +74,40 @@ internal struct NostrKind: Equatable {
     static let zap = NostrKind(rawValue: 9735)
     init?(rawValue: UInt32) { self.rawValue = rawValue }
 }
-internal struct NdbInvoice {
+
+struct NdbInvoice {
     let description: NdbInvoiceDescription
     let amount: NdbAmount
 }
-internal struct NdbInvoiceDescription {
+
+struct NdbInvoiceDescription {
     let description: String
 }
-internal struct NdbAmount {
+
+struct NdbAmount {
     let amount: UInt64
 }
 
 // Typealiases for backward compatibility within NostrDB files
 // Note: Signature is NOT aliased to avoid conflicts with NDKSwift's Signature type
-internal typealias Pubkey = NdbPubkey
-internal typealias NoteId = NdbNoteId
-internal typealias ProfileRecord = NdbCachedProfile
-internal typealias Keypair = NdbKeypair
-internal typealias Privkey = NdbPrivkey
-internal typealias Invoice = NdbInvoice
-internal typealias InvoiceDescription = NdbInvoiceDescription
-internal typealias Amount = NdbAmount
+typealias Pubkey = NdbPubkey
+typealias NoteId = NdbNoteId
+typealias ProfileRecord = NdbCachedProfile
+typealias Keypair = NdbKeypair
+typealias Privkey = NdbPrivkey
+typealias Invoice = NdbInvoice
+typealias InvoiceDescription = NdbInvoiceDescription
+typealias Amount = NdbAmount
 struct ThreadReply {
     let reply: ReplyRef
     let root: ReplyRef?
-    init?(tags: TagsSequence) { return nil }
+    init?(tags _: TagsSequence) { return nil }
 }
+
 struct ReplyRef {
     let note_id: NoteId
 }
+
 /// Protocol for types that can be extracted from nostr event tags
 protocol TagConvertible {
     static func from_tag(tag: TagSequence) -> Self?
@@ -108,7 +119,7 @@ struct References<T: TagConvertible>: Sequence, IteratorProtocol {
 
     init(tags: TagsSequence) {
         self.tags = tags
-        self.tags_iter = tags.makeIterator()
+        tags_iter = tags.makeIterator()
     }
 
     mutating func next() -> T? {
@@ -128,7 +139,7 @@ extension References {
 
     var last: T? {
         var copy = self
-        var last: T? = nil
+        var last: T?
         while let t = copy.next() {
             last = t
         }
@@ -165,6 +176,7 @@ extension NdbNoteId: TagConvertible {
         return NdbNoteId(id)
     }
 }
+
 struct QuoteId: TagConvertible {
     let id: Data
     var note_id: NoteId { NoteId(id) }
@@ -181,27 +193,34 @@ struct QuoteId: TagConvertible {
         return QuoteId(id: id)
     }
 }
+
 struct NoteRef: TagConvertible {
-    static func from_tag(tag: TagSequence) -> NoteRef? { nil }
+    static func from_tag(tag _: TagSequence) -> NoteRef? { nil }
 }
+
 struct FollowRef: TagConvertible {
-    static func from_tag(tag: TagSequence) -> FollowRef? { nil }
+    static func from_tag(tag _: TagSequence) -> FollowRef? { nil }
 }
+
 struct Hashtag: TagConvertible {
-    static func from_tag(tag: TagSequence) -> Hashtag? { nil }
+    static func from_tag(tag _: TagSequence) -> Hashtag? { nil }
 }
+
 struct ReplaceableParam: TagConvertible {
-    static func from_tag(tag: TagSequence) -> ReplaceableParam? { nil }
+    static func from_tag(tag _: TagSequence) -> ReplaceableParam? { nil }
 }
+
 struct MuteItem: TagConvertible {
-    static func from_tag(tag: TagSequence) -> MuteItem? { nil }
+    static func from_tag(tag _: TagSequence) -> MuteItem? { nil }
 }
+
 struct RefId: TagConvertible {
-    static func from_tag(tag: TagSequence) -> RefId? { nil }
+    static func from_tag(tag _: TagSequence) -> RefId? { nil }
 }
+
 struct CommentItemRef: TagConvertible {
     let content: String
-    static func from_tag(tag: TagSequence) -> CommentItemRef? { nil }
+    static func from_tag(tag _: TagSequence) -> CommentItemRef? { nil }
 }
 
 enum DmEncoding {
@@ -209,15 +228,15 @@ enum DmEncoding {
     case utf8
 }
 
-func decrypt_dm(_ privkey: Privkey?, pubkey: Pubkey, content: String, encoding: DmEncoding) -> String? {
+func decrypt_dm(_: Privkey?, pubkey _: Pubkey, content _: String, encoding _: DmEncoding) -> String? {
     return nil
 }
 
 func hexchar(_ val: UInt8) -> UInt8 {
     if val < 10 {
-        return 48 + val  // '0' + val
+        return 48 + val // '0' + val
     } else {
-        return 97 + val - 10  // 'a' + (val - 10)
+        return 97 + val - 10 // 'a' + (val - 10)
     }
 }
 
@@ -227,7 +246,7 @@ func hex_decode(_ str: String) -> [UInt8]? {
     var index = str.startIndex
     while index < str.endIndex {
         let nextIndex = str.index(index, offsetBy: 2)
-        let byteString = String(str[index..<nextIndex])
+        let byteString = String(str[index ..< nextIndex])
         guard let byte = UInt8(byteString, radix: 16) else { return nil }
         bytes.append(byte)
         index = nextIndex
@@ -289,43 +308,40 @@ class NdbNote: Codable, Equatable, Hashable, @unchecked Sendable {
     let key: NoteKey?
     let note: ndb_note_ptr
 
-    
     private var inner_event: NdbNote? {
-        get {
-            return NdbNote.owned_from_json_cstr(json: content_raw, json_len: content_len)
-        }
+        return NdbNote.owned_from_json_cstr(json: content_raw, json_len: content_len)
     }
 
     init(note: ndb_note_ptr, size: Int, owned: Bool, key: NoteKey?) {
         self.note = note
         self.owned = owned
-        self.count = size
+        count = size
         self.key = key
 
         #if DEBUG_NOTE_SIZE
-        if let owned_size {
-            NdbNote.total_ndb_size += Int(owned_size)
-            NdbNote.notes_created += 1
+            if let owned_size {
+                NdbNote.total_ndb_size += Int(owned_size)
+                NdbNote.notes_created += 1
 
-            print("\(NdbNote.notes_created) ndb_notes, \(NdbNote.total_ndb_size) bytes")
-        }
+                print("\(NdbNote.notes_created) ndb_notes, \(NdbNote.total_ndb_size) bytes")
+            }
         #endif
     }
 
     func to_owned() -> NdbNote {
-        if self.owned {
+        if owned {
             return self
         }
 
-        let buf = malloc(self.count)!
-        memcpy(buf, UnsafeRawPointer(self.note.ptr), self.count)
+        let buf = malloc(count)!
+        memcpy(buf, UnsafeRawPointer(note.ptr), count)
 
         let new_note = ndb_note_ptr(ptr: OpaquePointer(buf))
-        return NdbNote(note: new_note, size: self.count, owned: true, key: self.key)
+        return NdbNote(note: new_note, size: count, owned: true, key: key)
     }
-    
+
     func mark_ownership_moved() {
-        self.owned = false
+        owned = false
     }
 
     var content: String {
@@ -343,27 +359,27 @@ class NdbNote: Codable, Equatable, Hashable, @unchecked Sendable {
     var id: NoteId {
         .init(Data(bytes: ndb_note_id(note.ptr), count: 32))
     }
-    
+
     var raw_note_id: UnsafeMutablePointer<UInt8> {
         ndb_note_id(note.ptr)
     }
 
     func id_matches(other: NdbNote) -> Bool {
-        memcmp(self.raw_note_id, other.raw_note_id, 32) == 0
+        memcmp(raw_note_id, other.raw_note_id, 32) == 0
     }
 
     var sig: NdbSignature {
         .init(Data(bytes: ndb_note_sig(note.ptr), count: 64))
     }
-    
+
     var pubkey: Pubkey {
         .init(Data(bytes: ndb_note_pubkey(note.ptr), count: 32))
     }
-    
+
     var created_at: UInt32 {
         ndb_note_created_at(note.ptr)
     }
-    
+
     var kind: UInt32 {
         ndb_note_kind(note.ptr)
     }
@@ -375,10 +391,10 @@ class NdbNote: Codable, Equatable, Hashable, @unchecked Sendable {
     deinit {
         if self.owned {
             #if DEBUG_NOTE_SIZE
-            NdbNote.total_ndb_size -= Int(count)
-            NdbNote.notes_created -= 1
+                NdbNote.total_ndb_size -= Int(count)
+                NdbNote.notes_created -= 1
 
-            print("\(NdbNote.notes_created) ndb_notes, \(NdbNote.total_ndb_size) bytes")
+                print("\(NdbNote.notes_created) ndb_notes, \(NdbNote.total_ndb_size) bytes")
             #endif
             free(UnsafeMutableRawPointer(note.ptr))
         }
@@ -408,10 +424,10 @@ class NdbNote: Codable, Equatable, Hashable, @unchecked Sendable {
         try container.encode(content, forKey: .content)
         try container.encode(tags, forKey: .tags)
     }
-    
+
     required init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        
+
         let content = try container.decode(String.self, forKey: .content)
         let pubkey = try container.decode(Pubkey.self, forKey: .pubkey)
         let kind = try container.decode(UInt32.self, forKey: .kind)
@@ -419,53 +435,51 @@ class NdbNote: Codable, Equatable, Hashable, @unchecked Sendable {
         let createdAt = try container.decode(UInt32.self, forKey: .created_at)
         let noteId = try container.decode(NoteId.self, forKey: .id)
         let signature = try container.decode(NdbSignature.self, forKey: .sig)
-        
-        guard let note = NdbNote.init(content: content, author: pubkey, kind: kind, tags: tags, createdAt: createdAt, id: noteId, sig: signature) else {
+
+        guard let note = NdbNote(content: content, author: pubkey, kind: kind, tags: tags, createdAt: createdAt, id: noteId, sig: signature) else {
             throw DecodingError.initializationFailed
         }
-        
+
         self.note = note.note
-        self.owned = note.owned
+        owned = note.owned
         note.mark_ownership_moved() // This is done to prevent a double-free error when both `self` and `note` get deinitialized.
-        self.count = note.count
-        self.key = note.key
-        
+        count = note.count
+        key = note.key
     }
-    
+
     enum DecodingError: Error {
         case initializationFailed
     }
 
     #if DEBUG_NOTE_SIZE
-    static var total_ndb_size: Int = 0
-    static var notes_created: Int = 0
+        static var total_ndb_size: Int = 0
+        static var notes_created: Int = 0
     #endif
-    
+
     fileprivate enum NoteConstructionMaterial {
         case keypair(Keypair)
         case manual(Pubkey, NdbSignature, NoteId)
-        
+
         var pubkey: Pubkey {
             switch self {
-            case .keypair(let keypair):
+            case let .keypair(keypair):
                 return keypair.pubkey
-            case .manual(let pubkey, _, _):
+            case let .manual(pubkey, _, _):
                 return pubkey
             }
         }
-        
+
         var privkey: Privkey? {
             switch self {
-            case .keypair(let kp):
+            case let .keypair(kp):
                 return kp.privkey
-            case .manual(_, _, _):
+            case .manual:
                 return nil
             }
         }
     }
-    
-    fileprivate init?(content: String, noteConstructionMaterial: NoteConstructionMaterial, kind: UInt32 = 1, tags: [[String]] = [], createdAt: UInt32 = UInt32(Date().timeIntervalSince1970)) {
 
+    fileprivate init?(content: String, noteConstructionMaterial: NoteConstructionMaterial, kind: UInt32 = 1, tags: [[String]] = [], createdAt: UInt32 = UInt32(Date().timeIntervalSince1970)) {
         var builder = ndb_builder()
         let buflen = MAX_NOTE_SIZE
         let buf = malloc(buflen)
@@ -480,11 +494,11 @@ class NdbNote: Codable, Equatable, Hashable, @unchecked Sendable {
 
         var ok = true
         for tag in tags {
-            ndb_builder_new_tag(&builder);
+            ndb_builder_new_tag(&builder)
             for elem in tag {
-                ok = elem.withCString({ eptr in
-                    return ndb_builder_push_tag_str(&builder, eptr, Int32(elem.utf8.count)) > 0
-                })
+                ok = elem.withCString { eptr in
+                    ndb_builder_push_tag_str(&builder, eptr, Int32(elem.utf8.count)) > 0
+                }
                 if !ok {
                     return nil
                 }
@@ -492,7 +506,7 @@ class NdbNote: Codable, Equatable, Hashable, @unchecked Sendable {
         }
 
         ok = content.withCString { cptr in
-            return ndb_builder_set_content(&builder, cptr, Int32(content.utf8.count)) > 0
+            ndb_builder_set_content(&builder, cptr, Int32(content.utf8.count)) > 0
         }
         if !ok {
             return nil
@@ -500,38 +514,38 @@ class NdbNote: Codable, Equatable, Hashable, @unchecked Sendable {
 
         var n = ndb_note_ptr()
         var len: Int32 = 0
-        
+
         switch noteConstructionMaterial {
         case .keypair:
-            var the_kp: ndb_keypair? = nil
+            var the_kp: ndb_keypair?
 
             if let sec = noteConstructionMaterial.privkey {
                 var kp = ndb_keypair()
-                memcpy(&kp.secret.0, sec.id.bytes, 32);
-                
+                memcpy(&kp.secret.0, sec.id.bytes, 32)
+
                 if ndb_create_keypair(&kp) <= 0 {
                     print("bad keypair")
                 } else {
                     the_kp = kp
                 }
             }
-            
+
             if var the_kp {
                 len = ndb_builder_finalize(&builder, &n.ptr, &the_kp)
             } else {
                 len = ndb_builder_finalize(&builder, &n.ptr, nil)
             }
-            
+
             if len <= 0 {
                 free(buf)
                 return nil
             }
-        case .manual(_, let signature, let noteId):
+        case let .manual(_, signature, noteId):
             var raw_sig = signature.data.byteArray
             var raw_id = noteId.id.byteArray
             ndb_builder_set_sig(&builder, &raw_sig)
             ndb_builder_set_id(&builder, &raw_id)
-            
+
             do {
                 // Finalize note, save length, and ensure it is higher than zero (which signals finalization has succeeded)
                 len = ndb_builder_finalize(&builder, &n.ptr, nil)
@@ -540,43 +554,43 @@ class NdbNote: Codable, Equatable, Hashable, @unchecked Sendable {
                 // SECURITY WARNING: Signature verification disabled - secp256k1 not available
                 // This note is NOT verified and should be treated as untrusted
                 // Signature verification requires secp256k1 integration from NDK layer
-            }
-            catch {
+            } catch {
                 free(buf)
                 return nil
             }
         }
 
-        //guard let n else { return nil }
+        // guard let n else { return nil }
 
-        self.owned = true
-        self.count = Int(len)
-        //self.note = n
+        owned = true
+        count = Int(len)
+        // self.note = n
         let r = realloc(buf, Int(len))
         guard let r else {
             free(buf)
             return nil
         }
 
-        self.note = ndb_note_ptr(ptr: OpaquePointer(r))
-        self.key = nil
+        note = ndb_note_ptr(ptr: OpaquePointer(r))
+        key = nil
     }
 
     convenience init?(content: String, keypair: Keypair, kind: UInt32 = 1, tags: [[String]] = [], createdAt: UInt32 = UInt32(Date().timeIntervalSince1970)) {
         self.init(content: content, noteConstructionMaterial: .keypair(keypair), kind: kind, tags: tags, createdAt: createdAt)
     }
-    
+
     convenience init?(content: String, author: Pubkey, kind: UInt32 = 1, tags: [[String]] = [], createdAt: UInt32 = UInt32(Date().timeIntervalSince1970), id: NoteId, sig: NdbSignature) {
         self.init(content: content, noteConstructionMaterial: .manual(author, sig, id), kind: kind, tags: tags, createdAt: createdAt)
     }
 
     static func owned_from_json(json: String, bufsize: Int = 2 << 18) -> NdbNote? {
         return json.withCString { cstr in
-            return NdbNote.owned_from_json_cstr(
-                json: cstr, json_len: UInt32(json.utf8.count), bufsize: bufsize)
+            NdbNote.owned_from_json_cstr(
+                json: cstr, json_len: UInt32(json.utf8.count), bufsize: bufsize
+            )
         }
     }
-    
+
     func verify() -> Bool {
         // SECURITY: Signature verification disabled - secp256k1 not available
         // Return false to indicate verification cannot be performed
@@ -587,9 +601,9 @@ class NdbNote: Codable, Equatable, Hashable, @unchecked Sendable {
 
     static func owned_from_json_cstr(json: UnsafePointer<CChar>, json_len: UInt32, bufsize: Int = 2 << 18) -> NdbNote? {
         let data = malloc(bufsize)
-        //guard var json_cstr = json.cString(using: .utf8) else { return nil }
+        // guard var json_cstr = json.cString(using: .utf8) else { return nil }
 
-        //json_cs
+        // json_cs
         var note = ndb_note_ptr()
 
         let len = ndb_note_from_json(json, Int32(json_len), &note.ptr, data, Int32(bufsize))
@@ -604,9 +618,9 @@ class NdbNote: Codable, Equatable, Hashable, @unchecked Sendable {
         let new_note_ptr = ndb_note_ptr(ptr: OpaquePointer(new_note))
         return NdbNote(note: new_note_ptr, size: Int(len), owned: true, key: nil)
     }
-    
+
     func get_inner_event() -> NdbNote? {
-        return self.inner_event
+        return inner_event
     }
 }
 
@@ -629,17 +643,17 @@ extension NdbNote {
     }
 
     var known_kind: NostrKind? {
-        return NostrKind.init(rawValue: kind)
+        return NostrKind(rawValue: kind)
     }
 
     var too_big: Bool {
-        return known_kind != .longform && self.content_len > 16000
+        return known_kind != .longform && content_len > 16000
     }
 
     var should_show_event: Bool {
         return !too_big
     }
-    
+
     func is_hellthread(max_pubkeys: Int) -> Bool {
         switch known_kind {
         case .text, .boost, .like, .zap:
@@ -650,54 +664,54 @@ extension NdbNote {
     }
 
     public var referenced_ids: References<NoteId> {
-        References<NoteId>(tags: self.tags)
+        References<NoteId>(tags: tags)
     }
-    
+
     public var referenced_quote_ids: References<QuoteId> {
-        References<QuoteId>(tags: self.tags)
+        References<QuoteId>(tags: tags)
     }
 
     public var referenced_noterefs: References<NoteRef> {
-        References<NoteRef>(tags: self.tags)
+        References<NoteRef>(tags: tags)
     }
 
     public var referenced_follows: References<FollowRef> {
-        References<FollowRef>(tags: self.tags)
+        References<FollowRef>(tags: tags)
     }
 
     public var referenced_pubkeys: References<Pubkey> {
-        References<Pubkey>(tags: self.tags)
+        References<Pubkey>(tags: tags)
     }
 
     public var referenced_hashtags: References<Hashtag> {
-        References<Hashtag>(tags: self.tags)
+        References<Hashtag>(tags: tags)
     }
 
     public var referenced_params: References<ReplaceableParam> {
-        References<ReplaceableParam>(tags: self.tags)
+        References<ReplaceableParam>(tags: tags)
     }
 
     public var referenced_mute_items: References<MuteItem> {
-        References<MuteItem>(tags: self.tags)
+        References<MuteItem>(tags: tags)
     }
-    
+
     public var referenced_comment_items: References<CommentItemRef> {
-        References<CommentItemRef>(tags: self.tags)
+        References<CommentItemRef>(tags: tags)
     }
 
     public var references: References<RefId> {
-        References<RefId>(tags: self.tags)
+        References<RefId>(tags: tags)
     }
-    
+
     func thread_reply() -> ThreadReply? {
-        if self.known_kind != .highlight {
-            return ThreadReply(tags: self.tags)
+        if known_kind != .highlight {
+            return ThreadReply(tags: tags)
         }
         return nil
     }
-    
+
     func highlighted_note_id() -> NoteId? {
-        return ThreadReply(tags: self.tags)?.reply.note_id
+        return ThreadReply(tags: tags)?.reply.note_id
     }
 
     func block_offsets(ndb: Ndb) -> SafeNdbTxn<NdbBlockGroup.BlocksMetadata>? {
@@ -712,17 +726,16 @@ extension NdbNote {
 
         return blocks_txn
     }
-    
+
     func is_content_encrypted() -> Bool {
-        return known_kind == .dm    // Probably other kinds should be listed here
+        return known_kind == .dm // Probably other kinds should be listed here
     }
 
     func get_content(_ keypair: Keypair) -> String {
         if is_content_encrypted() {
             return decrypted(keypair: keypair) ?? "*failed to decrypt content*"
-        }
-        else if known_kind == .highlight {
-            return self.referenced_comment_items.first?.content ?? ""
+        } else if known_kind == .highlight {
+            return referenced_comment_items.first?.content ?? ""
         }
 
         return content
@@ -731,9 +744,8 @@ extension NdbNote {
     func maybe_get_content(_ keypair: Keypair) -> String? {
         if is_content_encrypted() {
             return decrypted(keypair: keypair)
-        }
-        else if known_kind == .highlight {
-            return self.referenced_comment_items.first?.content
+        } else if known_kind == .highlight {
+            return referenced_comment_items.first?.content
         }
 
         return content
@@ -745,11 +757,11 @@ extension NdbNote {
 
         var pubkey = self.pubkey
         // This is our DM, we need to use the pubkey of the person we're talking to instead
-        if our_pubkey == pubkey, let pk = self.referenced_pubkeys.first {
+        if our_pubkey == pubkey, let pk = referenced_pubkeys.first {
             pubkey = pk
         }
 
-        return decrypt_dm(keypair.privkey, pubkey: pubkey, content: self.content, encoding: .base64)
+        return decrypt_dm(keypair.privkey, pubkey: pubkey, content: content, encoding: .base64)
     }
 
     public func direct_replies() -> NoteId? {
@@ -757,62 +769,62 @@ extension NdbNote {
     }
 
     public func thread_id() -> NoteId {
-        guard let root = self.thread_reply()?.root else {
-            return self.id
+        guard let root = thread_reply()?.root else {
+            return id
         }
 
         return root.note_id
     }
 
     public func last_refid() -> NoteId? {
-        return self.referenced_ids.last
+        return referenced_ids.last
     }
 
     func is_reply() -> Bool {
         return thread_reply() != nil
     }
 
-    func note_language(ndb: Ndb, _ keypair: Keypair) -> String? {
+    func note_language(ndb _: Ndb, _ keypair: Keypair) -> String? {
         assert(!Thread.isMainThread, "This function must not be run on the main thread.")
 
         // Rely on Apple's NLLanguageRecognizer to tell us which language it thinks the note is in
         // and filter on only the text portions of the content as URLs and hashtags confuse the language recognizer.
         /*
-        guard let blocks_txn = self.blocks(ndb: ndb) else {
-            return nil
-        }
-        let blocks = blocks_txn.unsafeUnownedValue
+         guard let blocks_txn = self.blocks(ndb: ndb) else {
+             return nil
+         }
+         let blocks = blocks_txn.unsafeUnownedValue
 
-        let originalOnlyText = blocks.blocks(note: self).compactMap {
-                if case .text(let txt) = $0 {
-                    // Replacing right single quotation marks (’) with "typewriter or ASCII apostrophes" (')
-                    // as a workaround to get Apple's language recognizer to predict language the correctly.
-                    // It is important to add this workaround to get the language right because it wastes users' money to send translation requests.
-                    // Until Apple fixes their language model, this workaround will be kept in place.
-                    // See https://en.wikipedia.org/wiki/Apostrophe#Unicode for an explanation of the differences between the two characters.
-                    //
-                    // For example,
-                    // "nevent1qqs0wsknetaju06xk39cv8sttd064amkykqalvfue7ydtg3p0lyfksqzyrhxagf6h8l9cjngatumrg60uq22v66qz979pm32v985ek54ndh8gj42wtp"
-                    // has the note content "It’s a meme".
-                    // Without the character replacement, it is 61% confident that the text is in Turkish (tr) and 8% confident that the text is in English (en),
-                    // which is a wildly incorrect hypothesis.
-                    // With the character replacement, it is 65% confident that the text is in English (en) and 24% confident that the text is in Turkish (tr), which is more accurate.
-                    //
-                    // Similarly,
-                    // "nevent1qqspjqlln6wvxrqg6kzl2p7gk0rgr5stc7zz5sstl34cxlw55gvtylgpp4mhxue69uhkummn9ekx7mqpr4mhxue69uhkummnw3ez6ur4vgh8wetvd3hhyer9wghxuet5qy28wumn8ghj7un9d3shjtnwdaehgu3wvfnsygpx6655ve67vqlcme9ld7ww73pqx7msclhwzu8lqmkhvuluxnyc7yhf3xut"
-                    // has the note content "You’re funner".
-                    // Without the character replacement, it is 52% confident that the text is in Norwegian Bokmål (nb) and 41% confident that the text is in English (en).
-                    // With the character replacement, it is 93% confident that the text is in English (en) and 4% confident that the text is in Norwegian Bokmål (nb).
-                    return txt.replacingOccurrences(of: "’", with: "'")
-                }
-                else {
-                    return nil
-                }
-            }
-            .joined(separator: " ")
-         */
-        
-        let originalOnlyText = self.get_content(keypair)
+         let originalOnlyText = blocks.blocks(note: self).compactMap {
+                 if case .text(let txt) = $0 {
+                     // Replacing right single quotation marks (’) with "typewriter or ASCII apostrophes" (')
+                     // as a workaround to get Apple's language recognizer to predict language the correctly.
+                     // It is important to add this workaround to get the language right because it wastes users' money to send translation requests.
+                     // Until Apple fixes their language model, this workaround will be kept in place.
+                     // See https://en.wikipedia.org/wiki/Apostrophe#Unicode for an explanation of the differences between the two characters.
+                     //
+                     // For example,
+                     // "nevent1qqs0wsknetaju06xk39cv8sttd064amkykqalvfue7ydtg3p0lyfksqzyrhxagf6h8l9cjngatumrg60uq22v66qz979pm32v985ek54ndh8gj42wtp"
+                     // has the note content "It’s a meme".
+                     // Without the character replacement, it is 61% confident that the text is in Turkish (tr) and 8% confident that the text is in English (en),
+                     // which is a wildly incorrect hypothesis.
+                     // With the character replacement, it is 65% confident that the text is in English (en) and 24% confident that the text is in Turkish (tr), which is more accurate.
+                     //
+                     // Similarly,
+                     // "nevent1qqspjqlln6wvxrqg6kzl2p7gk0rgr5stc7zz5sstl34cxlw55gvtylgpp4mhxue69uhkummn9ekx7mqpr4mhxue69uhkummnw3ez6ur4vgh8wetvd3hhyer9wghxuet5qy28wumn8ghj7un9d3shjtnwdaehgu3wvfnsygpx6655ve67vqlcme9ld7ww73pqx7msclhwzu8lqmkhvuluxnyc7yhf3xut"
+                     // has the note content "You’re funner".
+                     // Without the character replacement, it is 52% confident that the text is in Norwegian Bokmål (nb) and 41% confident that the text is in English (en).
+                     // With the character replacement, it is 93% confident that the text is in English (en) and 4% confident that the text is in Norwegian Bokmål (nb).
+                     return txt.replacingOccurrences(of: "’", with: "'")
+                 }
+                 else {
+                     return nil
+                 }
+             }
+             .joined(separator: " ")
+          */
+
+        let originalOnlyText = get_content(keypair)
 
         // If there is no text, there's nothing to use to detect language.
         guard !originalOnlyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -850,9 +862,9 @@ func hex_encode(_ data: Data) -> String {
     return str
 }
 
-extension NdbNote {
+private extension NdbNote {
     /// A generic init error type to help make error handling code more concise
-    fileprivate enum InitError: Error {
+    enum InitError: Error {
         case generic
     }
 }

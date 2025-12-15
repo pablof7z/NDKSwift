@@ -1,8 +1,8 @@
-import SwiftUI
 import NDKSwiftCore
+import SwiftUI
 
 #if canImport(UIKit)
-import UIKit
+    import UIKit
 #endif
 
 // MARK: - NDKUIProfilePicture
@@ -29,7 +29,6 @@ import UIKit
 ///     .onTapGesture { /* handle tap */ }
 /// ```
 public struct NDKUIProfilePicture: View {
-
     // MARK: - Properties
 
     private let ndk: NDK
@@ -126,7 +125,7 @@ public struct NDKUIProfilePicture: View {
         .onDisappear {
             profileTask?.cancel()
         }
-        .onChange(of: pubkey) { _, newPubkey in
+        .onChange(of: pubkey) { _, _ in
             loadProfile()
         }
     }
@@ -210,38 +209,38 @@ private struct TapGestureModifier: ViewModifier {
 // MARK: - Preview
 
 #if DEBUG
-struct NDKUIProfilePicture_Previews: PreviewProvider {
-    static var previews: some View {
-        // Create a mock NDK for preview
-        let mockNDK = NDK(relayUrls: [])
-        
-        VStack(spacing: 20) {
-            // Different sizes
-            HStack(spacing: 16) {
-                NDKUIProfilePicture(ndk: mockNDK, pubkey: "sample_pubkey", size: 30)
-                NDKUIProfilePicture(ndk: mockNDK, pubkey: "sample_pubkey", size: UIConstants.ProfilePictureSize.small)
-                NDKUIProfilePicture(ndk: mockNDK, pubkey: "sample_pubkey", size: UIConstants.ProfilePictureSize.medium)
-                NDKUIProfilePicture(ndk: mockNDK, pubkey: "sample_pubkey", size: UIConstants.ProfilePictureSize.large)
+    struct NDKUIProfilePicture_Previews: PreviewProvider {
+        static var previews: some View {
+            // Create a mock NDK for preview
+            let mockNDK = NDK(relayURLs: [])
+
+            VStack(spacing: 20) {
+                // Different sizes
+                HStack(spacing: 16) {
+                    NDKUIProfilePicture(ndk: mockNDK, pubkey: "sample_pubkey", size: 30)
+                    NDKUIProfilePicture(ndk: mockNDK, pubkey: "sample_pubkey", size: UIConstants.ProfilePictureSize.small)
+                    NDKUIProfilePicture(ndk: mockNDK, pubkey: "sample_pubkey", size: UIConstants.ProfilePictureSize.medium)
+                    NDKUIProfilePicture(ndk: mockNDK, pubkey: "sample_pubkey", size: UIConstants.ProfilePictureSize.large)
+                }
+
+                // With border
+                NDKUIProfilePicture(
+                    ndk: mockNDK,
+                    pubkey: "sample_pubkey",
+                    size: UIConstants.ProfilePictureSize.medium,
+                    borderColor: .blue,
+                    borderWidth: 2
+                )
+
+                // Square with custom corner radius
+                NDKUIProfilePicture(
+                    ndk: mockNDK,
+                    pubkey: "sample_pubkey",
+                    size: UIConstants.ProfilePictureSize.medium,
+                    cornerRadius: 12
+                )
             }
-
-            // With border
-            NDKUIProfilePicture(
-                ndk: mockNDK,
-                pubkey: "sample_pubkey",
-                size: UIConstants.ProfilePictureSize.medium,
-                borderColor: .blue,
-                borderWidth: 2
-            )
-
-            // Square with custom corner radius
-            NDKUIProfilePicture(
-                ndk: mockNDK,
-                pubkey: "sample_pubkey",
-                size: UIConstants.ProfilePictureSize.medium,
-                cornerRadius: 12
-            )
+            .padding()
         }
-        .padding()
     }
-}
 #endif

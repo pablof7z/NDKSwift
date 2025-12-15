@@ -19,7 +19,7 @@ import Foundation
 ///       .content("Hello, Nostr!")
 ///       .tags([["t", "greeting"]])
 /// }
-/// 
+///
 /// // Accessing event properties
 /// print("Event ID: \(event.id)")
 /// print("Author: \(event.pubkey)")
@@ -46,7 +46,6 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
 
     /// Event signature
     public let sig: Signature
-
 
     // MARK: - Initialization
 
@@ -77,10 +76,9 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
-        let id = try GuardHelpers.unwrap(
-            try container.decodeIfPresent(String.self, forKey: .id),
-            error: NDKError.invalidEventID("Event ID is required")
-        )
+        guard let id = try container.decodeIfPresent(String.self, forKey: .id) else {
+            throw NDKError.invalidEventID("Event ID is required")
+        }
 
         let pubkey = try container.decode(String.self, forKey: .pubkey)
         let createdAt = try container.decode(Timestamp.self, forKey: .createdAt)
@@ -88,10 +86,9 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
         let tags = try container.decode([[String]].self, forKey: .tags)
         let content = try container.decode(String.self, forKey: .content)
 
-        let sig = try GuardHelpers.unwrap(
-            try container.decodeIfPresent(String.self, forKey: .sig),
-            error: NDKError.invalidSignature("Event signature is required")
-        )
+        guard let sig = try container.decodeIfPresent(String.self, forKey: .sig) else {
+            throw NDKError.invalidSignature("Event signature is required")
+        }
 
         self.init(
             id: id,
@@ -156,10 +153,9 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
     /// Calculate event ID based on NIP-01 without modifying the event
     public func calculateID() throws -> EventID {
         let serialized = try serializeForID()
-        let data = try GuardHelpers.unwrap(
-            serialized.data(using: .utf8),
-            error: NDKError.invalidInput(message: "Failed to convert serialized event to UTF-8 data")
-        )
+        guard let data = serialized.data(using: .utf8) else {
+            throw NDKError.invalidInput(message: "Failed to convert serialized event to UTF-8 data")
+        }
         let hash = data.sha256()
         return hash.hexString
     }
@@ -173,7 +169,7 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
             createdAt,
             kind,
             tags,
-            content
+            content,
         ]
 
         return try JSONCoding.serializeToString(array)
@@ -257,7 +253,6 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
             return false
         }
     }
-
 
     // MARK: - Convenience
 
@@ -348,7 +343,7 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
             NostrConstants.JSONField.kind: kind,
             NostrConstants.JSONField.tags: tags,
             NostrConstants.JSONField.content: content,
-            NostrConstants.JSONField.sig: sig
+            NostrConstants.JSONField.sig: sig,
         ]
     }
 
@@ -415,5 +410,4 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
         // Use nevent if the event has non-standard kind or has important tags
         return kind != EventKind.textNote || !referencedEventIds.isEmpty || !referencedPubkeys.isEmpty
     }
-
 }

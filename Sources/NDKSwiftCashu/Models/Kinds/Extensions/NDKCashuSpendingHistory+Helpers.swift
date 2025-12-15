@@ -1,13 +1,12 @@
+import CashuSwift
 import Foundation
 import NDKSwiftCore
-import CashuSwift
 
 // MARK: - Helper Extensions for NDKCashuSpendingHistory
 
-extension NDKCashuSpendingHistory {
-
+public extension NDKCashuSpendingHistory {
     /// Extract decrypted spending history data
-    public func decryptedHistoryData(signer: NDKSigner) async throws -> HistoryData {
+    func decryptedHistoryData(signer: NDKSigner) async throws -> HistoryData {
         // Decrypt the content
         let sender = NDKUser(pubkey: event.pubkey)
         let decryptedContent = try await signer.decrypt(
@@ -18,7 +17,8 @@ extension NDKCashuSpendingHistory {
 
         // Parse tags from decrypted content
         guard let tagsData = decryptedContent.data(using: .utf8),
-              let tags = try? JSONCoding.decode([[String]].self, from: tagsData) else {
+              let tags = try? JSONCoding.decode([[String]].self, from: tagsData)
+        else {
             throw NDKError.invalidContent("Failed to parse history event tags")
         }
 
@@ -91,7 +91,7 @@ extension NDKCashuSpendingHistory {
     }
 
     /// Structure containing decrypted history data
-    public struct HistoryData {
+    struct HistoryData {
         public let direction: SpendingDirection?
         public let amount: Int64
         public let memo: String?
@@ -116,14 +116,16 @@ extension NDKCashuSpendingHistory {
             case .in:
                 // Check if it's a mint (from Lightning) or receive (from ecash)
                 if memo?.lowercased().contains("lightning") == true ||
-                   memo?.lowercased().contains("deposit") == true {
+                    memo?.lowercased().contains("deposit") == true
+                {
                     return .mint
                 }
                 return .receive
             case .out:
                 // Check if it's a melt (to Lightning) or send (ecash)
                 if memo?.lowercased().contains("lightning") == true ||
-                   memo?.lowercased().contains("payment") == true {
+                    memo?.lowercased().contains("payment") == true
+                {
                     return .melt
                 }
                 return .send
@@ -156,12 +158,12 @@ extension NDKCashuSpendingHistory {
         }
     }
 
-    public enum TransactionType {
-        case mint    // Lightning -> ecash
-        case melt    // ecash -> Lightning
-        case send    // ecash send
+    enum TransactionType {
+        case mint // Lightning -> ecash
+        case melt // ecash -> Lightning
+        case send // ecash send
         case receive // ecash receive
-        case nutzap  // nutzap
+        case nutzap // nutzap
         case unknown
     }
 }

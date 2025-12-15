@@ -1,93 +1,85 @@
 import Foundation
 
-/// Utilities for formatting byte counts in a human-readable format
-public enum ByteCountFormatters {
-    
-    /// Shared byte count formatter instance
-    ///
-    /// **Concurrency Safety**: `nonisolated(unsafe)` is safe here because:
-    /// - Formatter is created once during lazy initialization
-    /// - Never modified after creation (immutable usage pattern)
-    /// - ByteCountFormatter is safe for concurrent reads
-    private nonisolated(unsafe) static let formatter: ByteCountFormatter = {
-        let formatter = ByteCountFormatter()
-        formatter.allowedUnits = [.useBytes, .useKB, .useMB, .useGB]
-        formatter.countStyle = .binary
-        return formatter
-    }()
+/// Thread-safe utilities for formatting byte counts in a human-readable format
+public actor ByteCountFormatters {
+    public static let shared = ByteCountFormatters()
 
-    /// Shared decimal style formatter (1000 instead of 1024)
-    ///
-    /// **Concurrency Safety**: `nonisolated(unsafe)` is safe here because:
-    /// - Formatter is created once during lazy initialization
-    /// - Never modified after creation (immutable usage pattern)
-    /// - ByteCountFormatter is safe for concurrent reads
-    private nonisolated(unsafe) static let decimalFormatter: ByteCountFormatter = {
-        let formatter = ByteCountFormatter()
-        formatter.allowedUnits = [.useBytes, .useKB, .useMB, .useGB]
-        formatter.countStyle = .decimal
-        return formatter
-    }()
-    
+    private let formatter: ByteCountFormatter
+    private let decimalFormatter: ByteCountFormatter
+
+    private init() {
+        // Binary formatter (1024)
+        let binaryFormatter = ByteCountFormatter()
+        binaryFormatter.allowedUnits = [.useBytes, .useKB, .useMB, .useGB]
+        binaryFormatter.countStyle = .binary
+        self.formatter = binaryFormatter
+
+        // Decimal formatter (1000)
+        let decFormatter = ByteCountFormatter()
+        decFormatter.allowedUnits = [.useBytes, .useKB, .useMB, .useGB]
+        decFormatter.countStyle = .decimal
+        self.decimalFormatter = decFormatter
+    }
+
     /// Format bytes using binary units (1024)
     /// - Parameter bytes: Number of bytes
     /// - Returns: Formatted string (e.g., "1.5 MB")
-    public static func formatBytes(_ bytes: Int64) -> String {
+    public func formatBytes(_ bytes: Int64) -> String {
         return formatter.string(fromByteCount: bytes)
     }
-    
+
     /// Format bytes using decimal units (1000)
     /// - Parameter bytes: Number of bytes
     /// - Returns: Formatted string (e.g., "1.5 MB")
-    public static func formatBytesDecimal(_ bytes: Int64) -> String {
+    public func formatBytesDecimal(_ bytes: Int64) -> String {
         return decimalFormatter.string(fromByteCount: bytes)
     }
-    
+
     /// Format bytes with specific units
     /// - Parameters:
     ///   - bytes: Number of bytes
     ///   - units: Allowed units for formatting
     /// - Returns: Formatted string
-    public static func formatBytes(_ bytes: Int64, allowedUnits units: ByteCountFormatter.Units) -> String {
+    public func formatBytes(_ bytes: Int64, allowedUnits units: ByteCountFormatter.Units) -> String {
         let customFormatter = ByteCountFormatter()
         customFormatter.allowedUnits = units
         customFormatter.countStyle = .binary
         return customFormatter.string(fromByteCount: bytes)
     }
-    
+
     /// Get a human-readable description of memory usage
     /// - Parameter bytes: Number of bytes
     /// - Returns: Description string (e.g., "Using 1.5 MB of memory")
-    public static func memoryUsageDescription(_ bytes: Int64) -> String {
+    public func memoryUsageDescription(_ bytes: Int64) -> String {
         return "Using \(formatBytes(bytes)) of memory"
     }
-    
+
     /// Get a progress description for downloads/uploads
     /// - Parameters:
     ///   - current: Current bytes transferred
     ///   - total: Total bytes to transfer
     /// - Returns: Progress string (e.g., "1.2 MB / 5.0 MB")
-    public static func progressDescription(current: Int64, total: Int64) -> String {
+    public func progressDescription(current: Int64, total: Int64) -> String {
         return "\(formatBytes(current)) / \(formatBytes(total))"
     }
-    
+
     /// Get a transfer rate description
     /// - Parameter bytesPerSecond: Transfer rate in bytes per second
     /// - Returns: Rate string (e.g., "1.5 MB/s")
-    public static func transferRateDescription(_ bytesPerSecond: Int64) -> String {
+    public func transferRateDescription(_ bytesPerSecond: Int64) -> String {
         return "\(formatBytes(bytesPerSecond))/s"
     }
-    
+
     /// Calculate and format download time estimate
     /// - Parameters:
     ///   - remainingBytes: Bytes left to download
     ///   - bytesPerSecond: Current download rate
     /// - Returns: Time estimate string (e.g., "About 2 minutes remaining")
-    public static func downloadTimeEstimate(remainingBytes: Int64, bytesPerSecond: Int64) -> String? {
+    public func downloadTimeEstimate(remainingBytes: Int64, bytesPerSecond: Int64) -> String? {
         guard bytesPerSecond > 0 else { return nil }
-        
+
         let remainingSeconds = Int(remainingBytes / bytesPerSecond)
-        
+
         if remainingSeconds < 60 {
             return "Less than a minute remaining"
         } else if remainingSeconds < 3600 {
@@ -102,31 +94,5 @@ public enum ByteCountFormatters {
                 return "About \(hours) hour\(hours == 1 ? "" : "s") remaining"
             }
         }
-    }
-}
-
-// MARK: - Convenience Extensions
-
-public extension Int64 {
-    /// Format this byte count as a human-readable string
-    var formattedByteCount: String {
-        return ByteCountFormatters.formatBytes(self)
-    }
-    
-    /// Format this byte count using decimal units
-    var formattedByteCountDecimal: String {
-        return ByteCountFormatters.formatBytesDecimal(self)
-    }
-}
-
-public extension Int {
-    /// Format this byte count as a human-readable string
-    var formattedByteCount: String {
-        return ByteCountFormatters.formatBytes(Int64(self))
-    }
-    
-    /// Format this byte count using decimal units
-    var formattedByteCountDecimal: String {
-        return ByteCountFormatters.formatBytesDecimal(Int64(self))
     }
 }

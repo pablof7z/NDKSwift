@@ -45,11 +45,12 @@ public struct NWCConnectionURI {
         guard HexValidator.isValid32ByteHex(pubkey) else {
             throw NDKError.invalidDataFormat("wallet public key", details: ValidationConstants.expectedHex64Got(pubkey.count))
         }
-        self.walletPubkey = pubkey.lowercased()
+        walletPubkey = pubkey.lowercased()
 
         // Parse query parameters
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-              let queryItems = components.queryItems else {
+              let queryItems = components.queryItems
+        else {
             throw NDKError.missingRequired("query parameters", in: "NWC URI")
         }
 
@@ -65,7 +66,7 @@ public struct NWCConnectionURI {
                 throw NDKError.invalidDataFormat("relay URL", details: "Invalid URL: \(relay)")
             }
         }
-        self.relayURLs = relays
+        relayURLs = relays
 
         // Extract secret
         guard let secret = queryItems.first(where: { $0.name == NostrConstants.JSONField.secret })?.value else {
@@ -79,7 +80,7 @@ public struct NWCConnectionURI {
         self.secret = secret.lowercased()
 
         // Extract optional lud16
-        self.lud16 = queryItems.first(where: { $0.name == "lud16" })?.value
+        lud16 = queryItems.first(where: { $0.name == "lud16" })?.value
     }
 
     /// Initialize with individual components
@@ -143,7 +144,7 @@ public struct NWCConnectionURI {
     /// Normalize relay URLs according to NDKSwift conventions
     public func normalizedRelayURLs() -> Set<String> {
         return Set(relayURLs.compactMap { urlString in
-            return URLNormalizer.tryNormalizeRelayUrl(urlString) ?? urlString
+            URLNormalizer.tryNormalizeRelayUrl(urlString) ?? urlString
         })
     }
 }

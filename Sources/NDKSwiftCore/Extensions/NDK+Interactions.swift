@@ -1,6 +1,5 @@
 /// Extensions for NDK to handle user interactions (NIP-09, NIP-18, NIP-25)
 public extension NDK {
-
     // MARK: - NIP-18: Reposts
 
     /// Repost an event
@@ -71,5 +70,6 @@ public extension NDK {
     }
 
     // MARK: - NIP-09: Event Deletion
+
     // Note: Use event.delete() method instead
 }

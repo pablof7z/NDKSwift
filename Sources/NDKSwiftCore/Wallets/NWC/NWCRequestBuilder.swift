@@ -84,16 +84,16 @@ public struct NWCRequestBuilder {
 
 // MARK: - Event Kind Extension
 
-extension Int {
+public extension Int {
     /// NWC request event kind (23194)
-    public static let nostrWalletConnectReq = 23194
+    static let nostrWalletConnectReq = 23194
 
     /// NWC response event kind (23195)
-    public static let nostrWalletConnectRes = 23195
+    static let nostrWalletConnectRes = 23195
 
     /// NWC notification event kind (23196)
-    public static let nostrWalletConnectNotification = 23196
+    static let nostrWalletConnectNotification = 23196
 
     /// NWC info event kind (13194)
-    public static let nostrWalletConnectInfo = 13194
+    static let nostrWalletConnectInfo = 13194
 }

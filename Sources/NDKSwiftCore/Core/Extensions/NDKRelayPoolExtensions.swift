@@ -7,7 +7,6 @@ public extension NDKPool {
         return await getRelay(for: url)
     }
 
-
     /// Get permanent and connected relays
     func permanentAndConnectedRelays() async -> [NDKRelay] {
         // Return all connected relays

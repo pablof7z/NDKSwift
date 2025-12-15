@@ -26,7 +26,8 @@ struct NostrFilter {
     init(ids: [NoteId]? = nil, kinds: [NostrKind]? = nil, referenced_ids: [NoteId]? = nil,
          pubkeys: [Pubkey]? = nil, since: UInt64? = nil, until: UInt64? = nil,
          limit: Int? = nil, authors: [Pubkey]? = nil, hashtag: [String]? = nil,
-         parameter: [String]? = nil, quotes: [NoteId]? = nil) {
+         parameter: [String]? = nil, quotes: [NoteId]? = nil)
+    {
         self.ids = ids
         self.kinds = kinds
         self.referenced_ids = referenced_ids
@@ -56,32 +57,32 @@ struct NostrFilter {
 /// ```
 class NdbFilter {
     private let filterPointer: UnsafeMutablePointer<ndb_filter>
-    
+
     /// Creates a new NdbFilter from a NostrFilter.
     /// - Parameter nostrFilter: The NostrFilter to convert
     /// - Throws: `NdbFilterError.conversionFailed` if the underlying conversion fails
     init(from nostrFilter: NostrFilter) throws {
         do {
-            self.filterPointer = try Self.from(nostrFilter: nostrFilter)
+            filterPointer = try Self.from(nostrFilter: nostrFilter)
         } catch {
             throw NdbFilterError.conversionFailed(error)
         }
     }
-    
+
     /// Provides access to the underlying `ndb_filter` structure.
     /// - Returns: The underlying `ndb_filter` value (not a pointer)
     var ndbFilter: ndb_filter {
         return filterPointer.pointee
     }
-    
+
     /// Provides access to the underlying unsafe pointer when needed for C interop.
-    /// - Warning: The caller must not deallocate this pointer. It will be automatically 
+    /// - Warning: The caller must not deallocate this pointer. It will be automatically
     ///           deallocated when this NdbFilter is destroyed.
     /// - Returns: The unsafe mutable pointer to the underlying ndb_filter
     var unsafePointer: UnsafeMutablePointer<ndb_filter> {
         return filterPointer
     }
-    
+
     /// Creates multiple NdbFilter instances from an array of NostrFilters.
     /// - Parameter nostrFilters: Array of NostrFilter instances to convert
     /// - Returns: Array of NdbFilter instances
@@ -99,7 +100,7 @@ class NdbFilter {
             filterPointer.deallocate()
             throw NdbFilterConversionError.failedToInitialize
         }
-        
+
         // Handle `ids` field
         if let ids = nostrFilter.ids {
             guard ndb_filter_start_field(filterPointer, NDB_FILTER_IDS) == 1 else {
@@ -107,27 +108,26 @@ class NdbFilter {
                 filterPointer.deallocate()
                 throw NdbFilterConversionError.failedToStartField
             }
-            
+
             for noteId in ids {
                 do {
-                    try noteId.withUnsafePointer({ idPointer in
+                    try noteId.withUnsafePointer { idPointer in
                         if ndb_filter_add_id_element(filterPointer, idPointer) != 1 {
                             ndb_filter_destroy(filterPointer)
                             filterPointer.deallocate()
                             throw NdbFilterConversionError.failedToAddElement
                         }
-                    })
-                }
-                catch {
+                    }
+                } catch {
                     ndb_filter_destroy(filterPointer)
                     filterPointer.deallocate()
                     throw NdbFilterConversionError.failedToAddElement
                 }
             }
-            
+
             ndb_filter_end_field(filterPointer)
         }
-        
+
         // Handle `kinds` field
         if let kinds = nostrFilter.kinds {
             guard ndb_filter_start_field(filterPointer, NDB_FILTER_KINDS) == 1 else {
@@ -135,7 +135,7 @@ class NdbFilter {
                 filterPointer.deallocate()
                 throw NdbFilterConversionError.failedToStartField
             }
-            
+
             for kind in kinds {
                 if ndb_filter_add_int_element(filterPointer, UInt64(kind.rawValue)) != 1 {
                     ndb_filter_destroy(filterPointer)
@@ -143,10 +143,10 @@ class NdbFilter {
                     throw NdbFilterConversionError.failedToAddElement
                 }
             }
-            
+
             ndb_filter_end_field(filterPointer)
         }
-        
+
         // Handle `referenced_ids` field
         if let referencedIds = nostrFilter.referenced_ids {
             guard ndb_filter_start_tag_field(filterPointer, CChar(UnicodeScalar("e").value)) == 1 else {
@@ -154,24 +154,23 @@ class NdbFilter {
                 filterPointer.deallocate()
                 throw NdbFilterConversionError.failedToStartField
             }
-            
+
             for refId in referencedIds {
                 do {
-                    try refId.withUnsafePointer({ refPointer in
+                    try refId.withUnsafePointer { refPointer in
                         if ndb_filter_add_id_element(filterPointer, refPointer) != 1 {
                             ndb_filter_destroy(filterPointer)
                             filterPointer.deallocate()
                             throw NdbFilterConversionError.failedToAddElement
                         }
-                    })
-                }
-                catch {
+                    }
+                } catch {
                     ndb_filter_destroy(filterPointer)
                     filterPointer.deallocate()
                     throw NdbFilterConversionError.failedToAddElement
                 }
             }
-            
+
             ndb_filter_end_field(filterPointer)
         }
 
@@ -185,24 +184,23 @@ class NdbFilter {
 
             for pubkey in pubkeys {
                 do {
-                    try pubkey.withUnsafePointer({ pubkeyPointer in
+                    try pubkey.withUnsafePointer { pubkeyPointer in
                         if ndb_filter_add_id_element(filterPointer, pubkeyPointer) != 1 {
                             ndb_filter_destroy(filterPointer)
                             filterPointer.deallocate()
                             throw NdbFilterConversionError.failedToAddElement
                         }
-                    })
-                }
-                catch {
+                    }
+                } catch {
                     ndb_filter_destroy(filterPointer)
                     filterPointer.deallocate()
                     throw NdbFilterConversionError.failedToAddElement
                 }
             }
-            
+
             ndb_filter_end_field(filterPointer)
         }
-        
+
         // Handle `since`
         if let since = nostrFilter.since {
             if ndb_filter_start_field(filterPointer, NDB_FILTER_SINCE) != 1 {
@@ -210,13 +208,13 @@ class NdbFilter {
                 filterPointer.deallocate()
                 throw NdbFilterConversionError.failedToAddElement
             }
-            
+
             if ndb_filter_add_int_element(filterPointer, UInt64(since)) != 1 {
                 ndb_filter_destroy(filterPointer)
                 filterPointer.deallocate()
                 throw NdbFilterConversionError.failedToAddElement
             }
-            
+
             ndb_filter_end_field(filterPointer)
         }
 
@@ -227,13 +225,13 @@ class NdbFilter {
                 filterPointer.deallocate()
                 throw NdbFilterConversionError.failedToAddElement
             }
-            
+
             if ndb_filter_add_int_element(filterPointer, UInt64(until)) != 1 {
                 ndb_filter_destroy(filterPointer)
                 filterPointer.deallocate()
                 throw NdbFilterConversionError.failedToAddElement
             }
-            
+
             ndb_filter_end_field(filterPointer)
         }
 
@@ -244,16 +242,16 @@ class NdbFilter {
                 filterPointer.deallocate()
                 throw NdbFilterConversionError.failedToAddElement
             }
-            
+
             if ndb_filter_add_int_element(filterPointer, UInt64(limit)) != 1 {
                 ndb_filter_destroy(filterPointer)
                 filterPointer.deallocate()
                 throw NdbFilterConversionError.failedToAddElement
             }
-            
+
             ndb_filter_end_field(filterPointer)
         }
-        
+
         // Handle `authors`
         if let authors = nostrFilter.authors {
             guard ndb_filter_start_field(filterPointer, NDB_FILTER_AUTHORS) == 1 else {
@@ -264,25 +262,23 @@ class NdbFilter {
 
             for author in authors {
                 do {
-                    try author.withUnsafePointer({ authorPointer in
+                    try author.withUnsafePointer { authorPointer in
                         if ndb_filter_add_id_element(filterPointer, authorPointer) != 1 {
                             ndb_filter_destroy(filterPointer)
                             filterPointer.deallocate()
                             throw NdbFilterConversionError.failedToAddElement
                         }
-                    })
-                }
-                catch {
+                    }
+                } catch {
                     ndb_filter_destroy(filterPointer)
                     filterPointer.deallocate()
                     throw NdbFilterConversionError.failedToAddElement
                 }
-                
             }
-            
+
             ndb_filter_end_field(filterPointer)
         }
-        
+
         // Handle `hashtag`
         if let hashtags = nostrFilter.hashtag {
             guard ndb_filter_start_tag_field(filterPointer, CChar(UnicodeScalar("t").value)) == 1 else {
@@ -300,7 +296,7 @@ class NdbFilter {
             }
             ndb_filter_end_field(filterPointer)
         }
-        
+
         // Handle `parameter`
         if let parameters = nostrFilter.parameter {
             guard ndb_filter_start_tag_field(filterPointer, CChar(UnicodeScalar("d").value)) == 1 else {
@@ -326,25 +322,23 @@ class NdbFilter {
                 filterPointer.deallocate()
                 throw NdbFilterConversionError.failedToStartField
             }
-            
+
             for quote in quotes {
                 do {
-                    try quote.withUnsafePointer({ quotePointer in
+                    try quote.withUnsafePointer { quotePointer in
                         if ndb_filter_add_id_element(filterPointer, quotePointer) != 1 {
                             ndb_filter_destroy(filterPointer)
                             filterPointer.deallocate()
                             throw NdbFilterConversionError.failedToAddElement
                         }
-                    })
-                }
-                catch {
+                    }
+                } catch {
                     ndb_filter_destroy(filterPointer)
                     filterPointer.deallocate()
                     throw NdbFilterConversionError.failedToAddElement
                 }
-                
             }
-            
+
             ndb_filter_end_field(filterPointer)
         }
 
@@ -364,7 +358,7 @@ class NdbFilter {
         case failedToAddElement
         case failedToFinalize
     }
-    
+
     deinit {
         ndb_filter_destroy(filterPointer)
         filterPointer.deallocate()
@@ -384,6 +378,6 @@ extension Array where Element == NostrFilter {
     /// - Returns: Array of NdbFilter instances
     /// - Throws: `NdbFilterError.conversionFailed` if any conversion fails
     func toNdbFilters() throws -> [NdbFilter] {
-        return try self.map { try NdbFilter(from: $0) }
+        return try map { try NdbFilter(from: $0) }
     }
 }

@@ -20,7 +20,7 @@ public actor NDKSignatureVerificationSampler {
 
     public init(config: NDKSignatureVerificationConfig) {
         self.config = config
-        self.cache = NDKSignatureVerificationCache()
+        cache = NDKSignatureVerificationCache()
     }
 
     /// Verify an event's signature with sampling

@@ -22,9 +22,9 @@ public actor NIP05Manager {
 
     public init(ndk: NDK) {
         self.ndk = ndk
-        self.cache = ndk.cache
-        self.memoryCache = LRUCache(capacity: NetworkConstants.nip05CacheCapacity, defaultTTL: TimeConstants.hour)
-        self.domainRateLimiter = LRUCache(capacity: NetworkConstants.domainRateLimiterCapacity, defaultTTL: TimeConstants.hour)
+        cache = ndk.cache
+        memoryCache = LRUCache(capacity: NetworkConstants.nip05CacheCapacity, defaultTTL: TimeConstants.hour)
+        domainRateLimiter = LRUCache(capacity: NetworkConstants.domainRateLimiterCapacity, defaultTTL: TimeConstants.hour)
     }
 
     // MARK: - Public API
@@ -133,7 +133,8 @@ public actor NIP05Manager {
         // Check if we already have this in memory cache
         if let existing = await memoryCache.get(normalizedNip05),
            existing.pubkey == event.pubkey,
-           existing.status == .verified {
+           existing.status == .verified
+        {
             return
         }
 
@@ -353,7 +354,8 @@ public actor NIP05Manager {
         }
 
         guard let names = json["names"] as? [String: String],
-              let pubkey = names[name] else {
+              let pubkey = names[name]
+        else {
             // Cache invalid format
             let invalidEntry = NIP05CacheEntry(
                 identifier: identifier,
@@ -431,5 +433,6 @@ extension NDKError {
     static let invalidNIP05Format = { (identifier: String) in
         NDKError.invalidDataFormat("NIP-05 identifier", details: "Invalid format: \(identifier)")
     }
+
     static let invalidNIP05Response = NDKError.invalidResponse(from: "NIP-05")
 }

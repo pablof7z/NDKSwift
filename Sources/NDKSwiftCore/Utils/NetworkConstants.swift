@@ -14,15 +14,15 @@ public enum NetworkConstants {
     /// Subscription timeout for receiving initial data - short to detect dead subscriptions
     public static let timeoutSubscription: TimeInterval = 5
     /// Large resources (images, files) need extended timeout for slow connections
-    public static let timeoutResource: TimeInterval = 5 * TimeConstants.minute  // 5 minutes
+    public static let timeoutResource: TimeInterval = 5 * TimeConstants.minute // 5 minutes
     /// Wallet deposits may involve multiple chain confirmations
-    public static let timeoutWalletDeposit: TimeInterval = 10 * TimeConstants.minute  // 10 minutes
+    public static let timeoutWalletDeposit: TimeInterval = 10 * TimeConstants.minute // 10 minutes
 
     // Data Collection Timeouts (for collect() operations)
-    public static let timeoutDataCollectionShort: TimeInterval = 2.0  // For wallet operations
+    public static let timeoutDataCollectionShort: TimeInterval = 2.0 // For wallet operations
     public static let timeoutDataCollectionMedium: TimeInterval = 3.0 // For relay/contact lists
-    public static let timeoutDataCollectionLong: TimeInterval = 5.0   // For zap operations
-    public static let timeoutDataCollectionSync: TimeInterval = 30.0  // For sync operations
+    public static let timeoutDataCollectionLong: TimeInterval = 5.0 // For zap operations
+    public static let timeoutDataCollectionSync: TimeInterval = 30.0 // For sync operations
 
     // Connection Parameters
     /// Maximum reconnect attempts before giving up - prevents infinite retry loops

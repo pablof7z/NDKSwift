@@ -1,5 +1,5 @@
-import Foundation
 import CryptoKit
+import Foundation
 
 /// Filter for subscribing to events
 ///
@@ -60,7 +60,7 @@ public struct NDKFilter: Codable, Equatable, Sendable {
         // Convert tags to tagFilters format
         if let tags = tags {
             for (tagName, values) in tags {
-                self.tagFilters["#\(tagName)"] = Array(values)
+                tagFilters["#\(tagName)"] = Array(values)
             }
         }
     }
@@ -93,7 +93,7 @@ public struct NDKFilter: Codable, Equatable, Sendable {
         }
         return result
     }
-    
+
     /// Check if this filter is for replaceable events
     /// Replaceable events are kinds 0, 3, 10000-19999, and 30000-39999
     public var isReplaceable: Bool {
@@ -120,12 +120,12 @@ public struct NDKFilter: Codable, Equatable, Sendable {
         let container = try decoder.container(keyedBy: DynamicCodingKey.self)
 
         // Decode standard fields
-        self.ids = try container.decodeIfPresent([String].self, forKey: DynamicCodingKey(stringValue: "ids")!)
-        self.authors = try container.decodeIfPresent([String].self, forKey: DynamicCodingKey(stringValue: "authors")!)
-        self.kinds = try container.decodeIfPresent([Int].self, forKey: DynamicCodingKey(stringValue: "kinds")!)
-        self.since = try container.decodeIfPresent(Timestamp.self, forKey: DynamicCodingKey(stringValue: "since")!)
-        self.until = try container.decodeIfPresent(Timestamp.self, forKey: DynamicCodingKey(stringValue: "until")!)
-        self.limit = try container.decodeIfPresent(Int.self, forKey: DynamicCodingKey(stringValue: "limit")!)
+        ids = try container.decodeIfPresent([String].self, forKey: DynamicCodingKey(stringValue: "ids")!)
+        authors = try container.decodeIfPresent([String].self, forKey: DynamicCodingKey(stringValue: "authors")!)
+        kinds = try container.decodeIfPresent([Int].self, forKey: DynamicCodingKey(stringValue: "kinds")!)
+        since = try container.decodeIfPresent(Timestamp.self, forKey: DynamicCodingKey(stringValue: "since")!)
+        until = try container.decodeIfPresent(Timestamp.self, forKey: DynamicCodingKey(stringValue: "until")!)
+        limit = try container.decodeIfPresent(Int.self, forKey: DynamicCodingKey(stringValue: "limit")!)
 
         // Handle special tag filters
         if let events = try container.decodeIfPresent([String].self, forKey: DynamicCodingKey(stringValue: "#e")!) {
@@ -371,8 +371,9 @@ public struct NDKFilter: Codable, Equatable, Sendable {
 
         // Don't merge if either has tag filters, events, or pubkeys
         if !tagFilters.isEmpty || !other.tagFilters.isEmpty ||
-           events != nil || other.events != nil ||
-           pubkeys != nil || other.pubkeys != nil {
+            events != nil || other.events != nil ||
+            pubkeys != nil || other.pubkeys != nil
+        {
             return false
         }
 

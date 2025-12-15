@@ -34,7 +34,7 @@ public actor NDKRelayConnection {
             config.timeoutIntervalForRequest = NetworkConstants.timeoutStandardRequest
             config.timeoutIntervalForResource = NetworkConstants.timeoutResource
             config.httpAdditionalHeaders = [
-                "User-Agent": "NDKSwift 1.0"
+                "User-Agent": "NDKSwift 1.0",
             ]
             return URLSession(configuration: config)
         }()
@@ -172,7 +172,6 @@ public actor NDKRelayConnection {
                 return
             }
 
-
             // Create WebSocket request
             var request = URLRequest(url: url)
             request.addValue(HTTPConstants.webSocketProtocolNostr, forHTTPHeaderField: HTTPConstants.headerSecWebSocketProtocol)
@@ -181,7 +180,6 @@ public actor NDKRelayConnection {
             // Create WebSocket task
             webSocketTask = Self.sharedURLSession.webSocketTask(with: request)
             webSocketTask?.resume()
-
 
             // Start receiving messages in a detached task so it doesn't block
             Task.detached { [weak self] in
@@ -321,7 +319,6 @@ public actor NDKRelayConnection {
         }
     }
 
-
     /// Handle timeout for a pending event (actor-isolated)
     private func handleTimeout(eventId: EventID) {
         let error = NDKError.timeout(operation: "publishEvent", seconds: Int(NetworkConstants.timeoutRelayConnection))
@@ -357,45 +354,43 @@ public actor NDKRelayConnection {
 
         messagesSent += 1
     }
-    
+
     #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
-    private func receiveMessages() async {
-        guard let task = webSocketTask else {
-            NDKLogger.log(.error, category: .connection, "❌ \(ErrorMessageConstants.Messages.notConnected) - WebSocket task not available for receiving messages")
-            return
-        }
+        private func receiveMessages() async {
+            guard let task = webSocketTask else {
+                NDKLogger.log(.error, category: .connection, "❌ \(ErrorMessageConstants.Messages.notConnected) - WebSocket task not available for receiving messages")
+                return
+            }
 
+            do {
+                while true {
+                    let message = try await task.receive()
+                    messagesReceived += 1
 
-        do {
-            while true {
-                let message = try await task.receive()
-                messagesReceived += 1
-
-                switch message {
-                case let .string(json):
-                    await handleReceivedMessage(json)
-                case let .data(data):
-                    if let json = String(data: data, encoding: .utf8) {
-                        NDKLogger.log(.trace, category: .connection, "🔄 Converted data message to string")
+                    switch message {
+                    case let .string(json):
                         await handleReceivedMessage(json)
-                    } else {
-                        NDKLogger.log(.warning, category: .connection, "⚠️ Failed to convert data message to UTF-8 string")
+                    case let .data(data):
+                        if let json = String(data: data, encoding: .utf8) {
+                            NDKLogger.log(.trace, category: .connection, "🔄 Converted data message to string")
+                            await handleReceivedMessage(json)
+                        } else {
+                            NDKLogger.log(.warning, category: .connection, "⚠️ Failed to convert data message to UTF-8 string")
+                        }
+                    @unknown default:
+                        NDKLogger.log(.warning, category: .connection, "❓ Received unknown message type")
                     }
-                @unknown default:
-                    NDKLogger.log(.warning, category: .connection, "❓ Received unknown message type")
-                    break
                 }
+            } catch {
+                // Connection closed or error occurred
+                let ndkError = mapToNDKError(error, operation: "receive message")
+                let shouldLog = await connectionErrorRateLimiter.shouldLogError(for: url.absoluteString, errorType: "receiveError")
+                if shouldLog {
+                    NDKLogger.log(.error, category: .connection, "🔴 Receive loop ended with error: \(ndkError)")
+                }
+                await handleConnectionError(ndkError, shouldLog: false) // Don't double-log
             }
-        } catch {
-            // Connection closed or error occurred
-            let ndkError = mapToNDKError(error, operation: "receive message")
-            let shouldLog = await connectionErrorRateLimiter.shouldLogError(for: url.absoluteString, errorType: "receiveError")
-            if shouldLog {
-                NDKLogger.log(.error, category: .connection, "🔴 Receive loop ended with error: \(ndkError)")
-            }
-            await handleConnectionError(ndkError, shouldLog: false) // Don't double-log
         }
-    }
     #endif
 
     private func handleReceivedMessage(_ json: String) async {
@@ -410,7 +405,7 @@ public actor NDKRelayConnection {
 
             // Log received message
             NDKNetworkLogger.logNetworkReceive(from: url, message: json, parsed: message)
-            
+
             // Handle OK messages for pending events
             if case let .ok(eventId, accepted, errorMessage) = message {
                 if accepted {
@@ -436,86 +431,85 @@ public actor NDKRelayConnection {
     // MARK: - Connection Verification
 
     #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
-    private func sendPing() async {
-        guard let task = webSocketTask else {
-            NDKLogger.log(.error, category: .connection, "❌ No WebSocket task for \(url) - cannot send ping")
-            let error = NDKError.connectionLost(relay: url.absoluteString, message: "No WebSocket task")
-            resumeAllContinuations(with: .failure(error))
-            return
-        }
+        private func sendPing() async {
+            guard let task = webSocketTask else {
+                NDKLogger.log(.error, category: .connection, "❌ No WebSocket task for \(url) - cannot send ping")
+                let error = NDKError.connectionLost(relay: url.absoluteString, message: "No WebSocket task")
+                resumeAllContinuations(with: .failure(error))
+                return
+            }
 
+            // Use a single task with timeout built-in
+            let pingCompleted = await withCheckedContinuation { continuation in
+                var pingHandled = false
 
-        // Use a single task with timeout built-in
-        let pingCompleted = await withCheckedContinuation { continuation in
-            var pingHandled = false
+                // Set up timeout
+                let timeoutTask = Task {
+                    try? await Task.sleep(nanoseconds: UInt64(NetworkConstants.timeoutPing * Double(TimeConstants.nanosecondsPerSecond)))
+                    if !pingHandled {
+                        pingHandled = true
+                        NDKLogger.log(.error, category: .connection, "⏰ Ping timeout for \(url) after \(Int(NetworkConstants.timeoutPing)) seconds")
+                        continuation.resume(returning: false)
+                    }
+                }
 
-            // Set up timeout
-            let timeoutTask = Task {
-                try? await Task.sleep(nanoseconds: UInt64(NetworkConstants.timeoutPing * Double(TimeConstants.nanosecondsPerSecond)))
-                if !pingHandled {
+                task.sendPing { [weak self] error in
+                    guard !pingHandled else { return } // Ignore if timeout already fired
                     pingHandled = true
-                    NDKLogger.log(.error, category: .connection, "⏰ Ping timeout for \(url) after \(Int(NetworkConstants.timeoutPing)) seconds")
-                    continuation.resume(returning: false)
-                }
-            }
+                    timeoutTask.cancel()
 
-            task.sendPing { [weak self] error in
-                guard !pingHandled else { return } // Ignore if timeout already fired
-                pingHandled = true
-                timeoutTask.cancel()
-
-                Task { [weak self] in
-                    guard let self = self else {
-                        continuation.resume(returning: false)
-                        return
-                    }
-
-                    if let error = error {
-                        let ndkError = await self.mapToNDKError(error, operation: "ping")
-                        let shouldLog = await connectionErrorRateLimiter.shouldLogError(for: self.url.absoluteString, errorType: "pingFailed")
-                        if shouldLog {
-                            NDKLogger.log(.error, category: .connection, "❌ Ping failed for \(self.url): \(ndkError)")
+                    Task { [weak self] in
+                        guard let self = self else {
+                            continuation.resume(returning: false)
+                            return
                         }
-                        await self.resumeContinuationWithError(ndkError)
-                        await self.handleConnectionError(ndkError, shouldLog: false) // Don't double-log
-                        continuation.resume(returning: false)
-                    } else {
-                        await self.markAsConnected()
-                        continuation.resume(returning: true)
+
+                        if let error = error {
+                            let ndkError = await self.mapToNDKError(error, operation: "ping")
+                            let shouldLog = await connectionErrorRateLimiter.shouldLogError(for: self.url.absoluteString, errorType: "pingFailed")
+                            if shouldLog {
+                                NDKLogger.log(.error, category: .connection, "❌ Ping failed for \(self.url): \(ndkError)")
+                            }
+                            await self.resumeContinuationWithError(ndkError)
+                            await self.handleConnectionError(ndkError, shouldLog: false) // Don't double-log
+                            continuation.resume(returning: false)
+                        } else {
+                            await self.markAsConnected()
+                            continuation.resume(returning: true)
+                        }
                     }
                 }
             }
+
+            if !pingCompleted {
+                let timeoutError = NDKError.timeout(operation: "ping", seconds: Int(NetworkConstants.timeoutPing))
+                await resumeContinuationWithError(timeoutError)
+                await handleConnectionError(timeoutError)
+            }
         }
 
-        if !pingCompleted {
-            let timeoutError = NDKError.timeout(operation: "ping", seconds: Int(NetworkConstants.timeoutPing))
-            await resumeContinuationWithError(timeoutError)
-            await handleConnectionError(timeoutError)
-        }
-    }
+        private func markAsConnected() async {
+            guard !isConnected else {
+                resumeAllContinuations(with: .success(()))
+                return
+            }
 
-    private func markAsConnected() async {
-        guard !isConnected else {
+            isConnected = true
+            isInitialConnection = false
+            connectedAt = Date()
+            retryPolicy.reset()
+
             resumeAllContinuations(with: .success(()))
-            return
+
+            // Notify delegate
+            await notifyDelegate { delegate in
+                delegate.relayConnectionDidConnect(self)
+            }
         }
 
-        isConnected = true
-        isInitialConnection = false
-        connectedAt = Date()
-        retryPolicy.reset()
-
-        resumeAllContinuations(with: .success(()))
-
-        // Notify delegate
-        await notifyDelegate { delegate in
-            delegate.relayConnectionDidConnect(self)
+        private func resumeContinuationWithError(_ error: Error) async {
+            resumeAllContinuations(with: .failure(error))
         }
-    }
-    
-    private func resumeContinuationWithError(_ error: Error) async {
-        resumeAllContinuations(with: .failure(error))
-    }
     #endif
 
     private func handleConnectionError(_ error: Error, shouldLog: Bool = true) async {
@@ -542,7 +536,7 @@ public actor NDKRelayConnection {
         await notifyDelegate { delegate in
             delegate.relayConnectionDidDisconnect(self, error: error)
         }
-        
+
         // Only schedule reconnection if this wasn't an initial connection attempt
         if !isInitialConnection {
             NDKLogger.log(.debug, category: .connection, "🔁 Will attempt reconnection (not initial connection)")
@@ -570,51 +564,51 @@ public actor NDKRelayConnection {
     }
 
     // MARK: - Error Handling Helpers
-    
+
     /// Resume all waiting continuations with result
     private func resumeAllContinuations(with result: Result<Void, Error>) {
         for continuation in connectionContinuations {
             switch result {
             case .success:
                 continuation.resume()
-            case .failure(let error):
+            case let .failure(error):
                 continuation.resume(throwing: error)
             }
         }
         connectionContinuations.removeAll()
         isConnecting = false
     }
-    
+
     /// Resume a pending event continuation with result
     private func resumePendingEvent(eventId: EventID, with result: Result<Bool, Error>) {
         if let continuation = pendingEvents.removeValue(forKey: eventId) {
             switch result {
-            case .success(let value):
+            case let .success(value):
                 continuation.resume(returning: value)
-            case .failure(let error):
+            case let .failure(error):
                 continuation.resume(throwing: error)
             }
         }
     }
-    
+
     /// Clean up pending events with appropriate error
     private func cleanupPendingEvents(error: Error) async {
         let eventIds = Array(pendingEvents.keys)
         let ndkError = mapToNDKError(error, operation: "send event")
-        
+
         for eventId in eventIds {
             NDKLogger.log(.warning, category: .relay, "⚠️ Failing pending event \(eventId) due to connection error")
             resumePendingEvent(eventId: eventId, with: .failure(ndkError))
         }
     }
-    
+
     /// Map generic errors to specific NDKError cases
     private func mapToNDKError(_ error: Error, operation: String) -> NDKError {
         // Check if it's already an NDKError
         if let ndkError = error as? NDKError {
             return ndkError
         }
-        
+
         // Map URLError cases
         if let urlError = error as? URLError {
             switch urlError.code {
@@ -628,7 +622,7 @@ public actor NDKRelayConnection {
                 return NDKError.networkError(for: url.absoluteString, operation: operation, error: error)
             }
         }
-        
+
         // Default to network error
         return NDKError.networkError(for: url.absoluteString, operation: operation, error: error)
     }

@@ -18,7 +18,7 @@ struct NdbStrIter: IteratorProtocol {
 
     mutating func next() -> CChar? {
         let c = str.str[ind]
-        if (c != 0) {
+        if c != 0 {
             ind += 1
             return c
         }
@@ -27,8 +27,8 @@ struct NdbStrIter: IteratorProtocol {
     }
 
     init(tag: NdbTagElem) {
-        self.str = ndb_tag_str(tag.note.note.ptr, tag.tag.ptr, tag.index)
-        self.ind = 0
+        str = ndb_tag_str(tag.note.note.ptr, tag.tag.ptr, tag.index)
+        ind = 0
         self.tag = tag
     }
 }
@@ -65,7 +65,7 @@ struct NdbTagElem: Sequence, Hashable, Equatable {
         self.note = note
         self.tag = tag
         self.index = index
-        self.str = ndb_tag_str(note.note.ptr, tag.ptr, index)
+        str = ndb_tag_str(note.note.ptr, tag.ptr, index)
     }
 
     var is_id: Bool {
@@ -124,19 +124,19 @@ struct NdbTagElem: Sequence, Hashable, Equatable {
     }
 
     func data() -> NdbData {
-        return NdbData(note: note, str: self.str)
+        return NdbData(note: note, str: str)
     }
 
     func id() -> Data? {
-        guard case .id(let id) = self.data() else { return nil }
+        guard case let .id(id) = data() else { return nil }
         return id.id
     }
 
     func u64() -> UInt64? {
-        switch self.data() {
+        switch data() {
         case .id:
             return nil
-        case .str(let str):
+        case let .str(str):
             var end_ptr = UnsafeMutablePointer<CChar>(nil as OpaquePointer?)
             let res = strtoull(str.str, &end_ptr, 10)
 
@@ -149,10 +149,10 @@ struct NdbTagElem: Sequence, Hashable, Equatable {
     }
 
     func string() -> String {
-        switch self.data() {
-        case .id(let id):
+        switch data() {
+        case let .id(id):
             return hex_encode(id.id)
-        case .str(let s):
+        case let .str(s):
             return String(cString: s.str, encoding: .utf8) ?? ""
         }
     }
@@ -161,4 +161,3 @@ struct NdbTagElem: Sequence, Hashable, Equatable {
         return NdbStrIter(tag: self)
     }
 }
-

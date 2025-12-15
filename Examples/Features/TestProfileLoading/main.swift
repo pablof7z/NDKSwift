@@ -6,8 +6,8 @@ let ndk = NDK(relayUrls: ["wss://relay.primal.net", "wss://relay.damus.io"])
 ndk.debugMode = true
 
 // Set up logger to see what's happening
-NDKLogger.logLevel = .trace
-NDKLogger.enabledCategories = [.subscription, .relay, .general]
+NDKLogger.setLogLevel(.trace)
+NDKLogger.setEnabledCategories([.subscription, .relay, .general])
 
 let testPubkey = "82341f882b6eabcd2ba7f1ef90aad961cf074af15b9ef44a09f9d2a8fbfbe6a2"
 
@@ -15,20 +15,20 @@ print("Testing profile loading for pubkey: \(testPubkey)")
 
 Task {
     await ndk.connect()
-    
+
     // Wait a moment for connection
     try? await Task.sleep(nanoseconds: 2_000_000_000)
-    
+
     print("\n=== Testing NDKSubscription directly ===")
     let filter = NDKFilter(
         authors: [testPubkey],
         kinds: [0]
     )
-    
+
     let dataSource = ndk.subscribe(filter: filter, maxAge: 0, cachePolicy: .networkOnly)
-    
+
     print("Created data source, waiting for events...")
-    
+
     var receivedEvent = false
     for await event in dataSource.events {
         receivedEvent = true
@@ -36,21 +36,21 @@ Task {
         print("  ID: \(event.id)")
         print("  Created at: \(event.createdAt)")
         print("  Content preview: \(event.content.prefix(100))...")
-        
+
         let metadata = NDKUserMetadata(event: event)
         print("\n✅ Successfully created metadata:")
         print("  Name: \(metadata.name ?? "N/A")")
         print("  Display Name: \(metadata.displayName ?? "N/A")")
         print("  Picture: \(metadata.picture ?? "N/A")")
         print("  NIP-05: \(metadata.nip05 ?? "N/A")")
-        
+
         break
     }
-    
+
     if !receivedEvent {
         print("❌ No events received after waiting")
     }
-    
+
     exit(0)
 }
 

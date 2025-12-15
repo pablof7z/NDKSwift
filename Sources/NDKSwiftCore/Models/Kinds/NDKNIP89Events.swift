@@ -97,11 +97,11 @@ public struct NIP89HandlerReference {
 
 // MARK: - NDKEvent Extensions for NIP-89
 
-extension NDKEvent {
+public extension NDKEvent {
     /// Parse this event as a NIP-89 handler information event
     ///
     /// - Returns: Handler information if this is a valid kind 31990 event
-    public func asNIP89HandlerInfo() -> NIP89HandlerInfo? {
+    func asNIP89HandlerInfo() -> NIP89HandlerInfo? {
         guard kind == NIP89Kind.handlerInfo.rawValue else { return nil }
 
         // Get the d-tag identifier
@@ -155,7 +155,7 @@ extension NDKEvent {
     /// Parse this event as a NIP-89 recommendation event
     ///
     /// - Returns: Recommendation information if this is a valid kind 31989 event
-    public func asNIP89Recommendation() -> NIP89Recommendation? {
+    func asNIP89Recommendation() -> NIP89Recommendation? {
         guard kind == NIP89Kind.recommendation.rawValue else { return nil }
 
         // Get the event kind from d-tag
@@ -178,7 +178,7 @@ extension NDKEvent {
 
 // MARK: - NDKEventBuilder Extensions for NIP-89
 
-extension NDKEventBuilder {
+public extension NDKEventBuilder {
     /// Create a NIP-89 handler information event (kind 31990)
     ///
     /// - Parameters:
@@ -189,14 +189,13 @@ extension NDKEventBuilder {
     ///
     /// - Returns: Self for chaining
     @discardableResult
-    public func nip89HandlerInfo(
+    func nip89HandlerInfo(
         identifier: String,
         supportedKinds: [Kind],
         handlerURLs: [String: String],
         metadata: NIP89HandlerMetadata? = nil
     ) -> NDKEventBuilder {
-        return self
-            .kind(NIP89Kind.handlerInfo.rawValue)
+        return kind(NIP89Kind.handlerInfo.rawValue)
             .dTag(identifier)
             .tags(supportedKinds.map { ["k", String($0)] })
             .tags(handlerURLs.map { platform, url in
@@ -217,12 +216,11 @@ extension NDKEventBuilder {
     ///
     /// - Returns: Self for chaining
     @discardableResult
-    public func nip89Recommendation(
+    func nip89Recommendation(
         eventKind: Kind,
         handlers: [NIP89HandlerReference]
     ) -> NDKEventBuilder {
-        return self
-            .kind(NIP89Kind.recommendation.rawValue)
+        return kind(NIP89Kind.recommendation.rawValue)
             .dTag(String(eventKind))
             .tags(handlers.map { handler in
                 var tag = ["a", handler.address]

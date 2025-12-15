@@ -15,64 +15,63 @@
  */
 
 #if !os(WASI)
-import Foundation
-import NDKSwiftCore
+    import Foundation
+    import NDKSwiftCore
 #else
-import SwiftOverlayShims
+    import SwiftOverlayShims
 #endif
 
 /// Collection of thrown from the Flatbuffer verifier
 public enum FlatbuffersErrors: Error, Equatable {
-
-  /// Thrown when verifying a file id that doesnt match buffer id
-  case bufferIdDidntMatchPassedId
-  /// Prefixed size doesnt match the current (readable) buffer size
-  case prefixedSizeNotEqualToBufferSize
-  /// Thrown when buffer is bigger than the allowed 2GiB
-  case exceedsMaxSizeAllowed
-  /// Thrown when there is an missaligned pointer at position
-  /// of type
-  case missAlignedPointer(position: Int, type: String)
-  /// Thrown when trying to read a value that goes out of the
-  /// current buffer bounds
-  case outOfBounds(position: UInt, end: Int)
-  /// Thrown when the signed offset is out of the bounds of the
-  /// current buffer
-  case signedOffsetOutOfBounds(offset: Int, position: Int)
-  /// Thrown when a required field doesnt exist within the buffer
-  case requiredFieldDoesntExist(position: VOffset, name: String)
-  /// Thrown when a string is missing its NULL Terminator `\0`,
-  /// this can be disabled in the `VerifierOptions`
-  case missingNullTerminator(position: Int, str: String?)
-  /// Thrown when the verifier has reached the maximum tables allowed,
-  /// this can be disabled in the `VerifierOptions`
-  case maximumTables
-  /// Thrown when the verifier has reached the maximum depth allowed,
-  /// this can be disabled in the `VerifierOptions`
-  case maximumDepth
-  /// Thrown when the verifier is presented with an unknown union case
-  case unknownUnionCase
-  /// thrown when a value for a union is not found within the buffer
-  case valueNotFound(key: Int?, keyName: String, field: Int?, fieldName: String)
-  /// thrown when the size of the keys vector doesnt match fields vector
-  case unionVectorSize(
-    keyVectorSize: Int,
-    fieldVectorSize: Int,
-    unionKeyName: String,
-    fieldName: String)
-  case apparentSizeTooLarge
-
+    /// Thrown when verifying a file id that doesnt match buffer id
+    case bufferIdDidntMatchPassedId
+    /// Prefixed size doesnt match the current (readable) buffer size
+    case prefixedSizeNotEqualToBufferSize
+    /// Thrown when buffer is bigger than the allowed 2GiB
+    case exceedsMaxSizeAllowed
+    /// Thrown when there is an missaligned pointer at position
+    /// of type
+    case missAlignedPointer(position: Int, type: String)
+    /// Thrown when trying to read a value that goes out of the
+    /// current buffer bounds
+    case outOfBounds(position: UInt, end: Int)
+    /// Thrown when the signed offset is out of the bounds of the
+    /// current buffer
+    case signedOffsetOutOfBounds(offset: Int, position: Int)
+    /// Thrown when a required field doesnt exist within the buffer
+    case requiredFieldDoesntExist(position: VOffset, name: String)
+    /// Thrown when a string is missing its NULL Terminator `\0`,
+    /// this can be disabled in the `VerifierOptions`
+    case missingNullTerminator(position: Int, str: String?)
+    /// Thrown when the verifier has reached the maximum tables allowed,
+    /// this can be disabled in the `VerifierOptions`
+    case maximumTables
+    /// Thrown when the verifier has reached the maximum depth allowed,
+    /// this can be disabled in the `VerifierOptions`
+    case maximumDepth
+    /// Thrown when the verifier is presented with an unknown union case
+    case unknownUnionCase
+    /// thrown when a value for a union is not found within the buffer
+    case valueNotFound(key: Int?, keyName: String, field: Int?, fieldName: String)
+    /// thrown when the size of the keys vector doesnt match fields vector
+    case unionVectorSize(
+        keyVectorSize: Int,
+        fieldVectorSize: Int,
+        unionKeyName: String,
+        fieldName: String
+    )
+    case apparentSizeTooLarge
 }
 
 #if !os(WASI)
 
-extension FlatbuffersErrors {
-  public static func == (
-    lhs: FlatbuffersErrors,
-    rhs: FlatbuffersErrors) -> Bool
-  {
-    lhs.localizedDescription == rhs.localizedDescription
-  }
-}
+    public extension FlatbuffersErrors {
+        static func == (
+            lhs: FlatbuffersErrors,
+            rhs: FlatbuffersErrors
+        ) -> Bool {
+            lhs.localizedDescription == rhs.localizedDescription
+        }
+    }
 
 #endif

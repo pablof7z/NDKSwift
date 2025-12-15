@@ -1,5 +1,5 @@
-import Foundation
 import Combine
+import Foundation
 
 /// Log prefix constant for bunker signer related logging
 private let logPrefix = "[BunkerSigner]"
@@ -80,7 +80,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
     private let ndk: NDK
     private var userPubkey: String?
     private var bunkerPubkey: String?
-    private var relayUrls: [String]
+    private var relayURLs: [String]
     private var secret: String?
     private let localSigner: NDKPrivateKeySigner
     private var subscriptionTask: Task<Void, Never>?
@@ -164,7 +164,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         self.ndk = ndk
         self.connectionType = connectionType
         self.localSigner = localSigner
-        self.relayUrls = []
+        relayURLs = []
 
         switch connectionType {
         case let .bunker(token):
@@ -182,14 +182,14 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         let (bunkerPubkey, userPubkey, relays, secret) = parser.parse()
         self.bunkerPubkey = bunkerPubkey
         self.userPubkey = userPubkey
-        self.relayUrls = relays
+        relayURLs = relays
         self.secret = secret
     }
 
     private func initNostrConnect(relays: [String], options: NostrConnectOptions?, pubkey: String) {
-        self.relayUrls = relays
-        self.nostrConnectSecret = generateNostrConnectSecret()
-        self.nostrConnectUri = generateNostrConnectUri(pubkey: pubkey, relays: relays, options: options)
+        relayURLs = relays
+        nostrConnectSecret = generateNostrConnectSecret()
+        nostrConnectUri = generateNostrConnectUri(pubkey: pubkey, relays: relays, options: options)
     }
 
     private func generateNostrConnectUri(pubkey: String, relays: [String], options: NostrConnectOptions?) -> String {
@@ -239,20 +239,20 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         // Handle NIP-05 flow
         if case let .nip05(nip05) = connectionType {
             let user = try await NDKUser.fromNip05(nip05, ndk: ndk)
-            self.userPubkey = user.pubkey
+            userPubkey = user.pubkey
             let nip46Urls = await user.nip46Urls
             if let nip46Urls = nip46Urls {
-                self.relayUrls = nip46Urls
+                relayURLs = nip46Urls
             }
             if bunkerPubkey == nil {
-                self.bunkerPubkey = user.pubkey
+                bunkerPubkey = user.pubkey
             }
         }
 
         // Ensure relays are added and connected
-        if !relayUrls.isEmpty {
-            NDKLogger.log(.info, category: .auth, "\(logPrefix) Connecting to bunker relays: \(relayUrls)")
-            for relayUrl in relayUrls {
+        if !relayURLs.isEmpty {
+            NDKLogger.log(.info, category: .auth, "\(logPrefix) Connecting to bunker relays: \(relayURLs)")
+            for relayUrl in relayURLs {
                 let relay = await ndk.addRelay(relayUrl)
 
                 // Connect to the relay if not already connected
@@ -269,7 +269,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         }
 
         // Initialize RPC client
-        let rpcClient = NDKNostrRPC(ndk: ndk, localSigner: localSigner, relayUrls: relayUrls)
+        let rpcClient = NDKNostrRPC(ndk: ndk, localSigner: localSigner, relayURLs: relayURLs)
         self.rpcClient = rpcClient
 
         // Start listening for responses
@@ -303,7 +303,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
             filter: filter,
             maxAge: 0, // Always fresh for real-time bunker communication
             cachePolicy: .networkOnly, // Skip cache for bunker messages
-            relays: relayUrls.setOrNil
+            relays: relayURLs.setOrNil
         )
 
         // DataSource created
@@ -353,7 +353,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         if response.result == "ack" {
             // Now get the public key
             let pubkey = try await getPublicKey()
-            self.userPubkey = pubkey
+            userPubkey = pubkey
             isConnected = true
 
             let user = NDKUser(pubkey: pubkey)
@@ -396,7 +396,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
 
             if isValidSecret {
                 let responsePubkey = response.event.pubkey
-                bunkerPubkey = responsePubkey  // Store remote signer pubkey
+                bunkerPubkey = responsePubkey // Store remote signer pubkey
 
                 // According to NIP-46, we must call get_public_key to learn the user's actual pubkey
                 Task {
@@ -460,7 +460,8 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         )
 
         guard let response = response,
-              response.error == nil else {
+              response.error == nil
+        else {
             throw NDKError.failedTo("sign event", message: response?.error)
         }
 
@@ -568,13 +569,13 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
     }
 
     public func serialize() async throws -> Data {
-        let payload: [String: Any] = [
+        let payload: [String: Any] = try [
             "bunkerPubkey": bunkerPubkey ?? "",
             "userPubkey": userPubkey ?? "",
-            "relayUrls": relayUrls,
+            "relayURLs": relayURLs,
             NostrConstants.JSONField.secret: secret ?? "",
-            "localSignerData": try await localSigner.serialize(),
-            "connectionType": connectionType.rawValue
+            "localSignerData": await localSigner.serialize(),
+            "connectionType": connectionType.rawValue,
         ]
         return try NDKSignerSerialization.createContainer(type: Self.signerType, payload: payload)
     }
@@ -589,10 +590,11 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
 
         guard let bunkerPubkey = payload["bunkerPubkey"] as? String,
               let userPubkey = payload["userPubkey"] as? String,
-              let relayUrls = payload["relayUrls"] as? [String],
+              let relayURLs = payload["relayURLs"] as? [String],
               let secret = payload[NostrConstants.JSONField.secret] as? String,
               let localSignerData = payload["localSignerData"] as? Data,
-              let connectionTypeRaw = payload["connectionType"] as? String else {
+              let connectionTypeRaw = payload["connectionType"] as? String
+        else {
             throw NDKSignerRegistryError.deserializationError(ErrorMessageConstants.missing(BunkerConstants.ErrorMessages.requiredDataMissing))
         }
 
@@ -605,10 +607,10 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         case BunkerConstants.urlScheme:
             // Reconstruct bunker URL
             let bunkerUrl = "\(BunkerConstants.urlScheme)://\(bunkerPubkey)?pubkey=\(userPubkey)&secret=\(secret)" +
-                           relayUrls.map { "&relay=\($0)" }.joined()
+                relayURLs.map { "&relay=\($0)" }.joined()
             connectionType = .bunker(bunkerUrl)
         case "nostrConnect":
-            connectionType = .nostrConnect(relays: relayUrls, options: nil)
+            connectionType = .nostrConnect(relays: relayURLs, options: nil)
         case "nip05":
             connectionType = .nip05(userPubkey)
         default:

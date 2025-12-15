@@ -16,7 +16,7 @@ import Foundation
 ///     // Use cached data
 /// }
 /// ```
-actor LRUCache<Key: Hashable, Value> {
+public actor LRUCache<Key: Hashable, Value> {
     /// Internal structure to store cached values with metadata
     private struct CacheEntry {
         let value: Value
@@ -26,21 +26,21 @@ actor LRUCache<Key: Hashable, Value> {
 
     /// Main storage dictionary mapping keys to cache entries
     private var cache: [Key: CacheEntry] = [:]
-    
+
     /// Ordered list of keys by access time (most recent at end)
     private var accessOrder: [Key] = []
-    
+
     /// Maximum number of items the cache can hold
     private let capacity: Int
-    
+
     /// Default time-to-live for cache entries in seconds
     private let defaultTTL: TimeInterval
 
     // MARK: - Statistics
-    
+
     /// Number of successful cache hits
     private var hits: Int = 0
-    
+
     /// Number of cache misses
     private var misses: Int = 0
 
@@ -48,7 +48,7 @@ actor LRUCache<Key: Hashable, Value> {
     /// - Parameters:
     ///   - capacity: Maximum number of items to store (default: 100)
     ///   - defaultTTL: Default time-to-live for entries in seconds (default: 1 hour)
-    init(capacity: Int = 100, defaultTTL: TimeInterval = TimeConstants.hour) {
+    public init(capacity: Int = 100, defaultTTL: TimeInterval = TimeConstants.hour) {
         self.capacity = capacity
         self.defaultTTL = defaultTTL
     }
@@ -57,7 +57,7 @@ actor LRUCache<Key: Hashable, Value> {
     /// - Parameter key: The key to look up
     /// - Returns: The cached value if it exists and hasn't expired, nil otherwise
     /// - Note: This method updates the access order, making the item the most recently used
-    func get(_ key: Key) -> Value? {
+    public func get(_ key: Key) -> Value? {
         guard var entry = cache[key] else {
             misses += 1
             return nil
@@ -84,7 +84,7 @@ actor LRUCache<Key: Hashable, Value> {
     }
 
     /// Set a value in the cache
-    func set(_ key: Key, value: Value, ttl: TimeInterval? = nil) {
+    public func set(_ key: Key, value: Value, ttl: TimeInterval? = nil) {
         let expiresAt = Date().addingTimeInterval(ttl ?? defaultTTL)
         let entry = CacheEntry(
             value: value,
@@ -117,7 +117,7 @@ actor LRUCache<Key: Hashable, Value> {
     }
 
     /// Clear all values from the cache
-    func clear() {
+    public func clear() {
         cache.removeAll()
         accessOrder.removeAll()
         hits = 0
@@ -167,29 +167,35 @@ actor LRUCache<Key: Hashable, Value> {
     private func evictOldest() {
         guard !accessOrder.isEmpty else { return }
 
-        // Find the oldest entry that isn't expired
+        // Find the oldest entry that isn't expired, evicting expired ones along the way
+        var expiredIndices: [Int] = []
         var indexToRemove: Int?
-        var keyToRemove: Key?
         let now = Date()
 
         // Prioritize evicting expired items
         for (index, key) in accessOrder.enumerated() {
-            if let entry = cache[key] {
-                if entry.expiresAt <= now {
-                    // Found expired item, remove it immediately and return
-                    cache.removeValue(forKey: key)
-                    accessOrder.remove(at: index)
-                    return
-                }
+            if let entry = cache[key], entry.expiresAt > now {
+                // Found first non-expired entry - this is the oldest we'll evict
+                indexToRemove = index
+                break
             } else {
-                 // Inconsistency: key in accessOrder but not cache. Remove it.
-                 accessOrder.remove(at: index)
-                 return
+                // Mark expired entry for removal
+                expiredIndices.append(index)
+                cache.removeValue(forKey: key)
             }
         }
 
-        // If no expired items found, remove the LRU item (first in accessOrder)
-        let key = accessOrder.removeFirst()
-        cache.removeValue(forKey: key)
+        // Remove expired entries from accessOrder (in reverse to preserve indices)
+        for index in expiredIndices.reversed() {
+            accessOrder.remove(at: index)
+        }
+
+        // Remove oldest non-expired entry if found
+        if let index = indexToRemove {
+            // Adjust index after removing expired entries
+            let adjustedIndex = index - expiredIndices.filter { $0 < index }.count
+            let key = accessOrder.remove(at: adjustedIndex)
+            cache.removeValue(forKey: key)
+        }
     }
 }

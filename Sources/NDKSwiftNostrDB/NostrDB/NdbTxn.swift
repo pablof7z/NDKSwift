@@ -1,5 +1,5 @@
 //
-//  NdbTx.swift
+//  NdbTxn.swift
 //  damus
 //
 //  Created by William Casarin on 2023-08-30.
@@ -10,7 +10,7 @@ import NDKSwiftCore
 import NostrDB
 
 #if TXNDEBUG
-fileprivate var txn_count: Int = 0
+    fileprivate var txn_count: Int = 0
 #endif
 
 // Would use struct and ~Copyable but generics aren't supported well
@@ -31,47 +31,47 @@ class NdbTxn<T>: RawNdbTxnAccessible {
         guard !ndb.is_closed else { return nil }
         self.name = name ?? "txn"
         self.ndb = ndb
-        self.generation = ndb.generation
+        generation = ndb.generation
         if let active_txn = Thread.current.threadDictionary["ndb_txn"] as? ndb_txn,
            let txn_generation = Thread.current.threadDictionary["txn_generation"] as? Int,
            txn_generation == ndb.generation
         {
             // some parent thread is active, use that instead
             print("txn: inherited txn")
-            self.txn = active_txn
-            self.inherited = true
-            self.generation = Thread.current.threadDictionary["txn_generation"] as! Int
+            txn = active_txn
+            inherited = true
+            generation = Thread.current.threadDictionary["txn_generation"] as! Int
             let ref_count = Thread.current.threadDictionary["ndb_txn_ref_count"] as! Int
             let new_ref_count = ref_count + 1
             Thread.current.threadDictionary["ndb_txn_ref_count"] = new_ref_count
         } else {
-            self.txn = ndb_txn()
+            txn = ndb_txn()
             guard !ndb.is_closed else { return nil }
-            self.generation = ndb.generation
+            generation = ndb.generation
             #if TXNDEBUG
-            txn_count += 1
+                txn_count += 1
             #endif
-            let ok = ndb_begin_query(ndb.ndb.ndb, &self.txn) != 0
+            let ok = ndb_begin_query(ndb.ndb.ndb, &txn) != 0
             if !ok {
                 return nil
             }
-            self.generation = ndb.generation
-            Thread.current.threadDictionary["ndb_txn"] = self.txn
+            generation = ndb.generation
+            Thread.current.threadDictionary["ndb_txn"] = txn
             Thread.current.threadDictionary["ndb_txn_ref_count"] = 1
             Thread.current.threadDictionary["txn_generation"] = ndb.generation
-            self.inherited = false
+            inherited = false
         }
         #if TXNDEBUG
-        print("txn: open  gen\(self.generation) '\(self.name)' \(txn_count)")
+            print("txn: open  gen\(generation) '\(self.name)' \(txn_count)")
         #endif
-        self.moved = false
-        self.val = with(self)
+        moved = false
+        val = with(self)
     }
 
     private init(ndb: Ndb, txn: ndb_txn, val: T, generation: Int, inherited: Bool, name: String) {
         self.txn = txn
         self.val = val
-        self.moved = false
+        moved = false
         self.inherited = inherited
         self.ndb = ndb
         self.generation = generation
@@ -109,27 +109,27 @@ class NdbTxn<T>: RawNdbTxnAccessible {
             return
         }
         if moved {
-            //print("txn: not closing. moved")
+            // print("txn: not closing. moved")
             return
         }
 
         #if TXNDEBUG
-        txn_count -= 1;
-        print("txn: close gen\(generation) '\(name)' \(txn_count)")
+            txn_count -= 1
+            print("txn: close gen\(generation) '\(name)' \(txn_count)")
         #endif
     }
 
     // functor
     func map<Y>(_ transform: (T) -> Y) -> NdbTxn<Y> {
-        self.moved = true
-        return .init(ndb: self.ndb, txn: self.txn, val: transform(val), generation: generation, inherited: inherited, name: self.name)
+        moved = true
+        return .init(ndb: ndb, txn: txn, val: transform(val), generation: generation, inherited: inherited, name: name)
     }
 
     // comonad!?
     // useful for moving ownership of a transaction to another value
     func extend<Y>(_ with: (NdbTxn<T>) -> Y) -> NdbTxn<Y> {
-        self.moved = true
-        return .init(ndb: self.ndb, txn: self.txn, val: with(self), generation: generation, inherited: inherited, name: self.name)
+        moved = true
+        return .init(ndb: ndb, txn: txn, val: with(self), generation: generation, inherited: inherited, name: name)
     }
 }
 
@@ -139,7 +139,7 @@ protocol RawNdbTxnAccessible: AnyObject {
 
 class PlaceholderNdbTxn: RawNdbTxnAccessible {
     var txn: ndb_txn
-    
+
     init(txn: ndb_txn) {
         self.txn = txn
     }
@@ -157,7 +157,7 @@ class SafeNdbTxn<T: ~Copyable> {
     static func pure(ndb: Ndb, val: consuming T) -> SafeNdbTxn<T> {
         .init(ndb: ndb, txn: ndb_txn(), val: val, generation: ndb.generation, inherited: true, name: "pure_txn")
     }
-    
+
     static func new(on ndb: Ndb, with valueGetter: (PlaceholderNdbTxn) -> T? = { _ in () }, name: String = "txn") -> SafeNdbTxn<T>? {
         guard !ndb.is_closed else { return nil }
         var generation = ndb.generation
@@ -180,7 +180,7 @@ class SafeNdbTxn<T: ~Copyable> {
             guard !ndb.is_closed else { return nil }
             generation = ndb.generation
             #if TXNDEBUG
-            txn_count += 1
+                txn_count += 1
             #endif
             let ok = ndb_begin_query(ndb.ndb.ndb, &txn) != 0
             if !ok {
@@ -193,7 +193,7 @@ class SafeNdbTxn<T: ~Copyable> {
             inherited = false
         }
         #if TXNDEBUG
-        print("txn: open  gen\(self.generation) '\(self.name)' \(txn_count)")
+            print("txn: open  gen\(self.generation) '\(self.name)' \(txn_count)")
         #endif
         let moved = false
         let placeholderTxn = PlaceholderNdbTxn(txn: txn)
@@ -204,7 +204,7 @@ class SafeNdbTxn<T: ~Copyable> {
     private init(ndb: Ndb, txn: ndb_txn, val: consuming T, generation: Int, inherited: Bool, name: String) {
         self.txn = txn
         self.val = consume val
-        self.moved = false
+        moved = false
         self.inherited = inherited
         self.ndb = ndb
         self.generation = generation
@@ -235,31 +235,31 @@ class SafeNdbTxn<T: ~Copyable> {
             return
         }
         if moved {
-            //print("txn: not closing. moved")
+            // print("txn: not closing. moved")
             return
         }
 
         #if TXNDEBUG
-        txn_count -= 1;
-        print("txn: close gen\(generation) '\(name)' \(txn_count)")
+            txn_count -= 1
+            print("txn: close gen\(generation) '\(name)' \(txn_count)")
         #endif
     }
 
     // functor
     func map<Y>(_ transform: (borrowing T) -> Y) -> SafeNdbTxn<Y> {
-        self.moved = true
-        return .init(ndb: self.ndb, txn: self.txn, val: transform(val), generation: generation, inherited: inherited, name: self.name)
+        moved = true
+        return .init(ndb: ndb, txn: txn, val: transform(val), generation: generation, inherited: inherited, name: name)
     }
 
     // comonad!?
     // useful for moving ownership of a transaction to another value
     func extend<Y>(_ with: (SafeNdbTxn<T>) -> Y) -> SafeNdbTxn<Y> {
-        self.moved = true
-        return .init(ndb: self.ndb, txn: self.txn, val: with(self), generation: generation, inherited: inherited, name: self.name)
+        moved = true
+        return .init(ndb: ndb, txn: txn, val: with(self), generation: generation, inherited: inherited, name: name)
     }
-    
+
     consuming func maybeExtend<Y>(_ with: (consuming SafeNdbTxn<T>) -> Y?) -> SafeNdbTxn<Y>? where Y: ~Copyable {
-        self.moved = true
+        moved = true
         let ndb = self.ndb
         let txn = self.txn
         let generation = self.generation
@@ -288,20 +288,20 @@ extension NdbTxn where T: OptionalType {
         guard let unwrappedVal: T.Wrapped = val.optional else {
             return nil
         }
-        self.moved = true
-        return NdbTxn<T.Wrapped>(ndb: self.ndb, txn: self.txn, val: unwrappedVal, generation: generation, inherited: inherited, name: name)
+        moved = true
+        return NdbTxn<T.Wrapped>(ndb: ndb, txn: txn, val: unwrappedVal, generation: generation, inherited: inherited, name: name)
     }
 }
 
-extension NdbTxn where T == Bool { var value: T { return self.unsafeUnownedValue } }
-extension NdbTxn where T == Bool? { var value: T { return self.unsafeUnownedValue } }
-extension NdbTxn where T == Int { var value: T { return self.unsafeUnownedValue } }
-extension NdbTxn where T == Int? { var value: T { return self.unsafeUnownedValue } }
-extension NdbTxn where T == Double { var value: T { return self.unsafeUnownedValue } }
-extension NdbTxn where T == Double? { var value: T { return self.unsafeUnownedValue } }
-extension NdbTxn where T == UInt64 { var value: T { return self.unsafeUnownedValue } }
-extension NdbTxn where T == UInt64? { var value: T { return self.unsafeUnownedValue } }
-extension NdbTxn where T == String { var value: T { return self.unsafeUnownedValue } }
-extension NdbTxn where T == String? { var value: T { return self.unsafeUnownedValue } }
-extension NdbTxn where T == NoteId? { var value: T { return self.unsafeUnownedValue } }
-extension NdbTxn where T == NoteId { var value: T { return self.unsafeUnownedValue } }
+extension NdbTxn where T == Bool { var value: T { return unsafeUnownedValue } }
+extension NdbTxn where T == Bool? { var value: T { return unsafeUnownedValue } }
+extension NdbTxn where T == Int { var value: T { return unsafeUnownedValue } }
+extension NdbTxn where T == Int? { var value: T { return unsafeUnownedValue } }
+extension NdbTxn where T == Double { var value: T { return unsafeUnownedValue } }
+extension NdbTxn where T == Double? { var value: T { return unsafeUnownedValue } }
+extension NdbTxn where T == UInt64 { var value: T { return unsafeUnownedValue } }
+extension NdbTxn where T == UInt64? { var value: T { return unsafeUnownedValue } }
+extension NdbTxn where T == String { var value: T { return unsafeUnownedValue } }
+extension NdbTxn where T == String? { var value: T { return unsafeUnownedValue } }
+extension NdbTxn where T == NoteId? { var value: T { return unsafeUnownedValue } }
+extension NdbTxn where T == NoteId { var value: T { return unsafeUnownedValue } }

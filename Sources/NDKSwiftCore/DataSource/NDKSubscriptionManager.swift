@@ -17,7 +17,7 @@ actor NDKSubscriptionManager {
         Task {
             await startPeriodicCleanup()
         }
-        
+
         // Listen for relay discoveries
         Task {
             await listenForRelayDiscoveries()
@@ -59,7 +59,7 @@ actor NDKSubscriptionManager {
         let correlationId = requirementId.uuidString.prefix(8)
 
         NDKLogger.log(.info, category: .subscription, "📥 [DataReqManager] registerRequirement - filter: \(filter), maxAge: \(maxAge), policy: \(cachePolicy), subscriptionId: \(subscriptionId ?? "auto")", correlationId: String(correlationId))
-        
+
         // Note: NDKSubscriptionRequirement will set up its own cache observation
         // This ensures proper lifecycle management
 
@@ -72,13 +72,13 @@ actor NDKSubscriptionManager {
 
         // Check if we should fetch from network
         var shouldFetchFromNetwork = true
-        
+
         // Cache-only policy never fetches from network
         if cachePolicy == .cacheOnly {
             shouldFetchFromNetwork = false
         }
         // Check cache freshness if maxAge > 0 and cachePolicy allows it
-        else if maxAge > 0 && cachePolicy == .cacheWithNetwork {
+        else if maxAge > 0, cachePolicy == .cacheWithNetwork {
             // Check if we have fresh data in cache
             if let lastFetchTime = await ndk.cache.getLastFetchTime(for: filter) {
                 let age = Date().timeIntervalSince(lastFetchTime)
@@ -118,7 +118,6 @@ actor NDKSubscriptionManager {
             await requirement.startProcessing()
         }
 
-
         return (
             handle: NDKSubscriptionRequirementHandle(
                 id: requirementId,
@@ -133,7 +132,7 @@ actor NDKSubscriptionManager {
     /// Create a data requirement with proper filter splitting for outbox model
     private func createRequirement(
         filter: NDKFilter,
-        maxAge: TimeInterval,
+        maxAge _: TimeInterval,
         cachePolicy: CachePolicy,
         relays: Set<RelayURL>?,
         exclusiveRelays: Bool,
@@ -158,9 +157,9 @@ actor NDKSubscriptionManager {
         // Create internal subscription
         let subId = subscriptionId ?? generateSubscriptionId(for: optimizedFilter)
         let fingerprint = [optimizedFilter].toFingerprint(closeOnEose: closeOnEose)
-        
+
         NDKLogger.log(.debug, category: .subscription,
-                     "🆕 [DataReqManager] Creating internal subscription with ID '\(subId)' and fingerprint '\(fingerprint)'")
+                      "🆕 [DataReqManager] Creating internal subscription with ID '\(subId)' and fingerprint '\(fingerprint)'")
         let internalSubscription = await ndk.internalSubscriptionManager.createSubscription(
             id: subId,
             filters: [optimizedFilter],
@@ -202,7 +201,7 @@ actor NDKSubscriptionManager {
     private func determineRelayStrategy(
         filter: NDKFilter,
         explicitRelays: Set<RelayURL>?,
-        exclusiveRelays: Bool
+        exclusiveRelays _: Bool
     ) async -> InternalRelaySelectionStrategy {
         // If explicit relays are provided, use them
         if let relays = explicitRelays {
@@ -212,7 +211,7 @@ actor NDKSubscriptionManager {
         // If outbox is enabled and filter has authors, use outbox strategy
         if ndk.outboxEnabled, let authors = filter.authors, !authors.isEmpty {
             let outboxStrategy = await ndk.outbox.getOutboxStrategy(for: filter)
-            
+
             // Start background discovery if needed
             if !outboxStrategy.authorsToDiscover.isEmpty {
                 NDKLogger.log(.info, category: .subscription, "🔍 Triggering background relay discovery for \(outboxStrategy.authorsToDiscover.count) authors")
@@ -220,49 +219,49 @@ actor NDKSubscriptionManager {
                     await ndk.outbox.discoverRelaysInBackground(for: outboxStrategy.authorsToDiscover)
                 }
             }
-            
+
             return .outbox(strategy: outboxStrategy)
         }
 
         // Otherwise use the app's configured/explicit relays (fallback relays)
         let explicitRelays = await ndk.pool.explicitRelays()
         let explicitRelayURLs = Set(explicitRelays.map { $0.url })
-        
+
         if explicitRelayURLs.isEmpty {
-            NDKLogger.log(.warning, category: .subscription, 
-                         "⚠️ No relays specified and no explicit/fallback relays configured in the pool. Add relays to the pool before creating subscriptions.")
+            NDKLogger.log(.warning, category: .subscription,
+                          "⚠️ No relays specified and no explicit/fallback relays configured in the pool. Add relays to the pool before creating subscriptions.")
         } else {
-            NDKLogger.log(.debug, category: .subscription, 
-                         "📡 Using \(explicitRelayURLs.count) explicit/fallback relays for subscription")
+            NDKLogger.log(.debug, category: .subscription,
+                          "📡 Using \(explicitRelayURLs.count) explicit/fallback relays for subscription")
         }
-        
+
         return .default(relays: explicitRelayURLs)
     }
 
     /// Generate a subscription ID for a filter
     private func generateSubscriptionId(for filter: NDKFilter) -> String {
         var parts: [String] = []
-        
+
         // Add kind info (abbreviated)
         if let kinds = filter.kinds {
             let kindStr = kinds.count == 1 ? "k\(kinds[0])" : "k\(kinds.count)"
             parts.append(kindStr)
         }
-        
+
         // Add author info (abbreviated)
         if let authors = filter.authors {
             let authorStr = authors.count == 1 ? String(authors[0].prefix(4)) : "a\(authors.count)"
             parts.append(authorStr)
         }
-        
+
         // Add tag info
         if let tags = filter.tags, !tags.isEmpty {
             parts.append("t\(tags.count)")
         }
-        
+
         // Add random component
         parts.append(String(UUID().uuidString.prefix(4)))
-        
+
         return parts.joined(separator: "_")
     }
 
@@ -309,38 +308,38 @@ actor NDKSubscriptionManager {
     /// Handle newly discovered relays for authors
     private func handleRelayDiscovery(authors: Set<String>, relays: Set<RelayURL>) async {
         NDKLogger.log(.info, category: .subscription, "📡 Relay discovery: \(relays.count) relays for \(authors.count) authors")
-        
+
         // According to Outbox.md: Create NEW NDKSubscriptionRequirements for discovered relays
         // and attach them to the same observers as the original subscription
-        
+
         // Create relay selection strategy
         let relaySelector = OverlapOptimizedRelaySelector(tracker: ndk.outbox)
-        
+
         // Find requirements that need enhancement with these relays
         for (requirementId, requirement) in activeRequirements {
             // Get the relay strategy to check if this requirement has unknown authors
             let filter = requirement.filter
             let relayStrategy = await requirement.relayStrategy
-            guard case .outbox(let strategy) = relayStrategy else { continue }
-            
+            guard case let .outbox(strategy) = relayStrategy else { continue }
+
             // Check if any discovered authors are in this requirement's unknown authors
             let relevantAuthors = authors.intersection(strategy.unknownAuthors)
             guard !relevantAuthors.isEmpty else { continue }
-            
+
             NDKLogger.log(.info, category: .subscription,
-                         "🎯 Evaluating enhanced requirements for \(relevantAuthors.count) authors")
-            
+                          "🎯 Evaluating enhanced requirements for \(relevantAuthors.count) authors")
+
             // Check if the requirement has observers
             let observerCount = await requirement.getObserverCount()
             guard observerCount > 0 else { continue }
-            
+
             // Get relays that are already serving these specific authors
             let existingRelays = await requirement.getRelaysServingAuthors(relevantAuthors)
             let connectedRelays = await ndk.pool.connectedRelayURLs
-            
+
             NDKLogger.log(.debug, category: .subscription,
-                         "📊 Requirement status - existing relays: \(existingRelays), connected pool relays: \(connectedRelays.count)")
-            
+                          "📊 Requirement status - existing relays: \(existingRelays), connected pool relays: \(connectedRelays.count)")
+
             // Use relay selector to choose which relays to connect to
             let selectedRelays = await relaySelector.selectRelaysToConnect(
                 discoveredRelays: relays,
@@ -349,31 +348,31 @@ actor NDKSubscriptionManager {
                 connectedRelays: connectedRelays,
                 maxRelays: OutboxConstants.relaysPerAuthorForFetching
             )
-            
+
             guard !selectedRelays.isEmpty else {
                 NDKLogger.log(.debug, category: .subscription,
-                             "📊 No additional relays needed for requirement \(requirementId)")
+                              "📊 No additional relays needed for requirement \(requirementId)")
                 continue
             }
-            
+
             NDKLogger.log(.info, category: .subscription,
-                         "🎯 Selected \(selectedRelays.count) relays for enhancement: \(selectedRelays)")
-            
+                          "🎯 Selected \(selectedRelays.count) relays for enhancement: \(selectedRelays)")
+
             // Connect to selected relays that aren't already connected
             for relayURL in selectedRelays {
                 if await ndk.pool.getRelay(for: relayURL) == nil {
                     NDKLogger.log(.info, category: .subscription,
-                                 "🔌 Adding and connecting to discovered relay: \(relayURL)")
+                                  "🔌 Adding and connecting to discovered relay: \(relayURL)")
                     let originAuthor = relevantAuthors.first ?? "unknown"
                     // Use ndk.addRelay instead of pool.addRelay to ensure auto-connect happens
                     await ndk.addRelay(relayURL, origin: .outbox(authorPubkey: originAuthor))
                 }
             }
-            
+
             // Create a new filter for just the relevant authors
             var enhancedFilter = filter
             enhancedFilter.authors = Array(relevantAuthors)
-            
+
             // Create new requirements for each selected relay with the enhanced filter
             for relayURL in selectedRelays {
                 // Create a unique subscription ID for this enhancement
@@ -382,7 +381,7 @@ actor NDKSubscriptionManager {
                     .replacingOccurrences(of: "/", with: "_")
                     .prefix(12)
                 let enhancedSubscriptionId = "\(requirement.subscriptionId)_enhanced_\(relaySuffix)"
-                
+
                 // Create enhanced requirement for this specific relay
                 // This follows the outbox model: create a new requirement for discovered relays
                 let enhancedRequirementId = UUID()
@@ -391,7 +390,7 @@ actor NDKSubscriptionManager {
                     maxAge: 0, // Enhanced requirements are live subscriptions
                     cachePolicy: .networkOnly, // Fetch fresh data from discovered relays
                     relays: Set([relayURL]),
-                    exclusiveRelays: true,  // Use only this specific relay
+                    exclusiveRelays: true, // Use only this specific relay
                     subscriptionId: enhancedSubscriptionId,
                     closeOnEose: false, // Keep live subscription open
                     requirementId: enhancedRequirementId,
@@ -400,28 +399,28 @@ actor NDKSubscriptionManager {
                     groupableDelay: nil,
                     groupableDelayType: nil
                 )
-                
+
                 // Create handle for the enhanced requirement
                 let enhancedHandle = NDKSubscriptionRequirementHandle(
                     id: enhancedRequirementId,
                     manager: self,
                     requirement: enhancedRequirement
                 )
-                
+
                 // Track the enhanced requirement
                 await requirement.addEnhancedRequirement(enhancedHandle)
-                
+
                 // Store in active requirements
                 activeRequirements[enhancedRequirementId] = enhancedRequirement
-                
+
                 NDKLogger.log(.info, category: .subscription,
-                             "✅ Created enhanced requirement '\(enhancedSubscriptionId)' for relay \(relayURL)")
-                
+                              "✅ Created enhanced requirement '\(enhancedSubscriptionId)' for relay \(relayURL)")
+
                 // Start processing the enhanced requirement
                 Task {
                     await enhancedRequirement.startProcessing()
                 }
-                
+
                 // Note: Enhanced requirements work independently
                 // Events will flow through the cache and reactive system naturally
             }
@@ -452,7 +451,7 @@ public final class NDKSubscriptionRequirementHandle: Sendable {
 
     init(id: RequirementID, manager: NDKSubscriptionManager?, requirement: NDKSubscriptionRequirement? = nil) {
         self.id = id
-        self.state = HandleStateActor(manager: manager, requirement: requirement)
+        state = HandleStateActor(manager: manager, requirement: requirement)
     }
 
     /// Cancel this requirement

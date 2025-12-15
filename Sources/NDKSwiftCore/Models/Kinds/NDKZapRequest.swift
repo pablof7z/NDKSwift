@@ -31,7 +31,8 @@ public struct NDKZapRequest {
         // Optional: lnurl tag
         for await profile in await ndk.profileManager.subscribe(for: recipient.pubkey, maxAge: TimeConstants.hour) {
             if let profile = profile,
-               let lnurl = profile.lud06 ?? profile.lud16 {
+               let lnurl = profile.lud06 ?? profile.lud16
+            {
                 let encoded = try encodeLNURL(lnurl)
                 tags.append([NostrConstants.TagName.lnurl, encoded])
             }

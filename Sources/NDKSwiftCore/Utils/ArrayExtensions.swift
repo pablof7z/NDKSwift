@@ -28,7 +28,6 @@ public extension Array {
 
 /// Convenience extensions for arrays containing NDKEvent objects
 public extension Array where Element == NDKEvent {
-
     /// Returns the most recent event based on createdAt timestamp
     /// - Returns: The event with the highest createdAt value, or nil if array is empty
     ///
@@ -71,26 +70,9 @@ public extension Array where Element == NDKEvent {
     /// let sorted = events.sortedByRecency()
     /// ```
     func sortedByRecency() -> [NDKEvent] {
-        return self.sorted(by: { $0.createdAt > $1.createdAt })
+        return sorted(by: { $0.createdAt > $1.createdAt })
     }
-
 }
 
 // MARK: - Array Mutation Extensions
-
-public extension Array {
-    /// Remove all elements matching the predicate and return the removed elements
-    @discardableResult
-    mutating func removeAll(where predicate: (Element) throws -> Bool) rethrows -> [Element] {
-        var removed: [Element] = []
-        self = try filter { element in
-            let shouldRemove = try predicate(element)
-            if shouldRemove {
-                removed.append(element)
-            }
-            return !shouldRemove
-        }
-        return removed
-    }
-}
-
+// (No custom removeAll to avoid shadowing Swift stdlib)

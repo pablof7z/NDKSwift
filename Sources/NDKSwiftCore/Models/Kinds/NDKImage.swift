@@ -1,5 +1,5 @@
-import Foundation
 import CoreGraphics
+import Foundation
 
 /// NDKImage represents a Nostr image event (kind 20)
 public struct NDKImage {
@@ -59,9 +59,9 @@ public struct NDKImage {
     // MARK: - Initialization
 
     /// Initialize a new NDKImage event
-    public init(ndk: NDK? = nil, pubkey: PublicKey = "") {
+    public init(ndk _: NDK? = nil, pubkey: PublicKey = "") {
         // Create a placeholder event - this will need to be properly signed later
-        self.event = NDKEvent(
+        event = NDKEvent(
             id: "", // Will be set when signed
             pubkey: pubkey,
             createdAt: Timestamp.now,
@@ -71,7 +71,6 @@ public struct NDKImage {
             sig: "" // Will be set when signed
         )
     }
-
 
     /// Create an NDKImage from an existing NDKEvent
     public init(event: NDKEvent) {

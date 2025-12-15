@@ -89,9 +89,9 @@ public enum PaymentError: LocalizedError, Sendable {
             return "Payment provider is not available"
         case .cannotFulfillRequest:
             return "Provider cannot fulfill this payment request"
-        case .insufficientBalance(let available, let required):
+        case let .insufficientBalance(available, required):
             return "Insufficient balance: \(available) sats available, \(required) required"
-        case .paymentFailed(let reason):
+        case let .paymentFailed(reason):
             return "Payment failed: \(reason)"
         case .userCancelled:
             return "Payment was cancelled by user"

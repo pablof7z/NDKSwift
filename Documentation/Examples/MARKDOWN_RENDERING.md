@@ -14,9 +14,9 @@ import NDKSwiftUI
 struct ContentView: View {
     @EnvironmentObject var ndk: NDK
     let content = "# Hello Nostr\nThis is **bold** and this is *italic*."
-    
+
     var body: some View {
-        NDKMarkdownRenderer(content, ndk: ndk)
+        NDKUIMarkdownRenderer(content, ndk: ndk)
     }
 }
 ```
@@ -41,7 +41,7 @@ struct EventView: View {
             }
             
             // Markdown content
-            NDKMarkdownRenderer(event: event, ndk: ndk)
+            NDKUIMarkdownRenderer(event: event, ndk: ndk)
                 .markdownStyle(.minimal)
         }
         .padding()
@@ -65,7 +65,7 @@ struct InteractiveContentView: View {
     """
     
     var body: some View {
-        NDKMarkdownRenderer(content, ndk: ndk)
+        NDKUIMarkdownRenderer(content, ndk: ndk)
             .onMentionTap { pubkey in
                 print("Tapped mention: \(pubkey)")
                 // Navigate to user profile
@@ -100,20 +100,20 @@ struct StyledMarkdownView: View {
     var body: some View {
         VStack(spacing: 20) {
             // Minimal style (default)
-            NDKMarkdownRenderer(content, ndk: ndk)
+            NDKUIMarkdownRenderer(content, ndk: ndk)
                 .markdownStyle(.minimal)
             
             // Dark mode optimized
-            NDKMarkdownRenderer(content, ndk: ndk)
+            NDKUIMarkdownRenderer(content, ndk: ndk)
                 .markdownStyle(.dark)
                 .background(Color.black)
             
             // Nostr-themed
-            NDKMarkdownRenderer(content, ndk: ndk)
+            NDKUIMarkdownRenderer(content, ndk: ndk)
                 .markdownStyle(.nostr)
             
             // Compact spacing
-            NDKMarkdownRenderer(content, ndk: ndk)
+            NDKUIMarkdownRenderer(content, ndk: ndk)
                 .markdownStyle(.compact)
         }
     }
@@ -152,7 +152,7 @@ struct CustomStyledView: View {
     }
     
     var body: some View {
-        NDKMarkdownRenderer(
+        NDKUIMarkdownRenderer(
             "# Custom Styled\nWith **custom** colors and fonts!",
             ndk: ndk
         )
@@ -179,7 +179,7 @@ struct ImageMarkdownView: View {
     """
     
     var body: some View {
-        NDKMarkdownRenderer(content, ndk: ndk)
+        NDKUIMarkdownRenderer(content, ndk: ndk)
             .renderImages()
             .onImageTap { url in
                 print("Tapped image: \(url)")
@@ -237,7 +237,7 @@ struct CodeExampleView: View {
     """
     
     var body: some View {
-        NDKMarkdownRenderer(content, ndk: ndk)
+        NDKUIMarkdownRenderer(content, ndk: ndk)
             .markdownStyle(.minimal)
     }
 }
@@ -270,7 +270,7 @@ struct NoteComposerView: View {
                 
                 // Live preview
                 ScrollView {
-                    NDKMarkdownRenderer(noteContent, ndk: ndk)
+                    NDKUIMarkdownRenderer(noteContent, ndk: ndk)
                         .markdownStyle(.minimal)
                         .padding()
                 }

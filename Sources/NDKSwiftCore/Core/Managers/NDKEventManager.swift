@@ -4,7 +4,7 @@ import Foundation
 public actor NDKEventManager {
     private weak var ndk: NDK?
     private let cache: NDKCache
-    
+
     /// Track events that failed due to auth requirements per relay
     private var pendingAuthEvents: [RelayURL: [NDKEvent]] = [:]
 
@@ -40,7 +40,7 @@ public actor NDKEventManager {
         NDKLogger.log(.debug, category: .event, "Event kind: \(event.kind), Selected \(targetRelayUrls.count) relays for publishing: \(targetRelayUrls)")
 
         // Use common publish implementation
-        return try await publishToRelays(event: event, relayUrls: targetRelayUrls, logRawJSON: logRawJSON, useOptimistic: true)
+        return try await publishToRelays(event: event, relayURLs: targetRelayUrls, logRawJSON: logRawJSON, useOptimistic: true)
     }
 
     /// Publish an event to specific relays
@@ -50,26 +50,26 @@ public actor NDKEventManager {
     ///
     /// - Parameters:
     ///   - event: The event to publish (must be signed)
-    ///   - relayUrls: Set of relay URLs to publish to
+    ///   - relayURLs: Set of relay URLs to publish to
     ///   - logRawJSON: If true, logs the raw JSON of the event for debugging
     /// - Returns: Set of relays that successfully accepted the event
     /// - Throws: `NDKError.invalidContent` if the event is not signed,
     ///           `NDKError.notConfigured` if NDK reference is lost,
     ///           `NDKError.publishError` if publishing fails
-    public func publish(event: NDKEvent, to relayUrls: Set<String>, logRawJSON: Bool = false) async throws -> Set<NDKRelay> {
+    public func publish(event: NDKEvent, to relayURLs: Set<String>, logRawJSON: Bool = false) async throws -> Set<NDKRelay> {
         // Use common publish implementation without optimistic publishing for explicit relay selection
-        return try await publishToRelays(event: event, relayUrls: relayUrls, logRawJSON: logRawJSON, useOptimistic: false)
+        return try await publishToRelays(event: event, relayURLs: relayURLs, logRawJSON: logRawJSON, useOptimistic: false)
     }
 
     /// Common implementation for publishing events
     ///
     /// - Parameters:
     ///   - event: The event to publish
-    ///   - relayUrls: Target relay URLs
+    ///   - relayURLs: Target relay URLs
     ///   - logRawJSON: Whether to log raw JSON
     ///   - useOptimistic: Whether to use optimistic publishing
     /// - Returns: Set of relays that accepted the event
-    private func publishToRelays(event: NDKEvent, relayUrls: Set<String>, logRawJSON: Bool, useOptimistic: Bool) async throws -> Set<NDKRelay> {
+    private func publishToRelays(event: NDKEvent, relayURLs: Set<String>, logRawJSON: Bool, useOptimistic: Bool) async throws -> Set<NDKRelay> {
         guard let ndk = ndk else {
             throw NDKError.notConfigured(ErrorMessageConstants.Messages.ndkReferenceLost)
         }
@@ -89,7 +89,7 @@ public actor NDKEventManager {
         // Always handle optimistic publishing (except for relay lists)
         if useOptimistic && event.kind != 10002 {
             do {
-                try await cache.addUnpublishedEvent(event, relays: relayUrls)
+                try await cache.addUnpublishedEvent(event, relays: relayURLs)
             } catch {
                 NDKLogger.log(.warning, category: .cache, "Failed to add unpublished event to cache: \(error)")
             }
@@ -108,7 +108,7 @@ public actor NDKEventManager {
         }
 
         // Prepare relays for publishing (add to pool and start connecting)
-        let targetRelays = await ndk.pool.prepareRelays(Array(relayUrls), autoConnect: true)
+        let targetRelays = await ndk.pool.prepareRelays(Array(relayURLs), autoConnect: true)
 
         // Publish to relays
         var publishedRelays = Set<NDKRelay>()
@@ -141,7 +141,7 @@ public actor NDKEventManager {
                 }
             }
 
-            for await (relay, success) in group {
+            for await(relay, success) in group {
                 if success {
                     publishedRelays.insert(relay)
 
@@ -170,7 +170,7 @@ public actor NDKEventManager {
     }
 
     /// Build and publish an event in one step
-    public func publish(_ builder: (NDKEventBuilder) -> NDKEventBuilder) async throws -> (event: NDKEvent, relays: Set<NDKRelay>) {
+    public func publish(_ builder: @Sendable (NDKEventBuilder) -> NDKEventBuilder) async throws -> (event: NDKEvent, relays: Set<NDKRelay>) {
         guard let ndk = ndk else {
             throw NDKError.notConfigured(ErrorMessageConstants.Messages.ndkReferenceLost)
         }
@@ -210,11 +210,11 @@ public actor NDKEventManager {
 
         return results
     }
-    
+
     // MARK: - Authentication-Related Methods
-    
+
     /// Track an event that failed due to auth requirements
-    internal func trackPendingAuthEvent(_ event: NDKEvent, for relay: RelayURL) {
+    func trackPendingAuthEvent(_ event: NDKEvent, for relay: RelayURL) {
         var pending = pendingAuthEvents[relay] ?? []
         if !pending.contains(where: { $0.id == event.id }) {
             pending.append(event)
@@ -222,20 +222,20 @@ public actor NDKEventManager {
             NDKLogger.log(.debug, category: .auth, "Tracked event \(event.id) pending auth for \(relay)")
         }
     }
-    
+
     /// Get and clear pending auth events for a relay
-    internal func getPendingAuthEvents(for relay: RelayURL) -> [NDKEvent] {
+    func getPendingAuthEvents(for relay: RelayURL) -> [NDKEvent] {
         return pendingAuthEvents.removeValue(forKey: relay) ?? []
     }
-    
+
     /// Retry events that were pending authentication for a specific relay
-    internal func retryAuthenticatedEvents(for relay: NDKRelay) async {
+    func retryAuthenticatedEvents(for relay: NDKRelay) async {
         let pendingEvents = getPendingAuthEvents(for: relay.url)
-        
+
         guard !pendingEvents.isEmpty else { return }
-        
+
         NDKLogger.log(.info, category: .auth, "Retrying \(pendingEvents.count) events after authentication on \(relay.url)")
-        
+
         for event in pendingEvents {
             do {
                 let result = try await relay.publish(event)
@@ -252,12 +252,12 @@ public actor NDKEventManager {
     }
 
     /// Publish queued events for a specific relay (called by NDKPool when relay connects)
-    internal func publishQueuedEvents(for relay: NDKRelay) async {
+    func publishQueuedEvents(for relay: NDKRelay) async {
         let unpublishedEvents = await cache.getUnpublishedEvents(maxAge: TimeConstants.hour, limit: nil)
-        
+
         // Count events targeted for this relay
         let eventsForRelay = unpublishedEvents.filter { $0.targetRelays.contains(relay.url) }
-        
+
         // Only log if there are events to publish
         if !eventsForRelay.isEmpty {
             NDKLogger.log(.debug, category: .relay, "📤 Publishing \(eventsForRelay.count) queued events for newly connected relay: \(relay.url)")

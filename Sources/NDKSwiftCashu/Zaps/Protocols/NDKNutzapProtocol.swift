@@ -1,6 +1,6 @@
+import CashuSwift
 import Foundation
 import NDKSwiftCore
-import CashuSwift
 
 /// NIP-61 Nutzap protocol implementation
 public class NDKNutzapProtocol: NDKZapProtocol {
@@ -46,8 +46,8 @@ public class NDKNutzapProtocol: NDKZapProtocol {
         // Payment provider will choose the optimal one
         let paymentRequest = NutzapPaymentRequest(
             amountSats: amountSats,
-            recipientPubkey: recipientInfo.pubkey,  // Nostr pubkey for p tag
-            recipientP2PK: p2pkPubkey,  // P2PK key for locking proofs
+            recipientPubkey: recipientInfo.pubkey, // Nostr pubkey for p tag
+            recipientP2PK: p2pkPubkey, // P2PK key for locking proofs
             acceptedMints: acceptedMints,
             comment: comment
         )
@@ -58,7 +58,7 @@ public class NDKNutzapProtocol: NDKZapProtocol {
         // Store metadata for completion
         let metadata: [String: Any] = [
             "preferences": preferences,
-            "relays": Array(allRelays)
+            "relays": Array(allRelays),
         ]
 
         // Create prepared zap with NDKUser
@@ -118,7 +118,7 @@ public class NDKNutzapProtocol: NDKZapProtocol {
 
     /// Create a mint quote for Lightning-to-Cashu conversion
     public func createMintQuote(
-        invoice: String,
+        invoice _: String,
         mint: URL,
         amount: Int64
     ) async throws -> MintQuote {
@@ -142,7 +142,7 @@ public class NDKNutzapProtocol: NDKZapProtocol {
                 id: mintQuote.quote,
                 mint: mint,
                 amount: amount,
-                invoice: mintQuote.request,  // The Lightning invoice to pay
+                invoice: mintQuote.request, // The Lightning invoice to pay
                 expiry: Date(nostrTimestamp: Timestamp(mintQuote.expiry ?? 0))
             )
         } catch {

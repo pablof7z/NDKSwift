@@ -1,48 +1,48 @@
-import XCTest
 @testable import NDKSwiftCore
+import XCTest
 
 final class NDKAuthErrorTests: XCTestCase {
-    
     func testCorruptedSessionDataError() {
         // Test creating the error
         let sessionId = "test-session-123"
         let error = NDKAuthError.corruptedSessionData(sessionId: sessionId)
-        
+
         // Test error description
         XCTAssertEqual(error.errorDescription, "Session data is corrupted for session: \(sessionId)")
-        
+
         // Test pattern matching
-        if case .corruptedSessionData(let id) = error {
+        if case let .corruptedSessionData(id) = error {
             XCTAssertEqual(id, sessionId)
         } else {
             XCTFail("Pattern matching failed for corruptedSessionData")
         }
     }
-    
+
     func testCorruptedSessionDataEquality() {
         let error1 = NDKAuthError.corruptedSessionData(sessionId: "session1")
         let error2 = NDKAuthError.corruptedSessionData(sessionId: "session1")
         let error3 = NDKAuthError.corruptedSessionData(sessionId: "session2")
-        
+
         // Same session ID should be equal
         XCTAssertEqual(error1, error2)
-        
+
         // Different session ID should not be equal
         XCTAssertNotEqual(error1, error3)
     }
-    
+
     func testErrorCasting() {
         let error: Error = NDKAuthError.corruptedSessionData(sessionId: "test")
-        
+
         // Test casting to NDKAuthError
         if let authError = error as? NDKAuthError,
-           case .corruptedSessionData(let sessionId) = authError {
+           case let .corruptedSessionData(sessionId) = authError
+        {
             XCTAssertEqual(sessionId, "test")
         } else {
             XCTFail("Failed to cast Error to NDKAuthError")
         }
     }
-    
+
     func testDecodingErrorHandling() async {
         // This simulates what happens in restoreActiveSession
         let simulateRestoreSession: () async throws -> Void = {
@@ -54,12 +54,12 @@ final class NDKAuthErrorTests: XCTestCase {
                 throw NDKAuthError.corruptedSessionData(sessionId: "test-session")
             }
         }
-        
+
         do {
             try await simulateRestoreSession()
             XCTFail("Expected error to be thrown")
         } catch let error as NDKAuthError {
-            if case .corruptedSessionData(let sessionId) = error {
+            if case let .corruptedSessionData(sessionId) = error {
                 XCTAssertEqual(sessionId, "test-session")
             } else {
                 XCTFail("Expected corruptedSessionData error, got \(error)")

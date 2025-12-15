@@ -3,7 +3,7 @@ import Foundation
 /// Extensions to simplify common Task patterns in the codebase
 extension Task where Success == Void, Failure == Never {
     /// Creates a Task with weak self capture, automatically handling nil self
-    /// 
+    ///
     /// Example:
     /// ```swift
     /// // Before:
@@ -11,7 +11,7 @@ extension Task where Success == Void, Failure == Never {
     ///     guard let self = self else { return }
     ///     await self.doSomething()
     /// }
-    /// 
+    ///
     /// // After:
     /// Task.weak(self) { strongSelf in
     ///     await strongSelf.doSomething()
@@ -24,7 +24,7 @@ extension Task where Success == Void, Failure == Never {
             await operation(object)
         }
     }
-    
+
     /// Creates a detached Task with weak self capture
     ///
     /// Example:
@@ -34,7 +34,7 @@ extension Task where Success == Void, Failure == Never {
     ///     guard let self = self else { return }
     ///     await self.doSomething()
     /// }
-    /// 
+    ///
     /// // After:
     /// Task.detachedWeak(self) { strongSelf in
     ///     await strongSelf.doSomething()
@@ -60,7 +60,7 @@ extension Task {
     ///     guard let self = self else { return nil }
     ///     return await self.fetchData()
     /// }
-    /// 
+    ///
     /// // After:
     /// Task.weak(self) { strongSelf in
     ///     return await strongSelf.fetchData()

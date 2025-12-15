@@ -1,11 +1,11 @@
-import Foundation
 import Combine
+import Foundation
 
 /// Base protocol for NDKSwiftUI data sources
 public protocol NDKSubscriptionProtocol: ObservableObject {
     /// The current error state of the data source
     var error: Error? { get }
-    
+
     /// Whether the data source is currently loading
     var isLoading: Bool { get }
 }

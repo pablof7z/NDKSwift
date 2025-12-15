@@ -1,25 +1,25 @@
-import XCTest
 @testable import NDKSwiftCore
+import XCTest
 
 final class ReactiveFilterTests: XCTestCase {
     var ndk: NDK!
     var signer: NDKPrivateKeySigner!
-    
+
     override func setUp() async throws {
         try await super.setUp()
-        
+
         // Create NDK with in-memory cache
         ndk = NDK(relayUrls: ["wss://relay.damus.io"], cache: MemoryCache())
-        
+
         // Create test signer
         signer = try NDKPrivateKeySigner.generate()
     }
-    
+
     override func tearDown() async throws {
         await ndk.disconnect()
         try await super.tearDown()
     }
-    
+
     func testReactiveFilterCreation() async throws {
         // Start session
         let sessionData = try await ndk.startSession(
@@ -29,13 +29,13 @@ final class ReactiveFilterTests: XCTestCase {
                 preloadStrategy: .progressive
             )
         )
-        
+
         XCTAssertNotNil(ndk.sessionData, "Session data should be stored on NDK instance")
         XCTAssertEqual(ndk.sessionData?.pubkey, sessionData.pubkey, "Session data should match")
-        
+
         // Create reactive filter
         let expectation = XCTestExpectation(description: "Reactive filter should be created")
-        
+
         let filter = ReactiveFilter(
             dependencies: [.followList],
             builder: { sessionData in
@@ -48,10 +48,10 @@ final class ReactiveFilterTests: XCTestCase {
                 )
             }
         )
-        
+
         // Observe with reactive filter
         let stream = ndk.observe(filter)
-        
+
         // Try to consume some events
         Task {
             var eventCount = 0
@@ -63,11 +63,11 @@ final class ReactiveFilterTests: XCTestCase {
                 }
             }
         }
-        
+
         // Wait for builder to be called
         await fulfillment(of: [expectation], timeout: 5.0)
     }
-    
+
     func testReactiveFilterWithEmptyFollowList() async throws {
         // Start session
         let sessionData = try await ndk.startSession(
@@ -77,13 +77,13 @@ final class ReactiveFilterTests: XCTestCase {
                 preloadStrategy: .progressive
             )
         )
-        
+
         // Verify empty follow list
         XCTAssertTrue(sessionData.followList.isEmpty, "New user should have empty follow list")
-        
+
         // Create reactive filter
         let builderCalled = XCTestExpectation(description: "Builder should be called")
-        
+
         let filter = ReactiveFilter(
             dependencies: [.followList],
             builder: { sessionData in
@@ -96,10 +96,10 @@ final class ReactiveFilterTests: XCTestCase {
                 )
             }
         )
-        
+
         // Observe with reactive filter
         let stream = ndk.observe(filter)
-        
+
         // Try to consume events
         Task {
             for await _ in stream {
@@ -108,7 +108,7 @@ final class ReactiveFilterTests: XCTestCase {
             }
             print("Stream ended as expected")
         }
-        
+
         await fulfillment(of: [builderCalled], timeout: 2.0)
     }
 }

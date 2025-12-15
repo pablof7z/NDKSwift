@@ -9,7 +9,7 @@
 
 import Foundation
 #if canImport(NDKSwift)
-import NDKSwift
+    import NDKSwift
 #endif
 
 @main
@@ -143,7 +143,7 @@ class TestExecutor {
     func testTC002_PublishToSingleRelay() async {
         print("--- TEST TC-002: Publish a text note event to a single relay ---")
 
-        guard let ndk = self.ndk else {
+        guard let ndk = ndk else {
             results.append(TestResult(
                 testID: "TC-002",
                 description: "Publish a text note event to a single relay",
@@ -200,7 +200,7 @@ class TestExecutor {
     func testTC003_PublishToMultipleRelays() async {
         print("--- TEST TC-003: Publish a text note event to multiple relays ---")
 
-        guard let ndk = self.ndk else {
+        guard let ndk = ndk else {
             results.append(TestResult(
                 testID: "TC-003",
                 description: "Publish a text note event to multiple relays",
@@ -258,7 +258,7 @@ class TestExecutor {
     func testTC004_SubscribeToSingleRelay() async {
         print("--- TEST TC-004: Subscribe to text note events from a single relay ---")
 
-        guard let ndk = self.ndk else {
+        guard let ndk = ndk else {
             results.append(TestResult(
                 testID: "TC-004",
                 description: "Subscribe to text note events from a single relay",
@@ -329,7 +329,7 @@ class TestExecutor {
     func testTC005_SubscribeToMultipleRelays() async {
         print("--- TEST TC-005: Subscribe to events from multiple relays ---")
 
-        guard let ndk = self.ndk else {
+        guard let ndk = ndk else {
             results.append(TestResult(
                 testID: "TC-005",
                 description: "Subscribe to events from multiple relays",
@@ -399,7 +399,7 @@ class TestExecutor {
     func testTC006_UnsubscribeFromRelay() async {
         print("--- TEST TC-006: Unsubscribe from a relay ---")
 
-        guard let ndk = self.ndk else {
+        guard let ndk = ndk else {
             results.append(TestResult(
                 testID: "TC-006",
                 description: "Unsubscribe from a relay",
@@ -514,7 +514,7 @@ class TestExecutor {
         print("--- TEST TC-008: Connect to a relay that requires authentication ---")
 
         // Note: Most public relays don't require auth, so this is a simplified test
-        guard let ndk = self.ndk else {
+        guard let ndk = ndk else {
             results.append(TestResult(
                 testID: "TC-008",
                 description: "Connect to a relay that requires authentication",
@@ -561,7 +561,7 @@ class TestExecutor {
     func testTC009_NetworkDisconnection() async {
         print("--- TEST TC-009: Handle a network disconnection ---")
 
-        guard let ndk = self.ndk else {
+        guard let ndk = ndk else {
             results.append(TestResult(
                 testID: "TC-009",
                 description: "Handle a network disconnection",
@@ -613,7 +613,7 @@ class TestExecutor {
     func testTC010_InvalidEvent() async {
         print("--- TEST TC-010: Handle an invalid event from a relay ---")
 
-        guard let ndk = self.ndk else {
+        guard let ndk = ndk else {
             results.append(TestResult(
                 testID: "TC-010",
                 description: "Handle an invalid event from a relay",

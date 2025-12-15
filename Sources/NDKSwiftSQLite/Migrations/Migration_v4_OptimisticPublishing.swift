@@ -1,6 +1,6 @@
 import Foundation
-import NDKSwiftCore
 import GRDB
+import NDKSwiftCore
 
 extension NDKSQLiteCache {
     static func registerV4OptimisticPublishingMigration(_ migrator: inout DatabaseMigrator) {

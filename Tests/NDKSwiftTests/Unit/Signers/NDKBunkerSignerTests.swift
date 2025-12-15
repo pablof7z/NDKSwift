@@ -1,94 +1,93 @@
-import XCTest
 import Combine
 @testable import NDKSwiftCore
+import XCTest
 
 @MainActor
 final class NDKBunkerSignerTests: XCTestCase {
-    
     // MARK: - Test Helpers
-    
+
     private var cancellables = Set<AnyCancellable>()
-    
+
     override func setUp() {
         super.setUp()
         cancellables = Set<AnyCancellable>()
     }
-    
+
     override func tearDown() {
         cancellables.removeAll()
         super.tearDown()
     }
-    
+
     private func createTestNDK() -> NDK {
         return NDK()
     }
-    
+
     private func createLocalSigner() throws -> NDKPrivateKeySigner {
         return try NDKPrivateKeySigner.generate()
     }
-    
+
     // MARK: - BunkerURLParser Tests
-    
+
     func testBunkerURLParserValidURL() {
         let parser = BunkerURLParser(urlString: "bunker://pubkey123?relay=wss://relay1.com&relay=wss://relay2.com&secret=mysecret&pubkey=userpubkey")
         let result = parser.parse()
-        
+
         XCTAssertEqual(result.bunkerPubkey, "pubkey123")
         XCTAssertEqual(result.userPubkey, "userpubkey")
         XCTAssertEqual(result.relays, ["wss://relay1.com", "wss://relay2.com"])
         XCTAssertEqual(result.secret, "mysecret")
     }
-    
+
     func testBunkerURLParserWithHostname() {
         let parser = BunkerURLParser(urlString: "bunker://bunker.example.com?relay=wss://relay.com")
         let result = parser.parse()
-        
+
         XCTAssertEqual(result.bunkerPubkey, "bunker.example.com")
         XCTAssertNil(result.userPubkey)
         XCTAssertEqual(result.relays, ["wss://relay.com"])
         XCTAssertNil(result.secret)
     }
-    
+
     func testBunkerURLParserWithDoubleSlashPath() {
         let parser = BunkerURLParser(urlString: "bunker:////pubkey456?relay=wss://relay.com")
         let result = parser.parse()
-        
+
         XCTAssertEqual(result.bunkerPubkey, "pubkey456")
         XCTAssertEqual(result.relays, ["wss://relay.com"])
     }
-    
+
     func testBunkerURLParserMinimal() {
         let parser = BunkerURLParser(urlString: "bunker://pubkey789")
         let result = parser.parse()
-        
+
         XCTAssertEqual(result.bunkerPubkey, "pubkey789")
         XCTAssertNil(result.userPubkey)
         XCTAssertEqual(result.relays, [])
         XCTAssertNil(result.secret)
     }
-    
+
     func testBunkerURLParserInvalidScheme() {
         let parser = BunkerURLParser(urlString: "https://example.com")
         let result = parser.parse()
-        
+
         XCTAssertNil(result.bunkerPubkey)
         XCTAssertNil(result.userPubkey)
         XCTAssertEqual(result.relays, [])
         XCTAssertNil(result.secret)
     }
-    
+
     func testBunkerURLParserInvalidURL() {
         let parser = BunkerURLParser(urlString: "not a valid url")
         let result = parser.parse()
-        
+
         XCTAssertNil(result.bunkerPubkey)
         XCTAssertNil(result.userPubkey)
         XCTAssertEqual(result.relays, [])
         XCTAssertNil(result.secret)
     }
-    
+
     // MARK: - Factory Method Tests
-    
+
     func testCreateBunkerSignerWithConnectionToken() async throws {
         let ndk = createTestNDK()
         let localSigner = try createLocalSigner()
@@ -101,7 +100,7 @@ final class NDKBunkerSignerTests: XCTestCase {
         XCTAssertNotNil(bunkerSigner)
         // Don't call pubkey as it will try to connect
     }
-    
+
     func testCreateBunkerSignerWithNIP05() async throws {
         let ndk = createTestNDK()
         let localSigner = try createLocalSigner()
@@ -111,7 +110,7 @@ final class NDKBunkerSignerTests: XCTestCase {
 
         XCTAssertNotNil(bunkerSigner)
     }
-    
+
     func testCreateNostrConnectSigner() async throws {
         let ndk = createTestNDK()
         let localSigner = try createLocalSigner()
@@ -138,7 +137,7 @@ final class NDKBunkerSignerTests: XCTestCase {
             XCTAssertTrue(uri.contains("relay=wss://relay.example.com"))
         }
     }
-    
+
     func testCreateNostrConnectSignerMinimal() async throws {
         let ndk = createTestNDK()
         let relays = ["wss://relay.example.com"]
@@ -158,9 +157,9 @@ final class NDKBunkerSignerTests: XCTestCase {
             XCTAssertTrue(uri.contains("secret=")) // Should have generated secret
         }
     }
-    
+
     // MARK: - NostrConnect Options Tests
-    
+
     func testNostrConnectOptionsInitialization() {
         let options = NDKBunkerSigner.NostrConnectOptions(
             name: "MyApp",
@@ -168,24 +167,24 @@ final class NDKBunkerSignerTests: XCTestCase {
             image: "https://myapp.com/logo.png",
             perms: "sign_event:1"
         )
-        
+
         XCTAssertEqual(options.name, "MyApp")
         XCTAssertEqual(options.url, "https://myapp.com")
         XCTAssertEqual(options.image, "https://myapp.com/logo.png")
         XCTAssertEqual(options.perms, "sign_event:1")
     }
-    
+
     func testNostrConnectOptionsPartial() {
         let options = NDKBunkerSigner.NostrConnectOptions(name: "MyApp")
-        
+
         XCTAssertEqual(options.name, "MyApp")
         XCTAssertNil(options.url)
         XCTAssertNil(options.image)
         XCTAssertNil(options.perms)
     }
-    
+
     // MARK: - NDKSigner Protocol Tests
-    
+
     func testBunkerSignerConformsToNDKSigner() async throws {
         let ndk = createTestNDK()
         let localSigner = try createLocalSigner()
@@ -194,7 +193,7 @@ final class NDKBunkerSignerTests: XCTestCase {
         // Test that it's a bunker signer
         XCTAssertNotNil(bunkerSigner)
     }
-    
+
     func testPubkeyTriggersConnection() async throws {
         let ndk = createTestNDK()
         let localSigner = try createLocalSigner()
@@ -205,57 +204,57 @@ final class NDKBunkerSignerTests: XCTestCase {
         // Just verify the signer was created
         XCTAssertNotNil(bunkerSigner)
     }
-    
+
     // MARK: - Auth URL Publisher Tests
-    
+
     func testAuthURLPublisher() async throws {
         let ndk = createTestNDK()
         let localSigner = try createLocalSigner()
         let bunkerSigner = try await NDKBunkerSigner.bunker(ndk: ndk, connectionToken: "bunker://test", localSigner: localSigner)
-        
+
         var receivedURLs: [String] = []
         let expectation = expectation(description: "Auth URL received")
         expectation.isInverted = true // We don't expect it to be called in this test
-        
+
         await bunkerSigner.authUrlPublisher
             .sink { url in
                 receivedURLs.append(url)
                 expectation.fulfill()
             }
             .store(in: &cancellables)
-        
+
         await fulfillment(of: [expectation], timeout: 0.5)
         XCTAssertEqual(receivedURLs.count, 0)
     }
-    
+
     // MARK: - Bunker URL Parsing Edge Cases
-    
+
     func testBunkerURLParserMultipleRelays() {
         let parser = BunkerURLParser(urlString: "bunker://pubkey?relay=wss://relay1.com&relay=wss://relay2.com&relay=wss://relay3.com")
         let result = parser.parse()
-        
+
         XCTAssertEqual(result.relays.count, 3)
         XCTAssertEqual(result.relays, ["wss://relay1.com", "wss://relay2.com", "wss://relay3.com"])
     }
-    
+
     func testBunkerURLParserSpecialCharactersInSecret() {
         let parser = BunkerURLParser(urlString: "bunker://pubkey?secret=abc%20def%2Bghi&relay=wss://relay.com")
         let result = parser.parse()
-        
+
         XCTAssertEqual(result.secret, "abc def+ghi") // URL decoding happens automatically
     }
-    
+
     func testBunkerURLParserEmptyQueryParameters() {
         let parser = BunkerURLParser(urlString: "bunker://pubkey?pubkey=&secret=&relay=")
         let result = parser.parse()
-        
+
         XCTAssertEqual(result.userPubkey, "")
         XCTAssertEqual(result.secret, "")
         XCTAssertEqual(result.relays, [""])
     }
-    
+
     // MARK: - NostrConnect URI Generation Tests
-    
+
     func testNostrConnectURIWithAllOptions() async throws {
         let ndk = createTestNDK()
         let localSigner = try createLocalSigner()
@@ -278,24 +277,25 @@ final class NDKBunkerSignerTests: XCTestCase {
         // URI should be immediately available
         let uri = await bunkerSigner.nostrConnectUri
         XCTAssertNotNil(uri)
-        
+
         // Parse the generated URI
         guard let uri = uri,
               let url = URL(string: uri),
-              let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+              let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        else {
             XCTFail("Invalid URI generated")
             return
         }
-        
+
         XCTAssertEqual(url.scheme, "nostrconnect")
         XCTAssertEqual(url.host, localPubkey)
-        
+
         // Check query parameters
         let queryItems = components.queryItems ?? []
         let queryDict = Dictionary(uniqueKeysWithValues: queryItems.compactMap { item in
             item.value.map { (item.name, $0) }
         })
-        
+
         XCTAssertEqual(queryDict["name"], "Test App")
         XCTAssertEqual(queryDict["url"], "https://test.com")
         XCTAssertEqual(queryDict["image"], "https://test.com/icon.png")
@@ -303,7 +303,7 @@ final class NDKBunkerSignerTests: XCTestCase {
         XCTAssertEqual(queryDict["relay"], "wss://relay.test.com")
         XCTAssertNotNil(queryDict["secret"]) // Should have a generated secret
     }
-    
+
     func testNostrConnectURIWithSpecialCharacters() async throws {
         let ndk = createTestNDK()
         let options = NDKBunkerSigner.NostrConnectOptions(
@@ -335,7 +335,7 @@ final class NDKBunkerSignerTests: XCTestCase {
         let relays = [
             "wss://relay1.example.com",
             "wss://relay2.example.com",
-            "wss://relay3.example.com"
+            "wss://relay3.example.com",
         ]
 
         let bunkerSigner = try await NDKBunkerSigner.nostrConnect(
@@ -358,13 +358,13 @@ final class NDKBunkerSignerTests: XCTestCase {
             XCTAssertEqual(relayCount, 3, "Expected 3 relay parameters")
         }
     }
-    
+
     // MARK: - Connection Type Tests
-    
+
     func testBunkerConnectionTypeInitialization() async throws {
         let ndk = createTestNDK()
         let localSigner = try createLocalSigner()
-        
+
         // Test bunker type
         let bunkerSigner = try await NDKBunkerSigner.bunker(
             ndk: ndk,
@@ -380,7 +380,7 @@ final class NDKBunkerSignerTests: XCTestCase {
             localSigner: localSigner
         )
         XCTAssertNotNil(nip05Signer)
-        
+
         // Test nostrconnect type
         let nostrConnectSigner = try await NDKBunkerSigner.nostrConnect(
             ndk: ndk,

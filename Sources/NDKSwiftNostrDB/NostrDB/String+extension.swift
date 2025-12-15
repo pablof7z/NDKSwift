@@ -15,100 +15,98 @@
  */
 
 #if !os(WASI)
-import Foundation
-import NDKSwiftCore
+    import Foundation
+    import NDKSwiftCore
 #else
-import SwiftOverlayShims
+    import SwiftOverlayShims
 #endif
 
 extension String: Verifiable {
+    /// Verifies that the current value is which the bounds of the buffer, and if
+    /// the current `Value` is aligned properly
+    /// - Parameters:
+    ///   - verifier: Verifier that hosts the buffer
+    ///   - position: Current position within the buffer
+    ///   - type: The type of the object to be verified
+    /// - Throws: Errors coming from `inBuffer`, `missingNullTerminator` and `outOfBounds`
+    public static func verify<T>(
+        _ verifier: inout Verifier,
+        at position: Int,
+        of _: T.Type
+    ) throws where T: Verifiable {
+        let range = try String.verifyRange(&verifier, at: position, of: UInt8.self)
+        /// Safe &+ since we already check for overflow in verify range
+        let stringLen = range.start &+ range.count
 
-  /// Verifies that the current value is which the bounds of the buffer, and if
-  /// the current `Value` is aligned properly
-  /// - Parameters:
-  ///   - verifier: Verifier that hosts the buffer
-  ///   - position: Current position within the buffer
-  ///   - type: The type of the object to be verified
-  /// - Throws: Errors coming from `inBuffer`, `missingNullTerminator` and `outOfBounds`
-  public static func verify<T>(
-    _ verifier: inout Verifier,
-    at position: Int,
-    of type: T.Type) throws where T: Verifiable
-  {
+        if stringLen >= verifier.capacity {
+            throw FlatbuffersErrors.outOfBounds(
+                position: UInt(clamping: stringLen.magnitude),
+                end: verifier.capacity
+            )
+        }
 
-    let range = try String.verifyRange(&verifier, at: position, of: UInt8.self)
-    /// Safe &+ since we already check for overflow in verify range
-    let stringLen = range.start &+ range.count
+        let isNullTerminated = verifier._buffer.read(
+            def: UInt8.self,
+            position: stringLen
+        ) == 0
 
-    if stringLen >= verifier.capacity {
-      throw FlatbuffersErrors.outOfBounds(
-        position: UInt(clamping: stringLen.magnitude),
-        end: verifier.capacity)
+        if !verifier._options._ignoreMissingNullTerminators && !isNullTerminated {
+            let str = verifier._buffer.readString(at: range.start, count: range.count)
+            throw FlatbuffersErrors.missingNullTerminator(
+                position: position,
+                str: str
+            )
+        }
     }
-
-    let isNullTerminated = verifier._buffer.read(
-      def: UInt8.self,
-      position: stringLen) == 0
-
-    if !verifier._options._ignoreMissingNullTerminators && !isNullTerminated {
-      let str = verifier._buffer.readString(at: range.start, count: range.count)
-      throw FlatbuffersErrors.missingNullTerminator(
-        position: position,
-        str: str)
-    }
-  }
 }
 
 extension String: FlatbuffersInitializable {
-
-  /// Initailizes a string from a Flatbuffers ByteBuffer
-  /// - Parameters:
-  ///   - bb: ByteBuffer containing the readable string
-  ///   - o: Current position
-  public init(_ bb: ByteBuffer, o: Int32) {
-    let v = Int(o)
-    let count = bb.read(def: Int32.self, position: v)
-    self = bb.readString(
-      at: MemoryLayout<Int32>.size + v,
-      count: Int(count)) ?? ""
-  }
+    /// Initailizes a string from a Flatbuffers ByteBuffer
+    /// - Parameters:
+    ///   - bb: ByteBuffer containing the readable string
+    ///   - o: Current position
+    public init(_ bb: ByteBuffer, o: Int32) {
+        let v = Int(o)
+        let count = bb.read(def: Int32.self, position: v)
+        self = bb.readString(
+            at: MemoryLayout<Int32>.size + v,
+            count: Int(count)
+        ) ?? ""
+    }
 }
 
 extension String: ObjectAPIPacker {
+    public static func pack(
+        _ builder: inout FlatBufferBuilder,
+        obj: inout String?
+    ) -> Offset {
+        guard var obj = obj else { return Offset() }
+        return pack(&builder, obj: &obj)
+    }
 
-  public static func pack(
-    _ builder: inout FlatBufferBuilder,
-    obj: inout String?) -> Offset
-  {
-    guard var obj = obj else { return Offset() }
-    return pack(&builder, obj: &obj)
-  }
+    public static func pack(
+        _ builder: inout FlatBufferBuilder,
+        obj: inout String
+    ) -> Offset {
+        builder.create(string: obj)
+    }
 
-  public static func pack(
-    _ builder: inout FlatBufferBuilder,
-    obj: inout String) -> Offset
-  {
-    builder.create(string: obj)
-  }
-
-  public mutating func unpack() -> String {
-    self
-  }
-
+    public mutating func unpack() -> String {
+        self
+    }
 }
 
 extension String: NativeObject {
+    public func serialize<T: ObjectAPIPacker>(type _: T.Type) -> ByteBuffer
+        where T.T == Self
+    {
+        fatalError("serialize should never be called from string directly")
+    }
 
-  public func serialize<T: ObjectAPIPacker>(type: T.Type) -> ByteBuffer
-    where T.T == Self
-  {
-    fatalError("serialize should never be called from string directly")
-  }
-
-  public func serialize<T: ObjectAPIPacker>(
-    builder: inout FlatBufferBuilder,
-    type: T.Type) -> ByteBuffer where T.T == Self
-  {
-    fatalError("serialize should never be called from string directly")
-  }
+    public func serialize<T: ObjectAPIPacker>(
+        builder _: inout FlatBufferBuilder,
+        type _: T.Type
+    ) -> ByteBuffer where T.T == Self {
+        fatalError("serialize should never be called from string directly")
+    }
 }

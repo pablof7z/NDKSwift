@@ -1,5 +1,5 @@
-import Foundation
 import CryptoKit
+import Foundation
 
 /// Accumulator for computing incremental hashes over sorted sets of items
 /// This is the core data structure for Negentropy's fingerprinting
@@ -8,7 +8,7 @@ public struct NegentropyAccumulator {
     private var itemCount: Int = 0
 
     public init() {
-        self.hash = SHA256()
+        hash = SHA256()
     }
 
     /// Add an item to the accumulator
@@ -121,10 +121,10 @@ public protocol NegentropyStorage {
 }
 
 /// Extension to compute fingerprints for arrays of items
-extension Array where Element == NegentropyItem {
+public extension Array where Element == NegentropyItem {
     /// Compute the fingerprint for this array of items
     /// Items must be sorted
-    public func fingerprint() -> Data {
+    func fingerprint() -> Data {
         return NegentropyAccumulator.from(self).fingerprint()
     }
 }

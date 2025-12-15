@@ -1,6 +1,6 @@
+import CashuSwift
 import Foundation
 import NDKSwiftCore
-import CashuSwift
 
 /// Handles nutzap redemption during wallet startup
 /// Ensures we wait for both nutzap and spending history EOSE before redeeming
@@ -36,7 +36,7 @@ actor StartupNutzapRedemption {
     func processSpendingHistory(_ event: NDKEvent) {
         // Check for redeemed nutzap events in the clear tags
         for tag in event.tags {
-            if tag.count >= 4 && tag[0] == NostrConstants.TagName.event && tag[3] == NostrConstants.Marker.redeemed {
+            if tag.count >= 4, tag[0] == NostrConstants.TagName.event, tag[3] == NostrConstants.Marker.redeemed {
                 let redeemedNutzapId = tag[1]
                 NDKLogger.log(.info, category: .wallet, "📝 Marking nutzap \(redeemedNutzapId) as already redeemed from history")
                 nutzapsMarkedRedeemed.insert(redeemedNutzapId)
@@ -60,7 +60,7 @@ actor StartupNutzapRedemption {
 
     /// Check if both EOSE received and redeem pending nutzaps
     private func checkAndRedeemIfReady() {
-        guard nutzapEoseReceived && spendingHistoryEoseReceived else {
+        guard nutzapEoseReceived, spendingHistoryEoseReceived else {
             NDKLogger.log(.debug, category: .wallet, "⏳ Waiting for both EOSE (nutzap: \(nutzapEoseReceived), history: \(spendingHistoryEoseReceived))")
             return
         }

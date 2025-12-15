@@ -1,5 +1,5 @@
-import NDKSwiftCore
 import CashuSwift
+import NDKSwiftCore
 
 /// Represents a change to wallet state - what proofs to store, destroy, or reserve
 public struct WalletStateChange {

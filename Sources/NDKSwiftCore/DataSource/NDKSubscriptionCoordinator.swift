@@ -6,11 +6,11 @@ actor InternalSubscriptionManager {
     private let ndk: NDK
     private var activeSubscriptions: [String: NDKSubscriptionCoordinator] = [:]
     private var relayMonitorTask: Task<Void, Never>?
-    
+
     // NEW: Fingerprint-based routing
     private var fingerprintSubscriptions: [NDKFilterFingerprint: Set<NDKSubscriptionCoordinator>] = [:]
     private var relayIdToFingerprint: [String: NDKFilterFingerprint] = [:]
-    
+
     // NEW: Relay-to-subscription mapping for O(1) lookups
     private var relayToSubscriptions: [RelayURL: Set<NDKSubscriptionCoordinator>] = [:]
 
@@ -50,7 +50,7 @@ actor InternalSubscriptionManager {
         }
 
         let fp = fingerprint ?? filters.toFingerprint(closeOnEose: closeOnEose)
-        
+
         let subscription = NDKSubscriptionCoordinator(
             id: id,
             filters: filters,
@@ -64,12 +64,12 @@ actor InternalSubscriptionManager {
         )
 
         activeSubscriptions[id] = subscription
-        
+
         // Add to fingerprint mapping
         var subs = fingerprintSubscriptions[fp] ?? Set<NDKSubscriptionCoordinator>()
         subs.insert(subscription)
         fingerprintSubscriptions[fp] = subs
-        
+
         // Add to relay-based mapping
         if let specificRelays = relays {
             // Subscription targets specific relays
@@ -83,7 +83,7 @@ actor InternalSubscriptionManager {
             // or fallback relays when started
             NDKLogger.log(.debug, category: .subscription, "📌 Subscription created without explicit relays2 - will use outbox model or fallback relays")
         }
-        
+
         NDKLogger.log(.debug, category: .subscription, "📌 Created subscription '\(id)' with fingerprint '\(fp)'")
 
         // Start the subscription if autoStart is true
@@ -101,19 +101,19 @@ actor InternalSubscriptionManager {
         relayIdToFingerprint[safeRelayId] = fingerprint
         NDKLogger.log(.debug, category: .subscription, "🔗 [InternalSubManager] Registered relay ID mapping: '\(safeRelayId)' → fingerprint '\(fingerprint)'")
         NDKLogger.log(.trace, category: .subscription,
-                     "   Total relay ID mappings: \(relayIdToFingerprint.count)")
+                      "   Total relay ID mappings: \(relayIdToFingerprint.count)")
     }
-    
+
     /// Update relay associations for a subscription (used by outbox model)
     func updateRelayAssociation(subscription: NDKSubscriptionCoordinator, relay: RelayURL) async {
         var relaySubs = relayToSubscriptions[relay] ?? Set<NDKSubscriptionCoordinator>()
         relaySubs.insert(subscription)
         relayToSubscriptions[relay] = relaySubs
-        
-        NDKLogger.log(.debug, category: .subscription, 
-                     "🔗 [InternalSubManager] Updated relay association: '\(subscription.id)' → '\(relay)'")
+
+        NDKLogger.log(.debug, category: .subscription,
+                      "🔗 [InternalSubManager] Updated relay association: '\(subscription.id)' → '\(relay)'")
     }
-    
+
     /// Close a subscription
     func closeSubscription(id: String) async {
         if let subscription = activeSubscriptions.removeValue(forKey: id) {
@@ -128,7 +128,7 @@ actor InternalSubscriptionManager {
                     fingerprintSubscriptions[fingerprint] = updatedSubs
                 }
             }
-            
+
             // Remove from relay-based mapping
             // Check all relays since subscription might have been associated dynamically
             for (relayUrl, var relaySubs) in relayToSubscriptions {
@@ -141,7 +141,7 @@ actor InternalSubscriptionManager {
                     }
                 }
             }
-            
+
             await subscription.close()
             NDKLogger.log(.info, category: .subscription, "✅ Closed subscription: \(id), remaining active: \(activeSubscriptions.count)")
         } else {
@@ -152,22 +152,23 @@ actor InternalSubscriptionManager {
     /// Process incoming event from relay
     func processEvent(_ event: NDKEvent, subscriptionId: String, from relay: RelayProtocol) async {
         NDKLogger.log(.trace, category: .subscription,
-                     "📥 [InternalSubManager] Processing event for subscription ID '\(subscriptionId)' from relay \(relay.url)")
-        
+                      "📥 [InternalSubManager] Processing event for subscription ID '\(subscriptionId)' from relay \(relay.url)")
+
         // Track which subscriptions have already received this event to avoid duplicates
         var deliveredTo = Set<String>()
-        
+
         // Try direct lookup first
         if let subscription = activeSubscriptions[subscriptionId] {
             NDKLogger.log(.trace, category: .subscription,
-                         "✅ [InternalSubManager] Found direct subscription for ID '\(subscriptionId)'")
+                          "✅ [InternalSubManager] Found direct subscription for ID '\(subscriptionId)'")
             await subscription.handleEvent(event, from: relay)
             deliveredTo.insert(subscription.id)
         }
-        
+
         // Try fingerprint-based routing for relay-specific IDs
         if let fingerprint = relayIdToFingerprint[subscriptionId],
-           let subscriptions = fingerprintSubscriptions[fingerprint] {
+           let subscriptions = fingerprintSubscriptions[fingerprint]
+        {
             NDKLogger.log(.trace, category: .subscription, "🔀 Routing via fingerprint: \(subscriptionId) → \(fingerprint) (\(subscriptions.count) subscriptions)")
             for subscription in subscriptions {
                 if !deliveredTo.contains(subscription.id) {
@@ -176,7 +177,7 @@ actor InternalSubscriptionManager {
                 }
             }
         }
-        
+
         if deliveredTo.isEmpty {
             NDKLogger.log(.trace, category: .subscription, "🚫 No matching subscriptions found for event")
         }
@@ -189,17 +190,18 @@ actor InternalSubscriptionManager {
             await subscription.handleEOSE(from: relay)
             return
         }
-        
+
         // NEW: Try fingerprint-based routing for relay-specific IDs
         if let fingerprint = relayIdToFingerprint[subscriptionId],
-           let subscriptions = fingerprintSubscriptions[fingerprint] {
+           let subscriptions = fingerprintSubscriptions[fingerprint]
+        {
             NDKLogger.log(.trace, category: .subscription, "🔀 Routing EOSE via fingerprint: \(subscriptionId) → \(fingerprint)")
             for subscription in subscriptions {
                 await subscription.handleEOSE(from: relay)
             }
             return
         }
-        
+
         NDKLogger.log(.trace, category: .subscription, "🚫 Ignoring EOSE for non-existent subscription: \(subscriptionId)")
     }
 
@@ -207,11 +209,8 @@ actor InternalSubscriptionManager {
 
     /// Start monitoring relay connection events
     private func startRelayMonitoring() async {
-        // Ensure pool is available before starting monitoring
-        guard let pool = ndk.pool else {
-            NDKLogger.log(.warning, category: .subscription, "⚠️ [InternalSubManager] Pool not available, skipping relay monitoring")
-            return
-        }
+        // Pool is always available
+        let pool = ndk.pool
 
         relayMonitorTask = Task {
             NDKLogger.log(.info, category: .subscription, "🔍 [InternalSubManager] Starting relay connection monitoring")
@@ -220,7 +219,7 @@ actor InternalSubscriptionManager {
                 guard !Task.isCancelled else { break }
 
                 switch event {
-                case .relayConnected(let relay):
+                case let .relayConnected(relay):
                     NDKLogger.log(.info, category: .subscription, "🔌 [InternalSubManager] Relay connected: \(relay.url) - replaying subscriptions")
                     await replaySubscriptionsForRelay(relay)
                 default:
@@ -235,32 +234,32 @@ actor InternalSubscriptionManager {
         // O(1) lookup: Get subscriptions that specifically target this relay
         let relaySpecificSubs = relayToSubscriptions[relay.url] ?? []
         let subscriptionsToReplay = Array(relaySpecificSubs)
-        
+
         guard !subscriptionsToReplay.isEmpty else {
             NDKLogger.log(.debug, category: .subscription, "📭 No active subscriptions to replay for \(relay.url)")
             return
         }
-        
+
         NDKLogger.log(.debug, category: .subscription, "🔍 Found \(subscriptionsToReplay.count) subscriptions for relay \(relay.url) (O(1) lookup)")
-        
+
         // All subscriptions in this list are already relevant - no filtering needed
         let relevantSubscriptions = subscriptionsToReplay
-        
+
         guard !relevantSubscriptions.isEmpty else {
             NDKLogger.log(.debug, category: .subscription, "📭 No relevant subscriptions to replay for \(relay.url)")
             return
         }
 
         NDKLogger.log(.info, category: .subscription, "🔄 Replaying \(relevantSubscriptions.count) subscriptions to \(relay.url)")
-        
+
         // Log details of subscriptions being replayed
         for (index, subscription) in relevantSubscriptions.enumerated() {
             let filterSummary = subscription.filters.map { filter in
                 var parts: [String] = []
-                if let kinds = filter.kinds { 
+                if let kinds = filter.kinds {
                     parts.append("kinds:\(kinds)")
                 }
-                if let authors = filter.authors { 
+                if let authors = filter.authors {
                     parts.append("authors:\(authors.map { String($0.prefix(8)) }.joined(separator: ","))")
                 }
                 if let limit = filter.limit {
@@ -271,7 +270,7 @@ actor InternalSubscriptionManager {
                 }
                 return parts.joined(separator: ", ")
             }.joined(separator: " | ")
-            
+
             NDKLogger.log(.debug, category: .subscription, "  \(index + 1). \(subscription.id): \(filterSummary)")
         }
 
@@ -282,11 +281,11 @@ actor InternalSubscriptionManager {
                 NDKLogger.log(.debug, category: .subscription, "⏭️ Subscription \(subscription.id) already sent to \(relay.url)")
                 continue
             }
-            
+
             // Check if subscription has been started
             let hasActiveRelays = await !subscription.activeRelays.isEmpty
             let isSubscriptionActive = await subscription.isActive
-            
+
             if !isSubscriptionActive {
                 // If not started yet, start it now
                 NDKLogger.log(.info, category: .subscription, "🚀 Starting inactive subscription \(subscription.id) for relay \(relay.url)")
@@ -294,7 +293,7 @@ actor InternalSubscriptionManager {
             } else if !hasActiveRelays {
                 // If started but no relays active (all were disconnected), add to relay via subscription manager
                 NDKLogger.log(.info, category: .subscription, "🔄 Subscription \(subscription.id) was started but has no active relays - adding to \(relay.url)")
-                
+
                 // Route through subscription manager for proper grouping
                 await relay.addSubscription(subscription, filters: subscription.filters)
                 await subscription.markRelayAsActive(relay.url)
@@ -302,11 +301,11 @@ actor InternalSubscriptionManager {
             } else {
                 // If already active on other relays, add to this relay via subscription manager
                 NDKLogger.log(.debug, category: .subscription, "📨 [RelayReplay] Replaying subscription \(subscription.id) to \(relay.url)")
-                
+
                 // Route through subscription manager for proper grouping
                 await relay.addSubscription(subscription, filters: subscription.filters)
                 await subscription.markRelayAsActive(relay.url)
-                
+
                 NDKLogger.log(.info, category: .subscription, "✅ Replayed subscription \(subscription.id) to \(relay.url)")
             }
         }
@@ -324,46 +323,45 @@ actor NDKSubscriptionCoordinator: Hashable {
     let filters: [NDKFilter]
     let relays: Set<RelayURL>?
     private weak var ndk: NDK?
-    
+
     // NEW: Fingerprint for internal routing
     var fingerprint: NDKFilterFingerprint = ""
     nonisolated let closeOnEose: Bool
-    
+
     // Grouping configuration
     nonisolated let isGroupable: Bool
     nonisolated let groupableDelay: TimeInterval?
     nonisolated let groupableDelayType: NDKSubscriptionDelayType?
 
-    private var eventHandlers: [(NDKEvent) async -> Void] = []
-    private var eoseHandlers: [(String) async -> Void] = []  // Changed to include relay URL
+    private var eoseHandlers: [(String) async -> Void] = [] // Changed to include relay URL
     var isActive = false
-    
+
     // Callbacks for NDKSubscriptionRequirement
     private var onEvent: ((NDKEvent, NDKRelay) async -> Void)?
     private var onEOSE: ((NDKRelay) async -> Void)?
-    
+
     /// Set the event handler callback
     func setOnEvent(_ handler: @escaping (NDKEvent, NDKRelay) async -> Void) {
         onEvent = handler
     }
-    
+
     /// Set the EOSE handler callback
     func setOnEOSE(_ handler: @escaping (NDKRelay) async -> Void) {
         onEOSE = handler
     }
-    
+
     // Track which relays we actually sent REQ to
     var activeRelays: Set<String> = []
 
     // AsyncSequence support
     private var eventStream: AsyncStream<(event: NDKEvent, relay: String)>?
     private var eventContinuation: AsyncStream<(event: NDKEvent, relay: String)>.Continuation?
-    
+
     // Make it Hashable for Set storage
     nonisolated func hash(into hasher: inout Hasher) {
         hasher.combine(id)
     }
-    
+
     nonisolated static func == (lhs: NDKSubscriptionCoordinator, rhs: NDKSubscriptionCoordinator) -> Bool {
         lhs.id == rhs.id
     }
@@ -425,7 +423,7 @@ actor NDKSubscriptionCoordinator: Hashable {
         // relay-level subscription managers. This method now just marks the subscription as active.
         // The NDKSubscriptionRequirement will handle adding subscriptions to specific relays based on
         // the relay selection strategy (outbox, explicit, or default).
-        
+
         NDKLogger.log(.info, category: .subscription, "✅ NDKSubscriptionCoordinator '\(id)' is now active")
     }
 
@@ -433,55 +431,60 @@ actor NDKSubscriptionCoordinator: Hashable {
     func markRelayAsActive(_ relayUrl: String) {
         activeRelays.insert(relayUrl)
     }
-    
+
     /// Handle incoming event
     func handleEvent(_ event: NDKEvent, from relay: RelayProtocol) async {
         // Call callback if set (new architecture)
         if let onEvent = onEvent {
-            await onEvent(event, relay as! NDKRelay)
+            // Only pass NDKRelay instances to maintain type safety
+            // For other RelayProtocol implementations, we can't guarantee full NDKRelay functionality
+            guard let ndkRelay = relay as? NDKRelay else {
+                NDKLogger.log(.warning, category: .subscription, "Received event from non-NDKRelay relay: \(relay.url)")
+                return
+            }
+            await onEvent(event, ndkRelay)
         }
-        
-        // Call legacy handlers
-        for handler in eventHandlers {
-            await handler(event)
-        }
-        
+
         // Stream to AsyncSequence
         eventContinuation?.yield((event: event, relay: relay.url))
     }
-    
+
     /// Handle EOSE
     func handleEOSE(from relay: RelayProtocol) async {
         // Call callback if set (new architecture)
         if let onEOSE = onEOSE {
-            await onEOSE(relay as! NDKRelay)
+            guard let ndkRelay = relay as? NDKRelay else {
+                NDKLogger.log(.warning, category: .subscription, "Received EOSE from non-NDKRelay relay: \(relay.url)")
+                return
+            }
+            await onEOSE(ndkRelay)
         }
-        
+
         // Call legacy handlers
         for handler in eoseHandlers {
             await handler(relay.url)
         }
-        
+
         // Close if configured
         if closeOnEose {
             await close()
         }
     }
-    
+
     /// Handle CLOSED message from relay
     func handleClosed(from relay: RelayProtocol, message: String) async {
         NDKLogger.log(.warning, category: .subscription,
-                     "⚠️ Subscription \(id) closed by relay \(relay.url): \(message)")
-        
+                      "⚠️ Subscription \(id) closed by relay \(relay.url): \(message)")
+
         // Remove this relay from active relays
         activeRelays.remove(relay.url)
-        
+
         // If no more active relays, close the subscription
         if activeRelays.isEmpty {
             await close()
         }
     }
-    
+
     /// Close the subscription
     func close() async {
         guard isActive else {
@@ -489,21 +492,20 @@ actor NDKSubscriptionCoordinator: Hashable {
             return
         }
         isActive = false
-        
+
         NDKLogger.log(.info, category: .subscription, "🛑 Closing NDKSubscriptionCoordinator: \(id)")
-        
+
         // In the new architecture, subscriptions are managed at the relay level
         // The NDKSubscriptionRequirement will handle removing subscriptions from relays
-        
+
         // Close event stream
         eventContinuation?.finish()
         eventContinuation = nil
         eventStream = nil
-        
-        // Clear event handlers
-        eventHandlers.removeAll()
+
+        // Clear EOSE handlers
         eoseHandlers.removeAll()
-        
+
         // Clear active relays
         activeRelays.removeAll()
     }
@@ -514,7 +516,7 @@ actor NDKSubscriptionCoordinator: Hashable {
     }
 
     /// Create REQ message
-    internal func createREQMessage() -> String {
+    func createREQMessage() -> String {
         var message: [Any] = ["REQ", id]
 
         for filter in filters {
@@ -589,7 +591,7 @@ extension NDKSubscriptionCoordinator {
         public let closeOnEose: Bool
         public let filterCount: Int
     }
-    
+
     /// Get inspection data for testing
     func inspect() async -> InspectionData {
         InspectionData(

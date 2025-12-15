@@ -1,5 +1,5 @@
-import NDKSwiftCore
 import CashuSwift
+import NDKSwiftCore
 
 // MARK: - CashuSwift Helper Functions
 

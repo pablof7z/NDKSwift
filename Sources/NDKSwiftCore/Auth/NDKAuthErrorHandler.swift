@@ -3,8 +3,7 @@ import LocalAuthentication
 
 /// Centralized error handler for authentication-related errors
 /// Provides user-friendly error messages and proper error type handling
-public struct NDKAuthErrorHandler {
-
+public enum NDKAuthErrorHandler {
     /// Categorizes an error and provides user-friendly messaging
     public struct ErrorInfo {
         public let title: String
@@ -34,9 +33,9 @@ public struct NDKAuthErrorHandler {
 
         // Check for LAError (biometric errors)
         #if !os(watchOS)
-        if let laError = error as? LAError {
-            return handleBiometricError(laError)
-        }
+            if let laError = error as? LAError {
+                return handleBiometricError(laError)
+            }
         #endif
 
         // Check for decoding errors (corrupted data)
@@ -99,7 +98,7 @@ public struct NDKAuthErrorHandler {
                 suggestedAction: .retry
             )
 
-        case .keychainError(let underlyingError):
+        case let .keychainError(underlyingError):
             // Delegate to keychain error handler
             return analyze(underlyingError)
 
@@ -131,7 +130,7 @@ public struct NDKAuthErrorHandler {
 
     private static func handleKeychainError(_ error: NDKKeychainError) -> ErrorInfo {
         switch error {
-        case .storageError(let status):
+        case let .storageError(status):
             return ErrorInfo(
                 title: "Storage Error",
                 message: "Failed to save credentials securely (code: \(status)). Please try again.",
@@ -139,7 +138,7 @@ public struct NDKAuthErrorHandler {
                 suggestedAction: .retry
             )
 
-        case .retrievalError(let status):
+        case let .retrievalError(status):
             return ErrorInfo(
                 title: "Retrieval Error",
                 message: "Failed to retrieve credentials (code: \(status)). Please sign in again.",
@@ -147,7 +146,7 @@ public struct NDKAuthErrorHandler {
                 suggestedAction: .reauthenticate
             )
 
-        case .deletionError(let status):
+        case let .deletionError(status):
             return ErrorInfo(
                 title: "Deletion Error",
                 message: "Failed to remove credentials (code: \(status)). Please try again.",
@@ -214,74 +213,74 @@ public struct NDKAuthErrorHandler {
     }
 
     #if !os(watchOS)
-    private static func handleBiometricError(_ error: LAError) -> ErrorInfo {
-        let errorMappings: [LAError.Code: (title: String, message: String, isRecoverable: Bool, suggestedAction: ErrorInfo.SuggestedAction?)] = [
-            .authenticationFailed: (
-                "Authentication Failed",
-                "Face ID or Touch ID authentication failed. Please try again.",
-                true,
-                .retry
-            ),
-            .userCancel: (
-                "Authentication Cancelled",
-                "You cancelled the authentication.",
-                true,
-                nil
-            ),
-            .userFallback: (
-                "Use Passcode",
-                "Please enter your device passcode to continue.",
-                true,
-                nil
-            ),
-            .systemCancel: (
-                "Authentication Interrupted",
-                "Authentication was cancelled by the system. Please try again.",
-                true,
-                .retry
-            ),
-            .passcodeNotSet: (
-                "Passcode Not Set",
-                "Please set up a device passcode in Settings to use this feature.",
-                false,
-                nil
-            ),
-            .biometryNotAvailable: (
-                "Biometrics Unavailable",
-                "Face ID or Touch ID is not available on this device.",
-                false,
-                nil
-            ),
-            .biometryNotEnrolled: (
-                "Biometrics Not Set Up",
-                "Please set up Face ID or Touch ID in Settings to use biometric authentication.",
-                false,
-                nil
-            ),
-            .biometryLockout: (
-                "Biometrics Locked",
-                "Too many failed attempts. Please use your device passcode.",
-                true,
-                nil
-            )
-        ]
+        private static func handleBiometricError(_ error: LAError) -> ErrorInfo {
+            let errorMappings: [LAError.Code: (title: String, message: String, isRecoverable: Bool, suggestedAction: ErrorInfo.SuggestedAction?)] = [
+                .authenticationFailed: (
+                    "Authentication Failed",
+                    "Face ID or Touch ID authentication failed. Please try again.",
+                    true,
+                    .retry
+                ),
+                .userCancel: (
+                    "Authentication Cancelled",
+                    "You cancelled the authentication.",
+                    true,
+                    nil
+                ),
+                .userFallback: (
+                    "Use Passcode",
+                    "Please enter your device passcode to continue.",
+                    true,
+                    nil
+                ),
+                .systemCancel: (
+                    "Authentication Interrupted",
+                    "Authentication was cancelled by the system. Please try again.",
+                    true,
+                    .retry
+                ),
+                .passcodeNotSet: (
+                    "Passcode Not Set",
+                    "Please set up a device passcode in Settings to use this feature.",
+                    false,
+                    nil
+                ),
+                .biometryNotAvailable: (
+                    "Biometrics Unavailable",
+                    "Face ID or Touch ID is not available on this device.",
+                    false,
+                    nil
+                ),
+                .biometryNotEnrolled: (
+                    "Biometrics Not Set Up",
+                    "Please set up Face ID or Touch ID in Settings to use biometric authentication.",
+                    false,
+                    nil
+                ),
+                .biometryLockout: (
+                    "Biometrics Locked",
+                    "Too many failed attempts. Please use your device passcode.",
+                    true,
+                    nil
+                ),
+            ]
 
-        if let mapping = errorMappings[error.code] {
-            return ErrorInfo(
-                title: mapping.title,
-                message: mapping.message,
-                isRecoverable: mapping.isRecoverable,
-                suggestedAction: mapping.suggestedAction
-            )
-        } else {
-            return ErrorInfo(
-                title: ErrorMessageConstants.Messages.authenticationFailed,
-                message: error.localizedDescription,
-                isRecoverable: true,
-                suggestedAction: .retry
-            )
+            if let mapping = errorMappings[error.code] {
+                return ErrorInfo(
+                    title: mapping.title,
+                    message: mapping.message,
+                    isRecoverable: mapping.isRecoverable,
+                    suggestedAction: mapping.suggestedAction
+                )
+            } else {
+                return ErrorInfo(
+                    title: ErrorMessageConstants.Messages.authenticationFailed,
+                    message: error.localizedDescription,
+                    isRecoverable: true,
+                    suggestedAction: .retry
+                )
+            }
         }
-    }
     #endif
 
     private static func handleNetworkError(_ error: URLError) -> ErrorInfo {

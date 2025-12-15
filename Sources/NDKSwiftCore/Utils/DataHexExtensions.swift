@@ -1,6 +1,7 @@
 import Foundation
 
 // MARK: - Data extensions for hex conversion
+
 // These extensions were previously provided by the CashuSwift fork
 // but are now implemented directly in NDKSwift
 
@@ -9,12 +10,12 @@ public extension Data {
     /// - Parameter hexString: Hex string to convert (supports "0x" prefix and odd-length strings)
     init?(hexString: String) {
         var hex = hexString.trimmed
-        
+
         // Remove 0x prefix if present (case insensitive)
         if hex.lowercased().hasPrefix("0x") {
             hex = String(hex.dropFirst(2))
         }
-        
+
         // Ensure even number of characters by padding with leading zero if needed
         if hex.count % 2 != 0 {
             hex = "0" + hex
@@ -37,7 +38,7 @@ public extension Data {
     var hexString: String {
         return map { String(format: "%02x", $0) }.joined()
     }
-    
+
     /// Pad Data to specified length with zeros
     /// - Parameter length: Target length
     /// - Returns: Data padded with zeros to reach the specified length
@@ -59,11 +60,11 @@ public extension String {
     func hexDecoded() -> Data? {
         return Data(hexString: self)
     }
-    
+
     /// Property to get bytes array from hex string
     /// Note: This is provided for backward compatibility but hexDecoded() is preferred
     var bytes: [UInt8] {
-        guard let data = self.hexDecoded() else { return [] }
+        guard let data = hexDecoded() else { return [] }
         return [UInt8](data)
     }
 }

@@ -1,7 +1,7 @@
 import Foundation
 import NDKSwiftCore
-import SwiftUI
 import Observation
+import SwiftUI
 
 // MARK: - NDKEventDataSource
 
@@ -32,7 +32,6 @@ import Observation
 @Observable
 @MainActor
 public final class NDKEventDataSource: @preconcurrency NDKSubscriptionProtocol {
-
     // MARK: - Published Properties
 
     /// Array of events matching the filter, sorted by creation time
@@ -71,7 +70,7 @@ public final class NDKEventDataSource: @preconcurrency NDKSubscriptionProtocol {
         self.sortDescending = sortDescending
 
         // Create data source with the provided filter
-        self.dataSource = ndk.subscribe(
+        dataSource = ndk.subscribe(
             filter: filter,
             maxAge: maxAge,
             cachePolicy: .cacheWithNetwork

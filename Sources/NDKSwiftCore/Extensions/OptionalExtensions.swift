@@ -21,11 +21,11 @@ extension Optional where Wrapped == String {
         switch self {
         case .none:
             return true
-        case .some(let value):
+        case let .some(value):
             return value.isEmpty
         }
     }
-    
+
     /// Returns the string value or an empty string if nil
     ///
     /// This property provides a safe way to unwrap optional strings when an
@@ -58,7 +58,7 @@ extension Optional where Wrapped: Collection {
         switch self {
         case .none:
             return true
-        case .some(let value):
+        case let .some(value):
             return value.isEmpty
         }
     }

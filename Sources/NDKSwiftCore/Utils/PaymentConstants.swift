@@ -2,7 +2,6 @@ import Foundation
 
 /// Constants for payment and wallet operations
 public enum PaymentConstants {
-
     // MARK: - Unit Conversions
 
     /// Number of millisatoshis per satoshi

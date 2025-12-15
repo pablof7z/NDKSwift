@@ -51,7 +51,7 @@
       "location" : "https://github.com/pablof7z/CashuSwift.git",
       "state" : {
         "branch" : "main",
-        "revision" : "f1259bad9fc8d869f4df1065998dc2f553dfcd5e"
+        "revision" : "3501e3baed8882cdf5e9badb7c26c72c05211a1a"
       }
     },
     {
@@ -88,6 +88,24 @@
       "state" : {
         "revision" : "b07e961f4c999671cf8c2dc80e740899e8946013",
         "version" : "2.3.0"
+      }
+    },
+    {
+      "identity" : "swift-docc-plugin",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-docc-plugin",
+      "state" : {
+        "revision" : "3e4f133a77e644a5812911a0513aeb7288b07d06",
+        "version" : "1.4.5"
+      }
+    },
+    {
+      "identity" : "swift-docc-symbolkit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/swiftlang/swift-docc-symbolkit",
+      "state" : {
+        "revision" : "b45d1f2ed151d057b54504d653e0da5552844e34",
+        "version" : "1.0.0"
       }
     },
     {

@@ -53,7 +53,7 @@ public actor NDKCacheNegentropyStorage: NegentropyStorage {
         return (fingerprint: fingerprint, count: items.count)
     }
 
-    public func addItems(_ items: [NegentropyItem]) async throws {
+    public func addItems(_: [NegentropyItem]) async throws {
         // Events are added through normal NDK flow, not directly through this method
         // This maintains consistency with NDK's event handling pipeline
     }
@@ -74,7 +74,7 @@ public actor NDKCacheNegentropyStorage: NegentropyStorage {
         var items: [NegentropyItem] = []
         for (hexId, exists) in existence {
             if exists, let event = await cache.getEvent(id: hexId) {
-                items.append(try NegentropyItem(event: event))
+                try items.append(NegentropyItem(event: event))
             }
         }
 
@@ -92,7 +92,7 @@ public actor NDKCacheNegentropyStorage: NegentropyStorage {
             filter: filter
         )
 
-        return try idsAndTimestamps.map { (id, timestamp) in
+        return try idsAndTimestamps.map { id, timestamp in
             guard let idData = id.hexDecoded(), idData.count == 32 else {
                 throw NegentropyError.invalidItemId
             }
@@ -100,4 +100,3 @@ public actor NDKCacheNegentropyStorage: NegentropyStorage {
         }
     }
 }
-

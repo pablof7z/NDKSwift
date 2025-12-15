@@ -12,7 +12,7 @@ public class LNURLResolver: LNURLResolving {
     private let networkClient: NDKNetworkClient
 
     public init(session: NDKNetworkFetching = URLSession.shared) {
-        self.networkClient = NDKNetworkClient(session: session)
+        networkClient = NDKNetworkClient(session: session)
     }
 
     /// Resolve an LNURL or LUD16 address
@@ -81,30 +81,30 @@ public class LNURLResolver: LNURLResolving {
     private func decodeLNURL(_ lnurl: String) throws -> URL {
         // Decode the bech32 string
         let (hrp, data) = try Bech32.decode(lnurl)
-        
+
         // Verify it's an LNURL (correct HRP)
         guard hrp.lowercased() == Bech32HRP.lnurl else {
             throw LNURLError.invalidFormat("Invalid HRP: expected '\(Bech32HRP.lnurl)', got '\(hrp)'")
         }
-        
+
         // Convert 5-bit groups back to 8-bit bytes
         let decodedData = try Bech32.convertBits(data: data, fromBits: 5, toBits: 8, pad: false)
-        
+
         // Convert to UTF-8 string
         guard let urlString = String(data: Data(decodedData), encoding: .utf8) else {
             throw LNURLError.decodingError("Failed to decode LNURL data as UTF-8 string")
         }
-        
+
         // Parse as URL
         guard let url = URL(string: urlString) else {
             throw LNURLError.invalidFormat("Decoded LNURL is not a valid URL: \(urlString)")
         }
-        
+
         // Validate it's an HTTP(S) URL
         guard url.scheme == "http" || url.scheme == "https" else {
             throw LNURLError.invalidFormat("LNURL must be an HTTP or HTTPS URL, got: \(url.scheme ?? "nil")")
         }
-        
+
         return url
     }
 
@@ -115,12 +115,12 @@ public class LNURLResolver: LNURLResolving {
                 LNURLPayResponse.self,
                 from: url
             )
-            
+
             // Validate it's a payRequest
             guard payResponse.tag == "payRequest" else {
                 throw LNURLError.invalidResponse("Expected payRequest tag, got: \(payResponse.tag)")
             }
-            
+
             return payResponse
         } catch let error as LNURLError {
             throw error
@@ -144,7 +144,8 @@ public class LNURLResolver: LNURLResolving {
             return rawMetadata?.compactMap { entry in
                 guard entry.count >= 2,
                       let type = entry[0] as? String,
-                      let value = entry[1] as? String else {
+                      let value = entry[1] as? String
+                else {
                     return nil
                 }
                 return LNURLMetadataEntry(type: type, value: value)

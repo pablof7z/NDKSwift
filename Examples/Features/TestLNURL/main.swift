@@ -9,34 +9,34 @@ struct TestLNURL {
     static func main() async {
         print("🧪 Testing LNURL Resolution")
         print("=" * 40)
-        
+
         // Create an NDK instance
         let ndk = NDK()
         let resolver = ndk.lnurlResolver
-        
+
         // Test cases for LUD16 addresses
         let lud16TestCases = [
-            "satoshi@bitcoin.org",      // Won't work (fake address)
-            "andre@lnmarkets.com",       // Should work if service is up
-            "hello@getalby.com",         // Should work if service is up
-            "notanemail",                // Should fail with invalid format
+            "satoshi@bitcoin.org", // Won't work (fake address)
+            "andre@lnmarkets.com", // Should work if service is up
+            "hello@getalby.com", // Should work if service is up
+            "notanemail", // Should fail with invalid format
         ]
-        
+
         // Test Bech32 LNURL encoding/decoding
         print("\n🔗 Testing Bech32 LNURL encoding/decoding")
         print("=" * 40)
-        
+
         let testURL = "https://service.walletofsatoshi.com/.well-known/lnurlp/alice"
         print("Original URL: \(testURL)")
-        
+
         // Encode to LNURL
         let urlData = testURL.data(using: .utf8)!
         let encodedData = try! Bech32.convertBits(data: Array(urlData), fromBits: 8, toBits: 5, pad: true)
         let lnurl = try! Bech32.encode(hrp: "lnurl", data: encodedData)
-        
+
         print("Encoded LNURL: \(lnurl)")
         print("LNURL length: \(lnurl.count) characters")
-        
+
         // Test decoding the LNURL we just created
         print("\n📥 Testing LNURL resolution:")
         do {
@@ -47,9 +47,9 @@ struct TestLNURL {
         } catch {
             print("❌ Error: \(error)")
         }
-        
+
         let testCases = lud16TestCases
-        
+
         for address in testCases {
             print("\n📧 Testing: \(address)")
             do {
@@ -71,44 +71,44 @@ struct TestLNURL {
                 print("❌ Unexpected error: \(error)")
             }
         }
-        
+
         print("\n\n🔧 Testing NDKZapManager integration")
         print("=" * 40)
-        
+
         // Create a mock zap receipt to test validation
         let mockReceipt = createMockZapReceipt()
         let zapManager = NDKZapManager(ndk: ndk)
-        
+
         print("\n📋 Mock zap receipt:")
         print("   Recipient: \(mockReceipt.recipientPubkey ?? "none")")
         print("   Event pubkey: \(mockReceipt.event.pubkey)")
-        
+
         // The actual validation would happen internally in validateAndParseZapReceipt
         // but that's a private method, so we just verify the integration compiles
         print("\n✅ LNURL integration with NDKZapManager compiles successfully!")
     }
-    
+
     static func createMockZapReceipt() -> NDKZapReceipt {
         // Create a mock event for testing
         let event = NDKEvent(
             id: "mock123",
-            pubkey: "mockprovider456", 
+            pubkey: "mockprovider456",
             createdAt: Timestamp.now,
             kind: 9735,
             tags: [
                 ["p", "recipient789"],
-                ["bolt11", "lnbc100n1..."]
+                ["bolt11", "lnbc100n1..."],
             ],
             content: "",
             sig: "mocksig"
         )
-        
+
         return NDKZapReceipt(event: event)
     }
 }
 
 extension String {
-    static func *(lhs: String, rhs: Int) -> String {
+    static func * (lhs: String, rhs: Int) -> String {
         String(repeating: lhs, count: rhs)
     }
 }

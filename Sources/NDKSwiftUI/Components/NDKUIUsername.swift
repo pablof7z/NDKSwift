@@ -1,5 +1,5 @@
-import SwiftUI
 import NDKSwiftCore
+import SwiftUI
 
 /// Displays a Nostr username with NIP-05 support
 ///
@@ -16,9 +16,9 @@ public struct NDKUIUsername: View {
     private let ndk: NDK
     private let pubkey: String
     private let maxLength: Int
-    
+
     @StateObject private var profileState: ProfileState
-    
+
     /// Initialize a username display component
     /// - Parameters:
     ///   - ndk: The NDK instance
@@ -28,9 +28,9 @@ public struct NDKUIUsername: View {
         self.ndk = ndk
         self.pubkey = pubkey
         self.maxLength = maxLength
-        self._profileState = StateObject(wrappedValue: ProfileState(pubkey: pubkey))
+        _profileState = StateObject(wrappedValue: ProfileState(pubkey: pubkey))
     }
-    
+
     public var body: some View {
         Group {
             if let nip05 = profileState.nip05, !nip05.isEmpty {
@@ -50,9 +50,9 @@ public struct NDKUIUsername: View {
             }
         }
     }
-    
+
     // MARK: - Private Helpers
-    
+
     private func formatNip05(_ nip05: String) -> String {
         // Remove _@ prefix for root identifiers
         if nip05.hasPrefix("_@") {
@@ -60,14 +60,14 @@ public struct NDKUIUsername: View {
         }
         return truncateIfNeeded(nip05)
     }
-    
+
     private func truncateIfNeeded(_ text: String) -> String {
         if text.count > maxLength {
             return String(text.prefix(maxLength - 3)) + "..."
         }
         return text
     }
-    
+
     private var truncatedNpub: String {
         let npub = NDKUser(pubkey: pubkey).npub
         // Show first 8 and last 4 characters
@@ -83,21 +83,21 @@ public struct NDKUIUsername: View {
 private class ProfileState: ObservableObject {
     @Published var name: String?
     @Published var nip05: String?
-    
+
     private let pubkey: String
     private var loadTask: Task<Void, Never>?
-    
+
     init(pubkey: String) {
         self.pubkey = pubkey
     }
-    
+
     deinit {
         loadTask?.cancel()
     }
-    
+
     func loadProfile(profileManager: NDKProfileManager) async {
         loadTask?.cancel()
-        
+
         loadTask = Task {
             // Use profile manager to observe profile updates
             for await profile in await profileManager.subscribe(for: pubkey) {
@@ -114,25 +114,25 @@ private class ProfileState: ObservableObject {
 // MARK: - Preview
 
 #if DEBUG
-struct NDKUIUsername_Previews: PreviewProvider {
-    static var previews: some View {
-        // Create a mock NDK for preview
-        let mockNDK = NDK(relayUrls: [])
-        
-        VStack(spacing: 16) {
-            // With NIP-05
-            NDKUIUsername(ndk: mockNDK, pubkey: "mock_pubkey_with_nip05")
-            
-            // With display name only
-            NDKUIUsername(ndk: mockNDK, pubkey: "mock_pubkey_with_name")
-            
-            // Fallback to npub
-            NDKUIUsername(ndk: mockNDK, pubkey: "mock_pubkey_no_profile")
-            
-            // Custom max length
-            NDKUIUsername(ndk: mockNDK, pubkey: "mock_pubkey_long_name", maxLength: 15)
+    struct NDKUIUsername_Previews: PreviewProvider {
+        static var previews: some View {
+            // Create a mock NDK for preview
+            let mockNDK = NDK(relayURLs: [])
+
+            VStack(spacing: 16) {
+                // With NIP-05
+                NDKUIUsername(ndk: mockNDK, pubkey: "mock_pubkey_with_nip05")
+
+                // With display name only
+                NDKUIUsername(ndk: mockNDK, pubkey: "mock_pubkey_with_name")
+
+                // Fallback to npub
+                NDKUIUsername(ndk: mockNDK, pubkey: "mock_pubkey_no_profile")
+
+                // Custom max length
+                NDKUIUsername(ndk: mockNDK, pubkey: "mock_pubkey_long_name", maxLength: 15)
+            }
+            .padding()
         }
-        .padding()
     }
-}
 #endif

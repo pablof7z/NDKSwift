@@ -1,17 +1,16 @@
-import XCTest
 import Foundation
+import XCTest
 
 /// Utility to add timeout functionality to async test operations
-struct TestTimeoutHelper {
-    
+enum TestTimeoutHelper {
     struct TimeoutError: Error, LocalizedError {
         let seconds: TimeInterval
-        
+
         var errorDescription: String? {
             "Test operation timed out after \(seconds) seconds"
         }
     }
-    
+
     /// Executes an async operation with a timeout
     /// - Parameters:
     ///   - seconds: Timeout duration in seconds (default: 30)
@@ -27,20 +26,20 @@ struct TestTimeoutHelper {
             group.addTask {
                 try await operation()
             }
-            
+
             // Add the timeout task
             group.addTask {
                 try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
                 throw TimeoutError(seconds: seconds)
             }
-            
+
             // Return the first result (either success or timeout)
             let result = try await group.next()!
             group.cancelAll()
             return result
         }
     }
-    
+
     /// Executes a non-throwing async operation with a timeout
     /// - Parameters:
     ///   - seconds: Timeout duration in seconds (default: 30)
@@ -58,7 +57,7 @@ struct TestTimeoutHelper {
             return nil
         }
     }
-    
+
     /// Convenience method for XCTest async test methods
     /// - Parameters:
     ///   - seconds: Timeout duration in seconds (default: 30)
@@ -84,7 +83,6 @@ struct TestTimeoutHelper {
 
 /// Extension to make it easier to use with XCTestCase
 extension XCTestCase {
-    
     /// Executes an async test operation with timeout protection
     func performAsyncTest(
         timeout: TimeInterval = 30,

@@ -1,7 +1,7 @@
-import Foundation
-import NDKSwiftCore
-import GRDB
 import Combine
+import Foundation
+import GRDB
+import NDKSwiftCore
 
 // MARK: - SQLite Constants
 
@@ -13,14 +13,13 @@ private enum SQLiteConstants {
     static let queryBatchSize = 100
 }
 
-
 /// SQLite-backed cache implementation for NDKSwift
 /// Provides efficient storage and querying of Nostr events with proper migration support
 public actor NDKSQLiteCache: NDKCache {
     private let dbQueue: DatabaseQueue
     private let dbPath: String
     private let debugMode: Bool
-    
+
     // Active observations
     private var activeObservations: [UUID: DatabaseCancellable] = [:]
 
@@ -39,21 +38,21 @@ public actor NDKSQLiteCache: NDKCache {
         self.debugMode = debugMode
 
         if let customPath = path {
-            self.dbPath = customPath
+            dbPath = customPath
         } else {
             let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            self.dbPath = documentsPath.appendingPathComponent("ndk_cache.db").path
+            dbPath = documentsPath.appendingPathComponent("ndk_cache.db").path
         }
 
         var config = Configuration()
         config.readonly = false
-        self.dbQueue = try DatabaseQueue(path: dbPath, configuration: config)
+        dbQueue = try DatabaseQueue(path: dbPath, configuration: config)
 
-        try await self.setupPragmas()
-        try await self.migrateDatabase()
+        try await setupPragmas()
+        try await migrateDatabase()
 
         // Start periodic cleanup task
-        self.cleanupTask = Task {
+        cleanupTask = Task {
             await self.startPeriodicCleanup()
         }
     }
@@ -120,7 +119,7 @@ public actor NDKSQLiteCache: NDKCache {
                     """,
                     arguments: [eventId, pubkey, createdAt, kind, content, sig, jsonString]
                 )
-                
+
                 if self.debugMode {
                     NDKLogger.log(.info, category: .cache, "💾 Saved event to database - id: \(eventId), kind: \(kind), pubkey: \(pubkey.prefix(8))...")
                 }
@@ -187,7 +186,7 @@ public actor NDKSQLiteCache: NDKCache {
             let rows = try Row.fetchAll(db, sql: sql, arguments: arguments)
 
             let events: [NDKEvent] = rows.compactMap { row in
-                return self.decodeEventFromRow(row)
+                self.decodeEventFromRow(row)
             }
 
             NDKLogger.log(.trace, category: .cache, "Exiting dbQueue.read block")
@@ -210,8 +209,8 @@ public actor NDKSQLiteCache: NDKCache {
 
         // Check if we have semantic fields populated
         let hasSemanticFields = row["name"] as? String != nil ||
-                              row["display_name"] as? String != nil ||
-                              row["about"] as? String != nil
+            row["display_name"] as? String != nil ||
+            row["about"] as? String != nil
 
         if hasSemanticFields {
             // Add standard fields if present
@@ -243,7 +242,8 @@ public actor NDKSQLiteCache: NDKCache {
         } else {
             // Fallback to JSON parsing for backward compatibility
             if let jsonString = row["json"] as? String,
-               let jsonData = jsonString.data(using: .utf8) {
+               let jsonData = jsonString.data(using: .utf8)
+            {
                 let jsonDict: [String: Any]?
                 do {
                     jsonDict = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any]
@@ -271,17 +271,17 @@ public actor NDKSQLiteCache: NDKCache {
         let nip05 = metadata["nip05"] as? String
         let lud06 = metadata["lud06"] as? String
         let lud16 = metadata["lud16"] as? String
-        
+
         // Extract additional fields
         let knownKeys = ["name", "display_name", "about", "picture", "banner", "nip05", "lud16", "lud06", "website"]
         var additionalFields: [String: String] = [:]
-        
+
         for (key, value) in metadata {
             if !knownKeys.contains(key), let stringValue = value as? String {
                 additionalFields[key] = stringValue
             }
         }
-        
+
         // Encode additional fields as property list data
         let additionalFieldsData: Data?
         if !additionalFields.isEmpty {
@@ -294,11 +294,11 @@ public actor NDKSQLiteCache: NDKCache {
         } else {
             additionalFieldsData = nil
         }
-        
+
         // Reconstruct JSON for backward compatibility
         let jsonData = try JSONSerialization.data(withJSONObject: metadata, options: [])
         let json = String(data: jsonData, encoding: .utf8) ?? "{}"
-        
+
         try await dbQueue.write { db in
             try db.execute(
                 sql: """
@@ -309,16 +309,16 @@ public actor NDKSQLiteCache: NDKCache {
                 """,
                 arguments: [
                     pubkey, name, displayName, about, picture, nip05, lud06, lud16, banner, website,
-                    additionalFieldsData, updatedAt, eventId, json
+                    additionalFieldsData, updatedAt, eventId, json,
                 ]
             )
         }
-        
+
         if debugMode {
             NDKLogger.log(.debug, category: .cache, "Saved profile metadata for \(pubkey.prefix(8))...")
         }
     }
-    
+
     public func getProfileMetadata(pubkey: String) async -> (metadata: [String: Any], updatedAt: Timestamp, eventId: String)? {
         do {
             return try await dbQueue.read { db in
@@ -337,19 +337,19 @@ public actor NDKSQLiteCache: NDKCache {
             return nil
         }
     }
-    
+
     public func getMultipleProfileMetadata(pubkeys: [String]) async -> [String: (metadata: [String: Any], updatedAt: Timestamp, eventId: String)] {
         guard !pubkeys.isEmpty else { return [:] }
-        
+
         do {
             return try await dbQueue.read { db in
                 var result: [String: (metadata: [String: Any], updatedAt: Timestamp, eventId: String)] = [:]
-                
+
                 // Batch fetch in groups to avoid SQLite limits
                 let chunks = stride(from: 0, to: pubkeys.count, by: SQLiteConstants.queryBatchSize).map {
-                    Array(pubkeys[$0..<min($0 + SQLiteConstants.queryBatchSize, pubkeys.count)])
+                    Array(pubkeys[$0 ..< min($0 + SQLiteConstants.queryBatchSize, pubkeys.count)])
                 }
-                
+
                 for chunk in chunks {
                     let placeholders = chunk.map { _ in "?" }.joined(separator: ",")
                     let sql = "SELECT * FROM profiles WHERE pubkey IN (\(placeholders))"
@@ -366,7 +366,7 @@ public actor NDKSQLiteCache: NDKCache {
                         result[pubkey] = (metadata, updatedAt, eventId)
                     }
                 }
-                
+
                 return result
             }
         } catch {
@@ -503,7 +503,8 @@ public actor NDKSQLiteCache: NDKCache {
                 var result: [String: Data] = [:]
                 for row in rows {
                     if let key = row["key"] as? String,
-                       let value = row["value"] as? Data {
+                       let value = row["value"] as? Data
+                    {
                         result[key] = value
                     }
                 }
@@ -536,7 +537,7 @@ public actor NDKSQLiteCache: NDKCache {
                     event.kind,
                     event.content,
                     event.sig,
-                    try JSONCoding.encodeToString(event)
+                    JSONCoding.encodeToString(event),
                 ]
             )
 
@@ -618,12 +619,12 @@ public actor NDKSQLiteCache: NDKCache {
         do {
             return try await dbQueue.read { db in
                 var sql = """
-                    SELECT e.json, ec.target_relays
-                    FROM events e
-                    JOIN event_confirmations ec ON e.id = ec.event_id
-                    WHERE ec.state = 'optimistic' AND ec.created_at >= ?
-                    ORDER BY ec.created_at DESC
-                    """
+                SELECT e.json, ec.target_relays
+                FROM events e
+                JOIN event_confirmations ec ON e.id = ec.event_id
+                WHERE ec.state = 'optimistic' AND ec.created_at >= ?
+                ORDER BY ec.created_at DESC
+                """
 
                 var arguments: StatementArguments = [cutoffTime]
 
@@ -639,7 +640,8 @@ public actor NDKSQLiteCache: NDKCache {
                           let jsonData = jsonString.data(using: .utf8),
                           let event = JSONCoding.safeDecode(NDKEvent.self, from: jsonData),
                           let targetRelaysJson = row["target_relays"] as? String,
-                          let targetRelaysData = targetRelaysJson.data(using: .utf8) else {
+                          let targetRelaysData = targetRelaysJson.data(using: .utf8)
+                    else {
                         return nil
                     }
 
@@ -836,12 +838,12 @@ public actor NDKSQLiteCache: NDKCache {
                     verifiedAt,
                     lastCheckAt,
                     entry.errorMessage,
-                    entry.httpStatusCode
+                    entry.httpStatusCode,
                 ])
 
                 if debugMode {
                     NDKLogger.log(.debug, category: .cache,
-                        "Saved NIP-05 resolution: \(entry.identifier) -> \(entry.pubkey) (\(entry.status))")
+                                  "Saved NIP-05 resolution: \(entry.identifier) -> \(entry.pubkey) (\(entry.status))")
                 }
             }
         } catch {
@@ -862,7 +864,7 @@ public actor NDKSQLiteCache: NDKCache {
                     NIP05VerificationStatus.invalid.rawValue,
                     Timestamp.from(Date()),
                     "Belongs to different pubkey",
-                    identifier
+                    identifier,
                 ])
 
                 // If we know the actual owner, save that as verified
@@ -877,13 +879,13 @@ public actor NDKSQLiteCache: NDKCache {
                         NIP05VerificationStatus.verified.rawValue,
                         Timestamp.from(Date()),
                         Timestamp.from(Date()),
-                        Timestamp.now
+                        Timestamp.now,
                     ])
                 }
 
                 if debugMode {
                     NDKLogger.log(.debug, category: .cache,
-                        "Invalidated NIP-05: \(identifier), actual owner: \(actualPubkey ?? "unknown")")
+                                  "Invalidated NIP-05: \(identifier), actual owner: \(actualPubkey ?? "unknown")")
                 }
             }
         } catch {
@@ -903,7 +905,8 @@ public actor NDKSQLiteCache: NDKCache {
                 """, arguments: [identifier])
 
                 guard let row = row,
-                      let status = row["status"] as? String else {
+                      let status = row["status"] as? String
+                else {
                     return true
                 }
 
@@ -959,7 +962,8 @@ public actor NDKSQLiteCache: NDKCache {
 
                 guard let row = row,
                       let attemptCount = row["attempt_count"] as? Int,
-                      let windowStart = row["window_start"] as? Int64 else {
+                      let windowStart = row["window_start"] as? Int64
+                else {
                     return true
                 }
 
@@ -988,7 +992,8 @@ public actor NDKSQLiteCache: NDKCache {
 
                 if let existing = existing,
                    let windowStart = existing["window_start"] as? Int64,
-                   TimeInterval(now - windowStart) <= rateLimitWindow {
+                   TimeInterval(now - windowStart) <= rateLimitWindow
+                {
                     try db.execute(sql: """
                         UPDATE nip05_rate_limit
                         SET attempt_count = attempt_count + 1
@@ -1068,7 +1073,7 @@ public actor NDKSQLiteCache: NDKCache {
                     readRelaysJSON,
                     fetchedAtInt,
                     expiresAtInt,
-                    checkedRelaysJSON
+                    checkedRelaysJSON,
                 ])
 
                 if debugMode {
@@ -1095,7 +1100,8 @@ public actor NDKSQLiteCache: NDKCache {
                 }
 
                 guard let fetchedAtInt = row["fetched_at"] as? Int64,
-                      let expiresAtInt = row["expires_at"] as? Int64 else {
+                      let expiresAtInt = row["expires_at"] as? Int64
+                else {
                     return nil
                 }
 
@@ -1115,7 +1121,8 @@ public actor NDKSQLiteCache: NDKCache {
 
                 let checkedRelays: Set<String>?
                 if let json = row["checked_relays"] as? String,
-                   let array = JSONCoding.safeDecode([String].self, from: json) {
+                   let array = JSONCoding.safeDecode([String].self, from: json)
+                {
                     checkedRelays = Set(array)
                 } else {
                     checkedRelays = nil
@@ -1292,7 +1299,7 @@ public actor NDKSQLiteCache: NDKCache {
                 let batchSize = SQLiteConstants.queryBatchSize
                 for i in stride(from: 0, to: ids.count, by: batchSize) {
                     let endIndex = min(i + batchSize, ids.count)
-                    let batch = Array(ids[i..<endIndex])
+                    let batch = Array(ids[i ..< endIndex])
 
                     let placeholders = batch.map { _ in "?" }.joined(separator: ", ")
                     let sql = "SELECT id FROM events WHERE id IN (\(placeholders))"
@@ -1435,51 +1442,51 @@ public actor NDKSQLiteCache: NDKCache {
     // MARK: - Testing Support (only for unit tests)
 
     #if DEBUG
-    /// Insert raw profile data for testing migration scenarios
-    /// - Warning: This method is only available in DEBUG builds for testing
-    public func insertRawProfileForTesting(pubkey: String, json: String) async throws {
-        try await dbQueue.write { db in
-            try db.execute(
-                sql: "INSERT INTO profiles (pubkey, json, updated_at) VALUES (?, ?, ?)",
-                arguments: [pubkey, json, Timestamp.now]
-            )
-        }
-    }
-
-    /// Get raw profile row for testing
-    /// - Warning: This method is only available in DEBUG builds for testing
-    public func getRawProfileForTesting(pubkey: String) async throws -> [String: Any]? {
-        return try await dbQueue.read { db in
-            guard let row = try Row.fetchOne(db, sql: "SELECT * FROM profiles WHERE pubkey = ?", arguments: [pubkey]) else {
-                return nil
+        /// Insert raw profile data for testing migration scenarios
+        /// - Warning: This method is only available in DEBUG builds for testing
+        public func insertRawProfileForTesting(pubkey: String, json: String) async throws {
+            try await dbQueue.write { db in
+                try db.execute(
+                    sql: "INSERT INTO profiles (pubkey, json, updated_at) VALUES (?, ?, ?)",
+                    arguments: [pubkey, json, Timestamp.now]
+                )
             }
+        }
 
-            var result: [String: Any] = [:]
-            for (column, dbValue) in row {
-                // Convert DatabaseValue to appropriate Swift type
-                if dbValue.isNull {
-                    result[column] = NSNull()
-                } else if let stringValue = String.fromDatabaseValue(dbValue) {
-                    result[column] = stringValue
-                } else if let intValue = Int64.fromDatabaseValue(dbValue) {
-                    result[column] = intValue
-                } else if let dataValue = Data.fromDatabaseValue(dbValue) {
-                    result[column] = dataValue
-                } else {
-                    // Store the database value directly if we can't convert it
-                    result[column] = dbValue
+        /// Get raw profile row for testing
+        /// - Warning: This method is only available in DEBUG builds for testing
+        public func getRawProfileForTesting(pubkey: String) async throws -> [String: Any]? {
+            return try await dbQueue.read { db in
+                guard let row = try Row.fetchOne(db, sql: "SELECT * FROM profiles WHERE pubkey = ?", arguments: [pubkey]) else {
+                    return nil
                 }
+
+                var result: [String: Any] = [:]
+                for (column, dbValue) in row {
+                    // Convert DatabaseValue to appropriate Swift type
+                    if dbValue.isNull {
+                        result[column] = NSNull()
+                    } else if let stringValue = String.fromDatabaseValue(dbValue) {
+                        result[column] = stringValue
+                    } else if let intValue = Int64.fromDatabaseValue(dbValue) {
+                        result[column] = intValue
+                    } else if let dataValue = Data.fromDatabaseValue(dbValue) {
+                        result[column] = dataValue
+                    } else {
+                        // Store the database value directly if we can't convert it
+                        result[column] = dbValue
+                    }
+                }
+                return result
             }
-            return result
         }
-    }
     #endif
 
     // MARK: - Reactive Observation
 
     /// Check if an event matches a filter using an optimized hybrid approach
     /// This ensures consistency with queryEvents SQL logic while optimizing performance
-    internal func eventMatchesFilter(_ event: NDKEvent, filter: NDKFilter) async -> Bool {
+    func eventMatchesFilter(_ event: NDKEvent, filter: NDKFilter) async -> Bool {
         // 1. Perform fast, in-memory checks for non-tag properties.
         // If any of these fail, we can return false immediately without a DB query.
         if let kinds = filter.kinds, !kinds.isEmpty, !kinds.contains(event.kind) {
@@ -1498,8 +1505,8 @@ public actor NDKSQLiteCache: NDKCache {
         // 2. Determine if a database query is necessary for tag-based filters.
         // These are the filters that require complex JOINs in SQL.
         let needsDBQueryForTags = (filter.tags != nil && !filter.tags!.isEmpty)
-                               || (filter.events != nil && !filter.events!.isEmpty)
-                               || (filter.pubkeys != nil && !filter.pubkeys!.isEmpty)
+            || (filter.events != nil && !filter.events!.isEmpty)
+            || (filter.pubkeys != nil && !filter.pubkeys!.isEmpty)
 
         if !needsDBQueryForTags {
             // If we passed all in-memory checks and there are no tag filters,
@@ -1539,7 +1546,8 @@ public actor NDKSQLiteCache: NDKCache {
     /// Helper method to decode NDKEvent from database row JSON
     private nonisolated func decodeEventFromRow(_ row: Row) -> NDKEvent? {
         guard let jsonString = row["json"] as? String,
-              let jsonData = jsonString.data(using: .utf8) else {
+              let jsonData = jsonString.data(using: .utf8)
+        else {
             return nil
         }
         return JSONCoding.safeDecode(NDKEvent.self, from: jsonData)
@@ -1548,7 +1556,8 @@ public actor NDKSQLiteCache: NDKCache {
     /// Helper method to decode NDKEvent from database row JSON (throwing version)
     private nonisolated func decodeEventFromRowThrowing(_ row: Row) throws -> NDKEvent? {
         guard let jsonString = row["json"] as? String,
-              let jsonData = jsonString.data(using: .utf8) else {
+              let jsonData = jsonString.data(using: .utf8)
+        else {
             return nil
         }
         return try JSONCoding.decode(NDKEvent.self, from: jsonData)
@@ -1565,7 +1574,7 @@ public actor NDKSQLiteCache: NDKCache {
     /// Clean up expired tombstones
     private func cleanupTombstones() async {
         let now = Timestamp.now
-        let expiredKeys = deletionTombstones.compactMap { (eventId, timestamp) -> String? in
+        let expiredKeys = deletionTombstones.compactMap { eventId, timestamp -> String? in
             let age = TimeInterval(now - timestamp)
             return age > tombstoneTTL ? eventId : nil
         }
@@ -1585,7 +1594,8 @@ public actor NDKSQLiteCache: NDKCache {
               let pubkey = row["pubkey"] as? String,
               let statusString = row["status"] as? String,
               let status = NIP05VerificationStatus(rawValue: statusString),
-              let claimedAtInt = row["claimed_at"] as? Int64 else {
+              let claimedAtInt = row["claimed_at"] as? Int64
+        else {
             return nil
         }
 
@@ -1618,17 +1628,17 @@ public actor NDKSQLiteCache: NDKCache {
         if debugMode {
             NDKLogger.log(.info, category: .cache, "🚀 observeEvents called with filter: \(filter), includeExisting: \(includeExisting)")
         }
-        
+
         let dbQueue = self.dbQueue
         let debugMode = self.debugMode
-        
+
         return AsyncThrowingStream { continuation in
             let observationId = UUID()
-            
+
             Task {
                 // Track existing event IDs when includeExisting is false
                 var existingEventIds: Set<String> = []
-                
+
                 if !includeExisting {
                     // Query existing events to track their IDs
                     do {
@@ -1643,16 +1653,16 @@ public actor NDKSQLiteCache: NDKCache {
                         }
                     }
                 }
-                
+
                 // Create the observation inline to work around GRDB type constraints
                 let observation = ValueObservation.tracking { [weak self] db -> [NDKEvent] in
                     guard let self = self else { return [] }
-                    
+
                     var arguments = StatementArguments()
                     var whereClauses: [String] = []
                     var joins: [String] = []
                     var tagIndex = 0
-                    
+
                     // Build filter clauses
                     SQLiteQueryBuilder.buildFilterClauses(
                         from: filter,
@@ -1661,7 +1671,7 @@ public actor NDKSQLiteCache: NDKCache {
                         joins: &joins,
                         tagIndex: &tagIndex
                     )
-                    
+
                     // Build and execute query
                     let sql = SQLiteQueryBuilder.buildSelectQuery(
                         joins: joins,
@@ -1669,14 +1679,14 @@ public actor NDKSQLiteCache: NDKCache {
                         limit: filter.limit,
                         orderBy: "e.created_at DESC"
                     )
-                    
+
                     let rows = try Row.fetchAll(db, sql: sql, arguments: arguments)
-                    
+
                     return rows.compactMap { row in
                         self.decodeEventFromRow(row)
                     }
                 }
-                
+
                 // Start the observation
                 let cancellable = observation.start(
                     in: dbQueue,
@@ -1687,7 +1697,7 @@ public actor NDKSQLiteCache: NDKCache {
                         if self.debugMode {
                             NDKLogger.log(.info, category: .cache, "🔔 GRDB observation triggered: \(events.count) events for filter \(filter)")
                         }
-                        
+
                         // Filter events based on includeExisting flag
                         let eventsToEmit: [NDKEvent]
                         if includeExisting {
@@ -1695,20 +1705,20 @@ public actor NDKSQLiteCache: NDKCache {
                         } else {
                             // Only emit events that weren't in the initial set
                             eventsToEmit = events.filter { !existingEventIds.contains($0.id) }
-                            if self.debugMode && eventsToEmit.count != events.count {
+                            if self.debugMode, eventsToEmit.count != events.count {
                                 NDKLogger.log(.info, category: .cache, "🔍 Filtered out \(events.count - eventsToEmit.count) existing events, emitting \(eventsToEmit.count) new events")
                             }
                         }
-                        
+
                         if !eventsToEmit.isEmpty {
                             continuation.yield(eventsToEmit)
                         }
                     }
                 )
-                
+
                 // Store the cancellable
                 await self.storeObservation(id: observationId, cancellable: cancellable)
-                
+
                 // If includeExisting, immediately query and emit current events
                 if includeExisting {
                     do {
@@ -1725,7 +1735,7 @@ public actor NDKSQLiteCache: NDKCache {
                         }
                     }
                 }
-                
+
                 // Set up cleanup when the stream is terminated
                 continuation.onTermination = { @Sendable _ in
                     Task {
@@ -1735,19 +1745,19 @@ public actor NDKSQLiteCache: NDKCache {
             }
         }
     }
-    
+
     /// Store an active observation
     private func storeObservation(id: UUID, cancellable: DatabaseCancellable) async {
         activeObservations[id] = cancellable
     }
-    
+
     /// Remove and cancel an observation
     private func removeObservation(id: UUID) async {
         if let cancellable = activeObservations.removeValue(forKey: id) {
             cancellable.cancel()
         }
     }
-    
+
     /// Create a reactive query for a single event by ID
     /// - Parameters:
     ///   - eventId: The event ID to observe
@@ -1758,52 +1768,52 @@ public actor NDKSQLiteCache: NDKCache {
         includeExisting: Bool = true
     ) async -> AsyncThrowingStream<NDKEvent?, Error> {
         let dbQueue = self.dbQueue
-        
+
         return AsyncThrowingStream { continuation in
             let observationId = UUID()
-            
+
             Task {
-                    // Create observation for single event
-                    let observation = ValueObservation.tracking { [weak self] db -> NDKEvent? in
-                        guard let self = self else { return nil }
-                        
-                        if let row = try Row.fetchOne(db, sql: "SELECT json FROM events WHERE id = ?", arguments: [eventId]) {
-                            return self.decodeEventFromRow(row)
-                        }
-                        return nil
+                // Create observation for single event
+                let observation = ValueObservation.tracking { [weak self] db -> NDKEvent? in
+                    guard let self = self else { return nil }
+
+                    if let row = try Row.fetchOne(db, sql: "SELECT json FROM events WHERE id = ?", arguments: [eventId]) {
+                        return self.decodeEventFromRow(row)
                     }
-                    
-                    // Start the observation
-                    let cancellable = observation.start(
-                        in: dbQueue,
-                        onError: { error in
-                            continuation.finish(throwing: error)
-                        },
-                        onChange: { event in
-                            continuation.yield(event)
-                        }
-                    )
-                    
-                    // Store the cancellable
-                    await self.storeObservation(id: observationId, cancellable: cancellable)
-                    
-                    // If includeExisting, immediately fetch and emit current event
-                    if includeExisting {
-                        if let existingEvent = await self.getEvent(id: eventId) {
-                            continuation.yield(existingEvent)
-                        }
+                    return nil
+                }
+
+                // Start the observation
+                let cancellable = observation.start(
+                    in: dbQueue,
+                    onError: { error in
+                        continuation.finish(throwing: error)
+                    },
+                    onChange: { event in
+                        continuation.yield(event)
                     }
-                    
-                    // Set up cleanup
-                    continuation.onTermination = { @Sendable _ in
-                        Task {
-                            await self.removeObservation(id: observationId)
-                        }
+                )
+
+                // Store the cancellable
+                await self.storeObservation(id: observationId, cancellable: cancellable)
+
+                // If includeExisting, immediately fetch and emit current event
+                if includeExisting {
+                    if let existingEvent = await self.getEvent(id: eventId) {
+                        continuation.yield(existingEvent)
                     }
+                }
+
+                // Set up cleanup
+                continuation.onTermination = { @Sendable _ in
+                    Task {
+                        await self.removeObservation(id: observationId)
+                    }
+                }
             }
         }
     }
-    
+
     /// Observe profile changes for a specific pubkey with reactive updates
     /// - Parameters:
     ///   - pubkey: The public key to observe profile changes for
@@ -1815,15 +1825,15 @@ public actor NDKSQLiteCache: NDKCache {
     ) async -> AsyncThrowingStream<NDKUserMetadata?, Error> {
         let dbQueue = self.dbQueue
         let debugMode = self.debugMode
-        
+
         return AsyncThrowingStream { continuation in
             let observationId = UUID()
-            
+
             Task {
                 // Create observation for profile metadata
                 let observation = ValueObservation.tracking { [weak self] db -> NDKUserMetadata? in
                     guard let self = self else { return nil }
-                    
+
                     // Query for the latest kind 0 event for this pubkey
                     let sql = """
                         SELECT e.json 
@@ -1833,7 +1843,7 @@ public actor NDKSQLiteCache: NDKCache {
                         ORDER BY e.created_at DESC
                         LIMIT 1
                     """
-                    
+
                     if let row = try Row.fetchOne(db, sql: sql, arguments: [pubkey]) {
                         if let event = self.decodeEventFromRow(row) {
                             return NDKUserMetadata(event: event)
@@ -1841,7 +1851,7 @@ public actor NDKSQLiteCache: NDKCache {
                     }
                     return nil
                 }
-                
+
                 // Start the observation
                 let cancellable = observation.start(
                     in: dbQueue,
@@ -1855,15 +1865,15 @@ public actor NDKSQLiteCache: NDKCache {
                         continuation.yield(profile)
                     }
                 )
-                
+
                 // Store the cancellable
                 await self.storeObservation(id: observationId, cancellable: cancellable)
-                
+
                 // If includeExisting, immediately fetch and emit current profile
                 if includeExisting {
                     // First yield nil to indicate we're starting
                     continuation.yield(nil)
-                    
+
                     // Then fetch the actual profile
                     do {
                         let filter = NDKFilter(authors: [pubkey], kinds: [EventKind.metadata], limit: 1)
@@ -1878,7 +1888,7 @@ public actor NDKSQLiteCache: NDKCache {
                         }
                     }
                 }
-                
+
                 // Set up cleanup
                 continuation.onTermination = { @Sendable _ in
                     Task {
@@ -1888,7 +1898,6 @@ public actor NDKSQLiteCache: NDKCache {
             }
         }
     }
-    
 }
 
 // MARK: - Cache Statistics Models

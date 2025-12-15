@@ -17,7 +17,7 @@ let ndk = NDK(
     relayUrls: [
         "wss://relay.damus.io",
         "wss://relay.primal.net",
-        "wss://nos.lol"
+        "wss://nos.lol",
     ],
     cache: cache
 )
@@ -50,13 +50,13 @@ Task {
         print("\n📬 Event received:")
         print("   Content: \(event.content)")
         print("   ID: \(event.id)")
-        
+
         // Check confirmation state
         if let state = await cache.getEventConfirmationState(eventId: event.id) {
             switch state {
             case .optimistic:
                 print("   Status: ⏳ Waiting to send...")
-            case .confirmed(let fromRelay):
+            case let .confirmed(fromRelay):
                 print("   Status: ✅ Confirmed by \(fromRelay)")
             }
         }
@@ -103,21 +103,21 @@ _ = try await ndk.publish(onlineEvent)
 
 // Monitor confirmation states
 print("\n📊 Monitoring event confirmation states...")
-for i in 0..<5 {
+for i in 0 ..< 5 {
     try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
-    
+
     print("\n--- Check \(i + 1) ---")
-    
+
     // Check offline event
     if let state = await cache.getEventConfirmationState(eventId: offlineEvent.id) {
         print("Offline event: \(describeState(state))")
     }
-    
-    // Check online event  
+
+    // Check online event
     if let state = await cache.getEventConfirmationState(eventId: onlineEvent.id) {
         print("Online event: \(describeState(state))")
     }
-    
+
     // Check unpublished count
     let unpublished = await cache.getUnpublishedEvents(limit: 100)
     if !unpublished.isEmpty {
@@ -178,8 +178,7 @@ func describeState(_ state: EventConfirmationState) -> String {
     switch state {
     case .optimistic:
         return "⏳ Optimistic (waiting to send)"
-    case .confirmed(let fromRelay):
+    case let .confirmed(fromRelay):
         return "✅ Confirmed (from \(fromRelay))"
     }
 }
-
