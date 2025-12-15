@@ -355,12 +355,11 @@ final class NDKEventBuilderComprehensiveTests: NDKUnitTestCase {
 
     func testEncryptToRecipient() async throws {
         let recipientPubkey = "recipient_pubkey_64_chars_hex_abcdef1234567890abcdef1234567890abcd"
-        let recipient = NDKUser(pubkey: recipientPubkey)
 
         let event = try await builder
             .kind(EventKind.encryptedDirectMessage)
             .content("Secret message")
-            .encrypt(recipient: recipient, signer: signer, scheme: .nip44)
+            .encrypt(recipientPubkey: recipientPubkey, signer: signer, scheme: .nip44)
 
         XCTAssertEqual(event.kind, EventKind.encryptedDirectMessage)
         XCTAssertNotEqual(event.content, "Secret message") // Should be encrypted

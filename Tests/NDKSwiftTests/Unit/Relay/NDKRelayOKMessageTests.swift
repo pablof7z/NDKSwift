@@ -11,7 +11,7 @@ final class NDKRelayOKMessageTests: XCTestCase {
         let signer = try NDKPrivateKeySigner.generate()
         ndk = NDK(signer: signer)
         relay = NDKRelay(url: "wss://test.relay")
-        relay.ndk = ndk
+        await relay.setNDK(ndk)
     }
 
     override func tearDown() async throws {

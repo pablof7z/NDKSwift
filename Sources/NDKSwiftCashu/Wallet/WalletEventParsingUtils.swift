@@ -15,14 +15,13 @@ enum WalletEventParsingUtils {
         signer: NDKSigner,
         scheme: NDKEncryptionScheme = .nip44
     ) async throws -> T {
-        let sender = NDKUser(pubkey: event.pubkey)
         let decryptedContent = try await signer.decrypt(
-            sender: sender,
+            senderPubkey: event.pubkey,
             value: event.content,
             scheme: scheme
         )
 
-        guard let data = decryptedContent.data(using: .utf8) else {
+        guard let data = decryptedContent.data(using: String.Encoding.utf8) else {
             throw NDKError.invalidContent("Decrypted content not valid UTF-8 for event \(event.id)")
         }
 

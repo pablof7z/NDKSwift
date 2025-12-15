@@ -92,10 +92,9 @@ public extension NDKEvent {
         ndk: NDK,
         useNIP44: Bool = true
     ) async throws -> NDKEvent {
-        let user = NDKUser(pubkey: recipientPubkey)
         let scheme: NDKEncryptionScheme = useNIP44 ? .nip44 : .nip04
 
-        let encryptedContent = try await signer.encrypt(recipient: user, value: content, scheme: scheme)
+        let encryptedContent = try await signer.encrypt(recipientPubkey: recipientPubkey, value: content, scheme: scheme)
 
         let event = try await NDKEventBuilder(ndk: ndk)
             .content(encryptedContent)
@@ -127,13 +126,7 @@ public extension NDKEvent {
             return cached
         }
 
-        let pubkey: PublicKey
-        if let senderPubkey = senderPubkey {
-            pubkey = senderPubkey
-        } else {
-            pubkey = self.pubkey
-        }
-        let sender = NDKUser(pubkey: pubkey)
+        let senderKey = senderPubkey ?? self.pubkey
 
         // Try to detect the encryption scheme based on content format
         let scheme: NDKEncryptionScheme
@@ -143,7 +136,7 @@ public extension NDKEvent {
             scheme = .nip44
         }
 
-        let decrypted = try await signer.decrypt(sender: sender, value: content, scheme: scheme)
+        let decrypted = try await signer.decrypt(senderPubkey: senderKey, value: content, scheme: scheme)
 
         // Store in cache (if available)
         if let cache = ndk?.cache {

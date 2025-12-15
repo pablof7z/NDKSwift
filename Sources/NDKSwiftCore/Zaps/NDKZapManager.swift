@@ -351,13 +351,10 @@ public actor NDKZapManager: ZapManaging {
 
     private func validateAndParseZapReceipt(_ receipt: NDKZapReceipt) async throws -> ZapInfo? {
         // Get the recipient to fetch their LNURL provider pubkey
-        let recipientPubkey = receipt.recipientPubkey
-        guard let recipientPubkey = recipientPubkey else {
+        guard let recipientPubkey = receipt.recipientPubkey,
+              HexValidator.isValid32ByteHex(recipientPubkey) else {
             return nil
         }
-
-        let recipient = NDKUser(pubkey: recipientPubkey)
-        recipient.ndk = ndk
 
         // Try to get provider pubkey from recipient's profile
         var providerPubkey: String?
@@ -435,10 +432,6 @@ extension NDKUser {
         preferredType: ZapType? = nil,
         preferredProvider: String? = nil
     ) async throws -> ZapResult {
-        guard let ndk = self.ndk else {
-            throw NDKError.notConfigured(ErrorMessageConstants.Messages.ndkNotAvailable)
-        }
-
         return try await ndk.zapManager.zap(
             event: nil,
             to: self,
@@ -448,7 +441,6 @@ extension NDKUser {
             preferredProvider: preferredProvider
         )
     }
-
 }
 
 // MARK: - Event Extension
@@ -462,7 +454,9 @@ extension NDKEvent {
         preferredType: ZapType? = nil,
         preferredProvider: String? = nil
     ) async throws -> ZapResult {
-        let author = NDKUser(pubkey: pubkey)
+        guard let author = ndk.getUser(pubkey) else {
+            throw NDKError.invalidDataFormat("pubkey", details: "Invalid event author pubkey")
+        }
 
         return try await ndk.zapManager.zap(
             event: self,
@@ -473,5 +467,4 @@ extension NDKEvent {
             preferredProvider: preferredProvider
         )
     }
-
 }

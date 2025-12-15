@@ -66,7 +66,7 @@ open class NDKTestCase: XCTestCase {
         outboxEnabled: Bool = false
     ) -> NDK {
         let ndk = NDKTestFactory.createNDK(
-            relayURLs: relayUrls,
+            relayURLs: relayURLs,
             signer: signer,
             cache: cache,
             debugMode: debugMode,

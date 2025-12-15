@@ -258,16 +258,15 @@ final class NIP89Tests: XCTestCase {
     // MARK: - Automatic Client Tagging Tests
 
     func testAutomaticClientTagging() async throws {
-        let ndk = NDK()
         let signer = try NDKPrivateKeySigner(privateKey: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
-
-        // Configure client tagging
-        ndk.clientTagConfig = NDKClientTagConfig(
-            name: "TestClient",
-            address: "31990:abc123:test",
-            relay: "wss://relay.test",
-            autoTag: true,
-            excludedKinds: [4] // Exclude DMs
+        let ndk = NDK(
+            clientTagConfig: NDKClientTagConfig(
+                name: "TestClient",
+                address: "31990:abc123:test",
+                relay: "wss://relay.test",
+                autoTag: true,
+                excludedKinds: [4] // Exclude DMs
+            )
         )
 
         // Test that client tag is automatically added
@@ -291,15 +290,14 @@ final class NIP89Tests: XCTestCase {
     }
 
     func testDisabledAutomaticClientTagging() async throws {
-        let ndk = NDK()
         let signer = try NDKPrivateKeySigner(privateKey: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
-
-        // Configure client tagging but disable auto-tagging
-        ndk.clientTagConfig = NDKClientTagConfig(
-            name: "TestClient",
-            address: "31990:abc123:test",
-            relay: "wss://relay.test",
-            autoTag: false
+        let ndk = NDK(
+            clientTagConfig: NDKClientTagConfig(
+                name: "TestClient",
+                address: "31990:abc123:test",
+                relay: "wss://relay.test",
+                autoTag: false
+            )
         )
 
         // Test that client tag is not automatically added
@@ -312,15 +310,14 @@ final class NIP89Tests: XCTestCase {
     }
 
     func testManualClientTagOverridesAutomatic() async throws {
-        let ndk = NDK()
         let signer = try NDKPrivateKeySigner(privateKey: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
-
-        // Configure client tagging
-        ndk.clientTagConfig = NDKClientTagConfig(
-            name: "TestClient",
-            address: "31990:abc123:test",
-            relay: "wss://relay.test",
-            autoTag: true
+        let ndk = NDK(
+            clientTagConfig: NDKClientTagConfig(
+                name: "TestClient",
+                address: "31990:abc123:test",
+                relay: "wss://relay.test",
+                autoTag: true
+            )
         )
 
         // Test that manual client tag overrides automatic one
@@ -337,14 +334,13 @@ final class NIP89Tests: XCTestCase {
     }
 
     func testAutomaticClientTaggingWithoutAddress() async throws {
-        let ndk = NDK()
         let signer = try NDKPrivateKeySigner(privateKey: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
-
-        // Configure client tagging without address
-        ndk.clientTagConfig = NDKClientTagConfig(
-            name: "TestClient",
-            relay: "wss://relay.test",
-            autoTag: true
+        let ndk = NDK(
+            clientTagConfig: NDKClientTagConfig(
+                name: "TestClient",
+                relay: "wss://relay.test",
+                autoTag: true
+            )
         )
 
         // Test that client tag is automatically added

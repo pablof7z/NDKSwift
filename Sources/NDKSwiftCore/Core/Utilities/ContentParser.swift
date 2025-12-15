@@ -27,7 +27,7 @@ public enum ContentParser {
     /// - Parameter content: The content to parse
     /// - Returns: Array of entities found and normalized content
     public static func parseContent(_ content: String) -> (entities: [ContentEntity], normalizedContent: String) {
-        let result = parseContentWithContext(content, tags: [], currentUser: nil)
+        let result = parseContentWithContext(content, tags: [], currentUserPubkey: nil)
         return (entities: result.entities, normalizedContent: result.normalizedContent)
     }
 
@@ -36,12 +36,12 @@ public enum ContentParser {
     /// - Parameters:
     ///   - content: The content to parse
     ///   - tags: Event tags for resolving #[index] references
-    ///   - currentUser: Current user for mention detection
+    ///   - currentUserPubkey: Current user's pubkey for mention detection
     /// - Returns: Full parsing result with entities, normalized content, and parsed content structure
     public static func parseContentWithContext(
         _ content: String,
         tags: [[String]],
-        currentUser: NDKUser?
+        currentUserPubkey: PublicKey?
     ) -> (entities: [ContentEntity], normalizedContent: String, parsedContent: NDKParsedContent) {
         var entities: [ContentEntity] = []
         var components: [NDKParsedContent.Component] = []
@@ -246,18 +246,18 @@ public enum ContentParser {
         }
 
         // Check if current user is mentioned
-        let isMentioningCurrentUser = currentUser.map { user in
+        let isMentioningCurrentUser = currentUserPubkey.map { userPubkey in
             entities.contains { entity in
                 switch entity {
                 case let .userMention(pubkey, _):
-                    return pubkey == user.pubkey
+                    return pubkey == userPubkey
                 case let .npub(npub):
                     do {
                         guard let pubkey = try String.fromNpub(npub) else {
                             NDKLogger.log(.warning, category: .event, "Failed to decode npub for current user check: nil result")
                             return false
                         }
-                        return pubkey == user.pubkey
+                        return pubkey == userPubkey
                     } catch {
                         NDKLogger.log(.warning, category: .event, "Failed to decode npub for current user check: \(error)")
                         return false

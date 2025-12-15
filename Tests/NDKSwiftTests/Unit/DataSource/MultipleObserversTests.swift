@@ -9,10 +9,8 @@ final class MultipleObserversTests: XCTestCase {
 
         // Initialize NDK with in-memory cache
         let cache = MemoryCache()
-        let ndk = NDK(cache: cache)
+        let ndk = NDK(cache: cache, debugMode: true, outboxEnabled: false)
         ndk.signer = signer
-        ndk.debugMode = true
-        ndk.outboxEnabled = false // Disable outbox to avoid relay fetching delays
 
         // Create filter for kind:1 notes from our test pubkey
         let filter = NDKFilter(
@@ -137,10 +135,8 @@ final class MultipleObserversTests: XCTestCase {
 
         // Initialize NDK with in-memory cache
         let cache = MemoryCache()
-        let ndk = NDK(cache: cache)
+        let ndk = NDK(cache: cache, debugMode: true, outboxEnabled: false)
         ndk.signer = signer
-        ndk.debugMode = true
-        ndk.outboxEnabled = false // Disable outbox to avoid relay fetching delays
 
         // Create filter
         let filter = NDKFilter(

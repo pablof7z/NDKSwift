@@ -4,20 +4,20 @@ import XCTest
 final class NDKNetworkLoggerTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
-        await NDKLoggerConfig.shared.setLogLevel(.trace)
-        await NDKLoggerConfig.shared.setLogNetworkTraffic(true)
+        NDKLogger.setLogLevel(.trace)
+        NDKLogger.setLogNetworkTraffic(true)
     }
 
     override func tearDown() async throws {
-        await NDKLogger.setLogHandler(nil)
-        await NDKLoggerConfig.shared.setLogLevel(.off)
-        await NDKLoggerConfig.shared.setLogNetworkTraffic(false)
+        NDKLogger.setLogHandler(nil)
+        NDKLogger.setLogLevel(.off)
+        NDKLogger.setLogNetworkTraffic(false)
         try await super.tearDown()
     }
 
     func testLogNetworkSend() async throws {
         var capturedOutput: String?
-        await NDKLogger.setLogHandler { output in
+        NDKLogger.setLogHandler { output in
             capturedOutput = output
         }
 
@@ -34,7 +34,7 @@ final class NDKNetworkLoggerTests: XCTestCase {
 
     func testLogNetworkReceive() async throws {
         var capturedOutput: String?
-        await NDKLogger.setLogHandler { output in
+        NDKLogger.setLogHandler { output in
             capturedOutput = output
         }
 
@@ -51,7 +51,7 @@ final class NDKNetworkLoggerTests: XCTestCase {
 
     func testLogNetworkParseError() async throws {
         var capturedOutput: String?
-        await NDKLogger.setLogHandler { output in
+        NDKLogger.setLogHandler { output in
             capturedOutput = output
         }
 
@@ -70,11 +70,11 @@ final class NDKNetworkLoggerTests: XCTestCase {
 
     func testLogNetworkTrafficDisabled() async throws {
         var capturedOutput: String?
-        await NDKLogger.setLogHandler { output in
+        NDKLogger.setLogHandler { output in
             capturedOutput = output
         }
 
-        await NDKLoggerConfig.shared.setLogNetworkTraffic(false)
+        NDKLogger.setLogNetworkTraffic(false)
 
         let testURL = URL(string: "wss://relay.example.com")!
         let message = "[\"REQ\",\"sub123\",{\"kinds\":[1]}]"
@@ -87,11 +87,11 @@ final class NDKNetworkLoggerTests: XCTestCase {
 
     func testLoggerDisabled() async throws {
         var capturedOutput: String?
-        await NDKLogger.setLogHandler { output in
+        NDKLogger.setLogHandler { output in
             capturedOutput = output
         }
 
-        await NDKLoggerConfig.shared.setLogLevel(.off)
+        NDKLogger.setLogLevel(.off)
 
         let testURL = URL(string: "wss://relay.example.com")!
         let message = "[\"REQ\",\"sub123\",{\"kinds\":[1]}]"
@@ -104,7 +104,7 @@ final class NDKNetworkLoggerTests: XCTestCase {
 
     func testLogParsedMessage_Event() async throws {
         var capturedOutput: String?
-        await NDKLogger.setLogHandler { output in
+        NDKLogger.setLogHandler { output in
             capturedOutput = output
         }
 
@@ -123,7 +123,7 @@ final class NDKNetworkLoggerTests: XCTestCase {
 
     func testLogParsedMessage_REQ() async throws {
         var capturedOutput: String?
-        await NDKLogger.setLogHandler { output in
+        NDKLogger.setLogHandler { output in
             capturedOutput = output
         }
 
@@ -144,7 +144,7 @@ final class NDKNetworkLoggerTests: XCTestCase {
 
     func testLogParsedMessage_OK() async throws {
         var capturedOutput: String?
-        await NDKLogger.setLogHandler { output in
+        NDKLogger.setLogHandler { output in
             capturedOutput = output
         }
 
@@ -162,7 +162,7 @@ final class NDKNetworkLoggerTests: XCTestCase {
 
     func testLogParsedMessage_EOSE() async throws {
         var capturedOutput: String?
-        await NDKLogger.setLogHandler { output in
+        NDKLogger.setLogHandler { output in
             capturedOutput = output
         }
 
@@ -178,7 +178,7 @@ final class NDKNetworkLoggerTests: XCTestCase {
 
     func testLogParsedMessage_ContentTruncation() async throws {
         var capturedOutput: String?
-        await NDKLogger.setLogHandler { output in
+        NDKLogger.setLogHandler { output in
             capturedOutput = output
         }
 

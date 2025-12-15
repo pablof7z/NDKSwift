@@ -69,7 +69,9 @@ public struct NDKUIUsername: View {
     }
 
     private var truncatedNpub: String {
-        let npub = NDKUser(pubkey: pubkey).npub
+        guard let npub = try? Bech32.npub(from: pubkey) else {
+            return String(pubkey.prefix(8)) + "..." + String(pubkey.suffix(4))
+        }
         // Show first 8 and last 4 characters
         let prefix = String(npub.prefix(8))
         let suffix = String(npub.suffix(4))

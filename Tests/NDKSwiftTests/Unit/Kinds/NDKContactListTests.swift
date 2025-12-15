@@ -75,7 +75,7 @@ final class NDKContactListTests: XCTestCase {
 
     func testAddContactByUser() {
         let contactList = NDKContactList(ndk: ndk)
-        let user = NDKUser(pubkey: "pubkey1")
+        let user = NDKUser(pubkey: "pubkey1", ndk: ndk)
 
         contactList.addContact(user: user, relayURL: "wss://relay.com", petname: "Bob")
         XCTAssertEqual(contactList.contactCount, 1)
@@ -101,7 +101,7 @@ final class NDKContactListTests: XCTestCase {
         XCTAssertTrue(contactList.isFollowing("pubkey2"))
 
         // Remove by user
-        let user = NDKUser(pubkey: "pubkey2")
+        let user = NDKUser(pubkey: "pubkey2", ndk: ndk)
         contactList.removeContact(user: user)
         XCTAssertEqual(contactList.contactCount, 0)
     }
@@ -124,7 +124,7 @@ final class NDKContactListTests: XCTestCase {
         XCTAssertNil(contactList.petname(for: "pubkey1"))
 
         // Test with user object
-        let user = NDKUser(pubkey: "pubkey1")
+        let user = NDKUser(pubkey: "pubkey1", ndk: ndk)
         contactList.updatePetname(for: "pubkey1", petname: "Alice Final")
         XCTAssertEqual(contactList.petname(for: user), "Alice Final")
     }
@@ -169,13 +169,13 @@ final class NDKContactListTests: XCTestCase {
         // Test filtered queries
         let withPetnames = contactList.contactsWithPetnames
         XCTAssertEqual(withPetnames.count, 2)
-        XCTAssertTrue(withPetnames.contains { $0.user.pubkey == "pubkey1" })
-        XCTAssertTrue(withPetnames.contains { $0.user.pubkey == "pubkey2" })
+        XCTAssertTrue(withPetnames.contains { $0.pubkey == "pubkey1" })
+        XCTAssertTrue(withPetnames.contains { $0.pubkey == "pubkey2" })
 
         let withRelays = contactList.contactsWithRelayURLs
         XCTAssertEqual(withRelays.count, 2)
-        XCTAssertTrue(withRelays.contains { $0.user.pubkey == "pubkey1" })
-        XCTAssertTrue(withRelays.contains { $0.user.pubkey == "pubkey3" })
+        XCTAssertTrue(withRelays.contains { $0.pubkey == "pubkey1" })
+        XCTAssertTrue(withRelays.contains { $0.pubkey == "pubkey3" })
     }
 
     // MARK: - Filter Creation Tests
@@ -237,9 +237,9 @@ final class NDKContactListTests: XCTestCase {
 
     func testCreateFromUsers() {
         let users = [
-            NDKUser(pubkey: "pubkey1"),
-            NDKUser(pubkey: "pubkey2"),
-            NDKUser(pubkey: "pubkey3"),
+            NDKUser(pubkey: "pubkey1", ndk: ndk),
+            NDKUser(pubkey: "pubkey2", ndk: ndk),
+            NDKUser(pubkey: "pubkey3", ndk: ndk),
         ]
         let contactList = NDKContactList.from(users: users, ndk: ndk)
 
@@ -294,7 +294,7 @@ final class NDKContactListTests: XCTestCase {
         let tag1 = ["p", "pubkey1", "wss://relay.com", "Alice"]
         let entry1 = NDKContactEntry.from(tag: tag1)
         XCTAssertNotNil(entry1)
-        XCTAssertEqual(entry1?.user.pubkey, "pubkey1")
+        XCTAssertEqual(entry1?.pubkey, "pubkey1")
         XCTAssertEqual(entry1?.relayURL, "wss://relay.com")
         XCTAssertEqual(entry1?.petname, "Alice")
 
@@ -302,7 +302,7 @@ final class NDKContactListTests: XCTestCase {
         let tag2 = ["p", "pubkey2", "", "Bob"]
         let entry2 = NDKContactEntry.from(tag: tag2)
         XCTAssertNotNil(entry2)
-        XCTAssertEqual(entry2?.user.pubkey, "pubkey2")
+        XCTAssertEqual(entry2?.pubkey, "pubkey2")
         XCTAssertNil(entry2?.relayURL)
         XCTAssertEqual(entry2?.petname, "Bob")
 
@@ -310,7 +310,7 @@ final class NDKContactListTests: XCTestCase {
         let tag3 = ["p", "pubkey3"]
         let entry3 = NDKContactEntry.from(tag: tag3)
         XCTAssertNotNil(entry3)
-        XCTAssertEqual(entry3?.user.pubkey, "pubkey3")
+        XCTAssertEqual(entry3?.pubkey, "pubkey3")
         XCTAssertNil(entry3?.relayURL)
         XCTAssertNil(entry3?.petname)
 
