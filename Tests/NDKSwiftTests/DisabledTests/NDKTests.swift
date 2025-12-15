@@ -26,7 +26,7 @@ final class NDKTests: NDKTestCase {
             let cache = self.createMemoryCache()
 
             let ndk = NDK(
-                relayUrls: relayUrls,
+                relayURLs: relayUrls,
                 signer: signer,
                 cache: cache
             )
@@ -114,7 +114,7 @@ final class NDKTests: NDKTestCase {
     // MARK: - Connection Tests
 
     func testConnectDisconnect() async throws {
-        let ndk = createTestNDK(relayUrls: ["wss://mock.relay"])
+        let ndk = createTestNDK(relayURLs: ["wss://mock.relay"])
 
         // Initially disconnected
         let relays = await ndk.relays

@@ -22,7 +22,7 @@ final class NIP60BackupTests: XCTestCase {
         signer = try NDKPrivateKeySigner(privateKey: privateKey)
 
         // Create NDK instance
-        ndk = NDK(relayUrls: ["wss://test.relay"], signer: signer, cache: mockCache)
+        ndk = NDK(relayURLs: ["wss://test.relay"], signer: signer, cache: mockCache)
 
         // Create wallet
         wallet = try NIP60Wallet(ndk: ndk)
