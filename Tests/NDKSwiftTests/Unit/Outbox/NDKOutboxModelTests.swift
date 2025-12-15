@@ -10,7 +10,7 @@ final class NDKOutboxModelTests: XCTestCase {
         cache = MemoryCache()
         signer = try NDKPrivateKeySigner.generate()
         ndk = NDK(
-            relayUrls: [
+            relayURLs: [
                 "wss://relay1.example.com",
                 "wss://relay2.example.com",
                 "wss://relay3.example.com",

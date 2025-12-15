@@ -6,14 +6,14 @@ import Foundation
 enum NDKTestFactory {
     /// Creates a test NDK instance with optional configuration
     static func createNDK(
-        relayUrls: [RelayURL] = [],
+        relayURLs: [RelayURL] = [],
         signer: NDKSigner? = nil,
         cache: NDKCache? = MemoryCache(),
         debugMode: Bool = false,
         outboxEnabled: Bool = false
     ) -> NDK {
         let ndk = NDK(
-            relayUrls: relayUrls,
+            relayURLs: relayUrls,
             signer: signer,
             cache: cache
         )
@@ -24,11 +24,11 @@ enum NDKTestFactory {
 
     /// Creates an authenticated NDK instance with a generated signer
     static func createAuthenticatedNDK(
-        relayUrls: [RelayURL] = [],
+        relayURLs: [RelayURL] = [],
         cache: NDKCache? = MemoryCache()
     ) throws -> (ndk: NDK, signer: NDKSigner) {
         let signer = try NDKPrivateKeySigner.generate()
-        let ndk = createNDK(relayUrls: relayUrls, signer: signer, cache: cache)
+        let ndk = createNDK(relayURLs: relayUrls, signer: signer, cache: cache)
         return (ndk, signer)
     }
 
@@ -39,7 +39,7 @@ enum NDKTestFactory {
         cache: NDKCache? = MemoryCache()
     ) async throws -> NDK {
         let relayUrls = useTestRelays ? RelayConstants.testRelays : []
-        let ndk = createNDK(relayUrls: relayUrls, signer: signer, cache: cache)
+        let ndk = createNDK(relayURLs: relayUrls, signer: signer, cache: cache)
         await ndk.connect()
 
         // Wait for connections
@@ -53,7 +53,7 @@ enum NDKTestFactory {
         useTestRelays: Bool = true,
         cache: NDKCache? = MemoryCache()
     ) async throws -> (ndk: NDK, signer: NDKSigner) {
-        let (ndk, signer) = try createAuthenticatedNDK(relayUrls: useTestRelays ? RelayConstants.testRelays : [], cache: cache)
+        let (ndk, signer) = try createAuthenticatedNDK(relayURLs: useTestRelays ? RelayConstants.testRelays : [], cache: cache)
         await ndk.connect()
         _ = await ndk.waitForRelayConnections(minimumRelays: 1, timeout: 10.0)
         return (ndk, signer)

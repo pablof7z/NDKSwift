@@ -10,7 +10,7 @@ final class RelayOriginTests: XCTestCase {
         cache = MemoryCache()
         signer = try NDKPrivateKeySigner.generate()
         ndk = NDK(
-            relayUrls: [
+            relayURLs: [
                 "wss://explicit1.example.com",
                 "wss://explicit2.example.com",
             ],

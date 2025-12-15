@@ -9,7 +9,7 @@ final class NDKOutboxManagerTests: NDKUnitTestCase {
         try await super.setUp()
         memoryCache = MemoryCache()
         ndk = NDK(
-            relayUrls: [
+            relayURLs: [
                 "wss://relay1.test",
                 "wss://relay2.test",
             ],
