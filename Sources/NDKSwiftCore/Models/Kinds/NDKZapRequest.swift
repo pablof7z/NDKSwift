@@ -14,7 +14,7 @@ public struct NDKZapRequest {
     public static func create(
         ndk: NDK,
         signer: NDKSigner,
-        recipient: NDKUser,
+        recipientPubkey: PublicKey,
         amountMillisats: Int64,
         comment: String? = nil,
         relays: [String],
@@ -24,12 +24,12 @@ public struct NDKZapRequest {
         var tags: [[String]] = []
 
         // Required tags
-        tags.append([NostrConstants.TagName.pubkey, recipient.pubkey])
+        tags.append([NostrConstants.TagName.pubkey, recipientPubkey])
         tags.append(["relays"] + relays)
         tags.append([NostrConstants.TagName.amount, String(amountMillisats)])
 
         // Optional: lnurl tag
-        for await profile in await ndk.profileManager.subscribe(for: recipient.pubkey, maxAge: TimeConstants.hour) {
+        for await profile in await ndk.profileManager.subscribe(for: recipientPubkey, maxAge: TimeConstants.hour) {
             if let profile = profile,
                let lnurl = profile.lud06 ?? profile.lud16
             {

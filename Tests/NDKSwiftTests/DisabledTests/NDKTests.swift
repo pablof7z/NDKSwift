@@ -394,28 +394,29 @@ final class NDKTests: NDKTestCase {
     // MARK: - Configuration Tests
 
     func testDebugModeConfiguration() {
-        let ndk = createTestNDK()
+        // Test default value
+        let ndkDefault = createTestNDK()
+        XCTAssertFalse(ndkDefault.debugMode)
 
-        XCTAssertFalse(ndk.debugMode)
-
-        ndk.debugMode = true
-        XCTAssertTrue(ndk.debugMode)
+        // Test initialized with debugMode: true
+        let ndkDebug = NDK(debugMode: true)
+        XCTAssertTrue(ndkDebug.debugMode)
     }
 
     func testOutboxConfiguration() {
-        let ndk = createTestNDK()
+        // Test default value
+        let ndkDefault = createTestNDK()
+        XCTAssertTrue(ndkDefault.outboxEnabled) // Default
 
-        XCTAssertTrue(ndk.outboxEnabled) // Default
+        // Test initialized with outboxEnabled: false
+        let ndkNoOutbox = NDK(outboxEnabled: false)
+        XCTAssertFalse(ndkNoOutbox.outboxEnabled)
 
-        ndk.outboxEnabled = false
-        XCTAssertFalse(ndk.outboxEnabled)
-
-        // Test outbox config
-        let config = NDKOutboxConfig()
-        ndk.outboxConfig = config
-        // Verify outbox config is set
-        XCTAssertEqual(ndk.outboxConfig.blacklistedRelays, config.blacklistedRelays)
-        XCTAssertEqual(ndk.outboxConfig.outboxRelays, config.outboxRelays)
+        // Test outbox config via initializer
+        let outboxRelays = Set(["wss://outbox1.test", "wss://outbox2.test"])
+        let config = NDKOutboxConfig(outboxRelays: outboxRelays)
+        let ndkWithConfig = NDK(outboxConfig: config)
+        XCTAssertEqual(ndkWithConfig.outboxConfig.outboxRelays, outboxRelays)
     }
 
     // MARK: - Integration with Other Components Tests

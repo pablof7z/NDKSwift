@@ -182,7 +182,7 @@ final class ContentParserFullTests: XCTestCase {
         let content = "Hey #[0] and #[1], what do you think?"
 
         // When
-        let result = ContentParser.parseContentWithContext(content, tags: tags, currentUser: nil)
+        let result = ContentParser.parseContentWithContext(content, tags: tags, currentUserPubkey: nil)
 
         // Then
         XCTAssertTrue(result.entities.contains(.userMention(pubkey: pubkey1, npub: try! String.toNpub(pubkey1))))
@@ -200,7 +200,7 @@ final class ContentParserFullTests: XCTestCase {
         let content = "In reply to #[0]"
 
         // When
-        let result = ContentParser.parseContentWithContext(content, tags: tags, currentUser: nil)
+        let result = ContentParser.parseContentWithContext(content, tags: tags, currentUserPubkey: nil)
 
         // Then
         XCTAssertTrue(result.entities.contains(.eventMention(eventId)))
@@ -218,7 +218,7 @@ final class ContentParserFullTests: XCTestCase {
         let content = "Hey #[0], check out #[1] #bitcoin"
 
         // When
-        let result = ContentParser.parseContentWithContext(content, tags: tags, currentUser: nil)
+        let result = ContentParser.parseContentWithContext(content, tags: tags, currentUserPubkey: nil)
 
         // Then
         XCTAssertEqual(result.entities.count, 5) // user mention, text, event mention, text, hashtag
@@ -233,7 +233,7 @@ final class ContentParserFullTests: XCTestCase {
         let content = "This references #[5] which doesn't exist"
 
         // When
-        let result = ContentParser.parseContentWithContext(content, tags: tags, currentUser: nil)
+        let result = ContentParser.parseContentWithContext(content, tags: tags, currentUserPubkey: nil)
 
         // Then
         // Invalid reference should remain as text
@@ -246,12 +246,11 @@ final class ContentParserFullTests: XCTestCase {
     func testDetectCurrentUserMentionByPubkey() {
         // Given
         let currentUserPubkey = "32e1827635450ebb3c5a7d12c1f8e7b2b514439ac10a67eef3d9fd9c5c68e245"
-        let currentUser = NDKUser(pubkey: currentUserPubkey)
         let tags = [["p", currentUserPubkey]]
         let content = "Hey #[0], this is for you!"
 
         // When
-        let result = ContentParser.parseContentWithContext(content, tags: tags, currentUser: currentUser)
+        let result = ContentParser.parseContentWithContext(content, tags: tags, currentUserPubkey: currentUserPubkey)
 
         // Then
         XCTAssertTrue(result.parsedContent.isMentioningCurrentUser)
@@ -260,12 +259,11 @@ final class ContentParserFullTests: XCTestCase {
     func testDetectCurrentUserMentionByNpub() {
         // Given
         let currentUserPubkey = "32e1827635450ebb3c5a7d12c1f8e7b2b514439ac10a67eef3d9fd9c5c68e245"
-        let currentUser = NDKUser(pubkey: currentUserPubkey)
         let npub = try! String.toNpub(currentUserPubkey)
         let content = "Hey @\(npub), this is for you!"
 
         // When
-        let result = ContentParser.parseContentWithContext(content, tags: [], currentUser: currentUser)
+        let result = ContentParser.parseContentWithContext(content, tags: [], currentUserPubkey: currentUserPubkey)
 
         // Then
         XCTAssertTrue(result.parsedContent.isMentioningCurrentUser)
@@ -273,13 +271,13 @@ final class ContentParserFullTests: XCTestCase {
 
     func testNoCurrentUserMention() {
         // Given
-        let currentUser = NDKUser(pubkey: "32e1827635450ebb3c5a7d12c1f8e7b2b514439ac10a67eef3d9fd9c5c68e245")
+        let currentUserPubkey = "32e1827635450ebb3c5a7d12c1f8e7b2b514439ac10a67eef3d9fd9c5c68e245"
         let otherPubkey = "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d"
         let tags = [["p", otherPubkey]]
         let content = "Hey #[0], how are you?"
 
         // When
-        let result = ContentParser.parseContentWithContext(content, tags: tags, currentUser: currentUser)
+        let result = ContentParser.parseContentWithContext(content, tags: tags, currentUserPubkey: currentUserPubkey)
 
         // Then
         XCTAssertFalse(result.parsedContent.isMentioningCurrentUser)

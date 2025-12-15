@@ -11,20 +11,17 @@ public protocol NDKSigner: Sendable {
     /// Block until the signer is ready (e.g., user has unlocked it)
     func blockUntilReady() async throws
 
-    /// Get the user associated with this signer
-    func user() async throws -> NDKUser
-
     /// Get relays recommended by this signer (optional)
     func relays(ndk: NDK?) async -> [NDKRelay]
 
     /// Check which encryption schemes are supported
     func encryptionEnabled() async -> [NDKEncryptionScheme]
 
-    /// Encrypt a message
-    func encrypt(recipient: NDKUser, value: String, scheme: NDKEncryptionScheme) async throws -> String
+    /// Encrypt a message for a recipient
+    func encrypt(recipientPubkey: PublicKey, value: String, scheme: NDKEncryptionScheme) async throws -> String
 
-    /// Decrypt a message
-    func decrypt(sender: NDKUser, value: String, scheme: NDKEncryptionScheme) async throws -> String
+    /// Decrypt a message from a sender
+    func decrypt(senderPubkey: PublicKey, value: String, scheme: NDKEncryptionScheme) async throws -> String
 
     // MARK: - Serialization
 
@@ -46,11 +43,6 @@ public extension NDKSigner {
 
     func encryptionEnabled() async -> [NDKEncryptionScheme] {
         return []
-    }
-
-    func user() async throws -> NDKUser {
-        let pubkey = try await self.pubkey
-        return NDKUser(pubkey: pubkey)
     }
 
     func blockUntilReady() async throws {

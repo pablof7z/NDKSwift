@@ -31,9 +31,7 @@ open class NDKUnitTestCase: NDKTestCase {
         signer = try NDKPrivateKeySigner.generate()
 
         // Create NDK instance
-        ndk = NDK(cache: cache)
-        ndk.signer = signer
-        ndk.debugMode = false // Keep tests quiet by default
+        ndk = NDK(signer: signer, cache: cache, debugMode: false)
 
         // Create test user
         let pubkey = try await signer.pubkey

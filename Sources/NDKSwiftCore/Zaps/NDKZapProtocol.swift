@@ -39,8 +39,8 @@ public struct PreparedZap {
     /// The payment request to be fulfilled
     public let paymentRequest: PaymentRequest
 
-    /// The recipient user
-    public let recipient: NDKUser
+    /// The recipient pubkey
+    public let recipientPubkey: PublicKey
 
     /// Optional event being zapped
     public let zappedEvent: NDKEvent?
@@ -53,13 +53,13 @@ public struct PreparedZap {
 
     public init(
         paymentRequest: PaymentRequest,
-        recipient: NDKUser,
+        recipientPubkey: PublicKey,
         zappedEvent: NDKEvent? = nil,
         comment: String? = nil,
         metadata: [String: Any] = [:]
     ) {
         self.paymentRequest = paymentRequest
-        self.recipient = recipient
+        self.recipientPubkey = recipientPubkey
         self.zappedEvent = zappedEvent
         self.comment = comment
         self.metadata = metadata

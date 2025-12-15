@@ -1,50 +1,34 @@
 import Foundation
 
-/// Represents a Nostr user with reactive profile updates
-@Observable
+/// Represents a Nostr user
 public final class NDKUser: Equatable, Hashable {
     /// User's public key
     public let pubkey: PublicKey
 
-    /// User's profile metadata - automatically updates when new kind 0 events arrive
-    public private(set) var profile: NDKUserMetadata?
+    /// Reference to NDK instance (required)
+    public let ndk: NDK
 
     /// Relay list (NIP-65)
     public private(set) var relayList: [NDKRelayInfo] = []
 
     /// NIP-46 relay URLs (for remote signing)
-    public private(set) var nip46Urls: [String]?
-
-    /// Reference to NDK instance
-    public weak var ndk: NDK? {
-        didSet {
-            if ndk != nil {
-                startProfileObservation()
-            }
-        }
-    }
-
-    /// Active profile subscription task
-    private var profileTask: Task<Void, Never>?
+    public internal(set) var nip46Urls: [String]?
 
     // MARK: - Initialization
 
-    public init(pubkey: PublicKey) {
+    public init(pubkey: PublicKey, ndk: NDK) {
         self.pubkey = pubkey
+        self.ndk = ndk
     }
 
     /// Create user from npub
-    public convenience init?(npub: String) {
+    public convenience init?(npub: String, ndk: NDK) {
         do {
             let pubkey = try Bech32.pubkey(from: npub)
-            self.init(pubkey: pubkey)
+            self.init(pubkey: pubkey, ndk: ndk)
         } catch {
             return nil
         }
-    }
-
-    deinit {
-        profileTask?.cancel()
     }
 
     /// Create user from NIP-05 identifier
@@ -66,35 +50,12 @@ public final class NDKUser: Equatable, Hashable {
         return user
     }
 
-    // MARK: - Profile Observation
+    // MARK: - Profile
 
-    private func startProfileObservation() {
-        profileTask?.cancel()
-        guard let ndk else { return }
-
-        profileTask = Task { [weak self] in
-            guard let self else { return }
-
-            let filter = NDKFilter(
-                authors: [self.pubkey],
-                kinds: [EventKind.metadata]
-            )
-
-            let subscription = ndk.subscribe(
-                filter: filter,
-                cachePolicy: .cacheWithNetwork
-            )
-
-            for await event in subscription.events {
-                guard !Task.isCancelled else { break }
-                let metadata = NDKUserMetadata(event: event, ndk: ndk)
-
-                // Only update if this is newer than current profile
-                if self.profile == nil || metadata.updatedAt > self.profile!.updatedAt {
-                    self.profile = metadata
-                }
-            }
-        }
+    /// Observable profile that streams kind 0 metadata updates
+    @MainActor
+    public var profile: NDKProfile {
+        ndk.profileCache.get(pubkey)
     }
 
     // MARK: - Relay List
@@ -102,10 +63,6 @@ public final class NDKUser: Equatable, Hashable {
     /// Fetch user's relay list (NIP-65)
     @discardableResult
     public func fetchRelayList() async throws -> [NDKRelayInfo] {
-        guard let ndk else {
-            throw NDKError.configurationError(ErrorMessageConstants.Messages.ndkInstanceNotSet)
-        }
-
         let filter = NDKFilter(
             authors: [pubkey],
             kinds: [EventKind.relayList]
@@ -143,10 +100,6 @@ public final class NDKUser: Equatable, Hashable {
 
     /// Get users this user follows
     public func follows() async throws -> Set<NDKUser> {
-        guard let ndk else {
-            throw NDKError.configurationError(ErrorMessageConstants.Messages.ndkInstanceNotSet)
-        }
-
         let filter = NDKFilter(
             authors: [pubkey],
             kinds: [EventKind.contacts]
@@ -165,13 +118,7 @@ public final class NDKUser: Equatable, Hashable {
                 .extractTags(named: NostrConstants.TagName.pubkey)
                 .compactMap { $0[safe: 1] }
 
-            var users: [NDKUser] = []
-            for pubkey in followedPubkeys {
-                let user = NDKUser(pubkey: pubkey)
-                user.ndk = ndk
-                users.append(user)
-            }
-
+            let users = followedPubkeys.compactMap { ndk.getUser($0) }
             return Set(users)
         }
 
@@ -203,16 +150,6 @@ public final class NDKUser: Equatable, Hashable {
         return pubkey
     }
 
-    /// Best available display name (from profile or fallback to npub)
-    public var displayName: String {
-        profile?.bestDisplayName ?? String(npub.prefix(16)) + "..."
-    }
-
-    /// Profile picture URL
-    public var pictureURL: URL? {
-        profile?.picture.flatMap(URL.init(string:))
-    }
-
     // MARK: - Equatable & Hashable
 
     public static func == (lhs: NDKUser, rhs: NDKUser) -> Bool {
@@ -227,10 +164,6 @@ public final class NDKUser: Equatable, Hashable {
 
     /// Verify this user's NIP-05 identifier
     public func verifyNIP05(maxAge: TimeInterval = TimeConstants.day) async throws -> Bool {
-        guard let ndk else {
-            throw NDKError.configurationError(ErrorMessageConstants.Messages.ndkInstanceNotSet)
-        }
-
         return try await ndk.verifyNIP05(for: self, maxAge: maxAge)
     }
 
@@ -238,10 +171,6 @@ public final class NDKUser: Equatable, Hashable {
 
     /// Pay this user using the configured wallet
     public func pay(amount _: Int64, comment _: String? = nil, tags _: [[String]]? = nil) async throws -> PaymentConfirmation {
-        guard ndk != nil else {
-            throw NDKError.configurationError(ErrorMessageConstants.Messages.ndkInstanceNotSet)
-        }
-
         throw NDKError.failedTo("route payment", message: "Not yet implemented")
     }
 }

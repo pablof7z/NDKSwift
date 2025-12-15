@@ -10,10 +10,7 @@ final class NDKPoolTests: NDKTestCase {
 
     func testAddRelay() async throws {
         let ndk = createMockNDK()
-        guard let pool = ndk.pool else {
-            XCTFail("Pool should not be nil")
-            return
-        }
+        let pool = ndk.pool
 
         let relayURL = "wss://relay.example.com"
         let relay = await pool.addRelay(relayURL)
@@ -27,10 +24,7 @@ final class NDKPoolTests: NDKTestCase {
 
     func testAddDuplicateRelay() async throws {
         let ndk = createMockNDK()
-        guard let pool = ndk.pool else {
-            XCTFail("Pool should not be nil")
-            return
-        }
+        let pool = ndk.pool
 
         let relayURL = "wss://relay.example.com"
         let relay1 = await pool.addRelay(relayURL)
@@ -45,10 +39,7 @@ final class NDKPoolTests: NDKTestCase {
 
     func testRemoveRelay() async throws {
         let ndk = createMockNDK()
-        guard let pool = ndk.pool else {
-            XCTFail("Pool should not be nil")
-            return
-        }
+        let pool = ndk.pool
 
         let relayURL = "wss://relay.example.com"
         await pool.addRelay(relayURL)
@@ -64,10 +55,7 @@ final class NDKPoolTests: NDKTestCase {
 
     func testGetRelayByURL() async throws {
         let ndk = createMockNDK()
-        guard let pool = ndk.pool else {
-            XCTFail("Pool should not be nil")
-            return
-        }
+        let pool = ndk.pool
 
         let relayURL = "wss://relay.example.com"
         let addedRelay = await pool.addRelay(relayURL)
@@ -84,10 +72,7 @@ final class NDKPoolTests: NDKTestCase {
 
     func testExplicitRelays() async throws {
         let ndk = createMockNDK()
-        guard let pool = ndk.pool else {
-            XCTFail("Pool should not be nil")
-            return
-        }
+        let pool = ndk.pool
 
         // Add explicit relay
         await pool.addRelay("wss://explicit.relay.com", origin: .explicit)
@@ -105,10 +90,7 @@ final class NDKPoolTests: NDKTestCase {
 
     func testPrepareRelays() async throws {
         let ndk = createMockNDK()
-        guard let pool = ndk.pool else {
-            XCTFail("Pool should not be nil")
-            return
-        }
+        let pool = ndk.pool
 
         let urls = [
             "wss://relay1.example.com",
@@ -137,10 +119,7 @@ final class NDKPoolTests: NDKTestCase {
         try await performAsyncTest(timeout: 5.0) { [weak self] in
             guard let self = self else { return }
             let ndk = self.createMockNDK()
-            guard let pool = ndk.pool else {
-                XCTFail("Pool should not be nil")
-                return
-            }
+            let pool = ndk.pool
 
             var receivedEvents: [NDKPoolChangeEvent] = []
             let addEventReceived = XCTestExpectation(description: "Relay added event received")
@@ -235,10 +214,7 @@ final class NDKPoolTests: NDKTestCase {
 
     func testConnectionSummary() async throws {
         let ndk = createMockNDK()
-        guard let pool = ndk.pool else {
-            XCTFail("Pool should not be nil")
-            return
-        }
+        let pool = ndk.pool
 
         // Add some relays
         await pool.addRelay("wss://relay1.example.com")
@@ -254,10 +230,7 @@ final class NDKPoolTests: NDKTestCase {
 
     func testDisconnectAll() async throws {
         let ndk = createMockNDK()
-        guard let pool = ndk.pool else {
-            XCTFail("Pool should not be nil")
-            return
-        }
+        let pool = ndk.pool
 
         // Add relays
         await pool.addRelay("wss://relay1.example.com")
@@ -274,10 +247,7 @@ final class NDKPoolTests: NDKTestCase {
 
     func testBlockedRelayNotAdded() async throws {
         let ndk = createMockNDK()
-        guard let pool = ndk.pool else {
-            XCTFail("Pool should not be nil")
-            return
-        }
+        let pool = ndk.pool
 
         // Setup mock signer with test user
         let signer = try NDKPrivateKeySigner(privateKey: TestFixtures.Keys.alice.privateKey)
@@ -309,10 +279,7 @@ final class NDKPoolTests: NDKTestCase {
 
     func testRefreshBlockedRelaysRemovesExistingRelays() async throws {
         let ndk = createMockNDK()
-        guard let pool = ndk.pool else {
-            XCTFail("Pool should not be nil")
-            return
-        }
+        let pool = ndk.pool
 
         // Setup mock signer with test user
         let signer = try NDKPrivateKeySigner(privateKey: TestFixtures.Keys.alice.privateKey)
@@ -353,10 +320,7 @@ final class NDKPoolTests: NDKTestCase {
 
     func testGetRelayStateSnapshot() async throws {
         let ndk = createMockNDK()
-        guard let pool = ndk.pool else {
-            XCTFail("Pool should not be nil")
-            return
-        }
+        let pool = ndk.pool
 
         // Add multiple relays
         await pool.addRelay("wss://relay1.example.com")
@@ -379,10 +343,7 @@ final class NDKPoolTests: NDKTestCase {
 
     func testConnectedRelayURLs() async throws {
         let ndk = createMockNDK()
-        guard let pool = ndk.pool else {
-            XCTFail("Pool should not be nil")
-            return
-        }
+        let pool = ndk.pool
 
         // Add relays
         await pool.addRelay("wss://relay1.example.com")
@@ -395,10 +356,7 @@ final class NDKPoolTests: NDKTestCase {
 
     func testConnectAll() async throws {
         let ndk = createMockNDK()
-        guard let pool = ndk.pool else {
-            XCTFail("Pool should not be nil")
-            return
-        }
+        let pool = ndk.pool
 
         // Add multiple relays
         await pool.addRelay("wss://relay1.example.com")
@@ -420,10 +378,7 @@ final class NDKPoolTests: NDKTestCase {
 
     func testPrepareRelaysWithAutoConnect() async throws {
         let ndk = createMockNDK()
-        guard let pool = ndk.pool else {
-            XCTFail("Pool should not be nil")
-            return
-        }
+        let pool = ndk.pool
 
         let urls = [
             "wss://relay1.example.com",

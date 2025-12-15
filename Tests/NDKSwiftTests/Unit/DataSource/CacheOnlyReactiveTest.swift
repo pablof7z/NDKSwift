@@ -11,8 +11,7 @@ final class CacheOnlyReactiveTest: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         cache = try await NDKSQLiteCache()
-        ndk = NDK(cache: cache)
-        ndk.outboxEnabled = false
+        ndk = NDK(cache: cache, outboxEnabled: false)
     }
 
     override func tearDown() async throws {

@@ -118,8 +118,10 @@ public struct NDKUIDisplayName: View {
     private var fallbackText: String {
         switch fallbackStyle {
         case .npub:
-            let npub = NDKUser(pubkey: pubkey).npub
-            return String(npub.prefix(16)) + "..."
+            if let npub = try? Bech32.npub(from: pubkey) {
+                return String(npub.prefix(16)) + "..."
+            }
+            return String(pubkey.prefix(12)) + "..."
         case .placeholder:
             return "Unknown User"
         case .pubkey:

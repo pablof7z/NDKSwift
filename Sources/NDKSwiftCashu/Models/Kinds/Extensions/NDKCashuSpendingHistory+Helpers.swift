@@ -8,15 +8,14 @@ public extension NDKCashuSpendingHistory {
     /// Extract decrypted spending history data
     func decryptedHistoryData(signer: NDKSigner) async throws -> HistoryData {
         // Decrypt the content
-        let sender = NDKUser(pubkey: event.pubkey)
         let decryptedContent = try await signer.decrypt(
-            sender: sender,
+            senderPubkey: event.pubkey,
             value: event.content,
             scheme: .nip44
         )
 
         // Parse tags from decrypted content
-        guard let tagsData = decryptedContent.data(using: .utf8),
+        guard let tagsData = decryptedContent.data(using: String.Encoding.utf8),
               let tags = try? JSONCoding.decode([[String]].self, from: tagsData)
         else {
             throw NDKError.invalidContent("Failed to parse history event tags")

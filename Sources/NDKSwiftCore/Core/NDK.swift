@@ -26,9 +26,10 @@ public final class NDK {
     /// Active user (derived from signer)
     public var activeUser: NDKUser? {
         get async {
-            guard let signer = signer else { return nil }
+            guard let signer else { return nil }
             do {
-                return try await signer.user()
+                let pubkey = try await signer.pubkey
+                return getUser(pubkey)
             } catch {
                 NDKLogger.log(.warning, category: .signer, "Failed to get active user from signer: \(error.localizedDescription)")
                 return nil
@@ -92,6 +93,12 @@ public final class NDK {
     /// User and profile management
     public lazy var profileManager: NDKProfileManager = {
         NDKProfileManager(ndk: self)
+    }()
+
+    /// Cache for observable profile instances (MainActor-bound)
+    @MainActor
+    public lazy var profileCache: NDKProfileCache = {
+        NDKProfileCache(ndk: self)
     }()
 
     /// Event tracker for managing event metadata
@@ -507,37 +514,46 @@ public final class NDK {
 
     // MARK: - User Management
 
-    /// Get or create an NDKUser instance for a public key
+    /// Get or create an NDKUser instance from a public key identifier
     ///
-    /// User instances are cached and reused for efficiency.
+    /// Supports multiple formats:
+    /// - Hex public key (64 characters)
+    /// - npub bech32 format
+    /// - nprofile bech32 format (extracts pubkey, ignores relay hints)
     ///
-    /// - Parameter pubkey: The user's public key (hex format)
-    /// - Returns: An NDKUser instance
-    public func getUser(_ pubkey: PublicKey) -> NDKUser {
-        let user = NDKUser(pubkey: pubkey)
-        user.ndk = self
-        return user
-    }
+    /// - Parameter identifier: Public key in any supported format
+    /// - Returns: An NDKUser instance if the identifier is valid, nil otherwise
+    public func getUser(_ identifier: String) -> NDKUser? {
+        // Check if it's a bech32 format
+        if let hrp = Bech32.getHRP(identifier) {
+            switch hrp {
+            case Bech32HRP.npub:
+                guard let pubkey = try? Bech32.pubkey(from: identifier) else {
+                    NDKLogger.log(.warning, category: .general, "Failed to parse npub \(identifier.prefix(16))")
+                    return nil
+                }
+                return NDKUser(pubkey: pubkey, ndk: self)
 
-    /// Get or create an NDKUser instance from an npub
-    ///
-    /// - Parameter npub: The user's public key in bech32 format
-    /// - Returns: An NDKUser instance if the npub is valid, nil otherwise
-    public func getUser(npub: String) async -> NDKUser? {
-        let pubkey: PublicKey
-        do {
-            guard let pk = try PublicKey.fromNpub(npub) else {
-                NDKLogger.log(.warning, category: .event, "Failed to parse npub \(npub.prefix(16)): returned nil")
+            case Bech32HRP.nprofile:
+                guard let nprofile = try? Bech32.decodeNProfile(identifier) else {
+                    NDKLogger.log(.warning, category: .general, "Failed to parse nprofile \(identifier.prefix(16))")
+                    return nil
+                }
+                return NDKUser(pubkey: nprofile.pubkey, ndk: self)
+
+            default:
+                NDKLogger.log(.warning, category: .general, "Unsupported bech32 type '\(hrp)' for user lookup")
                 return nil
             }
-            pubkey = pk
-        } catch {
-            NDKLogger.log(.warning, category: .event, "Failed to parse npub \(npub.prefix(16)): \(error.localizedDescription)")
+        }
+
+        // Assume hex pubkey format
+        guard HexValidator.isValid32ByteHex(identifier) else {
+            NDKLogger.log(.warning, category: .general, "Invalid pubkey format: \(identifier.prefix(16))")
             return nil
         }
-        let user = NDKUser(pubkey: pubkey)
-        user.ndk = self
-        return user
+
+        return NDKUser(pubkey: identifier, ndk: self)
     }
 
     // MARK: - Content Parsing (Now a utility)
@@ -545,9 +561,9 @@ public final class NDK {
     public func parseContent(
         _ content: String,
         tags: [[String]] = [],
-        currentUser: NDKUser? = nil
+        currentUserPubkey: PublicKey? = nil
     ) async -> NDKParsedContent {
-        let result = ContentParser.parseContentWithContext(content, tags: tags, currentUser: currentUser)
+        let result = ContentParser.parseContentWithContext(content, tags: tags, currentUserPubkey: currentUserPubkey)
         return result.parsedContent
     }
 
@@ -800,8 +816,7 @@ public final class NDK {
 
         var results: [(user: NDKUser, nip05: String, status: NIP05VerificationStatus)] = []
         for entry in entries {
-            let user = NDKUser(pubkey: entry.pubkey)
-            user.ndk = self
+            let user = NDKUser(pubkey: entry.pubkey, ndk: self)
             results.append((user: user, nip05: entry.identifier, status: entry.status))
         }
         return results

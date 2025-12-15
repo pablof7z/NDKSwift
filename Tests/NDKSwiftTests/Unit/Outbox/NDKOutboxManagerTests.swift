@@ -8,21 +8,20 @@ final class NDKOutboxManagerTests: NDKUnitTestCase {
     override func setUp() async throws {
         try await super.setUp()
         memoryCache = MemoryCache()
+        let outboxConfig = NDKOutboxConfig(
+            outboxRelays: [
+                "wss://outbox1.test",
+                "wss://outbox2.test",
+            ]
+        )
         ndk = NDK(
             relayURLs: [
                 "wss://relay1.test",
                 "wss://relay2.test",
             ],
             signer: signer,
-            cache: memoryCache
-        )
-
-        // Configure outbox after initialization
-        ndk.outboxConfig = NDKOutboxConfig(
-            outboxRelays: [
-                "wss://outbox1.test",
-                "wss://outbox2.test",
-            ]
+            cache: memoryCache,
+            outboxConfig: outboxConfig
         )
         outboxManager = ndk.outbox
     }

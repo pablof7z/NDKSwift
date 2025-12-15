@@ -220,6 +220,84 @@ public extension Bech32 {
         return Data(data).hexString
     }
 
+    /// Decoded nprofile data
+    struct NProfile {
+        let pubkey: PublicKey
+        let relays: [String]
+    }
+
+    /// Encode public key with relay hints to nprofile format
+    static func nprofile(pubkey: PublicKey, relays: [String]? = nil) throws -> String {
+        let pubkeyData: Data
+        do {
+            pubkeyData = try HexValidator.validate32ByteHex(pubkey)
+        } catch {
+            throw NDKError.validationError(ErrorMessageConstants.invalid("public key"))
+        }
+
+        var tlvData: [UInt8] = []
+
+        // Type 0: Public key (32 bytes)
+        tlvData.append(0)
+        tlvData.append(32)
+        tlvData.append(contentsOf: pubkeyData)
+
+        // Type 1: Relay hints (optional)
+        if let relays = relays {
+            for relay in relays {
+                let relayData = Array(relay.utf8)
+                tlvData.append(1)
+                tlvData.append(UInt8(relayData.count))
+                tlvData.append(contentsOf: relayData)
+            }
+        }
+
+        return try encode(hrp: Bech32HRP.nprofile, data: tlvData)
+    }
+
+    /// Decode nprofile to public key and relay hints
+    static func decodeNProfile(_ nprofile: String) throws -> NProfile {
+        let (hrp, data) = try decode(nprofile)
+        guard hrp == Bech32HRP.nprofile else {
+            throw NDKError.validationError(ErrorMessageConstants.withContext(ErrorMessageConstants.invalid("HRP"), context: "expected \(Bech32HRP.nprofile), got \(hrp)"))
+        }
+
+        var pubkey: PublicKey?
+        var relays: [String] = []
+
+        var index = 0
+        while index < data.count {
+            guard index + 1 < data.count else { break }
+
+            let type = data[index]
+            let length = Int(data[index + 1])
+            index += 2
+
+            guard index + length <= data.count else { break }
+
+            let valueData = Array(data[index ..< index + length])
+            index += length
+
+            switch type {
+            case 0: // Public key (32 bytes)
+                guard length == 32 else { continue }
+                pubkey = Data(valueData).hexString
+            case 1: // Relay URL
+                if let relay = String(bytes: valueData, encoding: .utf8) {
+                    relays.append(relay)
+                }
+            default:
+                continue
+            }
+        }
+
+        guard let foundPubkey = pubkey else {
+            throw NDKError.validationError(ErrorMessageConstants.missing("public key in nprofile"))
+        }
+
+        return NProfile(pubkey: foundPubkey, relays: relays)
+    }
+
     /// Encode event with optional metadata to nevent format
     static func nevent(
         eventId: EventID,

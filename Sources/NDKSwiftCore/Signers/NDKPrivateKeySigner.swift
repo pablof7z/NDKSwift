@@ -67,34 +67,34 @@ public final class NDKPrivateKeySigner: NDKSigner {
         return [.nip04, .nip44]
     }
 
-    public func encrypt(recipient: NDKUser, value: String, scheme: NDKEncryptionScheme) async throws -> String {
+    public func encrypt(recipientPubkey: PublicKey, value: String, scheme: NDKEncryptionScheme) async throws -> String {
         switch scheme {
         case .nip04:
             do {
-                return try Crypto.nip04Encrypt(message: value, privateKey: privateKey, pubkey: recipient.pubkey)
+                return try Crypto.nip04Encrypt(message: value, privateKey: privateKey, pubkey: recipientPubkey)
             } catch {
                 throw NDKError.cryptoOperation(CryptoConstants.Operation.encryption, nip: CryptoConstants.NIP.nip04, error: error)
             }
         case .nip44:
             do {
-                return try Crypto.nip44Encrypt(message: value, privateKey: privateKey, pubkey: recipient.pubkey)
+                return try Crypto.nip44Encrypt(message: value, privateKey: privateKey, pubkey: recipientPubkey)
             } catch {
                 throw NDKError.cryptoOperation(CryptoConstants.Operation.encryption, nip: CryptoConstants.NIP.nip44, error: error)
             }
         }
     }
 
-    public func decrypt(sender: NDKUser, value: String, scheme: NDKEncryptionScheme) async throws -> String {
+    public func decrypt(senderPubkey: PublicKey, value: String, scheme: NDKEncryptionScheme) async throws -> String {
         switch scheme {
         case .nip04:
             do {
-                return try Crypto.nip04Decrypt(encrypted: value, privateKey: privateKey, pubkey: sender.pubkey)
+                return try Crypto.nip04Decrypt(encrypted: value, privateKey: privateKey, pubkey: senderPubkey)
             } catch {
                 throw NDKError.cryptoOperation(CryptoConstants.Operation.decryption, nip: CryptoConstants.NIP.nip04, error: error)
             }
         case .nip44:
             do {
-                return try Crypto.nip44Decrypt(encrypted: value, privateKey: privateKey, pubkey: sender.pubkey)
+                return try Crypto.nip44Decrypt(encrypted: value, privateKey: privateKey, pubkey: senderPubkey)
             } catch {
                 throw NDKError.cryptoOperation(CryptoConstants.Operation.decryption, nip: CryptoConstants.NIP.nip44, error: error)
             }
