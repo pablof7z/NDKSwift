@@ -59,7 +59,7 @@ public final class NDKEventBuilder: @unchecked Sendable {
     private var createdAt: Timestamp = .now
     public private(set) var kind: Kind = EventKind.textNote
     public private(set) var tags: [Tag] = []
-    public private(set) var content: String = ""
+    public internal(set) var content: String = ""
     private weak var ndk: NDK?
 
     // MARK: - Static reference to shared NDK instance
