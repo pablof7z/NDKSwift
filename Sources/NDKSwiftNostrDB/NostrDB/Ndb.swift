@@ -68,7 +68,7 @@ public enum NdbDatabase: Int, CaseIterable, Sendable {
     }
 }
 
-/// Common event kinds tracked by NostrDB stats
+/// Common event kinds tracked by NostrDB stats (index into C array)
 public enum NdbCommonKind: Int, CaseIterable, Sendable {
     case profile = 0
     case text = 1
@@ -86,23 +86,24 @@ public enum NdbCommonKind: Int, CaseIterable, Sendable {
     case longform = 13
     case status = 14
 
-    public var name: String {
+    /// The actual Nostr kind number this represents
+    public var kindNumber: UInt64 {
         switch self {
-        case .profile: return "Profile (0)"
-        case .text: return "Text (1)"
-        case .contacts: return "Contacts (3)"
-        case .dm: return "DM (4)"
-        case .delete: return "Delete (5)"
-        case .repost: return "Repost (6)"
-        case .reaction: return "Reaction (7)"
-        case .zap: return "Zap (9735)"
-        case .zapRequest: return "Zap Request (9734)"
-        case .nwcRequest: return "NWC Request"
-        case .nwcResponse: return "NWC Response"
-        case .httpAuth: return "HTTP Auth"
-        case .list: return "List (30000)"
-        case .longform: return "Longform (30023)"
-        case .status: return "Status (30315)"
+        case .profile: return 0
+        case .text: return 1
+        case .contacts: return 3
+        case .dm: return 4
+        case .delete: return 5
+        case .repost: return 6
+        case .reaction: return 7
+        case .zap: return 9735
+        case .zapRequest: return 9734
+        case .nwcRequest: return 23194
+        case .nwcResponse: return 23195
+        case .httpAuth: return 27235
+        case .list: return 30000
+        case .longform: return 30023
+        case .status: return 30315
         }
     }
 }
@@ -120,15 +121,12 @@ public struct NdbStatCounts: Sendable {
 public struct NdbStat: Sendable {
     /// Per-database statistics
     public let databases: [NdbDatabase: NdbStatCounts]
-    /// Per-kind statistics for common event kinds
-    public let commonKinds: [NdbCommonKind: NdbStatCounts]
-    /// Statistics for all other (uncommon) kinds
-    public let otherKinds: NdbStatCounts
+    /// Per-kind statistics keyed by actual Nostr kind number
+    public let kinds: [UInt64: NdbStatCounts]
 
     /// Total number of events across all kinds
     public var totalEvents: Int {
-        let commonTotal = commonKinds.values.reduce(0) { $0 + $1.count }
-        return commonTotal + otherKinds.count
+        kinds.values.reduce(0) { $0 + $1.count }
     }
 
     /// Total storage size in bytes
@@ -770,31 +768,25 @@ class Ndb: @unchecked Sendable {
             )
         }
 
-        var commonKinds: [NdbCommonKind: NdbStatCounts] = [:]
-        for kind in NdbCommonKind.allCases {
-            let kindIndex = kind.rawValue
+        // Build kinds dictionary using actual Nostr kind numbers
+        var kinds: [UInt64: NdbStatCounts] = [:]
+        for commonKind in NdbCommonKind.allCases {
+            let kindIndex = commonKind.rawValue
             let counts = withUnsafePointer(to: &cStat.common_kinds) { ptr -> ndb_stat_counts in
                 ptr.withMemoryRebound(to: ndb_stat_counts.self, capacity: 15) { arrayPtr in
                     arrayPtr[kindIndex]
                 }
             }
-            commonKinds[kind] = NdbStatCounts(
+            kinds[commonKind.kindNumber] = NdbStatCounts(
                 keySize: counts.key_size,
                 valueSize: counts.value_size,
                 count: counts.count
             )
         }
 
-        let otherKinds = NdbStatCounts(
-            keySize: cStat.other_kinds.key_size,
-            valueSize: cStat.other_kinds.value_size,
-            count: cStat.other_kinds.count
-        )
-
         return NdbStat(
             databases: databases,
-            commonKinds: commonKinds,
-            otherKinds: otherKinds
+            kinds: kinds
         )
     }
 
