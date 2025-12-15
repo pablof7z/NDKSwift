@@ -84,12 +84,12 @@ public class NDKContactList: NDKList {
     }
 
     /// All contacts as NDKUser objects
-    public func contactUsers() async -> [NDKUser] {
+    public func contactUsers() -> [NDKUser] {
         var users: [NDKUser] = []
         for contact in contacts {
             let user = contact.user
             if let ndk = ndk {
-                await user.setNdk(ndk)
+                user.ndk = ndk
             }
             users.append(user)
         }
@@ -365,14 +365,14 @@ public extension NDK {
 public extension NDKUser {
     /// Fetch this user's contact list
     func fetchContactList() async throws -> NDKContactList? {
-        guard let ndk = await ndk else { return nil }
+        guard let ndk else { return nil }
         return try await ndk.fetchContactList(for: self)
     }
 
     /// Get the list of users this user follows
     func following() async throws -> [NDKUser] {
         guard let contactList = try await fetchContactList() else { return [] }
-        return await contactList.contactUsers()
+        return contactList.contactUsers()
     }
 
     /// Check if this user follows another user

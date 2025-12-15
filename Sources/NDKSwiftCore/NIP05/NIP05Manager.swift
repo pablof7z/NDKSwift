@@ -228,7 +228,7 @@ public actor NIP05Manager {
         // Step 1: Check memory cache
         if !forceVerify {
             if let cached = await checkMemoryCache(identifier: identifier, maxAge: maxAge) {
-                if cached.status == .verified, let user = await cached.toUser(ndk: ndk) {
+                if cached.status == .verified, let user = cached.toUser(ndk: ndk) {
                     NDKLogger.log(.debug, category: .network, "✅ NIP-05: Memory cache hit for \(identifier)")
                     return user
                 } else if cached.status == .invalid || cached.status == .failed {
@@ -244,7 +244,7 @@ public actor NIP05Manager {
                 // Update memory cache
                 await memoryCache.set(identifier, value: cached)
 
-                if cached.status == .verified, let user = await cached.toUser(ndk: ndk) {
+                if cached.status == .verified, let user = cached.toUser(ndk: ndk) {
                     NDKLogger.log(.debug, category: .network, "✅ NIP-05: Database cache hit for \(identifier)")
                     return user
                 } else if cached.status == .invalid || cached.status == .failed {
@@ -402,7 +402,7 @@ public actor NIP05Manager {
 
         // Create and return user
         let user = NDKUser(pubkey: pubkey)
-        await user.setNdk(ndk)
+        user.ndk = ndk
         return user
     }
 }
@@ -419,10 +419,10 @@ public struct NIP05CacheStatistics {
 }
 
 extension NIP05CacheEntry {
-    func toUser(ndk: NDK) async -> NDKUser? {
+    func toUser(ndk: NDK) -> NDKUser? {
         guard status == .verified, !pubkey.isEmpty else { return nil }
         let user = NDKUser(pubkey: pubkey)
-        await user.setNdk(ndk)
+        user.ndk = ndk
         return user
     }
 }
