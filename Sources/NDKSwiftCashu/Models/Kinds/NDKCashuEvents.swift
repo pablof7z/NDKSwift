@@ -282,14 +282,13 @@ public struct NDKCashuWalletEvent: NDKPublishableEvent {
             return cachedTags
         }
 
-        let sender = NDKUser(pubkey: event.pubkey)
         let decryptedContent = try await signer.decrypt(
-            sender: sender,
+            senderPubkey: event.pubkey,
             value: event.content,
             scheme: .nip44
         )
 
-        guard let tagsData = decryptedContent.data(using: .utf8),
+        guard let tagsData = decryptedContent.data(using: String.Encoding.utf8),
               let walletTags = JSONCoding.safeDecode([[String]].self, from: tagsData)
         else {
             throw NDKError.invalidContent("Failed to parse wallet configuration")
@@ -413,14 +412,13 @@ public struct NDKCashuWalletBackupEvent: NDKPublishableEvent {
             return cachedTags
         }
 
-        let sender = NDKUser(pubkey: event.pubkey)
         let decryptedContent = try await signer.decrypt(
-            sender: sender,
+            senderPubkey: event.pubkey,
             value: event.content,
             scheme: .nip44
         )
 
-        guard let tagsData = decryptedContent.data(using: .utf8),
+        guard let tagsData = decryptedContent.data(using: String.Encoding.utf8),
               let walletTags = JSONCoding.safeDecode([[String]].self, from: tagsData)
         else {
             throw NDKError.invalidContent("Failed to parse wallet backup")
@@ -587,14 +585,13 @@ public struct NDKCashuSpendingHistory {
             return cachedTags
         }
 
-        let sender = NDKUser(pubkey: event.pubkey)
         let decryptedContent = try await signer.decrypt(
-            sender: sender,
+            senderPubkey: event.pubkey,
             value: event.content,
             scheme: .nip44
         )
 
-        guard let tagsData = decryptedContent.data(using: .utf8),
+        guard let tagsData = decryptedContent.data(using: String.Encoding.utf8),
               let tags = JSONCoding.safeDecode([[String]].self, from: tagsData)
         else {
             throw NDKError.invalidContent("Failed to parse spending history tags")

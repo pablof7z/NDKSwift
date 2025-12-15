@@ -61,8 +61,7 @@ final class OutboxRelayExclusionTests: XCTestCase {
         let outboxConfig = NDKOutboxConfig(
             outboxRelays: ["wss://outbox1.example.com", "wss://outbox2.example.com"]
         )
-        let ndk = NDK()
-        ndk.outboxConfig = outboxConfig
+        let ndk = NDK(outboxConfig: outboxConfig)
 
         // Add regular relay
         await ndk.addRelay("wss://regular.example.com")

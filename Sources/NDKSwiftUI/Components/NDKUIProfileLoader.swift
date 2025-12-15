@@ -166,14 +166,14 @@ public struct NDKUICurrentUserProfile<Content: View>: View {
 
         profileTask = Task {
             do {
-                let currentUser = try await signer.user()
-                for await metadata in await ndk.profileManager.subscribe(for: currentUser.pubkey) {
+                let pubkey = try await signer.pubkey
+                for await metadata in await ndk.profileManager.subscribe(for: pubkey) {
                     await MainActor.run {
                         self.metadata = metadata
                     }
                 }
             } catch {
-                NDKLogger.log(.error, category: .general, "[NDKUIProfileLoader] Failed to get current user: \(error)")
+                NDKLogger.log(.error, category: .general, "[NDKUIProfileLoader] Failed to get current user pubkey: \(error)")
             }
         }
     }

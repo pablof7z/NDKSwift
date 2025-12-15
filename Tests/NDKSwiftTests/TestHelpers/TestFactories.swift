@@ -12,14 +12,13 @@ enum NDKTestFactory {
         debugMode: Bool = false,
         outboxEnabled: Bool = false
     ) -> NDK {
-        let ndk = NDK(
-            relayURLs: relayUrls,
+        return NDK(
+            relayURLs: relayURLs,
             signer: signer,
-            cache: cache
+            cache: cache,
+            debugMode: debugMode,
+            outboxEnabled: outboxEnabled
         )
-        ndk.debugMode = debugMode
-        ndk.outboxEnabled = outboxEnabled
-        return ndk
     }
 
     /// Creates an authenticated NDK instance with a generated signer
@@ -28,7 +27,7 @@ enum NDKTestFactory {
         cache: NDKCache? = MemoryCache()
     ) throws -> (ndk: NDK, signer: NDKSigner) {
         let signer = try NDKPrivateKeySigner.generate()
-        let ndk = createNDK(relayURLs: relayUrls, signer: signer, cache: cache)
+        let ndk = createNDK(relayURLs: relayURLs, signer: signer, cache: cache)
         return (ndk, signer)
     }
 
@@ -38,8 +37,8 @@ enum NDKTestFactory {
         signer: NDKSigner? = nil,
         cache: NDKCache? = MemoryCache()
     ) async throws -> NDK {
-        let relayUrls = useTestRelays ? RelayConstants.testRelays : []
-        let ndk = createNDK(relayURLs: relayUrls, signer: signer, cache: cache)
+        let relayURLs = useTestRelays ? RelayConstants.testRelays : []
+        let ndk = createNDK(relayURLs: relayURLs, signer: signer, cache: cache)
         await ndk.connect()
 
         // Wait for connections

@@ -13,8 +13,7 @@ final class ReactiveSubscriptionTests: XCTestCase {
         tempDbPath = FileManager.default.temporaryDirectory
             .appendingPathComponent("reactive-test-\(UUID().uuidString).db").path
         cache = try await NDKSQLiteCache(path: tempDbPath, debugMode: true)
-        ndk = NDK(cache: cache)
-        ndk.outboxEnabled = false // Simplify test by disabling outbox
+        ndk = NDK(cache: cache, outboxEnabled: false)
     }
 
     override func tearDown() async throws {

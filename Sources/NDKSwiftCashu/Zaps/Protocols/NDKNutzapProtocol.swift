@@ -61,12 +61,9 @@ public class NDKNutzapProtocol: NDKZapProtocol {
             "relays": Array(allRelays),
         ]
 
-        // Create prepared zap with NDKUser
-        let recipient = NDKUser(pubkey: recipientInfo.pubkey)
-
         return PreparedZap(
             paymentRequest: paymentRequest,
-            recipient: recipient,
+            recipientPubkey: recipientInfo.pubkey,
             zappedEvent: event,
             comment: comment,
             metadata: metadata

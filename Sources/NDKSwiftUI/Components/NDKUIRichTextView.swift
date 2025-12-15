@@ -6,7 +6,7 @@ public struct NDKUIRichTextView: View {
     private let ndk: NDK
     let content: String
     let tags: [Tag]
-    let currentUser: NDKUser?
+    let currentUserPubkey: PublicKey?
     let showLinkPreviews: Bool
     let style: Style
     @State private var parsedContent: NDKParsedContent?
@@ -30,14 +30,14 @@ public struct NDKUIRichTextView: View {
         ndk: NDK,
         content: String,
         tags: [Tag] = [],
-        currentUser: NDKUser? = nil,
+        currentUserPubkey: PublicKey? = nil,
         showLinkPreviews: Bool = true,
         style: Style = .full
     ) {
         self.ndk = ndk
         self.content = content
         self.tags = tags
-        self.currentUser = currentUser
+        self.currentUserPubkey = currentUserPubkey
         self.showLinkPreviews = showLinkPreviews && style == .full
         self.style = style
     }
@@ -208,7 +208,7 @@ public struct NDKUIRichTextView: View {
     }
 
     private func parseContent() async {
-        let parsed = await ndk.parseContent(content, tags: tags, currentUser: currentUser)
+        let parsed = await ndk.parseContent(content, tags: tags, currentUserPubkey: currentUserPubkey)
 
         await MainActor.run {
             self.parsedContent = parsed
@@ -365,13 +365,13 @@ public struct NDKUIRichTextInline: View {
     private let ndk: NDK
     let content: String
     let tags: [Tag]
-    let currentUser: NDKUser?
+    let currentUserPubkey: PublicKey?
 
-    public init(ndk: NDK, content: String, tags: [Tag] = [], currentUser: NDKUser? = nil) {
+    public init(ndk: NDK, content: String, tags: [Tag] = [], currentUserPubkey: PublicKey? = nil) {
         self.ndk = ndk
         self.content = content
         self.tags = tags
-        self.currentUser = currentUser
+        self.currentUserPubkey = currentUserPubkey
     }
 
     public var body: some View {
@@ -379,7 +379,7 @@ public struct NDKUIRichTextInline: View {
             ndk: ndk,
             content: content,
             tags: tags,
-            currentUser: currentUser,
+            currentUserPubkey: currentUserPubkey,
             showLinkPreviews: false,
             style: .minimal
         )

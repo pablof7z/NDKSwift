@@ -242,20 +242,20 @@ final class NDKPrivateKeySignerTests: XCTestCase {
         let signer1 = try NDKPrivateKeySigner(privateKey: testPrivateKey)
         let signer2 = try NDKPrivateKeySigner.generate()
 
-        // Create users
-        let user1 = try NDKUser(pubkey: await signer1.pubkey)
-        let user2 = try NDKUser(pubkey: await signer2.pubkey)
+        // Get pubkeys
+        let pubkey1 = try await signer1.pubkey
+        let pubkey2 = try await signer2.pubkey
 
         let message = "Hello, NIP-04!"
 
-        // Encrypt with signer1 for user2
-        let encrypted = try await signer1.encrypt(recipient: user2, value: message, scheme: .nip04)
+        // Encrypt with signer1 for pubkey2
+        let encrypted = try await signer1.encrypt(recipientPubkey: pubkey2, value: message, scheme: .nip04)
 
         // Encrypted should be different from original
         XCTAssertNotEqual(encrypted, message)
 
         // Decrypt with signer2
-        let decrypted = try await signer2.decrypt(sender: user1, value: encrypted, scheme: .nip04)
+        let decrypted = try await signer2.decrypt(senderPubkey: pubkey1, value: encrypted, scheme: .nip04)
 
         // Should match original
         XCTAssertEqual(decrypted, message)
@@ -266,20 +266,20 @@ final class NDKPrivateKeySignerTests: XCTestCase {
         let signer1 = try NDKPrivateKeySigner(privateKey: testPrivateKey)
         let signer2 = try NDKPrivateKeySigner.generate()
 
-        // Create users
-        let user1 = try NDKUser(pubkey: await signer1.pubkey)
-        let user2 = try NDKUser(pubkey: await signer2.pubkey)
+        // Get pubkeys
+        let pubkey1 = try await signer1.pubkey
+        let pubkey2 = try await signer2.pubkey
 
         let message = "Hello, NIP-44! 🚀"
 
-        // Encrypt with signer1 for user2
-        let encrypted = try await signer1.encrypt(recipient: user2, value: message, scheme: .nip44)
+        // Encrypt with signer1 for pubkey2
+        let encrypted = try await signer1.encrypt(recipientPubkey: pubkey2, value: message, scheme: .nip44)
 
         // Encrypted should be different from original
         XCTAssertNotEqual(encrypted, message)
 
         // Decrypt with signer2
-        let decrypted = try await signer2.decrypt(sender: user1, value: encrypted, scheme: .nip44)
+        let decrypted = try await signer2.decrypt(senderPubkey: pubkey1, value: encrypted, scheme: .nip44)
 
         // Should match original
         XCTAssertEqual(decrypted, message)
@@ -290,17 +290,17 @@ final class NDKPrivateKeySignerTests: XCTestCase {
         let signer1 = try NDKPrivateKeySigner(privateKey: testPrivateKey)
         let signer2 = try NDKPrivateKeySigner.generate()
 
-        // Create users
-        let user1 = try NDKUser(pubkey: await signer1.pubkey)
-        let user2 = try NDKUser(pubkey: await signer2.pubkey)
+        // Get pubkeys
+        let pubkey1 = try await signer1.pubkey
+        let pubkey2 = try await signer2.pubkey
 
         let message = "Test message"
 
         // Encrypt with NIP-04
-        let encrypted = try await signer1.encrypt(recipient: user2, value: message, scheme: .nip04)
+        let encrypted = try await signer1.encrypt(recipientPubkey: pubkey2, value: message, scheme: .nip04)
 
         // Try to decrypt with NIP-44 (should fail)
-        await XCTAssertThrowsAsyncError(try await signer2.decrypt(sender: user1, value: encrypted, scheme: .nip44)) { error in
+        await XCTAssertThrowsAsyncError(try await signer2.decrypt(senderPubkey: pubkey1, value: encrypted, scheme: .nip44)) { error in
             guard let ndkError = error as? NDKError else {
                 XCTFail("Expected NDKError")
                 return
@@ -431,9 +431,9 @@ final class NDKPrivateKeySignerTests: XCTestCase {
 
     func testEncryptWithInvalidRecipient() async throws {
         let signer = try NDKPrivateKeySigner(privateKey: testPrivateKey)
-        let invalidUser = NDKUser(pubkey: "invalid-pubkey")
+        let invalidPubkey = "invalid-pubkey"
 
-        await XCTAssertThrowsAsyncError(try await signer.encrypt(recipient: invalidUser, value: "test", scheme: .nip04)) { error in
+        await XCTAssertThrowsAsyncError(try await signer.encrypt(recipientPubkey: invalidPubkey, value: "test", scheme: .nip04)) { error in
             guard let ndkError = error as? NDKError else {
                 XCTFail("Expected NDKError")
                 return
@@ -451,9 +451,8 @@ final class NDKPrivateKeySignerTests: XCTestCase {
 
     func testDecryptWithInvalidCiphertext() async throws {
         let signer = try NDKPrivateKeySigner(privateKey: testPrivateKey)
-        let user = NDKUser(pubkey: testPublicKey)
 
-        await XCTAssertThrowsAsyncError(try await signer.decrypt(sender: user, value: "invalid-ciphertext", scheme: .nip04)) { error in
+        await XCTAssertThrowsAsyncError(try await signer.decrypt(senderPubkey: testPublicKey, value: "invalid-ciphertext", scheme: .nip04)) { error in
             guard let ndkError = error as? NDKError else {
                 XCTFail("Expected NDKError")
                 return
@@ -469,13 +468,13 @@ final class NDKPrivateKeySignerTests: XCTestCase {
         }
     }
 
-    // MARK: - User Creation Tests
+    // MARK: - Pubkey Tests
 
-    func testUser() async throws {
+    func testSignerPubkey() async throws {
         let signer = try NDKPrivateKeySigner(privateKey: testPrivateKey)
-        let user = try await signer.user()
+        let pubkey = try await signer.pubkey
 
-        XCTAssertEqual(user.pubkey, testPublicKey)
+        XCTAssertEqual(pubkey, testPublicKey)
     }
 }
 

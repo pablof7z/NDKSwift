@@ -13,8 +13,7 @@ final class NDKMetaSubscriptionTests: XCTestCase {
         tempDbPath = FileManager.default.temporaryDirectory
             .appendingPathComponent("meta-sub-test-\(UUID().uuidString).db").path
         cache = try await NDKSQLiteCache(path: tempDbPath, debugMode: true)
-        ndk = NDK(cache: cache)
-        ndk.outboxEnabled = false
+        ndk = NDK(cache: cache, outboxEnabled: false)
     }
 
     override func tearDown() async throws {
@@ -247,8 +246,7 @@ final class NDKMetaSubscriptionStressTests: XCTestCase {
         tempDbPath = FileManager.default.temporaryDirectory
             .appendingPathComponent("meta-sub-stress-test-\(UUID().uuidString).db").path
         cache = try await NDKSQLiteCache(path: tempDbPath, debugMode: true)
-        ndk = NDK(cache: cache)
-        ndk.outboxEnabled = false
+        ndk = NDK(cache: cache, outboxEnabled: false)
     }
 
     override func tearDown() async throws {

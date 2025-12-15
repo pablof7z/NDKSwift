@@ -62,11 +62,10 @@ public struct NWCResponseHandler {
 
                 // Decrypt the content
                 let senderPubkey = responseEvent.pubkey
-                let sender = NDKUser(pubkey: senderPubkey)
-                NDKLogger.log(.trace, category: .wallet, "[NWC Response] Decrypting content from \(sender.pubkey)")
+                NDKLogger.log(.trace, category: .wallet, "[NWC Response] Decrypting content from \(senderPubkey)")
                 let eventContent = responseEvent.content
                 let decryptedContent = try await signer.decrypt(
-                    sender: sender,
+                    senderPubkey: senderPubkey,
                     value: eventContent,
                     scheme: .nip04
                 )
@@ -191,11 +190,10 @@ public struct NWCResponseHandler {
                         continue
                     }
                     let walletPubkey = pTag[1]
-                    let walletUser = NDKUser(pubkey: walletPubkey)
 
                     let eventContent = event.content
                     let decrypted = try await signer.decrypt(
-                        sender: walletUser,
+                        senderPubkey: walletPubkey,
                         value: eventContent,
                         scheme: .nip04
                     )
@@ -282,13 +280,12 @@ public struct NWCResponseHandler {
                             continue
                         }
                         let walletPubkey = pTag[1]
-                        let walletUser = NDKUser(pubkey: walletPubkey)
 
                         // Decrypt the notification
                         do {
                             let eventContent = event.content
                             let decrypted = try await signer.decrypt(
-                                sender: walletUser,
+                                senderPubkey: walletPubkey,
                                 value: eventContent,
                                 scheme: .nip04
                             )
