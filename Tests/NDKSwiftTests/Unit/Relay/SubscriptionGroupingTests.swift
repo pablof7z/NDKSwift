@@ -14,7 +14,7 @@ final class SubscriptionGroupingTests: XCTestCase {
         // Create NDK with empty relay URLs to ensure pool is created
         ndk = NDK(relayURLs: [])
         relay = NDKRelay(url: "wss://test.relay.com")
-        relay.ndk = ndk
+        await relay.setNDK(ndk)
         manager = relay.subscriptionManager
     }
 

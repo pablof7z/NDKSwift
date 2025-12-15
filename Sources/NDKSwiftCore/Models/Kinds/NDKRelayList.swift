@@ -290,9 +290,9 @@ public extension NDK {
 
     /// Fetch the relay list for the current user
     func fetchRelayList() async throws -> NDKRelayList? {
-        guard let signer = signer else { return nil }
+        guard let signer else { return nil }
         let pubkey = try await signer.pubkey
-        let currentUser = NDKUser(pubkey: pubkey)
+        guard let currentUser = getUser(pubkey) else { return nil }
         return try await fetchRelayList(for: currentUser)
     }
 
@@ -309,7 +309,6 @@ public extension NDK {
 public extension NDKUser {
     /// Fetch this user's relay list
     func fetchRelayListEvent() async throws -> NDKRelayList? {
-        guard let ndk else { return nil }
         return try await ndk.fetchRelayList(for: self)
     }
 }

@@ -11,8 +11,7 @@ final class BroadFilterReactiveTest: XCTestCase {
         try await super.setUp()
         // Use SQLiteCache which properly implements reactive observation
         cache = try await NDKSQLiteCache(path: ":memory:")
-        ndk = NDK(cache: cache)
-        ndk.outboxEnabled = false
+        ndk = NDK(cache: cache, outboxEnabled: false)
     }
 
     override func tearDown() async throws {

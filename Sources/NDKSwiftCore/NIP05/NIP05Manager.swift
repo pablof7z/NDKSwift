@@ -401,9 +401,7 @@ public actor NIP05Manager {
         NDKLogger.log(.info, category: .network, "✅ NIP-05: Verified \(identifier) -> \(pubkey)")
 
         // Create and return user
-        let user = NDKUser(pubkey: pubkey)
-        user.ndk = ndk
-        return user
+        return NDKUser(pubkey: pubkey, ndk: ndk)
     }
 }
 
@@ -421,9 +419,7 @@ public struct NIP05CacheStatistics {
 extension NIP05CacheEntry {
     func toUser(ndk: NDK) -> NDKUser? {
         guard status == .verified, !pubkey.isEmpty else { return nil }
-        let user = NDKUser(pubkey: pubkey)
-        user.ndk = ndk
-        return user
+        return NDKUser(pubkey: pubkey, ndk: ndk)
     }
 }
 

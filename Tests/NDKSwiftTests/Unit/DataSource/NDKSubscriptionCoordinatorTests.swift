@@ -15,7 +15,7 @@ final class NDKSubscriptionCoordinatorTests: XCTestCase {
         )
 
         var receivedEvents: [(NDKEvent, String)] = []
-        coordinator.setOnEvent { event, relay in
+        await coordinator.setOnEvent { event, relay in
             receivedEvents.append((event, relay.url))
         }
 
@@ -43,7 +43,7 @@ final class NDKSubscriptionCoordinatorTests: XCTestCase {
         )
 
         var eoseRelays: [String] = []
-        coordinator.setOnEOSE { relay in
+        await coordinator.setOnEOSE { relay in
             eoseRelays.append(relay.url)
         }
 
@@ -69,13 +69,12 @@ final class NDKSubscriptionCoordinatorTests: XCTestCase {
         )
 
         var receivedEvents: [(NDKEvent, String)] = []
-        coordinator.setOnEvent { event, relay in
+        await coordinator.setOnEvent { event, relay in
             receivedEvents.append((event, relay.url))
         }
 
         // When: Event from a real NDKRelay
-        let ndkRelay = NDKRelay(url: "wss://test.relay")
-        ndkRelay.ndk = ndk
+        let ndkRelay = await ndk.pool.addRelay("wss://test.relay")
         let event = NDKEvent(kind: 1, content: "test", tags: [], pubkey: "test-pubkey")
 
         await coordinator.handleEvent(event, from: ndkRelay)

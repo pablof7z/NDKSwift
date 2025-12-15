@@ -2,25 +2,25 @@ import Foundation
 
 /// Represents a contact entry in a contact list with optional metadata
 public struct NDKContactEntry {
-    public let user: NDKUser
+    public let pubkey: PublicKey
     public let relayURL: String?
     public let petname: String?
 
-    public init(user: NDKUser, relayURL: String? = nil, petname: String? = nil) {
-        self.user = user
+    public init(pubkey: PublicKey, relayURL: String? = nil, petname: String? = nil) {
+        self.pubkey = pubkey
         self.relayURL = relayURL
         self.petname = petname
     }
 
-    public init(pubkey: String, relayURL: String? = nil, petname: String? = nil) {
-        user = NDKUser(pubkey: pubkey)
+    public init(user: NDKUser, relayURL: String? = nil, petname: String? = nil) {
+        pubkey = user.pubkey
         self.relayURL = relayURL
         self.petname = petname
     }
 
     /// Convert to Tag representation
     public func toTag() -> Tag {
-        var tag = ["p", user.pubkey]
+        var tag = ["p", pubkey]
 
         if let relayURL = relayURL, !relayURL.isEmpty {
             tag.append(relayURL)
@@ -80,20 +80,13 @@ public class NDKContactList: NDKList {
 
     /// All contact pubkeys
     public var contactPubkeys: [String] {
-        return contacts.map { $0.user.pubkey }
+        return contacts.map { $0.pubkey }
     }
 
-    /// All contacts as NDKUser objects
+    /// All contacts as NDKUser objects (requires ndk)
     public func contactUsers() -> [NDKUser] {
-        var users: [NDKUser] = []
-        for contact in contacts {
-            let user = contact.user
-            if let ndk = ndk {
-                user.ndk = ndk
-            }
-            users.append(user)
-        }
-        return users
+        guard let ndk else { return [] }
+        return contacts.compactMap { ndk.getUser($0.pubkey) }
     }
 
     /// Number of contacts in this list
@@ -119,7 +112,7 @@ public class NDKContactList: NDKList {
     @discardableResult
     public func addContact(_ contact: NDKContactEntry) -> NDKContactList {
         // Check if contact already exists
-        guard !isFollowing(contact.user.pubkey) else {
+        guard !isFollowing(contact.pubkey) else {
             return self
         }
 
@@ -176,7 +169,7 @@ public class NDKContactList: NDKList {
 
     /// Get contact entry for a specific pubkey
     public func contactEntry(for pubkey: String) -> NDKContactEntry? {
-        return contacts.first { $0.user.pubkey == pubkey }
+        return contacts.first { $0.pubkey == pubkey }
     }
 
     /// Get contact entry for a specific user
@@ -269,7 +262,7 @@ public class NDKContactList: NDKList {
     @discardableResult
     public func merge(with other: NDKContactList) -> NDKContactList {
         for contact in other.contacts {
-            if !isFollowing(contact.user.pubkey) {
+            if !isFollowing(contact.pubkey) {
                 addContact(contact)
             }
         }
@@ -317,14 +310,14 @@ public extension NDK {
         // Collect all contact list events and use the most recent
         let events = await dataSource.collect(timeout: NetworkConstants.timeoutDataCollectionMedium)
         guard let event = events.mostRecent else { return nil }
-        return NDKContactList.fromEvent(event)
+        return NDKContactList.fromEvent(event, ndk: self)
     }
 
     /// Fetch the contact list for the current user
     func fetchContactList() async throws -> NDKContactList? {
-        guard let signer = signer else { return nil }
+        guard let signer else { return nil }
         let pubkey = try await signer.pubkey
-        let currentUser = NDKUser(pubkey: pubkey)
+        guard let currentUser = getUser(pubkey) else { return nil }
         return try await fetchContactList(for: currentUser)
     }
 
@@ -365,7 +358,6 @@ public extension NDK {
 public extension NDKUser {
     /// Fetch this user's contact list
     func fetchContactList() async throws -> NDKContactList? {
-        guard let ndk else { return nil }
         return try await ndk.fetchContactList(for: self)
     }
 

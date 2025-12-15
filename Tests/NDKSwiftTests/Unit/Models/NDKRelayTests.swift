@@ -184,18 +184,14 @@ final class NDKRelayTests: XCTestCase {
 
     // MARK: - NDK Reference Tests
 
-    func testNDKReference() {
-        let relay = NDKRelay(url: "wss://relay.example.com")
+    func testNDKReference() async {
+        // Create relay through pool to have proper ndk reference
         let ndk = NDK(relayURLs: [])
+        let relay = await ndk.pool.addRelay("wss://relay.example.com")
 
-        relay.setNDK(ndk)
-        XCTAssertNotNil(relay.ndk)
-
-        relay.ndk = nil
-        XCTAssertNil(relay.ndk)
-
-        relay.ndk = ndk
-        XCTAssertNotNil(relay.ndk)
+        // Relay should have ndk reference when added through pool
+        let relayNDK = await relay.ndk
+        XCTAssertNotNil(relayNDK)
     }
 
     // MARK: - Statistics Tests

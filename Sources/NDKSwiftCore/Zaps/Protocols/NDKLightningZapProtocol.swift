@@ -48,9 +48,6 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
             throw ZapError.signerNotAvailable
         }
 
-        // Create NDKUser from recipient info
-        let user = NDKUser(pubkey: recipientInfo.pubkey)
-
         // 1. Resolve LNURL endpoint using pre-fetched profile
         guard let lightningAddress = recipientInfo.lightningAddress else {
             throw ZapError.recipientDoesNotSupportZaps
@@ -80,7 +77,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         let zapRequest = try await NDKZapRequest.create(
             ndk: ndk,
             signer: signer,
-            recipient: user,
+            recipientPubkey: recipientInfo.pubkey,
             amountMillisats: amountMillisats,
             comment: comment,
             relays: recipientRelays,
@@ -110,7 +107,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
 
         return PreparedZap(
             paymentRequest: paymentRequest,
-            recipient: user,
+            recipientPubkey: recipientInfo.pubkey,
             zappedEvent: event,
             comment: comment,
             metadata: metadata
@@ -133,7 +130,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
 
         // Wait for zap receipt (kind: 9735) from the LNURL provider
         let receiptEvent = try await waitForZapReceipt(
-            for: prepared.recipient,
+            recipientPubkey: prepared.recipientPubkey,
             zappedEvent: prepared.zappedEvent,
             zapRequestId: zapRequest.event.id,
             providerPubkey: endpoint.nostrPubkey,
@@ -152,7 +149,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
     // MARK: - Private Methods
 
     private func waitForZapReceipt(
-        for recipient: NDKUser,
+        recipientPubkey: PublicKey,
         zappedEvent: NDKEvent?,
         zapRequestId: String?,
         providerPubkey: String?,
@@ -161,7 +158,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         // Create filter for zap receipts
         var filter = NDKFilter()
         filter.kinds = [EventKind.zapReceipt]
-        filter.addTagFilter("p", values: [recipient.pubkey])
+        filter.addTagFilter("p", values: [recipientPubkey])
 
         if let zappedEvent = zappedEvent {
             let eventId = zappedEvent.id
@@ -206,26 +203,6 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         }
 
         return nil
-    }
-
-    private func resolveLNURL(for user: NDKUser) async throws -> LNURLPayEndpoint {
-        var userMetadata: NDKUserMetadata?
-
-        for await metadata in await ndk.profileManager.subscribe(for: user.pubkey, maxAge: TimeConstants.hour) {
-            userMetadata = metadata
-            break // Only need first value
-        }
-
-        guard let metadata = userMetadata else {
-            throw ZapError.noLNURL
-        }
-
-        let lnurlString = metadata.lud16 ?? metadata.lud06
-        guard let lnurlString = lnurlString else {
-            throw ZapError.noLNURL
-        }
-
-        return try await resolveLNURL(address: lnurlString)
     }
 
     private func resolveLNURL(address lnurlString: String) async throws -> LNURLPayEndpoint {
@@ -346,35 +323,6 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
 
         let invoiceResponse = try JSONCoding.decode(InvoiceResponse.self, from: data)
         return invoiceResponse.pr
-    }
-
-    private func getRecipientRelays(_ recipient: NDKUser) async throws -> [String] {
-        // Try to get relay list from NIP-65
-        var relayListFilter = NDKFilter()
-        relayListFilter.authors = [recipient.pubkey]
-        relayListFilter.kinds = [EventKind.relayList]
-
-        // Use NDKSubscription for fetching relay list
-        let dataSource = NDKSubscription(
-            ndk: ndk,
-            filter: relayListFilter,
-            maxAge: TimeConstants.hour // 1 hour - relay lists don't change frequently
-        )
-
-        // Collect all relay list events and use the most recent
-        let events = await dataSource.collect(timeout: NetworkConstants.timeoutDataCollectionMedium)
-        if let relayListEvent = events.mostRecent {
-            let eventTags = relayListEvent.tags
-            let relays = eventTags.tagValues(named: NostrConstants.TagName.reference)
-
-            if !relays.isEmpty {
-                return relays
-            }
-        }
-
-        // Fallback to connected relays
-        let connected = await ndk.pool.connectedRelays()
-        return connected.map { $0.url }
     }
 }
 
