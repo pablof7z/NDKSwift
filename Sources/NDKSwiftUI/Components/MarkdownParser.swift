@@ -165,10 +165,11 @@ enum MarkdownParser {
             return true
         }
 
-        // Ordered list
+        // Ordered list (e.g., "1. Item")
         if let firstSpace = trimmed.firstIndex(of: " ") {
             let prefix = String(trimmed[..<firstSpace])
-            if prefix.allSatisfy({ $0.isNumber }) && prefix.last == "." {
+            // Check if prefix ends with "." and everything before it is a number
+            if prefix.last == ".", prefix.dropLast().allSatisfy({ $0.isNumber }) {
                 return true
             }
         }

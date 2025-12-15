@@ -25,11 +25,107 @@ struct NDKUIMarkdownImageView: View {
     @ViewBuilder
     private func renderBlock(_ block: MarkdownBlock) -> some View {
         switch block {
+        case let .heading(level, text):
+            renderHeading(level: level, text: text)
+
         case let .paragraph(inlines):
             renderInlineContent(inlines)
-        default:
-            // For non-paragraph blocks, use the existing renderer logic
-            EmptyView()
+
+        case let .codeBlock(language, code):
+            renderCodeBlock(language: language, code: code)
+
+        case let .blockquote(inlines):
+            renderBlockquote(inlines)
+
+        case let .list(items, ordered):
+            renderList(items: items, ordered: ordered)
+
+        case .horizontalRule:
+            Divider()
+                .padding(.vertical, configuration.horizontalRulePadding)
+        }
+    }
+
+    @ViewBuilder
+    private func renderHeading(level: Int, text: String) -> some View {
+        Text(text)
+            .font(configuration.headingFont(for: level))
+            .foregroundColor(configuration.headingColor)
+            .padding(.bottom, configuration.headingSpacing)
+    }
+
+    @ViewBuilder
+    private func renderCodeBlock(language: String?, code: String) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if let language = language {
+                Text(language)
+                    .font(configuration.codeLanguageFont)
+                    .foregroundColor(configuration.codeLanguageColor)
+                    .padding(.horizontal, configuration.codeBlockPadding)
+                    .padding(.top, configuration.codeBlockPadding)
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                Text(code)
+                    .font(configuration.codeFont)
+                    .foregroundColor(configuration.codeColor)
+                    .padding(configuration.codeBlockPadding)
+            }
+        }
+        .background(configuration.codeBackgroundColor)
+        .cornerRadius(configuration.codeBlockCornerRadius)
+    }
+
+    @ViewBuilder
+    private func renderBlockquote(_ inlines: [MarkdownInline]) -> some View {
+        HStack(spacing: 0) {
+            Rectangle()
+                .fill(configuration.blockquoteBorderColor)
+                .frame(width: configuration.blockquoteBorderWidth)
+
+            Text(buildAttributedString(from: inlines))
+                .font(configuration.blockquoteFont)
+                .foregroundColor(configuration.blockquoteColor)
+                .padding(.leading, configuration.blockquotePadding)
+        }
+        .padding(.vertical, configuration.blockquoteVerticalPadding)
+    }
+
+    @ViewBuilder
+    private func renderList(items: [MarkdownList.Item], ordered: Bool) -> some View {
+        VStack(alignment: .leading, spacing: configuration.listItemSpacing) {
+            ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                HStack(alignment: .top, spacing: configuration.listBulletSpacing) {
+                    Text(ordered ? "\(index + 1)." : configuration.bulletCharacter)
+                        .font(configuration.listBulletFont)
+                        .foregroundColor(configuration.listBulletColor)
+                        .frame(minWidth: configuration.listBulletMinWidth, alignment: .trailing)
+
+                    VStack(alignment: .leading, spacing: configuration.listItemInternalSpacing) {
+                        Text(buildAttributedString(from: item.content))
+                            .font(configuration.bodyFont)
+                            .foregroundColor(configuration.textColor)
+
+                        if !item.subItems.isEmpty {
+                            VStack(alignment: .leading, spacing: configuration.listItemSpacing) {
+                                ForEach(Array(item.subItems.enumerated()), id: \.offset) { subIndex, subItem in
+                                    HStack(alignment: .top, spacing: configuration.listBulletSpacing) {
+                                        Text(ordered ? "\(subIndex + 1)." : configuration.bulletCharacter)
+                                            .font(configuration.listBulletFont)
+                                            .foregroundColor(configuration.listBulletColor)
+                                            .frame(minWidth: configuration.listBulletMinWidth, alignment: .trailing)
+
+                                        Text(buildAttributedString(from: subItem.content))
+                                            .font(configuration.bodyFont)
+                                            .foregroundColor(configuration.textColor)
+                                    }
+                                }
+                            }
+                            .padding(.leading, configuration.listIndentation)
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -285,7 +381,7 @@ public extension NDKUIMarkdownRenderer {
             )
             .padding(configuration.contentPadding)
         }
-        .task {
+        .onAppear {
             parseContent()
         }
     }

@@ -77,7 +77,7 @@ public struct NDKUIMarkdownRenderer: View {
             }
             .padding(configuration.contentPadding)
         }
-        .task {
+        .onAppear {
             parseContent()
         }
     }

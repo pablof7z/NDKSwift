@@ -131,6 +131,7 @@ let package = Package(
                 "NDKSwiftSQLite",
                 "NDKSwiftNostrDB",
                 "NDKSwiftCashu",
+                "NDKSwiftUI",
             ],
             exclude: ["DisabledTests"],
             resources: [
