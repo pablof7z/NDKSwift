@@ -72,8 +72,8 @@ public enum TimeConstants {
     /// Default TTL for relay list cache (24 hours)
     public static let relayListCacheTTL: TimeInterval = day
 
-    /// Default TTL for unpublished events retry window (1 hour)
-    public static let unpublishedEventRetryWindow: TimeInterval = hour
+    /// Default TTL for unpublished events retry window (effectively unlimited for automatic retries)
+    public static let unpublishedEventRetryWindow: TimeInterval = year * 10
 
     /// Default TTL for mint info cache (7 days)
     public static let mintInfoCacheTTL: TimeInterval = week

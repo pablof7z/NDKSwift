@@ -190,7 +190,7 @@ public actor NDKEventManager {
     }
 
     /// Retry publishing unpublished events
-    public func retryUnpublishedEvents(maxAge: TimeInterval = TimeConstants.hour, limit: Int? = nil) async throws -> [(event: NDKEvent, relays: Set<NDKRelay>)] {
+    public func retryUnpublishedEvents(maxAge: TimeInterval = TimeConstants.unpublishedEventRetryWindow, limit: Int? = nil) async throws -> [(event: NDKEvent, relays: Set<NDKRelay>)] {
         guard ndk != nil else {
             throw NDKError.notConfigured(ErrorMessageConstants.Messages.ndkReferenceLost)
         }
@@ -253,7 +253,7 @@ public actor NDKEventManager {
 
     /// Publish queued events for a specific relay (called by NDKPool when relay connects)
     func publishQueuedEvents(for relay: NDKRelay) async {
-        let unpublishedEvents = await cache.getUnpublishedEvents(maxAge: TimeConstants.hour, limit: nil)
+        let unpublishedEvents = await cache.getUnpublishedEvents(maxAge: TimeConstants.unpublishedEventRetryWindow, limit: nil)
 
         // Count events targeted for this relay
         let eventsForRelay = unpublishedEvents.filter { $0.targetRelays.contains(relay.url) }
