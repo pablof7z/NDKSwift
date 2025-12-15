@@ -27,11 +27,19 @@ import NDKSwiftCore
 /// - `getRelaySources(eventId:)` - Returns relays that provided an event
 /// - `observeEvents(matching:includeExisting:)` - Real-time event observation using nostrdb subscriptions
 /// - `observeProfile(pubkey:includeExisting:)` - Real-time profile observation using nostrdb subscriptions
-/// - `clear()` - Clears in-memory cache only (nostrdb files persist)
+/// - `clear()` - Clears in-memory cache and unpublished events
+/// - `clearPersisted()` - Clears persisted database and unpublished events
+///
+/// ## Implemented Optimistic Publishing
+/// - `addUnpublishedEvent(_:publishedRelays:pendingRelays:)` - Tracks unpublished events with per-relay state in JSONL file
+/// - `confirmEvent(eventId:onRelay:)` - Marks events as confirmed on specific relays
+/// - `getEventConfirmationState(eventId:)` - Returns detailed state (which relays pending/confirmed)
+/// - `getUnpublishedEvents(maxAge:limit:)` - Returns pending events (persists across app restarts)
+/// - `recordPublishFailure(eventId:relay:reason:)` - Records failure reason for specific relay
+/// - `removeUnpublishedEvent(eventId:)` - Removes event from tracking when threshold is met
 ///
 /// ## Protocol Defaults Used
 /// The following methods use default implementations from NDKCache protocol extensions:
-/// - Optimistic publishing: `addUnpublishedEvent`, `confirmEvent`, `getEventConfirmationState`, `getUnpublishedEvents`
 /// - Decrypted content: `getDecryptedContent`, `storeDecryptedContent`, `clearDecryptedContent`
 /// - Mint/wallet cache: All mint and keyset methods
 /// - Negentropy: `getEventsByTimeRange`, `getEventIdsWithTimestamps`, `hasEvents`
@@ -58,6 +66,9 @@ public actor NDKNostrDBCache: NDKCache {
     /// These events still exist in LMDB but should be filtered from queries.
     private var deletedEventIds: Set<String> = []
 
+    /// Unpublished events store for optimistic publishing (JSON file persistence)
+    private var unpublished: UnpublishedStore?
+
     /// Maximum number of relay URLs to track in the LRU cache
     private static let maxRelayCount = 100
 
@@ -70,6 +81,14 @@ public actor NDKNostrDBCache: NDKCache {
         ndb = Ndb(path: path)
         if ndb == nil {
             throw NDKNostrDBCacheError.failedToOpen
+        }
+
+        // Initialize unpublished events store (loads from JSON file)
+        do {
+            unpublished = try UnpublishedStore(cachePath: path)
+        } catch {
+            NDKLogger.log(.warning, category: .cache, "Failed to initialize unpublished store: \(error)")
+            // Continue without optimistic publishing support
         }
     }
 
@@ -323,6 +342,7 @@ public actor NDKNostrDBCache: NDKCache {
         eventRelaySources.removeAll()
         await relayCache.clear()
         deletedEventIds.removeAll()
+        try await unpublished?.clear()
     }
 
     /// Completely clears the database by deleting the LMDB files and reinitializing.
@@ -335,6 +355,7 @@ public actor NDKNostrDBCache: NDKCache {
         eventRelaySources.removeAll()
         await relayCache.clear()
         deletedEventIds.removeAll()
+        try await unpublished?.clear()
 
         // Close the nostrdb connection
         ndb?.close()
@@ -668,6 +689,65 @@ public actor NDKNostrDBCache: NDKCache {
         return eventRelaySources[eventId] ?? []
     }
 
+    // MARK: - Optimistic Publishing
+
+    /// Add an unpublished event (called by NDK-core which decides what needs tracking)
+    /// The cache layer is dumb - it just stores what it's told.
+    /// - Parameters:
+    ///   - event: The event to track
+    ///   - publishedRelays: Relays that have successfully published
+    ///   - pendingRelays: Relays pending publication with failure reasons
+    public func addUnpublishedEvent(_ event: NDKEvent, publishedRelays: [String], pendingRelays: [String: String]) async throws {
+        // Save event to nostrdb first
+        try await saveEvent(event)
+
+        // Store in unpublished file (NDK-core already decided this needs tracking)
+        try await unpublished?.add(event, publishedRelays: publishedRelays, pendingRelays: pendingRelays)
+    }
+
+    /// Mark event as confirmed on a specific relay
+    /// - Parameters:
+    ///   - eventId: The event ID
+    ///   - relay: The relay URL that confirmed
+    public func confirmEvent(eventId: String, onRelay relay: String) async throws {
+        try await unpublished?.markRelayPublished(eventId: eventId, relay: relay)
+    }
+
+    /// Record a publish failure for a relay
+    /// - Parameters:
+    ///   - eventId: The event ID
+    ///   - relay: The relay URL that failed
+    ///   - reason: The failure reason
+    public func recordPublishFailure(eventId: String, relay: String, reason: String) async throws {
+        try await unpublished?.markRelayFailed(eventId: eventId, relay: relay, reason: reason)
+    }
+
+    /// Remove an event from unpublished tracking (called by NDK-core when threshold is met)
+    /// - Parameter eventId: The event ID to remove
+    public func removeUnpublishedEvent(eventId: String) async throws {
+        try await unpublished?.remove(eventId: eventId)
+    }
+
+    /// Get event confirmation state
+    /// - Parameter eventId: The event ID
+    /// - Returns: Confirmation state with published and pending relays
+    public func getEventConfirmationState(eventId: String) async -> EventConfirmationState? {
+        return await unpublished?.getEventConfirmationState(eventId: eventId)
+    }
+
+    /// Get unpublished events that need retry
+    /// - Parameters:
+    ///   - maxAge: Maximum age of events to return
+    ///   - limit: Optional limit on number of events
+    /// - Returns: Array of events with their target relays
+    public func getUnpublishedEvents(
+        maxAge: TimeInterval = TimeConstants.unpublishedEventRetryWindow,
+        limit: Int? = nil
+    ) async -> [(event: NDKEvent, targetRelays: Set<String>)] {
+        guard let unpublished = unpublished else { return [] }
+        return await unpublished.getUnpublishedEvents(maxAge: maxAge, limit: limit)
+    }
+
     // MARK: - Helper Methods
 
     /// Convert NdbNote to NDKEvent
@@ -711,7 +791,13 @@ public actor NDKNostrDBCache: NDKCache {
 
     /// Convert Data to hex string
     private func dataToHex(_ data: Data) -> String {
-        return data.map { String(format: "%02x", $0) }.joined()
+        // Use reduce(into:) to build the string efficiently without intermediate allocations
+        data.reduce(into: "") { result, byte in
+            let high = byte >> 4
+            let low = byte & 0x0F
+            result.append(high < 10 ? Character(UnicodeScalar(0x30 + high)) : Character(UnicodeScalar(0x61 + high - 10)))
+            result.append(low < 10 ? Character(UnicodeScalar(0x30 + low)) : Character(UnicodeScalar(0x61 + low - 10)))
+        }
     }
 }
 
