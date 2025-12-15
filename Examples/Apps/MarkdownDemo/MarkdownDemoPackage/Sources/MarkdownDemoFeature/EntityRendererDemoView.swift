@@ -201,7 +201,7 @@ public struct EntityRendererDemoView: View {
         ## Connect with People
 
         Check out these amazing Nostr contributors:
-        - @npub1sn0wdenkukak0d9dfczzeacvhkrgz92ak56egt7vdgzn8pv2wfqqhrjdv9 (Pablo)
+        - nostr:npub1l2vyh47mk2p0qlsku7hg0vn29faehy9hy34ygaclpn66ukqp3afqutajft
         - @alice and @bob are joining too!
 
         ## Discover Content

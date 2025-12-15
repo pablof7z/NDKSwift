@@ -17,6 +17,14 @@ final class CustomSubscriptionIdTests: XCTestCase {
 
         // Create mock relay for capturing messages
         mockRelay = MockRelayWithCapture(url: "wss://test.relay")
+        mockRelay.ndk = ndk
+
+        // Add and connect mock relay
+        await mockRelay.connect()
+        _ = await ndk.pool.addRelay("wss://test.relay")
+
+        // Replace the real relay with our mock (hack for testing)
+        // Note: This is a test-only workaround since we can't directly inject mock relays
     }
 
     override func tearDown() async throws {
