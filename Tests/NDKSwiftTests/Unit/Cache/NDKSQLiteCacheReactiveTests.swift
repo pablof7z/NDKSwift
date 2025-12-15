@@ -289,7 +289,7 @@ final class NDKSQLiteCacheReactiveTests: XCTestCase {
 
     // Helper to create test events
     private func createTextNote(content: String) async throws -> NDKEvent {
-        let ndk = NDK(relayUrls: [], signer: signer)
+        let ndk = NDK(relayURLs: [], signer: signer)
         return try await NDKEventBuilder(ndk: ndk)
             .kind(1)
             .content(content)

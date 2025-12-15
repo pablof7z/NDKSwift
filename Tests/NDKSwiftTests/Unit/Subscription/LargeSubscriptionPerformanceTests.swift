@@ -14,7 +14,7 @@ final class LargeSubscriptionPerformanceTests: XCTestCase {
         cache = MemoryCache()
 
         // Create NDK with mock relay
-        ndk = NDK(relayUrls: [], cache: cache)
+        ndk = NDK(relayURLs: [], cache: cache)
 
         // Create and add mock relay
         mockRelay = MockRelay(url: "wss://test.relay")

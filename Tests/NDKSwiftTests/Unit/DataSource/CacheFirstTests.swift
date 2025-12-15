@@ -13,7 +13,7 @@ class CacheFirstTests: XCTestCase {
         // Create SQLite cache and NDK instance
         cache = try await NDKSQLiteCache(path: ":memory:")
         ndk = NDK(
-            relayUrls: [], // No relays to ensure we're testing cache-only behavior
+            relayURLs: [], // No relays to ensure we're testing cache-only behavior
             cache: cache
         )
     }

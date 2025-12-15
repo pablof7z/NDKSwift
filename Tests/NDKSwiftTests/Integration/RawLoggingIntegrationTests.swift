@@ -19,7 +19,7 @@ final class RawLoggingIntegrationTest: XCTestCase {
         // Run the entire test with a timeout to prevent hanging
         try await runWithTimeout(timeout: 15.0) {
             // Create NDK instance
-            let ndk = NDK(relayUrls: ["wss://relay.nostr.band"])
+            let ndk = NDK(relayURLs: ["wss://relay.nostr.band"])
 
             // Connect to relay with timeout
             let connected = await ndk.waitForRelayConnections(minimumRelays: 1, timeout: 5.0)
