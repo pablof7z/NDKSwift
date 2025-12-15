@@ -309,7 +309,7 @@ final class NDKTests: NDKTestCase {
         let user = ndk.getUser(npub: npub)
 
         XCTAssertNotNil(user)
-        XCTAssertEqual(user?.npub, npub)
+        XCTAssertEqual(try user?.npub, npub)
         XCTAssertFalse(user?.pubkey.isEmpty ?? true)
     }
 

@@ -41,8 +41,10 @@ public final class NDKProfile {
     public let pubkey: PublicKey
 
     private weak var ndk: NDK?
-    // Task for profile subscription - nonisolated(unsafe) is required for accessing in deinit
-    nonisolated(unsafe) private var subscriptionTask: Task<Void, Never>?
+
+    /// Cancellation handle for the subscription task
+    /// Using a class wrapper to allow nonisolated access in deinit
+    private let cancellation = CancellationHandle()
 
     init(pubkey: PublicKey, ndk: NDK) {
         self.pubkey = pubkey
@@ -51,17 +53,17 @@ public final class NDKProfile {
     }
 
     deinit {
-        subscriptionTask?.cancel()
+        cancellation.cancel()
     }
 
     private func startObservation() {
         guard let ndk else { return }
+        let cancellation = self.cancellation
+        let pubkey = self.pubkey
 
-        subscriptionTask = Task { [weak self] in
-            guard let self else { return }
-
+        Task { [weak self] in
             let filter = NDKFilter(
-                authors: [self.pubkey],
+                authors: [pubkey],
                 kinds: [EventKind.metadata]
             )
 
@@ -71,14 +73,38 @@ public final class NDKProfile {
             )
 
             for await event in subscription.events {
-                guard !Task.isCancelled else { break }
+                guard !cancellation.isCancelled else { break }
+                guard let self else { break }
+
                 let newMetadata = NDKUserMetadata(event: event, ndk: ndk)
 
                 // Only update if newer
-                if self.metadata == nil || newMetadata.updatedAt > self.metadata!.updatedAt {
+                if let existingMetadata = self.metadata {
+                    if newMetadata.updatedAt > existingMetadata.updatedAt {
+                        self.metadata = newMetadata
+                    }
+                } else {
                     self.metadata = newMetadata
                 }
             }
         }
+    }
+}
+
+/// Thread-safe cancellation handle that can be accessed from deinit
+private final class CancellationHandle: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _isCancelled = false
+
+    var isCancelled: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return _isCancelled
+    }
+
+    func cancel() {
+        lock.lock()
+        defer { lock.unlock() }
+        _isCancelled = true
     }
 }

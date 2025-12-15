@@ -524,7 +524,7 @@ public final class NDK {
     /// - Parameter identifier: Public key in any supported format
     /// - Returns: An NDKUser instance if the identifier is valid, nil otherwise
     public func getUser(_ identifier: String) -> NDKUser? {
-        // Check if it's a bech32 format
+        // Check if it's a known nostr bech32 format
         if let hrp = Bech32.getHRP(identifier) {
             switch hrp {
             case Bech32HRP.npub:
@@ -542,8 +542,9 @@ public final class NDK {
                 return NDKUser(pubkey: nprofile.pubkey, ndk: self)
 
             default:
-                NDKLogger.log(.warning, category: .general, "Unsupported bech32 type '\(hrp)' for user lookup")
-                return nil
+                // Unknown HRP - fall through to hex parsing
+                // (hex strings containing "1" may trigger getHRP)
+                break
             }
         }
 

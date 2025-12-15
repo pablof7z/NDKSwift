@@ -53,8 +53,9 @@ public final class NDKUser: Equatable, Hashable {
     // MARK: - Profile
 
     /// Observable profile that streams kind 0 metadata updates
+    /// Returns nil only if NDK has been deallocated (should not happen in normal usage)
     @MainActor
-    public var profile: NDKProfile {
+    public var profile: NDKProfile? {
         ndk.profileCache.get(pubkey)
     }
 
@@ -134,11 +135,10 @@ public final class NDKUser: Equatable, Hashable {
     // MARK: - Utilities
 
     /// Get npub representation
+    /// - Throws: Bech32Error if pubkey cannot be encoded
     public var npub: String {
-        do {
-            return try Bech32.npub(from: pubkey)
-        } catch {
-            return "npub1..."
+        get throws {
+            try Bech32.npub(from: pubkey)
         }
     }
 
@@ -165,12 +165,5 @@ public final class NDKUser: Equatable, Hashable {
     /// Verify this user's NIP-05 identifier
     public func verifyNIP05(maxAge: TimeInterval = TimeConstants.day) async throws -> Bool {
         return try await ndk.verifyNIP05(for: self, maxAge: maxAge)
-    }
-
-    // MARK: - Payments
-
-    /// Pay this user using the configured wallet
-    public func pay(amount _: Int64, comment _: String? = nil, tags _: [[String]]? = nil) async throws -> PaymentConfirmation {
-        throw NDKError.failedTo("route payment", message: "Not yet implemented")
     }
 }

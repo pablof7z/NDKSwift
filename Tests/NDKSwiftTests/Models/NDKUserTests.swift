@@ -82,26 +82,23 @@ final class NDKUserTests: XCTestCase {
 
     // MARK: - Utility Methods Tests
 
-    func testNpubGeneration() {
+    func testNpubGeneration() throws {
         let user = NDKUser(pubkey: testPubkey, ndk: ndk)
-        let generatedNpub = user.npub
+        let generatedNpub = try user.npub
 
         // Test that it generates a valid npub
         XCTAssertTrue(generatedNpub.hasPrefix("npub1"))
         XCTAssertGreaterThan(generatedNpub.count, 60)
 
         // Test round-trip conversion
-        if let decodedPubkey = try? Bech32.pubkey(from: generatedNpub) {
-            XCTAssertEqual(decodedPubkey, testPubkey)
-        } else {
-            XCTFail("Failed to decode generated npub")
-        }
+        let decodedPubkey = try Bech32.pubkey(from: generatedNpub)
+        XCTAssertEqual(decodedPubkey, testPubkey)
     }
 
     func testNpubGenerationWithInvalidPubkey() {
         let user = NDKUser(pubkey: "invalid", ndk: ndk)
-        // Should return placeholder on encoding failure
-        XCTAssertEqual(user.npub, "npub1...")
+        // Should throw on encoding failure
+        XCTAssertThrowsError(try user.npub)
     }
 
     func testShortPubkeyWithLongKey() {
@@ -149,27 +146,6 @@ final class NDKUserTests: XCTestCase {
 
         let follows = try await user1.follows(user2)
         XCTAssertFalse(follows)
-    }
-
-    // MARK: - Payment Tests
-
-    func testPayThrowsNotImplemented() async throws {
-        let user = NDKUser(pubkey: testPubkey, ndk: ndk)
-
-        do {
-            _ = try await user.pay(amount: 1000, comment: "Test payment", tags: [["test", "tag"]])
-            XCTFail("Should throw not implemented error")
-        } catch {
-            XCTAssertTrue(error is NDKError)
-            if let ndkError = error as? NDKError,
-               case let .unknown(message, _) = ndkError
-            {
-                XCTAssertTrue(message.contains("route payment"))
-                XCTAssertTrue(message.contains("Not yet implemented"))
-            } else {
-                XCTFail("Wrong error type: \(error)")
-            }
-        }
     }
 
     // MARK: - GetUser Tests
