@@ -279,7 +279,7 @@ class MockAuthRelay: MockRelayProtocol, @unchecked Sendable {
         updateConnectionState(.authRequired(challenge: challenge))
         if let ndk = ndk, let authDelegate = ndk.authenticationDelegate {
             // Cast self to NDKRelay since delegate expects NDKRelay type
-            if let relay = await ndk.pool?.relays.first(where: { $0.url == self.url }) {
+            if let relay = await ndk.pool.relays.first(where: { $0.url == self.url }) {
                 let shouldAuth = await authDelegate.relay(relay, requiresAuthenticationWithChallenge: challenge)
                 if shouldAuth {
                     updateConnectionState(.authenticating)

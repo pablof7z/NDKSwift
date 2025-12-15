@@ -11,7 +11,7 @@ final class NDKRelayAuthenticationTests: XCTestCase {
         let signer = try NDKPrivateKeySigner.generate()
         ndk = NDK(signer: signer)
         mockRelay = NDKRelay(url: "wss://auth.relay.test")
-        mockRelay.setNDK(ndk)
+        await mockRelay.setNDK(ndk)
         authDelegate = MockAuthenticationDelegate()
         ndk.authenticationDelegate = authDelegate
     }

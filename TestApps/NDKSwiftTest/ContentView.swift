@@ -87,12 +87,8 @@ struct ContentView: View {
         }
 
         ndk = NDK(signer: signer)
-        Task {
-            self.user = NDKUser(pubkey: signer.pubkey)
-            if let user = self.user, let ndk = self.ndk {
-                await user.setNdk(ndk)
-            }
-        }
+        self.user = NDKUser(pubkey: signer.pubkey)
+        self.user?.ndk = ndk
 
         status = "Logged in successfully!"
 
