@@ -242,7 +242,7 @@ enum MarkdownParser {
 
             // Stop at empty lines or block markers
             if trimmed.isEmpty ||
-                trimmed.starts(with: "#") ||
+                parseHeading(line) != nil ||
                 trimmed.starts(with: "```") ||
                 trimmed.starts(with: ">") ||
                 isListItem(line) ||
