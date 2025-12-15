@@ -14,9 +14,9 @@ public extension NDKEventBuilder {
 
         // Add text content if empty
         if self.content.isEmpty {
-            self.content = blob.url
+            _ = self.content(blob.url, extractImeta: false)
         } else {
-            self.content += "\n\(blob.url)"
+            _ = self.content(self.content + "\n\(blob.url)", extractImeta: false)
         }
 
         // Add alt text if provided
@@ -56,9 +56,9 @@ public extension NDKEventBuilder {
 
         // Add text content if empty
         if self.content.isEmpty {
-            self.content = url
+            _ = self.content(url, extractImeta: false)
         } else {
-            self.content += "\n\(url)"
+            _ = self.content(self.content + "\n\(url)", extractImeta: false)
         }
 
         if let alt = alt {
