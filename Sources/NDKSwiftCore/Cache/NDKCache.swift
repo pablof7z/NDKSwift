@@ -387,7 +387,7 @@ public extension NDKCache {
     }
 
     /// Default implementation that returns empty array
-    func getUnpublishedEvents(maxAge _: TimeInterval = TimeConstants.hour, limit _: Int? = nil) async -> [(event: NDKEvent, targetRelays: Set<String>)] {
+    func getUnpublishedEvents(maxAge _: TimeInterval = TimeConstants.unpublishedEventRetryWindow, limit _: Int? = nil) async -> [(event: NDKEvent, targetRelays: Set<String>)] {
         return []
     }
 

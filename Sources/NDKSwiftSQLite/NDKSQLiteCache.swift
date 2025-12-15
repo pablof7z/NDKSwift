@@ -613,7 +613,7 @@ public actor NDKSQLiteCache: NDKCache {
         }
     }
 
-    public func getUnpublishedEvents(maxAge: TimeInterval = TimeConstants.hour, limit: Int? = nil) async -> [(event: NDKEvent, targetRelays: Set<String>)] {
+    public func getUnpublishedEvents(maxAge: TimeInterval = TimeConstants.unpublishedEventRetryWindow, limit: Int? = nil) async -> [(event: NDKEvent, targetRelays: Set<String>)] {
         let cutoffTime = Timestamp.now - Timestamp(maxAge)
 
         do {
