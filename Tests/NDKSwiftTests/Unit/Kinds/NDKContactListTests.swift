@@ -163,7 +163,7 @@ final class NDKContactListTests: XCTestCase {
 
         // Test contact queries
         XCTAssertEqual(contactList.contactPubkeys.sorted(), ["pubkey1", "pubkey2", "pubkey3", "pubkey4"])
-        let users = await contactList.contactUsers()
+        let users = contactList.contactUsers()
         XCTAssertEqual(users.count, 4)
 
         // Test filtered queries

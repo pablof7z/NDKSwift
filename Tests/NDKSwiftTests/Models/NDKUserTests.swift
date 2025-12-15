@@ -12,11 +12,10 @@ final class NDKUserTests: XCTestCase {
 
     // MARK: - Initialization Tests
 
-    func testInitWithPubkey() async {
+    func testInitWithPubkey() {
         let user = NDKUser(pubkey: testPubkey)
         XCTAssertEqual(user.pubkey, testPubkey)
-        let ndk = await user.ndk
-        XCTAssertNil(ndk)
+        XCTAssertNil(user.ndk)
     }
 
     func testInitWithValidNpub() {
@@ -240,7 +239,7 @@ final class NDKUserTests: XCTestCase {
         let user = NDKUser(pubkey: testPubkey)
         // Create a minimal NDK instance to pass the nil check
         let ndk = NDK()
-        await user.setNdk(ndk)
+        user.ndk = ndk
 
         do {
             _ = try await user.pay(amount: 1000, comment: "Test payment", tags: [["test", "tag"]])

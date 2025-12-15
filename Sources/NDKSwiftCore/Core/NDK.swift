@@ -513,9 +513,9 @@ public final class NDK {
     ///
     /// - Parameter pubkey: The user's public key (hex format)
     /// - Returns: An NDKUser instance
-    public func getUser(_ pubkey: PublicKey) async -> NDKUser {
+    public func getUser(_ pubkey: PublicKey) -> NDKUser {
         let user = NDKUser(pubkey: pubkey)
-        await user.setNdk(self)
+        user.ndk = self
         return user
     }
 
@@ -536,7 +536,7 @@ public final class NDK {
             return nil
         }
         let user = NDKUser(pubkey: pubkey)
-        await user.setNdk(self)
+        user.ndk = self
         return user
     }
 
@@ -801,7 +801,7 @@ public final class NDK {
         var results: [(user: NDKUser, nip05: String, status: NIP05VerificationStatus)] = []
         for entry in entries {
             let user = NDKUser(pubkey: entry.pubkey)
-            await user.setNdk(self)
+            user.ndk = self
             results.append((user: user, nip05: entry.identifier, status: entry.status))
         }
         return results
