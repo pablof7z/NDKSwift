@@ -48,6 +48,12 @@ public struct NDKClientTagConfig {
 ///     .tag(["t", "nostr"])
 ///     .build()
 /// ```
+///
+/// **Sendable Conformance**: Uses `@unchecked Sendable` because:
+/// - Builder pattern requires mutable state for fluent interface
+/// - Designed for sequential use: create → configure → build → discard
+/// - Not intended for concurrent access from multiple threads
+/// - The `build()` method crosses async boundaries requiring Sendable
 public final class NDKEventBuilder: @unchecked Sendable {
     private var pubkey: PublicKey = ""
     private var createdAt: Timestamp = .now
