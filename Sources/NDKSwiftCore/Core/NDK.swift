@@ -142,6 +142,11 @@ public final class NDK {
         NDKBlossomServerManager(ndk: self)
     }()
 
+    /// Zap manager for handling zaps and payments
+    public lazy var zapManager: any ZapManaging = {
+        NDKZapManager(ndk: self)
+    }()
+
     // MARK: - Initialization
 
     /// Initialize NDK with a custom cache instance
