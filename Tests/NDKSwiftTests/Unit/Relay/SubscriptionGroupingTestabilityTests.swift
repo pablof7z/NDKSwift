@@ -12,7 +12,7 @@ final class SubscriptionGroupingTestabilityTests: XCTestCase {
         try await super.setUp()
         ndk = NDK()
         relay = NDKRelay(url: "wss://test.relay.com")
-        relay.ndk = ndk
+        await relay.setNDK(ndk)
         manager = relay.subscriptionManager
     }
 

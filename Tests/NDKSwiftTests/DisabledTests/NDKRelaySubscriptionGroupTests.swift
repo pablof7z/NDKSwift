@@ -342,7 +342,7 @@ final class NDKRelaySubscriptionTests: XCTestCase {
         let group = NDKRelaySubscription(relay: relay, fingerprint: "test", isGroupable: true)
 
         // Create relay with mock send capability
-        relay.ndk = NDK()
+        await relay.setNDK(NDK())
 
         // All subscriptions have closeOnEose = true
         let sub1 = createMockSubscription(id: "sub1", filters: [createFilter(kinds: [1])], closeOnEose: true)
@@ -361,7 +361,7 @@ final class NDKRelaySubscriptionTests: XCTestCase {
         let group = NDKRelaySubscription(relay: relay, fingerprint: "test", isGroupable: true)
 
         // Set up the relay to track close calls
-        relay.ndk = NDK()
+        await relay.setNDK(NDK())
 
         // Handle EOSE for a subscription ID when group has no subId set
         await group.handleEOSE(subscriptionId: "abandoned-sub-id")
@@ -378,7 +378,7 @@ final class NDKRelaySubscriptionTests: XCTestCase {
         let sub = createMockSubscription(id: "sub1", filters: [createFilter(kinds: [1])])
 
         // Mock the handleClosed behavior
-        relay.ndk = NDK()
+        await relay.setNDK(NDK())
 
         await group.addItem(sub, filters: [createFilter(kinds: [1])])
 
@@ -396,7 +396,7 @@ final class NDKRelaySubscriptionTests: XCTestCase {
         let relay = createMockRelay()
         let group = NDKRelaySubscription(relay: relay, fingerprint: "test", isGroupable: true)
 
-        relay.ndk = NDK()
+        await relay.setNDK(NDK())
 
         // Add a subscription
         let sub = createMockSubscription(id: "sub1", filters: [createFilter(kinds: [1])])

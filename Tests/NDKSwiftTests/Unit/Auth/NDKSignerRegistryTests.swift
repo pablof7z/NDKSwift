@@ -234,11 +234,11 @@ private final class CustomSigner: NDKSigner {
         return "custom-signature-9a59a5f40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b"
     }
 
-    func encrypt(recipient _: NDKUser, value _: String, scheme _: NDKEncryptionScheme) async throws -> String {
+    func encrypt(recipientPubkey _: PublicKey, value _: String, scheme _: NDKEncryptionScheme) async throws -> String {
         return "encrypted"
     }
 
-    func decrypt(sender _: NDKUser, value _: String, scheme _: NDKEncryptionScheme) async throws -> String {
+    func decrypt(senderPubkey _: PublicKey, value _: String, scheme _: NDKEncryptionScheme) async throws -> String {
         return "decrypted"
     }
 

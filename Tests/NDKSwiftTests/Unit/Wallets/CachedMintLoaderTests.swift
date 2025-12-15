@@ -216,11 +216,22 @@ actor MockNDKCache: NDKCache {
     }
 
     func setMockKeysetsLastUpdated(_ date: Date, for mintUrl: String) async {
-        // Store timestamp in KV store
-        let key = "keysets_timestamp:\(mintUrl)"
-        let timestamp = Int64(date.timeIntervalSince1970)
-        if let data = String(timestamp).data(using: .utf8) {
-            try? await setValue(data, forKey: key, namespace: "cashu")
+        // Re-save keysets with the specified timestamp
+        // First get existing keysets
+        let keysets = await getValues(namespace: "cashu", keyPrefix: "keyset:\(mintUrl):")
+
+        // Re-encode each with the new timestamp
+        for (key, data) in keysets {
+            if let wrapper = try? JSONDecoder().decode(KeysetWrapperForTest.self, from: data) {
+                let updatedWrapper = KeysetWrapperForTest(
+                    keyset: wrapper.keyset,
+                    mintUrl: wrapper.mintUrl,
+                    timestamp: date
+                )
+                if let newData = try? JSONEncoder().encode(updatedWrapper) {
+                    try? await setValue(newData, forKey: key, namespace: "cashu")
+                }
+            }
         }
     }
 
@@ -234,9 +245,17 @@ actor MockNDKCache: NDKCache {
         try? await helper.saveMintInfo(info, url: url)
     }
 
-    func setMockMintInfoLastUpdated(_: Date, for _: String) async {
-        // The CashuCacheHelper stores timestamp with the mint info
-        // We need to re-save with updated timestamp - this is a limitation of the test setup
+    func setMockMintInfoLastUpdated(_ date: Date, for mintUrl: String) async {
+        // Re-save mint info with the specified timestamp
+        let key = "mint:\(mintUrl)"
+        if let data = await getValue(forKey: key, namespace: "cashu"),
+           let wrapper = try? JSONDecoder().decode(MintInfoWrapperForTest.self, from: data)
+        {
+            let updatedWrapper = MintInfoWrapperForTest(info: wrapper.info, timestamp: date)
+            if let newData = try? JSONEncoder().encode(updatedWrapper) {
+                try? await setValue(newData, forKey: key, namespace: "cashu")
+            }
+        }
     }
 
     // MARK: - NDKCache Protocol Implementation
@@ -329,4 +348,19 @@ actor MockNDKCache: NDKCache {
             continuation.finish()
         }
     }
+}
+
+// MARK: - Wrapper Types for Testing
+
+/// Mirror of CashuCacheHelper's MintInfoWrapper for testing
+private struct MintInfoWrapperForTest: Codable {
+    let info: NDKMintInfo
+    let timestamp: Date
+}
+
+/// Mirror of CashuCacheHelper's KeysetWrapper for testing
+private struct KeysetWrapperForTest: Codable {
+    let keyset: CashuSwift.Keyset
+    let mintUrl: String
+    let timestamp: Date
 }

@@ -36,7 +36,7 @@ final class NDKNostrDBCacheOptimisticIntegrationTests: NDKTestCase {
     // MARK: - Basic Integration Tests
 
     func testAddUnpublishedEventSavesToNostrDB() async throws {
-        let event = EventTestFactory.createEvent(kind: EventKind.text, content: "Test event")
+        let event = EventTestFactory.createEvent(kind: EventKind.textNote, content: "Test event")
 
         // Add as unpublished
         try await cache.addUnpublishedEvent(
@@ -58,7 +58,7 @@ final class NDKNostrDBCacheOptimisticIntegrationTests: NDKTestCase {
     }
 
     func testConfirmEventUpdatesState() async throws {
-        let event = EventTestFactory.createEvent(kind: EventKind.text, content: "Test event")
+        let event = EventTestFactory.createEvent(kind: EventKind.textNote, content: "Test event")
 
         // Add as unpublished (optimistic)
         try await cache.addUnpublishedEvent(
@@ -69,7 +69,7 @@ final class NDKNostrDBCacheOptimisticIntegrationTests: NDKTestCase {
 
         // Initially optimistic
         var state = await cache.getEventConfirmationState(eventId: event.id)
-        XCTAssertEqual(state, .optimistic)
+        XCTAssertEqual(state, EventConfirmationState.optimistic)
 
         // Confirm on relay
         try await cache.confirmEvent(eventId: event.id, onRelay: "wss://relay1.com")
@@ -84,7 +84,7 @@ final class NDKNostrDBCacheOptimisticIntegrationTests: NDKTestCase {
     }
 
     func testRecordPublishFailureTracksReason() async throws {
-        let event = EventTestFactory.createEvent(kind: EventKind.text, content: "Test event")
+        let event = EventTestFactory.createEvent(kind: EventKind.textNote, content: "Test event")
 
         // Add as unpublished
         try await cache.addUnpublishedEvent(
@@ -106,7 +106,7 @@ final class NDKNostrDBCacheOptimisticIntegrationTests: NDKTestCase {
     }
 
     func testRemoveUnpublishedEventCleansUp() async throws {
-        let event = EventTestFactory.createEvent(kind: EventKind.text, content: "Test event")
+        let event = EventTestFactory.createEvent(kind: EventKind.textNote, content: "Test event")
 
         // Add as unpublished
         try await cache.addUnpublishedEvent(
@@ -134,7 +134,7 @@ final class NDKNostrDBCacheOptimisticIntegrationTests: NDKTestCase {
     // MARK: - Persistence Tests
 
     func testUnpublishedEventsPersistAcrossCacheRestart() async throws {
-        let event = EventTestFactory.createEvent(kind: EventKind.text, content: "Persistent event")
+        let event = EventTestFactory.createEvent(kind: EventKind.textNote, content: "Persistent event")
 
         // Add as unpublished
         try await cache.addUnpublishedEvent(
@@ -164,7 +164,7 @@ final class NDKNostrDBCacheOptimisticIntegrationTests: NDKTestCase {
     }
 
     func testClearRemovesUnpublishedEvents() async throws {
-        let event = EventTestFactory.createEvent(kind: EventKind.text, content: "Test event")
+        let event = EventTestFactory.createEvent(kind: EventKind.textNote, content: "Test event")
 
         // Add as unpublished
         try await cache.addUnpublishedEvent(
@@ -186,7 +186,7 @@ final class NDKNostrDBCacheOptimisticIntegrationTests: NDKTestCase {
     }
 
     func testClearPersistedRemovesUnpublishedEvents() async throws {
-        let event = EventTestFactory.createEvent(kind: EventKind.text, content: "Test event")
+        let event = EventTestFactory.createEvent(kind: EventKind.textNote, content: "Test event")
 
         // Add as unpublished
         try await cache.addUnpublishedEvent(
@@ -261,7 +261,7 @@ final class NDKNostrDBCacheOptimisticIntegrationTests: NDKTestCase {
         }
 
         let state3 = await cache.getEventConfirmationState(eventId: event3.id)
-        XCTAssertEqual(state3, .optimistic)
+        XCTAssertEqual(state3, EventConfirmationState.optimistic)
     }
 
     func testRetryScenario() async throws {

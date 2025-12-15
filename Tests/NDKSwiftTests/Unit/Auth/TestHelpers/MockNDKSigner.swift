@@ -45,12 +45,12 @@ final class MockNDKSigner: NDKSigner {
         return "9a59a5f40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b"
     }
 
-    func encrypt(recipient _: NDKUser, value: String, scheme _: NDKEncryptionScheme) async throws -> String {
+    func encrypt(recipientPubkey _: PublicKey, value: String, scheme _: NDKEncryptionScheme) async throws -> String {
         // Simple mock encryption
         return "encrypted:\(value)"
     }
 
-    func decrypt(sender _: NDKUser, value: String, scheme _: NDKEncryptionScheme) async throws -> String {
+    func decrypt(senderPubkey _: PublicKey, value: String, scheme _: NDKEncryptionScheme) async throws -> String {
         // Simple mock decryption
         if value.starts(with: "encrypted:") {
             return String(value.dropFirst("encrypted:".count))
@@ -113,11 +113,11 @@ final class MockBiometricSigner: NDKSigner {
         return "9a59a5f40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b9a40a5b7b"
     }
 
-    func encrypt(recipient _: NDKUser, value: String, scheme _: NDKEncryptionScheme) async throws -> String {
+    func encrypt(recipientPubkey _: PublicKey, value: String, scheme _: NDKEncryptionScheme) async throws -> String {
         return "encrypted:\(value)"
     }
 
-    func decrypt(sender _: NDKUser, value: String, scheme _: NDKEncryptionScheme) async throws -> String {
+    func decrypt(senderPubkey _: PublicKey, value: String, scheme _: NDKEncryptionScheme) async throws -> String {
         if value.starts(with: "encrypted:") {
             return String(value.dropFirst("encrypted:".count))
         }

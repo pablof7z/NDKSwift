@@ -9,10 +9,12 @@ final class SimpleObserverTest: XCTestCase {
 
         // Initialize NDK with in-memory cache
         let cache = MemoryCache()
-        let ndk = NDK(cache: cache)
-        ndk.signer = signer
-        ndk.debugMode = true
-        ndk.outboxEnabled = false // Disable outbox to avoid relay fetching
+        let ndk = NDK(
+            signer: signer,
+            cache: cache,
+            debugMode: true,
+            outboxEnabled: false // Disable outbox to avoid relay fetching
+        )
 
         // Create filter for kind:1 notes from our test pubkey
         let filter = NDKFilter(

@@ -59,7 +59,7 @@ public final class NDKEventBuilder: @unchecked Sendable {
     private var createdAt: Timestamp = .now
     public private(set) var kind: Kind = EventKind.textNote
     public private(set) var tags: [Tag] = []
-    public private(set) var content: String = ""
+    public internal(set) var content: String = ""
     private weak var ndk: NDK?
 
     // MARK: - Static reference to shared NDK instance
@@ -839,19 +839,18 @@ public final class NDKEventBuilder: @unchecked Sendable {
     ///     .encrypt(signer: signer)
     /// ```
     @discardableResult
-    public func encrypt(recipient: NDKUser? = nil, signer: NDKSigner, scheme: NDKEncryptionScheme = .nip44) async throws -> NDKEvent {
-        // Use provided recipient or create one from signer's pubkey
-        let encryptionRecipient: NDKUser
-        if let recipient = recipient {
-            encryptionRecipient = recipient
+    public func encrypt(recipientPubkey: PublicKey? = nil, signer: NDKSigner, scheme: NDKEncryptionScheme = .nip44) async throws -> NDKEvent {
+        // Use provided recipient pubkey or use signer's pubkey
+        let encryptionRecipient: PublicKey
+        if let recipientPubkey {
+            encryptionRecipient = recipientPubkey
         } else {
-            let signerPubkey = try await signer.pubkey
-            encryptionRecipient = NDKUser(pubkey: signerPubkey)
+            encryptionRecipient = try await signer.pubkey
         }
 
         // Encrypt the current content
         let encryptedContent = try await signer.encrypt(
-            recipient: encryptionRecipient,
+            recipientPubkey: encryptionRecipient,
             value: content,
             scheme: scheme
         )

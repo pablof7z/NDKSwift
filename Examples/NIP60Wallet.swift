@@ -649,7 +649,7 @@ struct NIP60WalletREPL {
                     print("❌ Invalid npub: \(recipient)")
                     return
                 }
-                await user.setNdk(ndk)
+                user.ndk = ndk
                 recipientUser = user
             } else if recipient.contains("@") {
                 // NIP-05 format
@@ -664,7 +664,7 @@ struct NIP60WalletREPL {
             } else if HexValidator.isValid32ByteHex(recipient) {
                 // Hex pubkey
                 recipientUser = NDKUser(pubkey: recipient)
-                await recipientUser.setNdk(ndk)
+                recipientUser.ndk = ndk
             } else {
                 print("❌ Invalid recipient format. Use npub, hex pubkey, or NIP-05")
                 return

@@ -33,7 +33,7 @@ final class NDKNutzapTests: XCTestCase {
     // MARK: - NDKNutzap Creation Tests
 
     func testCreateBasicNutzap() async throws {
-        let recipient = NDKUser(pubkey: testRecipientPubkey)
+        let recipient = NDKUser(pubkey: testRecipientPubkey, ndk: ndk)
 
         let proof = CashuSwift.Proof(
             keysetID: "keyset123",
@@ -69,7 +69,7 @@ final class NDKNutzapTests: XCTestCase {
     }
 
     func testCreateNutzapWithZappedEvent() async throws {
-        let recipient = NDKUser(pubkey: testRecipientPubkey)
+        let recipient = NDKUser(pubkey: testRecipientPubkey, ndk: ndk)
 
         // Create a zapped event
         let zappedEvent = try await NDKEventBuilder(ndk: ndk)
@@ -105,7 +105,7 @@ final class NDKNutzapTests: XCTestCase {
     }
 
     func testCreateNutzapWithMultipleProofs() async throws {
-        let recipient = NDKUser(pubkey: testRecipientPubkey)
+        let recipient = NDKUser(pubkey: testRecipientPubkey, ndk: ndk)
 
         let proof1 = CashuSwift.Proof(
             keysetID: "keyset789",
@@ -393,7 +393,7 @@ final class NDKNutzapTests: XCTestCase {
     func testNutzapValidation() async throws {
         // This test would require implementing CashuHelpers.isProofLockedTo
         // For now, just test that validation method exists and can be called
-        let recipient = NDKUser(pubkey: testRecipientPubkey)
+        let recipient = NDKUser(pubkey: testRecipientPubkey, ndk: ndk)
 
         let proof = CashuSwift.Proof(
             keysetID: "keyset123",
@@ -430,7 +430,7 @@ final class NDKNutzapTests: XCTestCase {
 
     func testCreateNutzapWithNoSigner() async throws {
         let ndkWithoutSigner = NDK()
-        let recipient = NDKUser(pubkey: testRecipientPubkey)
+        let recipient = NDKUser(pubkey: testRecipientPubkey, ndk: ndkWithoutSigner)
 
         let proof = CashuSwift.Proof(
             keysetID: "keyset123",
@@ -461,7 +461,7 @@ final class NDKNutzapTests: XCTestCase {
     }
 
     func testCreateNutzapWithEmptyProofs() async throws {
-        let recipient = NDKUser(pubkey: testRecipientPubkey)
+        let recipient = NDKUser(pubkey: testRecipientPubkey, ndk: ndk)
 
         let nutzap = try await NDKNutzap.create(
             ndk: ndk,

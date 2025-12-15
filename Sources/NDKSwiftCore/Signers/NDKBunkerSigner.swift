@@ -96,7 +96,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
 
     /// Connection state
     private var isConnected = false
-    private var connectionContinuation: CheckedContinuation<NDKUser, Error>?
+    private var connectionContinuation: CheckedContinuation<PublicKey, Error>?
 
     private enum ConnectionType {
         case bunker(String)
@@ -231,9 +231,11 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
     // MARK: - Connection
 
     /// Connect and authenticate with the bunker
-    public func connect() async throws -> NDKUser {
+    /// - Returns: The user's public key after successful connection
+    @discardableResult
+    public func connect() async throws -> PublicKey {
         if isConnected, let pubkey = userPubkey {
-            return NDKUser(pubkey: pubkey)
+            return pubkey
         }
 
         // Handle NIP-05 flow
@@ -316,7 +318,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         }
     }
 
-    private func connectNostrConnect() async throws -> NDKUser {
+    private func connectNostrConnect() async throws -> PublicKey {
         return try await withCheckedThrowingContinuation { continuation in
             self.connectionContinuation = continuation
 
@@ -327,7 +329,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         }
     }
 
-    private func connectBunker() async throws -> NDKUser {
+    private func connectBunker() async throws -> PublicKey {
         guard let bunkerPubkey = bunkerPubkey else {
             NDKLogger.log(.error, category: .auth, "\(logPrefix) ERROR: Bunker pubkey not set!")
             throw NDKError.configurationError(BunkerConstants.ErrorMessages.pubkeyNotSet)
@@ -356,9 +358,8 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
             userPubkey = pubkey
             isConnected = true
 
-            let user = NDKUser(pubkey: pubkey)
             NDKLogger.log(.info, category: .auth, "\(logPrefix) Successfully connected as \(pubkey)")
-            return user
+            return pubkey
         } else {
             let error = NDKError.networkError(for: BunkerConstants.relayName, operation: "connect", error: NSError(domain: BunkerConstants.errorDomain, code: -1, userInfo: [NSLocalizedDescriptionKey: response.error ?? ErrorMessageConstants.Messages.connectionFailed]))
             throw error
@@ -401,12 +402,11 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
                 // According to NIP-46, we must call get_public_key to learn the user's actual pubkey
                 Task {
                     do {
-                        let userPubkey = try await getPublicKey()
-                        self.userPubkey = userPubkey
+                        let pubkey = try await getPublicKey()
+                        self.userPubkey = pubkey
                         self.isConnected = true
 
-                        let user = NDKUser(pubkey: userPubkey)
-                        connectionContinuation?.resume(returning: user)
+                        connectionContinuation?.resume(returning: pubkey)
                         connectionContinuation = nil
                     } catch {
                         connectionContinuation?.resume(throwing: error)
@@ -441,8 +441,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
             if let pubkey = userPubkey {
                 return pubkey
             }
-            let user = try await connect()
-            return user.pubkey
+            return try await connect()
         }
     }
 
@@ -529,21 +528,14 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         return response.result
     }
 
-    public func encrypt(recipient: NDKUser, value: String, scheme: NDKEncryptionScheme) async throws -> String {
+    public func encrypt(recipientPubkey: PublicKey, value: String, scheme: NDKEncryptionScheme) async throws -> String {
         let method = scheme == .nip04 ? "nip04_encrypt" : "nip44_encrypt"
-        return try await performCrypto(method: method, params: [recipient.pubkey, value], errorMessage: ErrorMessageConstants.Messages.encryptionFailed)
+        return try await performCrypto(method: method, params: [recipientPubkey, value], errorMessage: ErrorMessageConstants.Messages.encryptionFailed)
     }
 
-    public func decrypt(sender: NDKUser, value: String, scheme: NDKEncryptionScheme) async throws -> String {
+    public func decrypt(senderPubkey: PublicKey, value: String, scheme: NDKEncryptionScheme) async throws -> String {
         let method = scheme == .nip04 ? "nip04_decrypt" : "nip44_decrypt"
-        return try await performCrypto(method: method, params: [sender.pubkey, value], errorMessage: ErrorMessageConstants.Messages.decryptionFailed)
-    }
-
-    public func user() async throws -> NDKUser {
-        if let pubkey = userPubkey {
-            return NDKUser(pubkey: pubkey)
-        }
-        return try await connect()
+        return try await performCrypto(method: method, params: [senderPubkey, value], errorMessage: ErrorMessageConstants.Messages.decryptionFailed)
     }
 
     // MARK: - Cleanup

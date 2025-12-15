@@ -495,7 +495,7 @@ enum Example09_NutzapsAndHistory {
             do {
                 let recipientPubkey = try await receiverKey.pubkey
                 let recipientUser = NDKUser(pubkey: recipientPubkey)
-                await recipientUser.setNdk(senderNDK)
+                recipientUser.ndk = senderNDK
 
                 let zapManager = NDKZapManager(ndk: senderNDK)
                 await zapManager.register(provider: senderWallet)

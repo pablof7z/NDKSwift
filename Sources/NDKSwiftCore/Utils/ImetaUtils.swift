@@ -11,13 +11,8 @@ public enum ImetaUtils {
 
         if tag.count == 2 {
             // Single value format: ["imeta", "url https://... alt text"]
-            let parts = tag[1].split(separator: " ", maxSplits: 1)
-            guard parts.count >= 2 else { return nil }
-
-            let field = String(parts[0])
-            let value = String(parts[1])
-
-            applyFieldValue(to: &imeta, field: field, value: value)
+            // Parse multiple field-value pairs from a single string
+            guard parseSingleValueFormat(tag[1], into: &imeta) else { return nil }
         } else {
             // Multi-value format: ["imeta", "url https://...", "alt text", ...]
             for i in 1 ..< tag.count {
@@ -89,6 +84,55 @@ public enum ImetaUtils {
     }
 
     // MARK: - Private Helpers
+
+    private static let knownFields = ["url", "blurhash", "dim", "alt", "m", "x", "size", "fallback", "annotate-user"]
+
+    /// Parses single-value format by finding known field names in the string
+    /// Returns false if no valid fields are found (indicates invalid format)
+    private static func parseSingleValueFormat(_ input: String, into imeta: inout NDKImetaTag) -> Bool {
+        var foundValidField = false
+        var remaining = input
+
+        while !remaining.isEmpty {
+            // Find the next field name
+            guard let firstSpaceIndex = remaining.firstIndex(of: " ") else {
+                // No space found, can't be a valid field-value pair
+                break
+            }
+
+            let field = String(remaining[..<firstSpaceIndex])
+            remaining = String(remaining[remaining.index(after: firstSpaceIndex)...])
+
+            // Check if this is a known field
+            guard knownFields.contains(field) else {
+                // Unknown field in single-value format makes it invalid
+                return false
+            }
+
+            foundValidField = true
+
+            // Find the next known field to determine where this value ends
+            var valueEndIndex = remaining.endIndex
+            for knownField in knownFields {
+                if let range = remaining.range(of: " \(knownField) ") {
+                    let candidateIndex = range.lowerBound
+                    if candidateIndex < valueEndIndex {
+                        valueEndIndex = candidateIndex
+                    }
+                }
+            }
+
+            let value = String(remaining[..<valueEndIndex]).trimmingCharacters(in: .whitespaces)
+            applyFieldValue(to: &imeta, field: field, value: value)
+
+            if valueEndIndex == remaining.endIndex {
+                break
+            }
+            remaining = String(remaining[remaining.index(after: valueEndIndex)...])
+        }
+
+        return foundValidField
+    }
 
     private static func applyFieldValue(to imeta: inout NDKImetaTag, field: String, value: String) {
         switch field {

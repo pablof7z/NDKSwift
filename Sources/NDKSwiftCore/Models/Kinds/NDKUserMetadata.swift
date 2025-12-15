@@ -120,7 +120,10 @@ public class NDKUserMetadata {
             return name
         }
         // Fallback to npub
-        return NDKUser(pubkey: pubkey).npub.prefix(16) + "..."
+        if let npub = try? Bech32.npub(from: pubkey) {
+            return String(npub.prefix(16)) + "..."
+        }
+        return String(pubkey.prefix(12)) + "..."
     }
 }
 

@@ -24,9 +24,8 @@ public struct NWCRequestBuilder {
         let signerPubkey = try await signer.pubkey
 
         // Encrypt content using NIP-04
-        let walletUser = NDKUser(pubkey: walletPubkey)
         let encryptedContent = try await signer.encrypt(
-            recipient: walletUser,
+            recipientPubkey: walletPubkey,
             value: jsonString,
             scheme: .nip04
         )

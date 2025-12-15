@@ -16,9 +16,9 @@ final class NDKOutboxConnectivityTests: XCTestCase {
 
     func testOutboxFallbackToConnectedRelays() async throws {
         // Configure NDK with an unreachable outbox relay
-        ndk.outboxConfig = NDKOutboxConfig(
+        ndk = NDK(outboxConfig: NDKOutboxConfig(
             outboxRelays: ["wss://unreachable.relay.test"]
-        )
+        ))
 
         // Add some test relays (won't actually connect in unit test environment)
         await ndk.pool.addRelay("wss://test-relay1.example.com")
@@ -42,9 +42,9 @@ final class NDKOutboxConnectivityTests: XCTestCase {
 
     func testOutboxStrategyWithDisconnectedOutboxRelays() async throws {
         // Configure NDK with an unreachable outbox relay
-        ndk.outboxConfig = NDKOutboxConfig(
+        ndk = NDK(outboxConfig: NDKOutboxConfig(
             outboxRelays: ["wss://unreachable.relay.test"]
-        )
+        ))
 
         // Add test relays
         await ndk.pool.addRelay("wss://test-relay1.example.com")
@@ -70,9 +70,9 @@ final class NDKOutboxConnectivityTests: XCTestCase {
 
     func testRelayListFetchWithoutOutboxRelays() async throws {
         // Configure NDK with empty outbox relays
-        ndk.outboxConfig = NDKOutboxConfig(
+        ndk = NDK(outboxConfig: NDKOutboxConfig(
             outboxRelays: []
-        )
+        ))
 
         // Add test relay
         await ndk.pool.addRelay("wss://test-relay.example.com")

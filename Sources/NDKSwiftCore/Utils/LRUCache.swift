@@ -190,8 +190,8 @@ public actor LRUCache<Key: Hashable, Value> {
             accessOrder.remove(at: index)
         }
 
-        // Remove oldest non-expired entry if found
-        if let index = indexToRemove {
+        // Only remove oldest non-expired entry if still over capacity after removing expired entries
+        if cache.count > capacity, let index = indexToRemove {
             // Adjust index after removing expired entries
             let adjustedIndex = index - expiredIndices.filter { $0 < index }.count
             let key = accessOrder.remove(at: adjustedIndex)

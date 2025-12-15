@@ -61,15 +61,13 @@ public actor NDKNostrRPC {
     }
 
     func parseEvent(_ event: NDKEvent) async throws -> Any {
-        let remoteUser = NDKUser(pubkey: event.pubkey)
-
         var decryptedContent: String
         do {
-            decryptedContent = try await localSigner.decrypt(sender: remoteUser, value: event.content, scheme: encryptionScheme)
+            decryptedContent = try await localSigner.decrypt(senderPubkey: event.pubkey, value: event.content, scheme: encryptionScheme)
         } catch {
             // Try other encryption scheme (fallback to NIP04 if NIP44 fails)
             let otherScheme: NDKEncryptionScheme = encryptionScheme == .nip44 ? .nip04 : .nip44
-            decryptedContent = try await localSigner.decrypt(sender: remoteUser, value: event.content, scheme: otherScheme)
+            decryptedContent = try await localSigner.decrypt(senderPubkey: event.pubkey, value: event.content, scheme: otherScheme)
             encryptionScheme = otherScheme
         }
 
@@ -129,8 +127,7 @@ public actor NDKNostrRPC {
         let requestString = String(data: requestData, encoding: .utf8) ?? ""
         NDKLogger.log(.debug, category: .auth, "Request JSON: \(requestString)")
 
-        let remoteUser = NDKUser(pubkey: pubkey)
-        let encryptedContent = try await localSigner.encrypt(recipient: remoteUser, value: requestString, scheme: encryptionScheme)
+        let encryptedContent = try await localSigner.encrypt(recipientPubkey: pubkey, value: requestString, scheme: encryptionScheme)
         NDKLogger.log(.debug, category: .auth, "Encrypted content using scheme: \(encryptionScheme)")
 
         let event = try await NDKEventBuilder(ndk: ndk)
