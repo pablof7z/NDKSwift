@@ -271,5 +271,11 @@ final class LRUCacheTests: XCTestCase {
         XCTAssertEqual(allItems.count, 2)
         XCTAssertEqual(allItems["key3"], 3)
         XCTAssertEqual(allItems["key4"], 4)
+
+        // Verify key1 and key2 are gone
+        let v1 = await cache.get("key1")
+        let v2 = await cache.get("key2")
+        XCTAssertNil(v1)
+        XCTAssertNil(v2)
     }
 }

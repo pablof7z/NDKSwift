@@ -172,6 +172,7 @@ public actor LRUCache<Key: Hashable, Value> {
         var indexToRemove: Int?
         let now = Date()
 
+        // Prioritize evicting expired items
         for (index, key) in accessOrder.enumerated() {
             if let entry = cache[key], entry.expiresAt > now {
                 // Found first non-expired entry - this is the oldest we'll evict
