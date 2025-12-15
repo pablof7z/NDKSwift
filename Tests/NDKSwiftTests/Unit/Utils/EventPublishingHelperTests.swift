@@ -18,7 +18,7 @@
      func testCreateAndPublish_successfullyPublishesEvent() async throws {
          // Setup
          let signer = try NDKPrivateKeySigner.generate()
-         let ndk = NDK(relayUrls: ["wss://test.relay.com"], signer: signer)
+         let ndk = NDK(relayURLs: ["wss://test.relay.com"], signer: signer)
 
          // Create mock relay
          let mockRelay = MockRelay(url: "wss://test.relay.com")
@@ -60,7 +60,7 @@
      func testCreateAndPublishWithId_logsEventId() async throws {
          // Setup
          let signer = try NDKPrivateKeySigner.generate()
-         let ndk = NDK(relayUrls: ["wss://test.relay.com"], signer: signer)
+         let ndk = NDK(relayURLs: ["wss://test.relay.com"], signer: signer)
 
          // Create mock relay
          let mockRelay = MockRelay(url: "wss://test.relay.com")
@@ -94,7 +94,7 @@
      func testCreateAndPublish_propagatesErrors() async throws {
          // Setup
          let signer = try NDKPrivateKeySigner.generate()
-         let ndk = NDK(relayUrls: ["wss://test.relay.com"], signer: signer)
+         let ndk = NDK(relayURLs: ["wss://test.relay.com"], signer: signer)
 
          // No connected relays - publishing should fail
 
@@ -123,7 +123,7 @@
      func testCreateAndPublish_handlesMultipleRelays() async throws {
          // Setup
          let signer = try NDKPrivateKeySigner.generate()
-         let ndk = NDK(relayUrls: ["wss://test1.relay.com", "wss://test2.relay.com"], signer: signer)
+         let ndk = NDK(relayURLs: ["wss://test1.relay.com", "wss://test2.relay.com"], signer: signer)
 
          // Create mock relays
          let mockRelay1 = MockRelay(url: "wss://test1.relay.com")

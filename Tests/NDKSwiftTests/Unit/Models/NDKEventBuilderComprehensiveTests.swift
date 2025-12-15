@@ -22,7 +22,7 @@ final class NDKEventBuilderComprehensiveTests: NDKUnitTestCase {
         )
 
         let customNDK = NDK(
-            relayUrls: ["wss://relay.test"],
+            relayURLs: ["wss://relay.test"],
             signer: signer
             // Updated setup without clientTagConfig
         )
@@ -381,7 +381,7 @@ final class NDKEventBuilderComprehensiveTests: NDKUnitTestCase {
 
     func testBuildWithoutSigner() async {
         // Create builder without NDK (no default signer)
-        let standaloneBuilder = NDKEventBuilder(ndk: NDK(relayUrls: []))
+        let standaloneBuilder = NDKEventBuilder(ndk: NDK(relayURLs: []))
 
         do {
             _ = try await standaloneBuilder

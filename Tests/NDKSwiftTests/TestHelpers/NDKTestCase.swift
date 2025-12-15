@@ -59,14 +59,14 @@ open class NDKTestCase: XCTestCase {
 
     /// Creates a test NDK instance that will be automatically cleaned up
     func createTestNDK(
-        relayUrls: [RelayURL] = [],
+        relayURLs: [RelayURL] = [],
         signer: NDKSigner? = nil,
         cache: NDKCache? = nil,
         debugMode: Bool = false,
         outboxEnabled: Bool = false
     ) -> NDK {
         let ndk = NDKTestFactory.createNDK(
-            relayUrls: relayUrls,
+            relayURLs: relayUrls,
             signer: signer,
             cache: cache,
             debugMode: debugMode,
@@ -203,7 +203,7 @@ open class NDKIntegrationTestCase: NDKTestCase {
     /// Creates and connects to test relays
     func createConnectedNDK(signer: NDKSigner? = nil) async throws -> NDK {
         let ndk = createTestNDK(
-            relayUrls: testRelayUrls,
+            relayURLs: testRelayUrls,
             signer: signer
         )
 

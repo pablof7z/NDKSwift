@@ -15,11 +15,11 @@ final class ZapFlowE2ETests: XCTestCase {
 
         // Create zapper instance (the one sending zaps)
         let zapperSigner = try NDKPrivateKeySigner.generate()
-        zapperNDK = NDK(relayUrls: testRelays, signer: zapperSigner)
+        zapperNDK = NDK(relayURLs: testRelays, signer: zapperSigner)
 
         // Create recipient instance
         let recipientSigner = try NDKPrivateKeySigner.generate()
-        recipientNDK = NDK(relayUrls: testRelays, signer: recipientSigner)
+        recipientNDK = NDK(relayURLs: testRelays, signer: recipientSigner)
         recipientPubkey = try await recipientSigner.pubkey
 
         // Connect both instances

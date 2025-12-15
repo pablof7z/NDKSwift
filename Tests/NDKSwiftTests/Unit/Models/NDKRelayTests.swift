@@ -186,7 +186,7 @@ final class NDKRelayTests: XCTestCase {
 
     func testNDKReference() {
         let relay = NDKRelay(url: "wss://relay.example.com")
-        let ndk = NDK(relayUrls: [])
+        let ndk = NDK(relayURLs: [])
 
         relay.setNDK(ndk)
         XCTAssertNotNil(relay.ndk)

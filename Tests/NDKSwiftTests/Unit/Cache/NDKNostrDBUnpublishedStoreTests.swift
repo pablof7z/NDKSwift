@@ -448,6 +448,6 @@ final class NDKNostrDBUnpublishedStoreTests: NDKTestCase {
     // MARK: - Helper Methods
 
     private func createSignedEvent(content: String) -> NDKEvent {
-        return EventTestFactory.createEvent(kind: EventKind.text, content: content)
+        return EventTestFactory.createEvent(kind: EventKind.textNote, content: content)
     }
 }

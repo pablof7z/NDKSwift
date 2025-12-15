@@ -13,7 +13,7 @@ final class NIP17PrivateMessagesE2ETests: XCTestCase {
         try await super.setUp()
 
         // Initialize NDK with test relays
-        ndk = NDK(relayUrls: ["wss://relay.damus.io"])
+        ndk = NDK(relayURLs: ["wss://relay.damus.io"])
         await ndk.connect()
 
         // Generate test keys

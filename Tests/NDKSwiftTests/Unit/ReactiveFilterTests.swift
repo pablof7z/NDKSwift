@@ -9,7 +9,7 @@ final class ReactiveFilterTests: XCTestCase {
         try await super.setUp()
 
         // Create NDK with in-memory cache
-        ndk = NDK(relayUrls: ["wss://relay.damus.io"], cache: MemoryCache())
+        ndk = NDK(relayURLs: ["wss://relay.damus.io"], cache: MemoryCache())
 
         // Create test signer
         signer = try NDKPrivateKeySigner.generate()

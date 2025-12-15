@@ -17,7 +17,7 @@ final class DeletionEventTests: XCTestCase {
 
         // Create NDK with test configuration
         ndk = NDK(
-            relayUrls: ["wss://relay.test"],
+            relayURLs: ["wss://relay.test"],
             signer: signer,
             cache: cache
         )

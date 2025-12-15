@@ -9,7 +9,7 @@ final class NDKProfileManagerTests: NDKTestCase {
     override func setUp() async throws {
         try await super.setUp()
         cache = MemoryCache()
-        ndk = NDK(relayUrls: [], cache: cache)
+        ndk = NDK(relayURLs: [], cache: cache)
         sut = NDKProfileManager(ndk: ndk)
     }
 
