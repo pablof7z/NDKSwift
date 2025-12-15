@@ -1,5 +1,5 @@
-import SwiftUI
 import NDKSwiftCore
+import SwiftUI
 
 /// A utility view that loads and provides profile data to its content
 ///
@@ -30,7 +30,7 @@ public struct NDKUIProfileLoader<Content: View>: View {
     let content: (NDKUserMetadata?) -> Content
     @State private var metadata: NDKUserMetadata?
     @State private var profileTask: Task<Void, Never>?
-    
+
     public init(
         ndk: NDK,
         pubkey: String,
@@ -42,7 +42,7 @@ public struct NDKUIProfileLoader<Content: View>: View {
         self.maxAge = maxAge
         self.content = content
     }
-    
+
     public init(
         ndk: NDK,
         user: NDKUser,
@@ -51,7 +51,7 @@ public struct NDKUIProfileLoader<Content: View>: View {
     ) {
         self.init(ndk: ndk, pubkey: user.pubkey, maxAge: maxAge, content: content)
     }
-    
+
     public var body: some View {
         content(metadata)
             .onAppear {
@@ -64,11 +64,11 @@ public struct NDKUIProfileLoader<Content: View>: View {
                 loadProfile()
             }
     }
-    
+
     private func loadProfile() {
         profileTask?.cancel()
         metadata = nil
-        
+
         profileTask = Task {
             for await metadata in await ndk.profileManager.subscribe(for: pubkey, maxAge: maxAge) {
                 await MainActor.run {
@@ -87,7 +87,7 @@ public struct NDKUIMultipleProfileLoader<Content: View>: View {
     let content: ([String: NDKUserMetadata]) -> Content
     @State private var profiles: [String: NDKUserMetadata] = [:]
     @State private var profileTasks: [String: Task<Void, Never>] = [:]
-    
+
     public init(
         ndk: NDK,
         pubkeys: [String],
@@ -99,7 +99,7 @@ public struct NDKUIMultipleProfileLoader<Content: View>: View {
         self.maxAge = maxAge
         self.content = content
     }
-    
+
     public var body: some View {
         content(profiles)
             .onAppear {
@@ -112,11 +112,11 @@ public struct NDKUIMultipleProfileLoader<Content: View>: View {
                 loadProfiles()
             }
     }
-    
+
     private func loadProfiles() {
         cancelAllTasks()
         profiles = [:]
-        
+
         for pubkey in pubkeys {
             let task = Task {
                 for await metadata in await ndk.profileManager.subscribe(for: pubkey, maxAge: maxAge) {
@@ -128,7 +128,7 @@ public struct NDKUIMultipleProfileLoader<Content: View>: View {
             profileTasks[pubkey] = task
         }
     }
-    
+
     private func cancelAllTasks() {
         for task in profileTasks.values {
             task.cancel()
@@ -143,12 +143,12 @@ public struct NDKUICurrentUserProfile<Content: View>: View {
     let content: (NDKUserMetadata?) -> Content
     @State private var metadata: NDKUserMetadata?
     @State private var profileTask: Task<Void, Never>?
-    
+
     public init(ndk: NDK, @ViewBuilder content: @escaping (NDKUserMetadata?) -> Content) {
         self.ndk = ndk
         self.content = content
     }
-    
+
     public var body: some View {
         content(metadata)
             .onAppear {
@@ -158,12 +158,12 @@ public struct NDKUICurrentUserProfile<Content: View>: View {
                 profileTask?.cancel()
             }
     }
-    
+
     private func loadCurrentUserProfile() {
         profileTask?.cancel()
-        
+
         guard let signer = ndk.signer else { return }
-        
+
         profileTask = Task {
             do {
                 let currentUser = try await signer.user()
@@ -188,34 +188,34 @@ public struct NDKUINip05Badge: View {
     @State private var verificationStatus: VerificationStatus = .loading
     @State private var profileTask: Task<Void, Never>?
     @State private var verificationTask: Task<Void, Never>?
-    
+
     public enum BadgeStyle {
-        case full       // Shows checkmark + NIP-05 identifier
-        case compact    // Shows just checkmark
-        case text       // Shows just the NIP-05 identifier
+        case full // Shows checkmark + NIP-05 identifier
+        case compact // Shows just checkmark
+        case text // Shows just the NIP-05 identifier
     }
-    
+
     public enum VerificationStatus {
         case loading
-        case verified(String)  // The NIP-05 identifier
+        case verified(String) // The NIP-05 identifier
         case unverified
         case failed
     }
-    
+
     public init(ndk: NDK, pubkey: String, style: BadgeStyle = .full) {
         self.ndk = ndk
         self.pubkey = pubkey
         self.style = style
     }
-    
+
     public init(ndk: NDK, user: NDKUser, style: BadgeStyle = .full) {
         self.init(ndk: ndk, pubkey: user.pubkey, style: style)
     }
-    
+
     public var body: some View {
         Group {
             switch (verificationStatus, style) {
-            case (.verified(let nip05), .full):
+            case let (.verified(nip05), .full):
                 HStack(spacing: 4) {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.caption)
@@ -225,18 +225,18 @@ public struct NDKUINip05Badge: View {
                         .foregroundColor(.secondary)
                         .lineLimit(1)
                 }
-                
+
             case (.verified(_), .compact):
                 Image(systemName: "checkmark.circle.fill")
                     .font(.caption)
                     .foregroundColor(.ndkAccent)
-                
-            case (.verified(let nip05), .text):
+
+            case let (.verified(nip05), .text):
                 Text(nip05)
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
-                
+
             default:
                 EmptyView()
             }
@@ -249,17 +249,17 @@ public struct NDKUINip05Badge: View {
             verificationTask?.cancel()
         }
     }
-    
+
     private func loadAndVerify() {
         profileTask?.cancel()
         verificationTask?.cancel()
-        
+
         profileTask = Task {
             for await metadata in await ndk.profileManager.subscribe(for: pubkey) {
                 await MainActor.run {
                     self.metadata = metadata
                 }
-                
+
                 // Verify NIP-05 when profile loads
                 if let nip05 = metadata?.nip05 {
                     await verifyNip05(nip05)
@@ -271,10 +271,10 @@ public struct NDKUINip05Badge: View {
             }
         }
     }
-    
+
     private func verifyNip05(_ identifier: String) async {
         verificationTask?.cancel()
-        
+
         verificationTask = Task {
             do {
                 let isValid = try await ndk.nip05Manager.verify(identifier: identifier, expectedPubkey: pubkey)
@@ -293,42 +293,42 @@ public struct NDKUINip05Badge: View {
 // MARK: - Preview
 
 #if DEBUG
-struct NDKUIProfileLoader_Previews: PreviewProvider {
-    static var previews: some View {
-        let mockNDK = NDK(relayUrls: [])
-        
-        VStack(spacing: 20) {
-            // Single profile loader
-            NDKUIProfileLoader(ndk: mockNDK, pubkey: "sample_pubkey") { metadata in
-                VStack(alignment: .leading) {
-                    Text("Name: \(metadata?.displayName ?? "Loading...")")
-                    Text("Bio: \(metadata?.about ?? "No bio")")
+    struct NDKUIProfileLoader_Previews: PreviewProvider {
+        static var previews: some View {
+            let mockNDK = NDK(relayURLs: [])
+
+            VStack(spacing: 20) {
+                // Single profile loader
+                NDKUIProfileLoader(ndk: mockNDK, pubkey: "sample_pubkey") { metadata in
+                    VStack(alignment: .leading) {
+                        Text("Name: \(metadata?.displayName ?? "Loading...")")
+                        Text("Bio: \(metadata?.about ?? "No bio")")
+                    }
                 }
-            }
-            
-            Divider()
-            
-            // Multiple profiles loader
-            NDKUIMultipleProfileLoader(ndk: mockNDK, pubkeys: ["pubkey1", "pubkey2", "pubkey3"]) { profiles in
-                VStack(alignment: .leading) {
-                    ForEach(profiles.keys.sorted(), id: \.self) { pubkey in
-                        if let metadata = profiles[pubkey] {
-                            Text("\(pubkey.prefix(8)): \(metadata.displayName ?? metadata.name ?? "Unknown")")
+
+                Divider()
+
+                // Multiple profiles loader
+                NDKUIMultipleProfileLoader(ndk: mockNDK, pubkeys: ["pubkey1", "pubkey2", "pubkey3"]) { profiles in
+                    VStack(alignment: .leading) {
+                        ForEach(profiles.keys.sorted(), id: \.self) { pubkey in
+                            if let metadata = profiles[pubkey] {
+                                Text("\(pubkey.prefix(8)): \(metadata.displayName ?? metadata.name ?? "Unknown")")
+                            }
                         }
                     }
                 }
+
+                Divider()
+
+                // NIP-05 badge
+                HStack {
+                    NDKUINip05Badge(ndk: mockNDK, pubkey: "sample_pubkey", style: .full)
+                    NDKUINip05Badge(ndk: mockNDK, pubkey: "sample_pubkey", style: .compact)
+                    NDKUINip05Badge(ndk: mockNDK, pubkey: "sample_pubkey", style: .text)
+                }
             }
-            
-            Divider()
-            
-            // NIP-05 badge
-            HStack {
-                NDKUINip05Badge(ndk: mockNDK, pubkey: "sample_pubkey", style: .full)
-                NDKUINip05Badge(ndk: mockNDK, pubkey: "sample_pubkey", style: .compact)
-                NDKUINip05Badge(ndk: mockNDK, pubkey: "sample_pubkey", style: .text)
-            }
+            .padding()
         }
-        .padding()
     }
-}
 #endif

@@ -15,10 +15,10 @@
  */
 
 #if !os(WASI)
-import Foundation
-import NDKSwiftCore
+    import Foundation
+    import NDKSwiftCore
 #else
-import SwiftOverlayShims
+    import SwiftOverlayShims
 #endif
 
 /// NativeStruct is a protocol that indicates if the struct is a native `swift` struct
@@ -28,42 +28,42 @@ public protocol NativeStruct {}
 /// FlatbuffersInitializable is a protocol that allows any object to be
 /// Initialized from a ByteBuffer
 public protocol FlatbuffersInitializable {
-  /// Any flatbuffers object that confirms to this protocol is going to be
-  /// initializable through this initializer
-  init(_ bb: ByteBuffer, o: Int32)
+    /// Any flatbuffers object that confirms to this protocol is going to be
+    /// initializable through this initializer
+    init(_ bb: ByteBuffer, o: Int32)
 }
 
 /// FlatbufferObject structures all the Flatbuffers objects
 public protocol FlatBufferObject: FlatbuffersInitializable {
-  var __buffer: ByteBuffer! { get }
+    var __buffer: ByteBuffer! { get }
 }
 
 /// ``ObjectAPIPacker`` is a protocol that allows object to pack and unpack from a
 /// ``NativeObject`` to a flatbuffers Object and vice versa.
 public protocol ObjectAPIPacker {
-  /// associatedtype to the object that should be unpacked.
-  associatedtype T
+    /// associatedtype to the object that should be unpacked.
+    associatedtype T
 
-  /// ``pack(_:obj:)-3ptws`` tries to pacs the variables of a native Object into the `ByteBuffer` by using
-  /// a FlatBufferBuilder
-  /// - Parameters:
-  ///   - builder: FlatBufferBuilder that will host incoming data
-  ///   - obj: Object of associatedtype to the current implementer
-  ///
-  /// ``pack(_:obj:)-3ptws`` can be called by passing through an already initialized ``FlatBufferBuilder``
-  /// or it can be called by using the public API that will create a new ``FlatBufferBuilder``
-  static func pack(_ builder: inout FlatBufferBuilder, obj: inout T?) -> Offset
+    /// ``pack(_:obj:)-3ptws`` tries to pacs the variables of a native Object into the `ByteBuffer` by using
+    /// a FlatBufferBuilder
+    /// - Parameters:
+    ///   - builder: FlatBufferBuilder that will host incoming data
+    ///   - obj: Object of associatedtype to the current implementer
+    ///
+    /// ``pack(_:obj:)-3ptws`` can be called by passing through an already initialized ``FlatBufferBuilder``
+    /// or it can be called by using the public API that will create a new ``FlatBufferBuilder``
+    static func pack(_ builder: inout FlatBufferBuilder, obj: inout T?) -> Offset
 
-  /// ``pack(_:obj:)-20ipk`` packs the variables of a native Object into the `ByteBuffer` by using
-  /// the FlatBufferBuilder
-  /// - Parameters:
-  ///   - builder: FlatBufferBuilder that will host incoming data
-  ///   - obj: Object of associatedtype to the current implementer
-  ///
-  /// ``pack(_:obj:)-20ipk`` can be called by passing through an already initialized ``FlatBufferBuilder``
-  /// or it can be called by using the public API that will create a new ``FlatBufferBuilder``
-  static func pack(_ builder: inout FlatBufferBuilder, obj: inout T) -> Offset
+    /// ``pack(_:obj:)-20ipk`` packs the variables of a native Object into the `ByteBuffer` by using
+    /// the FlatBufferBuilder
+    /// - Parameters:
+    ///   - builder: FlatBufferBuilder that will host incoming data
+    ///   - obj: Object of associatedtype to the current implementer
+    ///
+    /// ``pack(_:obj:)-20ipk`` can be called by passing through an already initialized ``FlatBufferBuilder``
+    /// or it can be called by using the public API that will create a new ``FlatBufferBuilder``
+    static func pack(_ builder: inout FlatBufferBuilder, obj: inout T) -> Offset
 
-  /// ``unpack()`` unpacks a ``FlatBuffers`` object into a Native swift object.
-  mutating func unpack() -> T
+    /// ``unpack()`` unpacks a ``FlatBuffers`` object into a Native swift object.
+    mutating func unpack() -> T
 }

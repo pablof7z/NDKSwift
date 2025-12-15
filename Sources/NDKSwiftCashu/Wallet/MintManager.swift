@@ -1,6 +1,6 @@
+import CashuSwift
 import Foundation
 import NDKSwiftCore
-import CashuSwift
 
 /// Manages all mint-related operations for the Cashu wallet
 public actor MintManager {
@@ -15,9 +15,9 @@ public actor MintManager {
 
     public init(cache: NDKCache? = nil) {
         if let cache = cache {
-            self.mintLoader = CachedMintLoader(cache: cache)
+            mintLoader = CachedMintLoader(cache: cache)
         } else {
-            self.mintLoader = nil
+            mintLoader = nil
         }
     }
 
@@ -42,7 +42,6 @@ public actor MintManager {
 
         return mint
     }
-
 
     /// Add mint URL without connecting (for configuration)
     public func addMintURL(url: URL) async {
@@ -147,10 +146,9 @@ public actor MintManager {
     /// Request a mint quote for Lightning deposits
     public func requestMintQuote(amount: Int64, mintURL: String) async throws -> CashuSwift.Bolt11.MintQuote {
         // Always ensure mint is properly loaded with keysets
-        let url = try GuardHelpers.unwrap(
-            URLUtils.safeURL(mintURL),
-            error: NDKError.invalidURL("\(ErrorMessageConstants.invalid("mint URL")): \(mintURL)")
-        )
+        guard let url = URLUtils.safeURL(mintURL) else {
+            throw NDKError.invalidURL("\(ErrorMessageConstants.invalid("mint URL")): \(mintURL)")
+        }
 
         // Get mint - loadMint will use cache and store in memory
         let mint = try await loadMint(url: url)
@@ -171,14 +169,12 @@ public actor MintManager {
             quoteRequest: quoteRequest
         )
 
-        let quoteResponse = try GuardHelpers.unwrap(
-            response as? CashuSwift.Bolt11.MintQuote,
-            error: NDKError.walletError(message: "Unexpected quote response type")
-        )
+        guard let quoteResponse = response as? CashuSwift.Bolt11.MintQuote else {
+            throw NDKError.walletError(message: "Unexpected quote response type")
+        }
 
         return quoteResponse
     }
-
 
     // MARK: - State Management
 
@@ -212,25 +208,26 @@ public actor MintManager {
 }
 
 // MARK: - Test Helpers
+
 #if DEBUG
-extension MintManager {
-    /// Test helper to directly set a mint
-    func setTestMint(_ mint: CashuSwift.Mint, for url: URL) {
-        mints[url.absoluteString] = mint
-        // Also store keysets
-        for keyset in mint.keysets {
+    extension MintManager {
+        /// Test helper to directly set a mint
+        func setTestMint(_ mint: CashuSwift.Mint, for url: URL) {
+            mints[url.absoluteString] = mint
+            // Also store keysets
+            for keyset in mint.keysets {
+                keysets[keyset.keysetID] = keyset
+            }
+        }
+
+        /// Test helper to directly set a keyset
+        func setTestKeyset(_ keyset: CashuSwift.Keyset) {
             keysets[keyset.keysetID] = keyset
         }
-    }
 
-    /// Test helper to directly set a keyset
-    func setTestKeyset(_ keyset: CashuSwift.Keyset) {
-        keysets[keyset.keysetID] = keyset
+        /// Get a mint by URL (overload for URL type)
+        func getMint(for url: URL) async throws -> CashuSwift.Mint? {
+            return mints[url.absoluteString]
+        }
     }
-
-    /// Get a mint by URL (overload for URL type)
-    func getMint(for url: URL) async throws -> CashuSwift.Mint? {
-        return mints[url.absoluteString]
-    }
-}
 #endif

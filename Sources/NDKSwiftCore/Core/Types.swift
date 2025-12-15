@@ -32,7 +32,6 @@ public typealias Signature = String
 /// Unix timestamp in seconds
 public typealias Timestamp = Int64
 
-
 // MARK: - Time Constants
 
 /// Constants for time conversion and common intervals
@@ -84,6 +83,7 @@ public enum TimeConstants {
 }
 
 // MARK: - Timestamp utilities
+
 public extension Timestamp {
     /// Get the current timestamp
     static var now: Timestamp {
@@ -110,6 +110,7 @@ public typealias Kind = Int
 /// Common Nostr event kinds as defined in various NIPs
 public enum EventKind {
     // MARK: - Core Events (0-999)
+
     /// User metadata (NIP-01) - Contains profile information like name, picture, about
     public static let metadata = 0
     /// User metadata (NIP-01) - Alias for metadata
@@ -142,6 +143,7 @@ public enum EventKind {
     public static let channelMessage = 42
 
     // MARK: - Extended Events (1000-9999)
+
     /// File metadata event (NIP-94) - Contains metadata for files stored on external servers
     public static let fileMetadata = 1063
     /// Generic reply/comment event (NIP-22) - Used for commenting on any addressable content
@@ -150,6 +152,7 @@ public enum EventKind {
     public static let report = 1984
 
     // MARK: - NIP-60 Cashu Events
+
     /// Cashu wallet backup event (NIP-60) - Encrypted backup of wallet proofs and state
     public static let cashuWalletBackup = 375
     /// Cashu quote event - Contains mint quotes for token operations
@@ -164,6 +167,7 @@ public enum EventKind {
     public static let cashuWalletConfig = 17375
 
     // MARK: - Zap Events
+
     /// Zap request event (NIP-57) - Request for a Lightning payment to a user
     public static let zapRequest = 9734
     /// Zap receipt event (NIP-57) - Proof of a completed Lightning payment
@@ -172,6 +176,7 @@ public enum EventKind {
     public static let zapReceipt = 9735
 
     // MARK: - List Events (10000-19999)
+
     /// Mute list (NIP-51) - List of users, threads, or words to mute
     public static let muteList = 10000
     /// Pin list (NIP-51) - List of events pinned by the user
@@ -199,6 +204,7 @@ public enum EventKind {
     public static let blockedMints = 10020
 
     // MARK: - Authentication Events (20000-29999)
+
     public static let clientAuthentication = 22242
     public static let nwcRequest = 23194
     public static let nwcResponse = 23195
@@ -207,6 +213,7 @@ public enum EventKind {
     public static let httpAuth = 27235
 
     // MARK: - Parameterized Replaceable Events (30000-39999)
+
     public static let categorizedPeopleList = 30000
     public static let categorizedBookmarkList = 30001
     public static let relayListMetadata = 30002
@@ -222,11 +229,11 @@ public enum EventKind {
     public static let liveEvent = 30311
     public static let handlerRecommendation = 31989
     public static let handlerInformation = 31990
-    public static let blossomServerAnnouncement = 36363  // Blossom server discovery
-    public static let mintAnnouncement = 38000  // NIP-87 mint discovery
-    public static let cashuMintAnnouncement = 38172  // NIP-87
-    public static let followPack = 39089  // NIP-51 follow pack
-    public static let mediaFollowPack = 39092  // NIP-51 media follow pack
+    public static let blossomServerAnnouncement = 36363 // Blossom server discovery
+    public static let mintAnnouncement = 38000 // NIP-87 mint discovery
+    public static let cashuMintAnnouncement = 38172 // NIP-87
+    public static let followPack = 39089 // NIP-51 follow pack
+    public static let mediaFollowPack = 39092 // NIP-51 media follow pack
 }
 
 // MARK: - Common Amount Presets
@@ -240,7 +247,7 @@ public enum AmountPresets {
     public static let standardAmounts = [100, 500, 1000, 5000, 10000, 50000]
 
     /// Extended preset amounts including larger values
-    public static let extendedAmounts = [100, 500, 1000, 5000, 10000, 50000, 100000]
+    public static let extendedAmounts = [100, 500, 1000, 5000, 10000, 50000, 100_000]
 
     /// Common nutzap preset amounts
     public static let nutzapAmounts = [1000, 5000, 10000, 50000]
@@ -256,23 +263,23 @@ public enum AmountPresets {
 
 public extension EventKind {
     /// Regular events (0-999)
-    static let regularRange = 0..<1000
+    static let regularRange = 0 ..< 1000
 
     /// Replaceable events (10000-19999)
-    static let replaceableRange = 10000..<20000
+    static let replaceableRange = 10000 ..< 20000
 
     /// Ephemeral events (20000-29999)
-    static let ephemeralRange = 20000..<30000
+    static let ephemeralRange = 20000 ..< 30000
 
     /// Parameterized replaceable events (30000-39999)
-    static let parameterizedReplaceableRange = 30000..<40000
+    static let parameterizedReplaceableRange = 30000 ..< 40000
 
     /// Check if a kind is replaceable (matching ndk-core logic)
     /// Includes kinds 0, 3, and 10000-19999, 30000-39999
     static func isReplaceable(_ kind: Int) -> Bool {
-        return [0, 3].contains(kind) || 
-               replaceableRange.contains(kind) || 
-               parameterizedReplaceableRange.contains(kind)
+        return [0, 3].contains(kind) ||
+            replaceableRange.contains(kind) ||
+            parameterizedReplaceableRange.contains(kind)
     }
 
     /// Check if a kind is ephemeral
@@ -312,31 +319,31 @@ public typealias Tag = [String]
 public struct NDKImetaTag: Sendable {
     /// The URL of the media file
     public var url: String?
-    
+
     /// Blurhash representation for progressive loading
     public var blurhash: String?
-    
+
     /// Dimensions in format "widthxheight" (e.g., "1024x768")
     public var dim: String?
-    
+
     /// Alternative text description for accessibility
     public var alt: String?
-    
+
     /// MIME type of the media (e.g., "image/jpeg", "video/mp4")
     public var m: String?
-    
+
     /// SHA256 hash of the file content
     public var x: String?
-    
+
     /// File size in bytes
     public var size: String?
-    
+
     /// Fallback URLs if the primary URL is unavailable
     public var fallback: [String]?
-    
+
     /// User annotations for tagging people in images
     public var userAnnotations: [UserAnnotation]?
-    
+
     /// Additional non-standard fields
     public var additionalFields: [String: String] = [:]
 
@@ -381,10 +388,10 @@ public struct NDKImetaTag: Sendable {
 public struct UserAnnotation: Sendable {
     /// The public key of the tagged user
     public let pubkey: PublicKey
-    
+
     /// X coordinate of the tag position in pixels
     public let x: Int
-    
+
     /// Y coordinate of the tag position in pixels
     public let y: Int
 
@@ -488,137 +495,128 @@ public enum NDKError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         // Validation
-        case .invalidPublicKey(let key):
+        case let .invalidPublicKey(key):
             return "Invalid public key: \(key)"
-        case .invalidPrivateKey(let key):
+        case let .invalidPrivateKey(key):
             return "Invalid private key: \(key)"
-        case .invalidEventID(let id):
+        case let .invalidEventID(id):
             return "Invalid event ID: \(id)"
-        case .invalidSignature(let sig):
+        case let .invalidSignature(sig):
             return "Invalid signature: \(sig)"
-        case .invalidFilter(let filter):
+        case let .invalidFilter(filter):
             return "Invalid filter: \(filter)"
-        case .invalidInput(let message):
+        case let .invalidInput(message):
             return message
-
         // Crypto
-        case .signingFailed(let message, let underlying):
+        case let .signingFailed(message, underlying):
             return underlying.map { "\(message): \($0.localizedDescription)" } ?? message
-        case .verificationFailed(let message, let underlying):
+        case let .verificationFailed(message, underlying):
             return underlying.map { "\(message): \($0.localizedDescription)" } ?? message
-        case .encryptionFailed(let message, let underlying):
+        case let .encryptionFailed(message, underlying):
             return underlying.map { "\(message): \($0.localizedDescription)" } ?? message
-        case .decryptionFailed(let message, let underlying):
+        case let .decryptionFailed(message, underlying):
             return underlying.map { "\(message): \($0.localizedDescription)" } ?? message
-        case .keyDerivationFailed(let message, let underlying):
+        case let .keyDerivationFailed(message, underlying):
             return underlying.map { "\(message): \($0.localizedDescription)" } ?? message
-
         // Network
-        case .connectionFailed(let relay, let message, let underlying):
+        case let .connectionFailed(relay, message, underlying):
             return underlying.map { "Connection to \(relay) failed: \(message) - \($0.localizedDescription)" } ?? "Connection to \(relay) failed: \(message)"
-        case .connectionLost(let relay, let message):
+        case let .connectionLost(relay, message):
             return "Connection to \(relay) lost: \(message)"
-        case .timeout(let operation, let seconds):
+        case let .timeout(operation, seconds):
             return "\(operation) timed out after \(seconds) seconds"
-        case .serverError(let relay, let code, let message):
+        case let .serverError(relay, code, message):
             return "Server error from \(relay) (\(code)): \(message ?? "Unknown error")"
-        case .unauthorized(let relay, let message):
+        case let .unauthorized(relay, message):
             return "Unauthorized on \(relay): \(message)"
-        case .relayError(let relay, let message):
+        case let .relayError(relay, message):
             return "Relay error from \(relay): \(message)"
-
         // Storage
-        case .cacheFailed(let operation, let underlying):
+        case let .cacheFailed(operation, underlying):
             return underlying.map { "Cache \(operation) failed: \($0.localizedDescription)" } ?? "Cache \(operation) failed"
         case .diskFull:
             return "Insufficient storage space"
-        case .fileNotFound(let path):
+        case let .fileNotFound(path):
             return "File not found: \(path)"
-        case .corruptedData(let path):
+        case let .corruptedData(path):
             return "Corrupted data at: \(path)"
-
         // Protocol
-        case .invalidMessage(let message):
+        case let .invalidMessage(message):
             return "Invalid protocol message: \(message)"
-        case .unsupportedVersion(let version):
+        case let .unsupportedVersion(version):
             return "Unsupported protocol version: \(version)"
-        case .subscriptionFailed(let reason):
+        case let .subscriptionFailed(reason):
             return "Subscription failed: \(reason)"
-        case .protocolViolation(let message):
+        case let .protocolViolation(message):
             return "Protocol violation: \(message)"
-
         // Configuration
-        case .notConfigured(let component):
+        case let .notConfigured(component):
             return "\(component) is not configured"
-        case .invalidConfiguration(let message):
+        case let .invalidConfiguration(message):
             return "Invalid configuration: \(message)"
-
         // Runtime
-        case .notImplemented(let feature):
+        case let .notImplemented(feature):
             return "\(feature) is not implemented"
         case .cancelled:
             return "Operation was cancelled"
-        case .unknown(let message, let underlying):
+        case let .unknown(message, underlying):
             return underlying.map { "\(message): \($0.localizedDescription)" } ?? message
-        case .internalError(let message):
+        case let .internalError(message):
             return "Internal error: \(message)"
-        case .publishFailed(let relay, let message):
+        case let .publishFailed(relay, message):
             return "Failed to publish to \(relay): \(message)"
-        case .rateLimited(let message):
+        case let .rateLimited(message):
             return message
-
         // Wallet
-        case .walletRateLimited(let retryAfter):
+        case let .walletRateLimited(retryAfter):
             return retryAfter.map { "Too many requests. Retry after \($0) seconds." } ?? "Too many requests. Please try again later."
-        case .walletNotImplemented(let method):
+        case let .walletNotImplemented(method):
             return "\(method) is not supported by the wallet"
-        case .insufficientBalance(let amount):
+        case let .insufficientBalance(amount):
             return amount.map { "Insufficient balance (need \($0) sats)" } ?? "Insufficient balance"
         case .walletQuotaExceeded:
             return "Spending quota exceeded"
-        case .walletRestricted(let reason):
+        case let .walletRestricted(reason):
             return "Wallet restricted: \(reason)"
         case .walletUnauthorized:
             return "No wallet connected or invalid credentials"
-        case .paymentFailed(let reason):
+        case let .paymentFailed(reason):
             return "Payment failed: \(reason)"
-        case .walletNotFound(let resource):
+        case let .walletNotFound(resource):
             return "Wallet resource not found: \(resource)"
-        case .walletError(let message):
+        case let .walletError(message):
             return message
-        case .paymentRequired(let message):
+        case let .paymentRequired(message):
             return message
-        case .walletInsufficientBalance(let amount, let available):
+        case let .walletInsufficientBalance(amount, available):
             return "Insufficient balance: need \(amount) sats, have \(available) sats"
-        case .walletInvalidProof(let details):
+        case let .walletInvalidProof(details):
             return "Invalid proof: \(details)"
-
         // Cashu
-        case .invalidRequest(let message):
+        case let .invalidRequest(message):
             return "Invalid request: \(message)"
-        case .noMintAvailable(let message):
+        case let .noMintAvailable(message):
             return "No mint available: \(message)"
-        case .encodingError(let message):
+        case let .encodingError(message):
             return "Encoding error: \(message)"
-        case .invalidContent(let message):
+        case let .invalidContent(message):
             return "Invalid content: \(message)"
-
         // File/Blossom
-        case .invalidURL(let url):
+        case let .invalidURL(url):
             return "Invalid URL: \(url)"
-        case .invalidResponse(let from):
+        case let .invalidResponse(from):
             return "Invalid response from \(from)"
-        case .fileTooLarge(let maxSize):
+        case let .fileTooLarge(maxSize):
             return "File exceeds maximum size of \(maxSize) bytes"
-        case .unsupportedMimeType(let type):
+        case let .unsupportedMimeType(type):
             return "Unsupported MIME type: \(type)"
-        case .blobNotFound(let sha256):
+        case let .blobNotFound(sha256):
             return "Blob not found: \(sha256)"
-        case .uploadFailed(let reason):
+        case let .uploadFailed(reason):
             return "Upload failed: \(reason)"
-        case .invalidSHA256(let hash):
+        case let .invalidSHA256(hash):
             return "Invalid SHA256 hash: \(hash)"
-        case .serializationFailed(let message):
+        case let .serializationFailed(message):
             return "Serialization failed: \(message)"
         }
     }
@@ -626,7 +624,7 @@ public enum NDKError: LocalizedError {
 
 // MARK: - Subscription State
 
-internal enum NDKSubscriptionState: Equatable, Sendable {
+enum NDKSubscriptionState: Equatable, Sendable {
     case pending
     case active
     case inactive

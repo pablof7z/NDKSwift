@@ -1,6 +1,6 @@
 import Foundation
-import Security
 import LocalAuthentication
+import Security
 
 /// NDK Keychain Manager for secure storage of sensitive authentication data
 ///
@@ -34,7 +34,6 @@ import LocalAuthentication
 /// )
 /// ```
 public class NDKKeychainManager {
-
     /// Accessibility levels for keychain items
     public enum AccessibilityLevel {
         /// Available only when device is unlocked, doesn't sync via iCloud
@@ -124,7 +123,7 @@ public class NDKKeychainManager {
             kSecAttrService as String: service,
             kSecAttrAccount as String: identifier,
             kSecValueData as String: data,
-            kSecAttrAccessControl as String: accessControl
+            kSecAttrAccessControl as String: accessControl,
         ]
 
         // Add access group if specified
@@ -158,7 +157,7 @@ public class NDKKeychainManager {
             kSecAttrService as String: service,
             kSecAttrAccount as String: identifier,
             kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
+            kSecMatchLimit as String: kSecMatchLimitOne,
         ]
 
         // Add access group if specified
@@ -203,7 +202,7 @@ public class NDKKeychainManager {
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: identifier
+            kSecAttrAccount as String: identifier,
         ]
 
         // Add access group if specified
@@ -214,7 +213,7 @@ public class NDKKeychainManager {
         // Delete item
         let status = SecItemDelete(query as CFDictionary)
 
-        if status != errSecSuccess && status != errSecItemNotFound {
+        if status != errSecSuccess, status != errSecItemNotFound {
             throw NDKKeychainError.deletionError(status: status)
         }
     }
@@ -228,7 +227,7 @@ public class NDKKeychainManager {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: identifier,
-            kSecMatchLimit as String: kSecMatchLimitOne
+            kSecMatchLimit as String: kSecMatchLimitOne,
         ]
 
         // Add access group if specified
@@ -254,7 +253,7 @@ public class NDKKeychainManager {
             kSecAttrService as String: "\(service).session",
             kSecAttrAccount as String: identifier,
             kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
         ]
 
         // Add access group if specified
@@ -283,7 +282,7 @@ public class NDKKeychainManager {
             kSecAttrService as String: "\(service).session",
             kSecAttrAccount as String: identifier,
             kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
+            kSecMatchLimit as String: kSecMatchLimitOne,
         ]
 
         // Add access group if specified
@@ -317,7 +316,7 @@ public class NDKKeychainManager {
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: "\(service).session",
-            kSecAttrAccount as String: identifier
+            kSecAttrAccount as String: identifier,
         ]
 
         // Add access group if specified
@@ -328,7 +327,7 @@ public class NDKKeychainManager {
         // Delete item
         let status = SecItemDelete(query as CFDictionary)
 
-        if status != errSecSuccess && status != errSecItemNotFound {
+        if status != errSecSuccess, status != errSecItemNotFound {
             throw NDKKeychainError.deletionError(status: status)
         }
     }
@@ -341,7 +340,7 @@ public class NDKKeychainManager {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: "\(service).session",
             kSecReturnAttributes as String: true,
-            kSecMatchLimit as String: kSecMatchLimitAll
+            kSecMatchLimit as String: kSecMatchLimitAll,
         ]
 
         // Add access group if specified
@@ -385,16 +384,16 @@ public class NDKKeychainManager {
     /// Get available biometric type
     /// - Returns: The available biometric type
     #if !os(watchOS)
-    public func getBiometricType() async -> LABiometryType {
-        let context = LAContext()
-        var error: NSError?
+        public func getBiometricType() async -> LABiometryType {
+            let context = LAContext()
+            var error: NSError?
 
-        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
-            return .none
+            guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
+                return .none
+            }
+
+            return context.biometryType
         }
-
-        return context.biometryType
-    }
     #endif
 
     /// Create authentication context for biometric authentication
@@ -403,7 +402,7 @@ public class NDKKeychainManager {
     ///   - fallbackTitle: Title for fallback authentication
     /// - Returns: Authentication context
     public func createAuthenticationContext(
-        reason: String,
+        reason _: String,
         fallbackTitle: String? = nil
     ) -> LAContext {
         let context = LAContext()
@@ -471,13 +470,13 @@ public enum NDKKeychainError: LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .storageError(let status):
+        case let .storageError(status):
             return ErrorMessageConstants.withContext(ErrorMessageConstants.failedTo("store item in keychain"), context: "\(status)")
-        case .retrievalError(let status):
+        case let .retrievalError(status):
             return ErrorMessageConstants.withContext(ErrorMessageConstants.failedTo("retrieve item from keychain"), context: "\(status)")
-        case .deletionError(let status):
+        case let .deletionError(status):
             return ErrorMessageConstants.withContext(ErrorMessageConstants.failedTo("delete item from keychain"), context: "\(status)")
-        case .accessControlError(let error):
+        case let .accessControlError(error):
             return ErrorMessageConstants.withContext(ErrorMessageConstants.failedTo("create access control"), context: error?.localizedDescription ?? ErrorMessageConstants.Messages.unknownError)
         case .itemNotFound:
             return ErrorMessageConstants.notFound("Item in keychain")

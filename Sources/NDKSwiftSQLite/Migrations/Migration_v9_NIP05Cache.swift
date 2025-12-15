@@ -1,6 +1,6 @@
 import Foundation
-import NDKSwiftCore
 import GRDB
+import NDKSwiftCore
 
 extension NDKSQLiteCache {
     static func registerV9NIP05CacheMigration(_ migrator: inout DatabaseMigrator) {
@@ -21,19 +21,19 @@ extension NDKSQLiteCache {
 
             // Create indexes for efficient queries
             try db.create(index: "idx_nip05_pubkey",
-                         on: "nip05_cache",
-                         columns: ["pubkey"],
-                         ifNotExists: true)
+                          on: "nip05_cache",
+                          columns: ["pubkey"],
+                          ifNotExists: true)
 
             try db.create(index: "idx_nip05_identifier",
-                         on: "nip05_cache",
-                         columns: ["identifier"],
-                         ifNotExists: true)
+                          on: "nip05_cache",
+                          columns: ["identifier"],
+                          ifNotExists: true)
 
             try db.create(index: "idx_nip05_status",
-                         on: "nip05_cache",
-                         columns: ["status"],
-                         ifNotExists: true)
+                          on: "nip05_cache",
+                          columns: ["status"],
+                          ifNotExists: true)
 
             // Case-insensitive search index for autocomplete
             try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_nip05_search ON nip05_cache(identifier COLLATE NOCASE)")

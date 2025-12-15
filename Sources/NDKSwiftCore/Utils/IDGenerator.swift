@@ -70,7 +70,7 @@ public actor IDGenerator {
     /// ```
     public static func randomId(prefix: String = "", length: Int = 8) -> String {
         let characters = "abcdefghijklmnopqrstuvwxyz0123456789"
-        let randomString = String((0..<length).compactMap { _ in characters.randomElement() })
+        let randomString = String((0 ..< length).compactMap { _ in characters.randomElement() })
         return prefix.isEmpty ? randomString : "\(prefix)_\(randomString)"
     }
 }

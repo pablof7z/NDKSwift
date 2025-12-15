@@ -1,13 +1,13 @@
 import Foundation
 
-extension NDK {
+public extension NDK {
     /// Start an authenticated session with data requirements
     /// - Parameters:
     ///   - signer: The signer for authentication
     ///   - config: Session configuration
     /// - Returns: The session data manager
     @discardableResult
-    public func startSession(
+    func startSession(
         signer: NDKSigner,
         config: NDKSessionConfiguration = NDKSessionConfiguration()
     ) async throws -> NDKSessionData {
@@ -42,7 +42,6 @@ extension NDK {
         case .lazy:
             // Don't load anything yet
             NDKLogger.log(.info, category: .subscription, "💤 [startSession] Lazy strategy - not loading data yet")
-            break
         }
 
         NDKLogger.log(.info, category: .subscription, "✅ [startSession] Session ready - follows: \(sessionData.followList.count)")
@@ -54,7 +53,7 @@ extension NDK {
     /// Observe events with a reactive filter
     /// - Parameter reactiveFilter: Filter that updates with dependencies
     /// - Returns: AsyncStream of events
-    public func observe(_ reactiveFilter: ReactiveFilter) -> AsyncStream<NDKEvent> {
+    func observe(_ reactiveFilter: ReactiveFilter) -> AsyncStream<NDKEvent> {
         NDKLogger.log(.debug, category: .subscription, "🔍 [ReactiveFilter] Starting observe with dependencies: \(reactiveFilter.dependencies)")
 
         var continuation: AsyncStream<NDKEvent>.Continuation!
@@ -84,7 +83,7 @@ extension NDK {
 
                 // Ensure required dependencies are loaded
                 var requiredData = reactiveFilter.dependencies
-                requiredData.insert(.muteList)  // Always load mute list for filtering
+                requiredData.insert(.muteList) // Always load mute list for filtering
 
                 NDKLogger.log(.debug, category: .subscription, "🔍 [ReactiveFilter] Ensuring dependencies are loaded: \(requiredData)")
                 await sessionData.load(requiredData)

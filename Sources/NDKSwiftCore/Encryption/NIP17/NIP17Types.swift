@@ -12,13 +12,13 @@ import Foundation
 public extension EventKind {
     /// Sealed event (NIP-59)
     static let seal = 13
-    
+
     /// Chat message (NIP-17)
     static let chatMessage = 14
-    
+
     /// File message (NIP-17)
     static let fileMessage = 15
-    
+
     /// Gift wrap event (NIP-59)
     static let giftWrap = 1059
 }
@@ -29,10 +29,10 @@ public extension EventKind {
 public struct NIP17Recipient: Sendable {
     /// The recipient's public key (hex encoded)
     public let pubkey: PublicKey
-    
+
     /// Optional relay URL where the recipient can be reached
     public let relayURL: RelayURL?
-    
+
     public init(pubkey: PublicKey, relayURL: RelayURL? = nil) {
         self.pubkey = pubkey
         self.relayURL = relayURL
@@ -43,10 +43,10 @@ public struct NIP17Recipient: Sendable {
 public struct NIP17ReplyTo: Sendable {
     /// The event ID being replied to
     public let eventId: EventID
-    
+
     /// Optional relay URL where the original message can be found
     public let relayURL: RelayURL?
-    
+
     public init(eventId: EventID, relayURL: RelayURL? = nil) {
         self.eventId = eventId
         self.relayURL = relayURL
@@ -57,16 +57,16 @@ public struct NIP17ReplyTo: Sendable {
 public struct NIP17MessageConfig: Sendable {
     /// Recipients of the message
     public let recipients: [NIP17Recipient]
-    
+
     /// Optional conversation title/subject
     public let subject: String?
-    
+
     /// Optional event being replied to
     public let replyTo: NIP17ReplyTo?
-    
+
     /// Additional tags to include in the message
     public let additionalTags: [Tag]
-    
+
     public init(
         recipients: [NIP17Recipient],
         subject: String? = nil,
@@ -84,7 +84,7 @@ public struct NIP17MessageConfig: Sendable {
 public struct NIP17WrappedEvents: Sendable {
     /// Wrapped events ready to be published, indexed by recipient pubkey
     public let events: [PublicKey: NDKEvent]
-    
+
     /// The original sealed event (before gift wrapping)
     public let sealedEvent: NDKEvent
 }
@@ -99,20 +99,20 @@ public enum NIP17Error: LocalizedError, Equatable {
     case unwrapFailed(String)
     case invalidEventKind(Int)
     case missingNIP59Implementation
-    
+
     public var errorDescription: String? {
         switch self {
         case .noRecipients:
             return "No recipients specified for the message"
-        case .invalidRecipient(let pubkey):
+        case let .invalidRecipient(pubkey):
             return "Invalid recipient public key: \(pubkey)"
-        case .sealingFailed(let reason):
+        case let .sealingFailed(reason):
             return "Failed to seal event: \(reason)"
-        case .wrapFailed(let reason):
+        case let .wrapFailed(reason):
             return "Failed to wrap event: \(reason)"
-        case .unwrapFailed(let reason):
+        case let .unwrapFailed(reason):
             return "Failed to unwrap event: \(reason)"
-        case .invalidEventKind(let kind):
+        case let .invalidEventKind(kind):
             return "Invalid event kind for NIP-17: \(kind)"
         case .missingNIP59Implementation:
             return "NIP-59 implementation is required for NIP-17"

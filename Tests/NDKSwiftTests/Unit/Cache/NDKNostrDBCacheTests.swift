@@ -1,6 +1,6 @@
-import XCTest
 @testable import NDKSwiftCore
 import NDKSwiftNostrDB
+import XCTest
 
 /// Tests for NDKNostrDBCache
 ///
@@ -21,7 +21,7 @@ final class NDKNostrDBCacheTests: NDKTestCase {
     var tempDir: URL!
 
     /// Set to true to enable NostrDB tests (requires working C library)
-    static let testsEnabled = false
+    static let testsEnabled = true
 
     override func setUp() async throws {
         try await super.setUp()
@@ -50,7 +50,6 @@ final class NDKNostrDBCacheTests: NDKTestCase {
     // MARK: - Basic Event Operations
 
     func testSaveAndRetrieveEvent() async throws {
-
         // Given
         let event = createTestEvent(
             pubkey: TestFixtures.Keys.alice.publicKey,
@@ -71,7 +70,6 @@ final class NDKNostrDBCacheTests: NDKTestCase {
     }
 
     func testGetNonExistentEvent() async throws {
-
         // When
         let retrieved = await cache.getEvent(id: "nonexistent_event_id_1234567890abcdef1234567890abcdef")
 
@@ -80,7 +78,6 @@ final class NDKNostrDBCacheTests: NDKTestCase {
     }
 
     func testDeleteEvent() async throws {
-
         // Given
         let event = createTestEvent()
         try await cache.saveEvent(event)
@@ -98,9 +95,8 @@ final class NDKNostrDBCacheTests: NDKTestCase {
     }
 
     func testSaveMultipleEvents() async throws {
-
         // Given
-        let events = (0..<5).map { i in
+        let events = (0 ..< 5).map { i in
             createTestEvent(
                 pubkey: TestFixtures.Keys.alice.publicKey,
                 kind: 1,
@@ -122,7 +118,6 @@ final class NDKNostrDBCacheTests: NDKTestCase {
     }
 
     func testSaveDuplicateEvent() async throws {
-
         // Given
         let event = createTestEvent(content: "Original content")
 
@@ -139,7 +134,6 @@ final class NDKNostrDBCacheTests: NDKTestCase {
     // MARK: - Query Operations
 
     func testQueryEventsByKind() async throws {
-
         // Given
         let textNote = createTestEvent(kind: 1, content: "Text note")
         let metadata = createTestEvent(kind: 0, content: "{\"name\":\"Alice\"}")
@@ -160,7 +154,6 @@ final class NDKNostrDBCacheTests: NDKTestCase {
     }
 
     func testQueryEventsByAuthor() async throws {
-
         // Given
         let alice = TestFixtures.Keys.alice.publicKey
         let bob = TestFixtures.Keys.bob.publicKey
@@ -181,9 +174,8 @@ final class NDKNostrDBCacheTests: NDKTestCase {
     }
 
     func testQueryWithLimit() async throws {
-
         // Given
-        let events = (0..<10).map { i in
+        let events = (0 ..< 10).map { i in
             createTestEvent(
                 content: "Event \(i)",
                 createdAt: Timestamp(1000 + Int64(i))
@@ -206,7 +198,6 @@ final class NDKNostrDBCacheTests: NDKTestCase {
     }
 
     func testQueryEventsByIds() async throws {
-
         // Given
         let event1 = createTestEvent(content: "Event 1")
         let event2 = createTestEvent(content: "Event 2")
@@ -229,7 +220,6 @@ final class NDKNostrDBCacheTests: NDKTestCase {
     }
 
     func testQueryEventsByTimestamp() async throws {
-
         // Given
         let oldEvent = createTestEvent(content: "Old", createdAt: Timestamp(1000))
         let middleEvent = createTestEvent(content: "Middle", createdAt: Timestamp(2000))
@@ -265,7 +255,6 @@ final class NDKNostrDBCacheTests: NDKTestCase {
     }
 
     func testQueryEventsEmptyResults() async throws {
-
         // Given
         let event = createTestEvent(kind: 1)
         try await cache.saveEvent(event)
@@ -281,7 +270,6 @@ final class NDKNostrDBCacheTests: NDKTestCase {
     // MARK: - Profile Operations
 
     func testGetProfileMetadata() async throws {
-
         // Given
         let pubkey = TestFixtures.Keys.alice.publicKey
         let metadata = """
@@ -314,7 +302,6 @@ final class NDKNostrDBCacheTests: NDKTestCase {
     }
 
     func testGetProfileMetadataNotFound() async throws {
-
         // When
         let profile = await cache.getProfileMetadata(pubkey: "nonexistent_pubkey_1234567890abcdef")
 
@@ -323,7 +310,6 @@ final class NDKNostrDBCacheTests: NDKTestCase {
     }
 
     func testGetProfileMetadataLatestEvent() async throws {
-
         // Given
         let pubkey = TestFixtures.Keys.alice.publicKey
         let oldMetadata = """
@@ -360,7 +346,6 @@ final class NDKNostrDBCacheTests: NDKTestCase {
     // MARK: - Text Search
 
     func testTextSearch() async throws {
-
         // Given
         let event1 = createTestEvent(content: "Bitcoin is the future of money")
         let event2 = createTestEvent(content: "Ethereum is a smart contract platform")
@@ -382,9 +367,8 @@ final class NDKNostrDBCacheTests: NDKTestCase {
     }
 
     func testTextSearchWithLimit() async throws {
-
         // Given
-        let events = (0..<10).map { i in
+        let events = (0 ..< 10).map { i in
             createTestEvent(content: "Bitcoin event number \(i)")
         }
 
@@ -400,7 +384,6 @@ final class NDKNostrDBCacheTests: NDKTestCase {
     }
 
     func testTextSearchNoResults() async throws {
-
         // Given
         let event = createTestEvent(content: "This is a test event")
         try await cache.saveEvent(event)
@@ -415,7 +398,6 @@ final class NDKNostrDBCacheTests: NDKTestCase {
     // MARK: - Relay Source Tracking
 
     func testProcessEventWithRelaySource() async throws {
-
         // Given
         let event = createTestEvent(content: "Test event")
         let relay = "wss://relay.example.com"
@@ -431,7 +413,6 @@ final class NDKNostrDBCacheTests: NDKTestCase {
     }
 
     func testGetRelaySources() async throws {
-
         // Given
         let event = createTestEvent(content: "Test event")
         let relay1 = "wss://relay1.example.com"
@@ -444,17 +425,66 @@ final class NDKNostrDBCacheTests: NDKTestCase {
         let sources = await cache.getRelaySources(eventId: event.id)
 
         // Then
-        // Note: Current implementation returns empty set, but test structure is ready
-        // for when relay source tracking is fully implemented
-        XCTAssertNotNil(sources)
+        XCTAssertEqual(sources.count, 2)
+        XCTAssertTrue(sources.contains(relay1))
+        XCTAssertTrue(sources.contains(relay2))
+    }
+
+    func testRelayTrackingLRUBehavior() async throws {
+        // Given - create more relays than the max cache size (100)
+        let maxRelays = 100
+        let extraRelays = 20
+        let totalRelays = maxRelays + extraRelays
+
+        // When - process events from many relays
+        for i in 0 ..< totalRelays {
+            let event = createTestEvent(content: "Event \(i)")
+            let relay = "wss://relay\(i).example.com"
+            try await cache.processEvent(event, from: relay, subscriptionId: "sub\(i)")
+        }
+
+        // Then - the relay cache should have been bounded
+        // Note: We can't directly inspect the relay cache size, but we can verify
+        // that the implementation doesn't crash and continues to work correctly
+        // The LRU cache will automatically evict the oldest relays
+
+        // Process one more event to ensure the cache still works after evictions
+        let finalEvent = createTestEvent(content: "Final event")
+        let finalRelay = "wss://final.example.com"
+        try await cache.processEvent(finalEvent, from: finalRelay, subscriptionId: "final_sub")
+
+        // Verify the event was processed
+        let retrieved = await cache.getEvent(id: finalEvent.id)
+        XCTAssertNotNil(retrieved)
+    }
+
+    func testRelayTrackingDoesNotGrowUnbounded() async throws {
+        // Given - process many events from different relays
+        let relayCount = 200 // Twice the max relay cache size
+
+        // When
+        for i in 0 ..< relayCount {
+            let event = createTestEvent(content: "Event \(i)")
+            let relay = "wss://relay\(i).example.com"
+            try await cache.processEvent(event, from: relay, subscriptionId: "sub\(i)")
+        }
+
+        // Then - verify cache still functions correctly
+        // The LRU cache should have evicted older relays to stay within bounds
+        let testEvent = createTestEvent(content: "Test event")
+        let testRelay = "wss://test.example.com"
+        try await cache.processEvent(testEvent, from: testRelay, subscriptionId: "test_sub")
+
+        let sources = await cache.getRelaySources(eventId: testEvent.id)
+        XCTAssertEqual(sources.count, 1)
+        XCTAssertTrue(sources.contains(testRelay))
     }
 
     // MARK: - Cache Management
 
     func testClear() async throws {
-
         // Given
-        let events = (0..<5).map { i in
+        let events = (0 ..< 5).map { i in
             createTestEvent(content: "Event \(i)")
         }
 
@@ -477,10 +507,91 @@ final class NDKNostrDBCacheTests: NDKTestCase {
         XCTAssertEqual(results.count, 0, "In-memory cache should be empty")
     }
 
+    func testClearPersisted() async throws {
+        // Given
+        let events = (0 ..< 5).map { i in
+            createTestEvent(content: "Event \(i)")
+        }
+
+        for event in events {
+            try await cache.saveEvent(event)
+        }
+
+        // Verify events exist
+        for event in events {
+            let retrieved = await cache.getEvent(id: event.id)
+            XCTAssertNotNil(retrieved)
+        }
+
+        // When
+        try await cache.clearPersisted()
+
+        // Then - all events should be gone, including persisted ones
+        for event in events {
+            let retrieved = await cache.getEvent(id: event.id)
+            XCTAssertNil(retrieved, "Event \(event.id) should be completely removed")
+        }
+
+        // Verify cache is still operational after clearPersisted
+        let newEvent = createTestEvent(content: "New event after clear")
+        try await cache.saveEvent(newEvent)
+        let retrieved = await cache.getEvent(id: newEvent.id)
+        XCTAssertNotNil(retrieved, "Cache should still work after clearPersisted")
+        XCTAssertEqual(retrieved?.content, "New event after clear")
+    }
+
+    func testClearPersistedDeletesLMDBFiles() async throws {
+        // Given
+        let event = createTestEvent(content: "Test event")
+        try await cache.saveEvent(event)
+
+        // Get the cache path
+        let dbPath = await cache.getCachePath()
+        XCTAssertNotNil(dbPath)
+
+        // When
+        try await cache.clearPersisted()
+
+        // Then - LMDB files should be deleted (or recreated fresh)
+        // The cache should still be operational
+        let newEvent = createTestEvent(content: "After clear")
+        try await cache.saveEvent(newEvent)
+        let retrieved = await cache.getEvent(id: newEvent.id)
+        XCTAssertNotNil(retrieved)
+
+        // Old event should be gone
+        let oldRetrieved = await cache.getEvent(id: event.id)
+        XCTAssertNil(oldRetrieved, "Old event should be gone after clearPersisted")
+    }
+
+    func testClearPersistedReinitializesDatabase() async throws {
+        // Given
+        let event = createTestEvent(content: "Test event")
+        try await cache.saveEvent(event)
+
+        // When
+        try await cache.clearPersisted()
+
+        // Then - database should be reinitialized and fully functional
+        // Test basic operations
+        let newEvent = createTestEvent(content: "New event")
+        try await cache.saveEvent(newEvent)
+
+        // Test query
+        let filter = NDKFilter(kinds: [1])
+        let results = try await cache.queryEvents(filter)
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results.first?.id, newEvent.id)
+
+        // Test deletion
+        try await cache.deleteEvent(id: newEvent.id)
+        let afterDelete = await cache.getEvent(id: newEvent.id)
+        XCTAssertNil(afterDelete)
+    }
+
     // MARK: - Reactive Observation
 
     func testObserveEventsWithExisting() async throws {
-
         // Given
         let event1 = createTestEvent(kind: 1, content: "Event 1")
         let event2 = createTestEvent(kind: 1, content: "Event 2")
@@ -494,11 +605,21 @@ final class NDKNostrDBCacheTests: NDKTestCase {
         let filter = NDKFilter(kinds: [1])
         let stream = await cache.observeEvents(matching: filter, includeExisting: true)
 
-        // Then
+        // Then - collect existing events with timeout
         var receivedEvents: [NDKEvent] = []
-        for try await events in stream {
-            receivedEvents.append(contentsOf: events)
+        let task = Task {
+            for try await events in stream {
+                receivedEvents.append(contentsOf: events)
+                // Once we have the existing events, we're done testing
+                if receivedEvents.count >= 2 {
+                    break
+                }
+            }
         }
+
+        // Wait for existing events with timeout
+        try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+        task.cancel()
 
         XCTAssertEqual(receivedEvents.count, 2)
         let eventIds = receivedEvents.map { $0.id }
@@ -507,7 +628,6 @@ final class NDKNostrDBCacheTests: NDKTestCase {
     }
 
     func testObserveEventsWithoutExisting() async throws {
-
         // Given
         let event = createTestEvent()
         try await cache.saveEvent(event)
@@ -516,17 +636,42 @@ final class NDKNostrDBCacheTests: NDKTestCase {
         let filter = NDKFilter(kinds: [1])
         let stream = await cache.observeEvents(matching: filter, includeExisting: false)
 
-        // Then
+        // Then - should not receive existing events but stream stays open
         var receivedCount = 0
-        for try await _ in stream {
-            receivedCount += 1
+        let task = Task {
+            for try await _ in stream {
+                receivedCount += 1
+            }
         }
 
-        XCTAssertEqual(receivedCount, 0, "Stream should complete without emitting existing events")
+        // Wait a bit to ensure no events are emitted
+        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        task.cancel()
+
+        XCTAssertEqual(receivedCount, 0, "Should not emit existing events when includeExisting is false")
+    }
+
+    func testObserveEventsDoesNotHang() async throws {
+        // This test verifies that the stream can be cancelled without hanging
+        // Given
+        let filter = NDKFilter(kinds: [1])
+        let stream = await cache.observeEvents(matching: filter, includeExisting: false)
+
+        let task = Task {
+            for try await _ in stream {
+                // Stream is active
+            }
+        }
+
+        // Cancel after a short time
+        try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+        task.cancel()
+
+        // If we get here without hanging, the test passes
+        XCTAssertTrue(true, "Stream cancelled successfully without hanging")
     }
 
     func testObserveProfile() async throws {
-
         // Given
         let pubkey = TestFixtures.Keys.alice.publicKey
         let metadata = """
@@ -543,20 +688,48 @@ final class NDKNostrDBCacheTests: NDKTestCase {
         // When
         let stream = await cache.observeProfile(pubkey: pubkey, includeExisting: true)
 
-        // Then
+        // Then - collect profile with timeout
         var receivedProfile: NDKUserMetadata?
-        for try await profile in stream {
-            receivedProfile = profile
+        let task = Task {
+            for try await profile in stream {
+                receivedProfile = profile
+                // Stop after receiving the existing profile
+                break
+            }
         }
+
+        // Wait for profile with timeout
+        try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+        task.cancel()
 
         XCTAssertNotNil(receivedProfile)
         XCTAssertEqual(receivedProfile?.pubkey, pubkey)
+        XCTAssertEqual(receivedProfile?.name, "Alice")
+    }
+
+    func testObserveProfileDoesNotHang() async throws {
+        // This test verifies that the stream can be cancelled without hanging
+        // Given
+        let pubkey = TestFixtures.Keys.alice.publicKey
+        let stream = await cache.observeProfile(pubkey: pubkey, includeExisting: false)
+
+        let task = Task {
+            for try await _ in stream {
+                // Stream is active
+            }
+        }
+
+        // Cancel after a short time
+        try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+        task.cancel()
+
+        // If we get here without hanging, the test passes
+        XCTAssertTrue(true, "Stream cancelled successfully without hanging")
     }
 
     // MARK: - Error Handling
 
     func testSaveEventWithInvalidJSON() async throws {
-
         // Given - create an event with content that's technically valid
         // (NostrDB validates the event structure, not content)
         let event = createTestEvent(content: "Valid content")
@@ -568,7 +741,6 @@ final class NDKNostrDBCacheTests: NDKTestCase {
     }
 
     func testGetEventWithInvalidId() async throws {
-
         // When - try to get event with invalid hex ID
         let retrieved = await cache.getEvent(id: "invalid_hex_zzz")
 

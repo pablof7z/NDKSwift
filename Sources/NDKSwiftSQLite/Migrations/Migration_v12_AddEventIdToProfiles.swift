@@ -8,7 +8,7 @@ extension NDKSQLiteCache {
             try db.alter(table: "profiles") { t in
                 t.add(column: "event_id", .text)
             }
-            
+
             // Create index on event_id for faster lookups
             try db.create(index: "idx_profiles_event_id", on: "profiles", columns: ["event_id"])
         }

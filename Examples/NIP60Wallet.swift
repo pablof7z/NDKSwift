@@ -12,11 +12,11 @@ enum Command {
     case quit
     case help
     case unknown(String)
-    
+
     static func parse(_ input: String) -> Command {
         let parts = input.split(separator: " ")
         guard let command = parts.first?.lowercased() else { return .unknown("") }
-        
+
         switch command {
         case "balance", "b":
             return .balance
@@ -33,7 +33,7 @@ enum Command {
             var dryRun = false
             var mintUrl: String?
             var currentIndex = 1
-            
+
             while currentIndex < parts.count {
                 let part = String(parts[currentIndex])
                 if part == "-d" || part == "--dry-run" {
@@ -44,13 +44,14 @@ enum Command {
                 }
                 currentIndex += 1
             }
-            
+
             return .validate(dryRun: dryRun, mintUrl: mintUrl)
         case "mints", "m":
             return .mints
         case "zap", "z":
             if parts.count >= 3,
-               let amount = Int64(parts[2]) {
+               let amount = Int64(parts[2])
+            {
                 let recipient = String(parts[1])
                 let comment = parts.count > 3 ? parts.dropFirst(3).joined(separator: " ") : nil
                 return .zap(recipient: recipient, amount: amount, comment: comment)
@@ -71,15 +72,15 @@ struct NIP60WalletREPL {
     static func main() async {
         print("🌰 NIP-60 Wallet REPL")
         print("=====================")
-        
+
         // Parse command line arguments
         let args = CommandLine.arguments
         var nsec: String?
-        
+
         if args.count > 1 {
             nsec = args[1]
         }
-        
+
         // Create or use provided key
         let signer: NDKPrivateKeySigner
         if let nsec = nsec {
@@ -97,42 +98,42 @@ struct NIP60WalletREPL {
                 print("🔑 Generated new key pair:")
                 let pubkey = try await signer.pubkey
                 print("   Public key: \(pubkey)")
-                print("   Nsec: \(try signer.nsec)")
+                try print("   Nsec: \(signer.nsec)")
                 print("")
             } catch {
                 print("❌ Failed to generate key pair: \(error)")
                 return
             }
         }
-        
+
         // Initialize NDK
         let ndk = NDK(signer: signer)
-        
+
         // Add relay
         await ndk.addRelay(RelayConstants.primal)
         await ndk.connect()
         print("📡 Connected to \(RelayConstants.primal)")
-        
+
         // Initialize wallet with test mints
         let mintUrls = [
             "https://nofees.testnut.cashu.space",
-            "https://testnut.cashu.space"
+            "https://testnut.cashu.space",
         ]
-        
+
         let relayUrls = [
-            RelayConstants.primal
+            RelayConstants.primal,
         ]
-        
+
         print("🏦 Initializing wallet with mints:")
         for url in mintUrls {
             print("   - \(url)")
         }
-        
+
         // Initialize NIP-60 wallet
         let wallet: NIP60Wallet
         do {
             wallet = try NIP60Wallet(ndk: ndk)
-            
+
             // Setup wallet with mints and relays
             print("🔄 Setting up wallet...")
             try await wallet.setup(
@@ -141,10 +142,10 @@ struct NIP60WalletREPL {
                 publishMintList: true
             )
             print("✅ Wallet setup complete")
-            
+
             // Load wallet (starts subscriptions)
             try await wallet.load()
-            
+
             // Configure wallet as payment provider for zaps
             await ndk.zapManager.configureDefaults(cashuWallet: wallet)
             print("⚡ Wallet configured for zaps")
@@ -152,75 +153,76 @@ struct NIP60WalletREPL {
             print("❌ Failed to initialize wallet: \(error)")
             return
         }
-        
+
         print("")
         print("Wallet initialized! Type 'help' for available commands.")
         print("")
-        
+
         // REPL loop
         await runREPL(ndk: ndk, wallet: wallet)
-        
+
         // Disconnect
         await ndk.disconnect()
     }
-    
+
     static func runREPL(ndk: NDK, wallet: NIP60Wallet) async {
         while true {
             print("wallet> ", terminator: "")
             fflush(stdout)
-            
+
             guard let input = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !input.isEmpty else {
+                  !input.isEmpty
+            else {
                 continue
             }
-            
+
             let command = Command.parse(input)
-            
+
             switch command {
             case .balance:
                 await showBalance(wallet: wallet)
-                
-            case .deposit(let amount, let mintUrl):
+
+            case let .deposit(amount, mintUrl):
                 await createDeposit(wallet: wallet, amount: amount, mintUrl: mintUrl)
-                
-            case .check(let mintUrl):
+
+            case let .check(mintUrl):
                 await checkProofs(wallet: wallet, mintUrl: mintUrl)
-                
-            case .validate(let dryRun, let mintUrl):
+
+            case let .validate(dryRun, mintUrl):
                 await validateProofs(wallet: wallet, dryRun: dryRun, mintUrl: mintUrl)
-                
+
             case .mints:
                 await showMints(wallet: wallet)
-                
-            case .zap(let recipient, let amount, let comment):
+
+            case let .zap(recipient, amount, comment):
                 await sendZap(ndk: ndk, wallet: wallet, recipient: recipient, amount: amount, comment: comment)
-                
+
             case .help:
                 showHelp()
-                
+
             case .quit:
                 print("Goodbye! 👋")
                 return
-                
-            case .unknown(let message):
+
+            case let .unknown(message):
                 print("❌ \(message)")
                 print("Type 'help' for available commands.")
             }
-            
+
             print("")
         }
     }
-    
+
     static func showBalance(wallet: NIP60Wallet) async {
         print("💰 Fetching balance...")
-        
+
         do {
             let balance = try await wallet.getBalance() ?? 0
-            
+
             print("\n📊 Wallet Balance")
             print("================")
             print("Total: \(balance) sats")
-            
+
             // Get balance by mint
             let mintBalances = await wallet.getBalancesByMint()
             if !mintBalances.isEmpty {
@@ -233,17 +235,17 @@ struct NIP60WalletREPL {
             print("❌ Error fetching balance: \(error)")
         }
     }
-    
+
     static func createDeposit(wallet: NIP60Wallet, amount: Int64, mintUrl: String?) async {
         print("💸 Creating deposit for \(amount) sats...")
-        
+
         do {
             // Use provided mint URL or get from available mints
             let mintUrlString: String
             if let providedUrl = mintUrl {
                 mintUrlString = providedUrl
                 print("🏦 Using provided mint: \(mintUrlString)")
-                
+
                 // Ensure the mint is properly loaded
                 if let mintUrl = URL(string: mintUrlString) {
                     print("🔄 Loading mint data...")
@@ -263,9 +265,9 @@ struct NIP60WalletREPL {
                 mintUrlString = firstMint
                 print("🏦 Using default mint: \(mintUrlString)")
             }
-            
+
             let quote = try await wallet.requestMint(amount: amount, mintURL: mintUrlString)
-            
+
             print("\n✅ Deposit created!")
             print("==================")
             print("Quote ID: \(quote.quoteId)")
@@ -274,14 +276,14 @@ struct NIP60WalletREPL {
             print("\n⚡ Lightning Invoice:")
             print("\(quote.invoice)")
             print("\n⏳ This quote will expire. Pay it to complete the deposit.")
-            
+
             // Start monitoring the quote
             print("\n🔄 Monitoring payment status...")
             print("Press Enter to check manually, or Ctrl+C to stop monitoring")
-            
+
             // Create manual check trigger
             let (triggerStream, triggerContinuation) = AsyncStream<Void>.makeStream()
-            
+
             // Start keyboard monitor task
             let keyboardTask = Task {
                 while !Task.isCancelled {
@@ -292,14 +294,14 @@ struct NIP60WalletREPL {
                 }
                 triggerContinuation.finish()
             }
-            
+
             // Monitor the deposit
             do {
                 for try await status in await wallet.monitorDeposit(quote: quote, timeout: 300, manualCheckTrigger: triggerStream) {
                     switch status {
                     case .pending:
                         print("⏳ Waiting for payment...")
-                    case .minted(let proofs):
+                    case let .minted(proofs):
                         print("✅ Payment received! Minted \(proofs.count) proofs")
                         let newBalance = try await wallet.getBalance() ?? 0
                         print("💰 New balance: \(newBalance) sats")
@@ -310,7 +312,7 @@ struct NIP60WalletREPL {
                         keyboardTask.cancel()
                         return
                     case .cancelled:
-                        print("❌ Quote cancelled") 
+                        print("❌ Quote cancelled")
                         keyboardTask.cancel()
                         return
                     }
@@ -318,17 +320,17 @@ struct NIP60WalletREPL {
             } catch {
                 print("❌ Error monitoring deposit: \(error)")
             }
-            
+
             // Clean up keyboard task
             keyboardTask.cancel()
         } catch {
             print("❌ Error creating deposit: \(error)")
         }
     }
-    
+
     static func checkProofs(wallet: NIP60Wallet, mintUrl: String?) async {
         print("🔍 Checking proof states...")
-        
+
         do {
             if let providedUrl = mintUrl {
                 // Check specific mint
@@ -336,25 +338,25 @@ struct NIP60WalletREPL {
                     print("❌ Invalid mint URL: \(providedUrl)")
                     return
                 }
-                
+
                 print("🏦 Checking proofs with mint: \(providedUrl)")
-                
+
                 let proofStates = try await wallet.checkProofStates(mintURL: url)
-                
+
                 if proofStates.isEmpty {
                     print("ℹ️ No proofs found for this mint")
                 } else {
                     print("\n📋 Proof States for \(providedUrl)")
                     print("=====================================")
-                    
+
                     var spentCount = 0
                     var unspentCount = 0
                     var pendingCount = 0
-                    
+
                     for (proofC, state) in proofStates {
                         let stateEmoji: String
                         let stateText: String
-                        
+
                         switch state {
                         case .unspent:
                             stateEmoji = "✅"
@@ -369,10 +371,10 @@ struct NIP60WalletREPL {
                             stateText = "PENDING"
                             pendingCount += 1
                         }
-                        
+
                         print("\(stateEmoji) \(proofC.prefix(8))... : \(stateText)")
                     }
-                    
+
                     print("\nSummary:")
                     print("--------")
                     print("✅ Unspent: \(unspentCount)")
@@ -383,36 +385,36 @@ struct NIP60WalletREPL {
             } else {
                 // Check all mints
                 let mintUrls = await wallet.mints.getMintURLs()
-                
+
                 if mintUrls.isEmpty {
                     print("ℹ️ No mints configured")
                     return
                 }
-                
+
                 print("🏦 Checking proofs across all \(mintUrls.count) mints...")
-                
+
                 var totalProofs = 0
                 var totalSpent = 0
                 var totalUnspent = 0
                 var totalPending = 0
-                
+
                 for mintUrlString in mintUrls {
                     guard let url = URL(string: mintUrlString) else { continue }
-                    
+
                     do {
                         let proofStates = try await wallet.checkProofStates(mintURL: url)
-                        
+
                         if !proofStates.isEmpty {
                             print("\n📋 Mint: \(mintUrlString)")
                             print("=====================================")
-                            
+
                             var mintSpent = 0
                             var mintUnspent = 0
                             var mintPending = 0
-                            
+
                             for (_, state) in proofStates {
                                 totalProofs += 1
-                                
+
                                 switch state {
                                 case .unspent:
                                     mintUnspent += 1
@@ -425,7 +427,7 @@ struct NIP60WalletREPL {
                                     totalPending += 1
                                 }
                             }
-                            
+
                             print("✅ Unspent: \(mintUnspent)")
                             print("❌ Spent: \(mintSpent)")
                             print("⏳ Pending: \(mintPending)")
@@ -435,7 +437,7 @@ struct NIP60WalletREPL {
                         print("\n⚠️ Error checking mint \(mintUrlString): \(error)")
                     }
                 }
-                
+
                 print("\n🌐 Overall Summary")
                 print("==================")
                 print("✅ Total Unspent: \(totalUnspent)")
@@ -444,20 +446,20 @@ struct NIP60WalletREPL {
                 print("📊 Total Proofs: \(totalProofs)")
                 print("🏦 Mints Checked: \(mintUrls.count)")
             }
-            
+
             // Optionally reconcile states
             print("\n🔄 Reconciling proof states...")
             _ = try await wallet.checkAndReconcileProofStates()
             print("✅ Reconciliation complete")
-            
+
         } catch {
             print("❌ Error checking proofs: \(error)")
         }
     }
-    
+
     static func validateProofs(wallet: NIP60Wallet, dryRun: Bool, mintUrl: String?) async {
         print("🔐 Validating proofs\(dryRun ? " (dry run - no changes will be made)" : "")...")
-        
+
         do {
             if let providedUrl = mintUrl {
                 // Validate specific mint
@@ -465,29 +467,29 @@ struct NIP60WalletREPL {
                     print("❌ Invalid mint URL: \(providedUrl)")
                     return
                 }
-                
+
                 print("🏦 Validating proofs with mint: \(providedUrl)")
-                
+
                 // Check proof states for this mint
                 let proofStates = try await wallet.checkProofStates(mintURL: url)
-                
+
                 if proofStates.isEmpty {
                     print("ℹ️ No proofs found for this mint")
                     return
                 }
-                
+
                 print("\n📋 Proof States for \(providedUrl)")
                 print("=====================================")
-                
+
                 var spentCount = 0
                 var unspentCount = 0
                 var pendingCount = 0
                 var spentProofs: [String] = []
-                
+
                 for (proofC, state) in proofStates {
                     let stateEmoji: String
                     let stateText: String
-                    
+
                     switch state {
                     case .unspent:
                         stateEmoji = "✅"
@@ -503,18 +505,18 @@ struct NIP60WalletREPL {
                         stateText = "PENDING"
                         pendingCount += 1
                     }
-                    
+
                     print("\(stateEmoji) \(proofC.prefix(8))... : \(stateText)")
                 }
-                
+
                 print("\nValidation Summary:")
                 print("------------------")
                 print("✅ Valid (unspent): \(unspentCount)")
                 print("❌ Invalid (spent): \(spentCount)")
                 print("⏳ Pending: \(pendingCount)")
                 print("📊 Total: \(proofStates.count)")
-                
-                if !dryRun && spentCount > 0 {
+
+                if !dryRun, spentCount > 0 {
                     print("\n🗑️ Removing \(spentCount) spent proofs...")
                     // The reconciliation will handle removing spent proofs
                     _ = try await wallet.checkAndReconcileProofStates()
@@ -523,38 +525,38 @@ struct NIP60WalletREPL {
             } else {
                 // Validate all mints
                 print("🌐 Validating proofs across all mints...")
-                
+
                 if dryRun {
                     // For dry run, check each mint individually without reconciliation
                     let mintUrls = await wallet.mints.getMintURLs()
-                    
+
                     if mintUrls.isEmpty {
                         print("ℹ️ No mints configured")
                         return
                     }
-                    
+
                     var totalProofs = 0
                     var totalSpent = 0
                     var totalUnspent = 0
                     var totalPending = 0
-                    
+
                     for mintUrlString in mintUrls {
                         guard let url = URL(string: mintUrlString) else { continue }
-                        
+
                         do {
                             let proofStates = try await wallet.checkProofStates(mintURL: url)
-                            
+
                             if !proofStates.isEmpty {
                                 print("\n📋 Mint: \(mintUrlString)")
                                 print("=====================================")
-                                
+
                                 var mintSpent = 0
                                 var mintUnspent = 0
                                 var mintPending = 0
-                                
+
                                 for (_, state) in proofStates {
                                     totalProofs += 1
-                                    
+
                                     switch state {
                                     case .unspent:
                                         mintUnspent += 1
@@ -567,7 +569,7 @@ struct NIP60WalletREPL {
                                         totalPending += 1
                                     }
                                 }
-                                
+
                                 print("✅ Valid (unspent): \(mintUnspent)")
                                 print("❌ Invalid (spent): \(mintSpent)")
                                 print("⏳ Pending: \(mintPending)")
@@ -577,7 +579,7 @@ struct NIP60WalletREPL {
                             print("\n⚠️ Error validating mint \(mintUrlString): \(error)")
                         }
                     }
-                    
+
                     print("\n🌐 Overall Validation Summary")
                     print("=============================")
                     print("✅ Total Valid (unspent): \(totalUnspent)")
@@ -588,21 +590,21 @@ struct NIP60WalletREPL {
                 } else {
                     // For non-dry run, use the built-in validateProofs method
                     let result = try await wallet.validateProofs()
-                    
+
                     print("\n📊 Validation Results")
                     print("====================")
                     print("📊 Total checked: \(result.totalChecked)")
                     print("❌ Spent proofs removed: \(result.spentProofs.count)")
                     print("⏳ Pending proofs: \(result.pendingProofs.count)")
                     print("⚠️ Errors: \(result.errors)")
-                    
+
                     let validProofs = result.totalChecked - result.spentProofs.count - result.pendingProofs.count
                     print("✅ Valid proofs: \(validProofs)")
-                    
+
                     if result.spentProofs.count > 0 {
                         print("\n✅ Wallet state updated - \(result.spentProofs.count) spent proofs removed")
                     }
-                    
+
                     if result.errors > 0 {
                         print("\n⚠️ Some errors occurred during validation. Check logs for details.")
                     }
@@ -612,13 +614,13 @@ struct NIP60WalletREPL {
             print("❌ Error validating proofs: \(error)")
         }
     }
-    
+
     static func showMints(wallet: NIP60Wallet) async {
         print("🏦 Configured Mints")
         print("==================")
-        
+
         let mintUrls = await wallet.mints.getMintURLs()
-        
+
         if mintUrls.isEmpty {
             print("No mints configured")
         } else {
@@ -633,15 +635,14 @@ struct NIP60WalletREPL {
             print("\nTotal mints: \(mintUrls.count)")
         }
     }
-    
+
     static func sendZap(ndk: NDK, wallet: NIP60Wallet, recipient: String, amount: Int64, comment: String?) async {
         print("⚡ Sending zap of \(amount) sats...")
-        
+
         do {
-            
             // Parse recipient (could be npub, hex pubkey, or NIP-05)
             let recipientUser: NDKUser
-            
+
             if recipient.starts(with: "npub") {
                 // npub format
                 guard let user = NDKUser(npub: recipient) else {
@@ -668,11 +669,11 @@ struct NIP60WalletREPL {
                 print("❌ Invalid recipient format. Use npub, hex pubkey, or NIP-05")
                 return
             }
-            
+
             // Fetch recipient profile to get their name
             print("📋 Fetching recipient profile...")
             var recipientName = recipientUser.npub
-            
+
             // Use profile manager to get profile data
             for await profile in await ndk.profileManager.subscribe(for: recipientUser.pubkey, maxAge: TimeConstants.hour) {
                 if let profile = profile {
@@ -681,43 +682,43 @@ struct NIP60WalletREPL {
                 }
             }
             print("⚡ Zapping \(recipientName)...")
-            
+
             // Send the zap
             let zapResult = try await recipientUser.zap(
                 amountSats: amount,
                 comment: comment,
                 preferredType: .nutzap // Prefer nutzap since we're using a Cashu wallet
             )
-            
+
             print("\n✅ Zap sent successfully!")
             print("==================")
             print("Type: \(zapResult.type)")
-            print("Amount: \(zapResult.amountSats) sats") 
+            print("Amount: \(zapResult.amountSats) sats")
             print("Recipient: \(recipientName)")
             if let comment = comment {
                 print("Comment: \(comment)")
             }
-            
+
             if let nutzapEvent = zapResult.nutzapEvent {
                 print("Nutzap Event ID: \(nutzapEvent.id)")
             }
-            
+
             if let receiptEvent = zapResult.receiptEvent {
                 print("Lightning Receipt ID: \(receiptEvent.id)")
             }
-            
+
             // Update balance
             let newBalance = try await wallet.getBalance() ?? 0
             print("\n💰 New balance: \(newBalance) sats")
-            
+
         } catch {
             print("❌ Failed to send zap: \(error)")
         }
     }
-    
+
     static func showHelp() {
         print("""
-        
+
         Available Commands:
         ==================
         balance, b                    - Show wallet balance
@@ -728,7 +729,7 @@ struct NIP60WalletREPL {
         zap, z <recipient> <amount> [comment] - Send a zap to a user (recipient can be npub, hex pubkey, or NIP-05)
         help, h                       - Show this help message
         quit, q, exit                 - Exit the REPL
-        
+
         Examples:
         =========
         wallet> balance
@@ -745,7 +746,7 @@ struct NIP60WalletREPL {
         wallet> zap pablo@f7z.io 100 "Thanks for NDKSwift!"
         wallet> zap 3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d 50
         wallet> quit
-        
+
         """)
     }
 }

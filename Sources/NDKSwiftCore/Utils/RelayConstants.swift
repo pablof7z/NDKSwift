@@ -1,7 +1,6 @@
 
 /// Centralized constants for commonly used Nostr relay URLs
 public enum RelayConstants {
-
     // MARK: - WebSocket Schemes
 
     /// WebSocket scheme constants
@@ -19,7 +18,7 @@ public enum RelayConstants {
             let lowercased = url.lowercased()
             return lowercased.hasPrefix(secure) || lowercased.hasPrefix(insecure)
         }
-        
+
         /// Add WebSocket scheme to URL if missing
         /// - Parameter url: The URL string to process
         /// - Returns: URL with WebSocket scheme added if it was missing
@@ -48,13 +47,13 @@ public enum RelayConstants {
 
     /// Snort Social relay
     public static let snortSocial = "wss://relay.snort.social"
-    
+
     /// Nostr Wine relay
     public static let nostrWine = "wss://relay.nostr.wine"
-    
+
     /// Current FYI relay
     public static let currentFyi = "wss://relay.current.fyi"
-    
+
     /// Oxtr Dev relay
     public static let oxtrDev = "wss://relay.dev.oxtr.dev"
 
@@ -70,7 +69,7 @@ public enum RelayConstants {
     /// Default set of relays for general use
     public static let defaultRelays: [String] = [
         damus,
-        nosLol
+        nosLol,
     ]
 
     /// Extended set of relays for better coverage
@@ -79,25 +78,25 @@ public enum RelayConstants {
         nosLol,
         primal,
         nostrBand,
-        nostrWine
+        nostrWine,
     ]
-    
+
     /// Test relays for E2E tests
     public static let testRelays: [String] = [
         damus,
         nosLol,
-        primal
+        primal,
     ]
 
     /// Relays optimized for wallet operations
     public static let walletRelays: [String] = [
         primal,
         damus,
-        nostrBand
+        nostrBand,
     ]
 
     /// Default outbox relays
     public static let defaultOutboxRelays: Set<String> = [
-        "wss://purplepag.es"
+        "wss://purplepag.es",
     ]
 }

@@ -14,18 +14,18 @@ struct NDKUserProfile: Codable {
     var lud16: String?
     var lud06: String?
     var website: String?
-    
+
     // Additional fields that can be stored
     var additionalFields: [String: String] = [:]
-    
+
     mutating func setAdditionalField(_ key: String, value: String) {
         additionalFields[key] = value
     }
-    
+
     func additionalField(_ key: String) -> String? {
         return additionalFields[key]
     }
-    
+
     init(
         name: String? = nil,
         displayName: String? = nil,
@@ -47,12 +47,12 @@ struct NDKUserProfile: Codable {
         self.lud06 = lud06
         self.website = website
     }
-    
+
     // Custom coding to handle additional fields
     enum CodingKeys: String, CodingKey {
         case name, displayName = "display_name", about, picture, banner, nip05, lud16, lud06, website
     }
-    
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         name = try container.decodeIfPresent(String.self, forKey: .name)
@@ -64,7 +64,7 @@ struct NDKUserProfile: Codable {
         lud16 = try container.decodeIfPresent(String.self, forKey: .lud16)
         lud06 = try container.decodeIfPresent(String.self, forKey: .lud06)
         website = try container.decodeIfPresent(String.self, forKey: .website)
-        
+
         // Decode any additional fields
         if let dynamicContainer = try? decoder.container(keyedBy: DynamicCodingKeys.self) {
             for key in dynamicContainer.allKeys {
@@ -76,7 +76,7 @@ struct NDKUserProfile: Codable {
             }
         }
     }
-    
+
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encodeIfPresent(name, forKey: .name)
@@ -88,7 +88,7 @@ struct NDKUserProfile: Codable {
         try container.encodeIfPresent(lud16, forKey: .lud16)
         try container.encodeIfPresent(lud06, forKey: .lud06)
         try container.encodeIfPresent(website, forKey: .website)
-        
+
         // Encode additional fields
         var dynamicContainer = encoder.container(keyedBy: DynamicCodingKeys.self)
         for (key, value) in additionalFields {
@@ -102,13 +102,13 @@ struct NDKUserProfile: Codable {
 private struct DynamicCodingKeys: CodingKey {
     var stringValue: String
     var intValue: Int?
-    
+
     init?(stringValue: String) {
         self.stringValue = stringValue
-        self.intValue = nil
+        intValue = nil
     }
-    
-    init?(intValue: Int) {
+
+    init?(intValue _: Int) {
         return nil
     }
 }

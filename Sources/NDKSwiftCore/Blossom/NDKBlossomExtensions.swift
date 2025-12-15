@@ -7,7 +7,7 @@ public enum BlossomConstants {
     public static let defaultServers = [
         "https://blossom.primal.net",
         "https://media.nostr.band",
-        "https://nostr.build"
+        "https://nostr.build",
     ]
 }
 

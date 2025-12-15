@@ -26,24 +26,24 @@ actor NDKRelaySelector {
         event: NDKEvent
     ) async -> RelaySelectionResult {
         let correlationId = event.id.prefix(8)
-        
+
         // Collect author and p-tagged users separately per NIP-65
         let authorPubkey = event.pubkey
         let pTags = event.pTags
-        
+
         // Start with author's write relays
         var relayToPubkeys = await chooseRelayCombinationForPublishingAuthors(
             [authorPubkey],
             preferredRelays: await getPreferredRelaysForPublishing()
         )
-        
+
         // For events with <10 p-tags, include their READ relays per NIP-65
         if pTags.count < ProtocolConstants.maxPTagsForOutboxModel {
             let pTaggedRelays = await chooseRelayCombinationForPTaggedUsers(
                 pTags,
                 preferredRelays: await getPreferredRelaysForPublishing()
             )
-            
+
             // Merge p-tagged user relays into the main map
             for (relayUrl, pubkeys) in pTaggedRelays {
                 var existingPubkeys = relayToPubkeys[relayUrl, default: []]
@@ -55,16 +55,16 @@ actor NDKRelaySelector {
                 relayToPubkeys[relayUrl] = existingPubkeys
             }
         }
-        
+
         // Collect all pubkeys for missing relay checks
         var allPubkeys = [authorPubkey]
         if pTags.count < ProtocolConstants.maxPTagsForOutboxModel {
             allPubkeys.append(contentsOf: pTags)
         }
-        
+
         // Extract missing pubkeys
         let missingRelayPubkeys = await getMissingRelayPubkeys(for: allPubkeys)
-        
+
         // Special handling for NIP-65 relay lists
         if event.kind == NDKRelayList.kind {
             // For relay lists, also publish to read relays
@@ -78,10 +78,10 @@ actor NDKRelaySelector {
                 }
             }
         }
-        
+
         // Extract relay URLs from the map
         var selectedRelays = Set(relayToPubkeys.keys)
-        
+
         // Add e-tag relay hints per NIP-10
         for tag in event.tags {
             if tag.count >= 3 && tag[0] == "e" {
@@ -91,7 +91,7 @@ actor NDKRelaySelector {
                 }
             }
         }
-        
+
         // Ensure minimum relays
         if selectedRelays.count < OutboxConstants.minPublishRelays {
             let fallbackRelays = await selectFallbackRelays(
@@ -101,7 +101,7 @@ actor NDKRelaySelector {
             )
             selectedRelays.formUnion(fallbackRelays)
         }
-        
+
         // Apply soft maximum limit if exceeded
         if selectedRelays.count > OutboxConstants.maxPublishRelays {
             // Rank and limit
@@ -112,15 +112,15 @@ actor NDKRelaySelector {
             )
             selectedRelays = Set(rankedRelays.prefix(OutboxConstants.maxPublishRelays).map { $0.url })
         }
-        
+
         NDKLogger.log(.debug, category: .outbox, "📤 Selected \(selectedRelays.count) relays for publishing (author + \(pTags.count) p-tags)", correlationId: String(correlationId))
-        
+
         // Trigger discovery for missing relay info
         if !missingRelayPubkeys.isEmpty {
             NDKLogger.log(.info, category: .outbox, "🔍 Triggering relay discovery for \(missingRelayPubkeys.count) p-tagged users", correlationId: String(correlationId))
             await ndk.outbox.discoverRelaysInBackground(for: missingRelayPubkeys)
         }
-        
+
         return RelaySelectionResult(
             relays: selectedRelays,
             missingRelayInfoPubkeys: missingRelayPubkeys,
@@ -134,7 +134,7 @@ actor NDKRelaySelector {
     ) async -> RelaySelectionResult {
         // Collect all relevant pubkeys
         var allPubkeys: [String] = []
-        
+
         // Add current user if signed in
         if let signer = ndk.signer {
             do {
@@ -144,31 +144,31 @@ actor NDKRelaySelector {
                 NDKLogger.log(.warning, category: .relay, "Failed to get user pubkey for relay selection: \(error.localizedDescription)")
             }
         }
-        
+
         // Add authors from filter
         if let authors = filter.authors {
             allPubkeys.append(contentsOf: authors)
         }
-        
+
         // Add p-tagged pubkeys from filter
         let taggedPubkeys = extractPubkeysFromFilter(filter)
         allPubkeys.append(contentsOf: taggedPubkeys)
-        
+
         // Remove duplicates
         allPubkeys = Array(Set(allPubkeys))
-        
+
         // Use improved relay combination selection
         let relayToPubkeys = await chooseRelayCombinationForFetchingAuthors(
             allPubkeys,
             preferredRelays: await getPreferredRelaysForFetching()
         )
-        
+
         // Extract missing pubkeys
         let missingRelayPubkeys = await getMissingRelayPubkeys(for: allPubkeys)
-        
+
         // Extract relay URLs
         var selectedRelays = Set(relayToPubkeys.keys)
-        
+
         // Ensure minimum relays
         if selectedRelays.count < OutboxConstants.minFetchRelays {
             let fallbackRelays = await selectFallbackRelays(
@@ -178,7 +178,7 @@ actor NDKRelaySelector {
             )
             selectedRelays.formUnion(fallbackRelays)
         }
-        
+
         // Apply soft maximum limit if exceeded
         if selectedRelays.count > OutboxConstants.maxFetchRelays {
             // Rank and limit
@@ -189,9 +189,9 @@ actor NDKRelaySelector {
             )
             selectedRelays = Set(rankedRelays.prefix(OutboxConstants.maxFetchRelays).map { $0.url })
         }
-        
+
         NDKLogger.log(.debug, category: .outbox, "🔍 Selected \(selectedRelays.count) relays for fetching from \(allPubkeys.count) authors")
-        
+
         return RelaySelectionResult(
             relays: selectedRelays,
             missingRelayInfoPubkeys: missingRelayPubkeys,
@@ -277,7 +277,7 @@ actor NDKRelaySelector {
             var assignedCount = 0
             for relayURL in fallbackRelays {
                 if assignedCount >= relaysPerAuthor { break }
-                
+
                 // Skip blocked relays
                 let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(relayURL) ?? relayURL
                 if blockedRelays.contains(normalizedUrl) { continue }
@@ -301,7 +301,8 @@ actor NDKRelaySelector {
         // Check cache first
         if let cached = blockedRelaysCache,
            let expiry = blockedRelaysCacheExpiry,
-           expiry > Date() {
+           expiry > Date()
+        {
             return cached
         }
 
@@ -362,7 +363,7 @@ actor NDKRelaySelector {
 
         // Extract from p tags (mentioned users) - NIP-65 outbox model
         let pTags = event.pTags
-        if purpose == .publishing && pTags.count < ProtocolConstants.maxPTagsForOutboxModel {
+        if purpose == .publishing, pTags.count < ProtocolConstants.maxPTagsForOutboxModel {
             // For events with less than 10 p-tags, apply NIP-65 outbox model:
             // Send to read relays of each tagged user
             for pubkey in pTags {
@@ -537,13 +538,13 @@ actor NDKRelaySelector {
             return .outbox
         }
     }
-    
+
     // MARK: - New Helper Methods for Per-Author Relay Selection
-    
+
     /// Choose relay combination optimized for publishing
     private func chooseRelayCombinationForPublishingAuthors(
         _ pubkeys: [String],
-        preferredRelays: Set<String>
+        preferredRelays _: Set<String>
     ) async -> RelayToPubkeysMap {
         // For publishing, we want write relays primarily
         return await chooseRelayCombinationForPubkeys(
@@ -552,11 +553,11 @@ actor NDKRelaySelector {
             relaysPerAuthor: OutboxConstants.relaysPerAuthor
         )
     }
-    
+
     /// Choose relay combination for p-tagged users (uses READ relays per NIP-65)
     private func chooseRelayCombinationForPTaggedUsers(
         _ pubkeys: [String],
-        preferredRelays: Set<String>
+        preferredRelays _: Set<String>
     ) async -> RelayToPubkeysMap {
         // For p-tagged users, we want read relays per NIP-65
         var relayMap = await chooseRelayCombinationForPubkeys(
@@ -564,18 +565,18 @@ actor NDKRelaySelector {
             type: .read,
             relaysPerAuthor: OutboxConstants.relaysPerAuthor
         )
-        
+
         // Fallback: if a p-tagged user has no read relays, try their write relays
         let assignedPubkeys = Set(relayMap.values.flatMap { $0 })
         let unassignedPubkeys = pubkeys.filter { !assignedPubkeys.contains($0) }
-        
+
         if !unassignedPubkeys.isEmpty {
             let fallbackRelayMap = await chooseRelayCombinationForPubkeys(
                 unassignedPubkeys,
                 type: .write,
                 relaysPerAuthor: OutboxConstants.relaysPerAuthor
             )
-            
+
             // Merge fallback relays into main map
             for (relayUrl, pubkeys) in fallbackRelayMap {
                 var existingPubkeys = relayMap[relayUrl, default: []]
@@ -587,14 +588,14 @@ actor NDKRelaySelector {
                 relayMap[relayUrl] = existingPubkeys
             }
         }
-        
+
         return relayMap
     }
-    
+
     /// Choose relay combination optimized for fetching
     private func chooseRelayCombinationForFetchingAuthors(
         _ pubkeys: [String],
-        preferredRelays: Set<String>
+        preferredRelays _: Set<String>
     ) async -> RelayToPubkeysMap {
         // For fetching, we want read relays
         return await chooseRelayCombinationForPubkeys(
@@ -603,56 +604,56 @@ actor NDKRelaySelector {
             relaysPerAuthor: OutboxConstants.relaysPerAuthorForFetching
         )
     }
-    
+
     /// Get preferred relays for publishing
     private func getPreferredRelaysForPublishing() async -> Set<String> {
         var preferred = Set<String>()
-        
+
         // Add explicit relays
         let explicitRelays = await ndk.pool.explicitRelays()
         preferred.formUnion(explicitRelays.map { $0.url })
-        
+
         // Add connected relays
         let connectedRelays = await ndk.pool.connectedRelays()
         preferred.formUnion(connectedRelays.map { $0.url })
-        
+
         return preferred
     }
-    
+
     /// Get preferred relays for fetching
     private func getPreferredRelaysForFetching() async -> Set<String> {
         var preferred = Set<String>()
-        
+
         // Add connected relays first (most important for fetching)
         let connectedRelays = await ndk.pool.connectedRelays()
         preferred.formUnion(connectedRelays.map { $0.url })
-        
+
         // Add explicit relays
         let explicitRelays = await ndk.pool.explicitRelays()
         preferred.formUnion(explicitRelays.map { $0.url })
-        
+
         return preferred
     }
-    
+
     /// Get missing relay pubkeys from a list
     private func getMissingRelayPubkeys(for pubkeys: [String]) async -> Set<String> {
         var missing = Set<String>()
-        
+
         for pubkey in pubkeys {
             let hasRelayInfo = await tracker.getRelaysSyncFor(pubkey: pubkey, type: .both) != nil
             if !hasRelayInfo {
                 missing.insert(pubkey)
             }
         }
-        
+
         return missing
     }
 }
 
 // MARK: - Configuration Types
 
-
 /// Configuration for relay combination selection
+
 // MARK: - Result Types
 
 /// Result of relay selection

@@ -78,7 +78,6 @@ public protocol NDKCache: Actor {
 
     /// Delete an event from cache
     func deleteEvent(id: String) async throws
-    
 
     // MARK: - Optimistic Publishing Support
 
@@ -182,7 +181,7 @@ public protocol NDKCache: Actor {
     func hasEvents(ids: [String]) async -> [String: Bool]
 
     // MARK: - Profile Metadata Operations
-    
+
     /// Save parsed profile metadata to cache
     /// - Parameters:
     ///   - pubkey: The public key of the user
@@ -190,12 +189,12 @@ public protocol NDKCache: Actor {
     ///   - updatedAt: When this metadata was last updated
     ///   - eventId: The event ID this metadata came from
     func saveProfileMetadata(pubkey: String, metadata: [String: Any], updatedAt: Timestamp, eventId: String) async throws
-    
+
     /// Get parsed profile metadata from cache
     /// - Parameter pubkey: The public key to look up
     /// - Returns: Tuple containing the metadata dictionary, update timestamp, and event ID, or nil if not found
     func getProfileMetadata(pubkey: String) async -> (metadata: [String: Any], updatedAt: Timestamp, eventId: String)?
-    
+
     /// Get multiple profile metadata entries at once
     /// - Parameter pubkeys: Array of public keys to look up
     /// - Returns: Dictionary mapping pubkeys to their metadata tuples
@@ -217,7 +216,7 @@ public protocol NDKCache: Actor {
         matching filter: NDKFilter,
         includeExisting: Bool
     ) async -> AsyncThrowingStream<[NDKEvent], Error>
-    
+
     /// Observe profile changes for a specific pubkey with reactive updates
     /// - Parameters:
     ///   - pubkey: The public key to observe profile changes for
@@ -370,38 +369,37 @@ public extension NDKCache {
         return try await queryEvents(filter)
     }
 
-
     // MARK: - Default Optimistic Publishing Implementation
 
     /// Default implementation that simply stores the event normally
-    func addUnpublishedEvent(_ event: NDKEvent, relays: Set<String>) async throws {
+    func addUnpublishedEvent(_ event: NDKEvent, relays _: Set<String>) async throws {
         try await saveEvent(event)
     }
 
     /// Default implementation that does nothing
-    func confirmEvent(eventId: String, onRelay relay: String) async throws {
+    func confirmEvent(eventId _: String, onRelay _: String) async throws {
         // Default implementation - cache implementations can override for richer behavior
     }
 
     /// Default implementation that returns nil
-    func getEventConfirmationState(eventId: String) async -> EventConfirmationState? {
+    func getEventConfirmationState(eventId _: String) async -> EventConfirmationState? {
         return nil
     }
 
     /// Default implementation that returns empty array
-    func getUnpublishedEvents(maxAge: TimeInterval = TimeConstants.hour, limit: Int? = nil) async -> [(event: NDKEvent, targetRelays: Set<String>)] {
+    func getUnpublishedEvents(maxAge _: TimeInterval = TimeConstants.hour, limit _: Int? = nil) async -> [(event: NDKEvent, targetRelays: Set<String>)] {
         return []
     }
 
     // MARK: - Default Decrypted Content Implementation
 
     /// Default implementation that returns nil (no caching)
-    func getDecryptedContent(for eventId: String, viewerPubkey: String) async -> String? {
+    func getDecryptedContent(for _: String, viewerPubkey _: String) async -> String? {
         return nil
     }
 
     /// Default implementation that does nothing (no caching)
-    func storeDecryptedContent(_ content: String, for eventId: String, viewerPubkey: String) async {
+    func storeDecryptedContent(_: String, for _: String, viewerPubkey _: String) async {
         // Default implementation - cache implementations can override for actual caching
     }
 
@@ -411,29 +409,29 @@ public extension NDKCache {
     }
 
     /// Default implementation that does nothing
-    func clearDecryptedContent(for viewerPubkey: String) async {
+    func clearDecryptedContent(for _: String) async {
         // Default implementation - cache implementations can override
     }
 
     // MARK: - Default Key-Value Store Implementation
 
     /// Default implementation that does nothing
-    func setValue(_ value: Data, forKey key: String, namespace: String) async throws {
+    func setValue(_: Data, forKey _: String, namespace _: String) async throws {
         // Default implementation - cache implementations should override
     }
 
     /// Default implementation that returns nil
-    func getValue(forKey key: String, namespace: String) async -> Data? {
+    func getValue(forKey _: String, namespace _: String) async -> Data? {
         return nil
     }
 
     /// Default implementation that does nothing
-    func deleteValue(forKey key: String, namespace: String) async throws {
+    func deleteValue(forKey _: String, namespace _: String) async throws {
         // Default implementation - cache implementations should override
     }
 
     /// Default implementation that returns empty dictionary
-    func getValues(namespace: String, keyPrefix: String?) async -> [String: Data] {
+    func getValues(namespace _: String, keyPrefix _: String?) async -> [String: Data] {
         return [:]
     }
 
@@ -467,15 +465,15 @@ public extension NDKCache {
     /// Default implementation that just saves the event
     func processEvent(
         _ event: NDKEvent,
-        from relay: String,
-        subscriptionId: String
+        from _: String,
+        subscriptionId _: String
     ) async throws {
         // Default implementation - just save the event
         try await saveEvent(event)
     }
 
     /// Default implementation that returns empty set
-    func getRelaySources(eventId: String) async -> Set<String> {
+    func getRelaySources(eventId _: String) async -> Set<String> {
         // Default implementation - cache implementations should override
         return []
     }
@@ -483,71 +481,71 @@ public extension NDKCache {
     // MARK: - Default Cache Freshness Implementation
 
     /// Default implementation that returns nil (no tracking)
-    func getLastFetchTime(for filter: NDKFilter) async -> Date? {
+    func getLastFetchTime(for _: NDKFilter) async -> Date? {
         // Default implementation - cache implementations should override
         return nil
     }
 
     /// Default implementation that does nothing
-    func recordFetchTime(for filter: NDKFilter, timestamp: Date = Date()) async {
+    func recordFetchTime(for _: NDKFilter, timestamp _: Date = Date()) async {
         // Default implementation - cache implementations should override
     }
 
     // MARK: - Default NIP-05 Implementation
 
     /// Default implementation that does nothing
-    func saveNIP05Claim(_ identifier: String, pubkey: String, retrievedAt: Date = Date()) async throws {
+    func saveNIP05Claim(_: String, pubkey _: String, retrievedAt _: Date = Date()) async throws {
         // Default implementation - cache implementations should override
     }
 
     /// Default implementation that returns nil
-    func getNIP05Entry(_ identifier: String) async -> NIP05CacheEntry? {
+    func getNIP05Entry(_: String) async -> NIP05CacheEntry? {
         // Default implementation - cache implementations should override
         return nil
     }
 
     /// Default implementation that returns empty array
-    func getNIP05Entries(pubkey: String) async -> [NIP05CacheEntry] {
+    func getNIP05Entries(pubkey _: String) async -> [NIP05CacheEntry] {
         // Default implementation - cache implementations should override
         return []
     }
 
     /// Default implementation that returns empty array
-    func searchNIP05(_ prefix: String, limit: Int) async -> [NIP05CacheEntry] {
+    func searchNIP05(_: String, limit _: Int) async -> [NIP05CacheEntry] {
         // Default implementation - cache implementations should override
         return []
     }
 
     /// Default implementation that does nothing
-    func saveNIP05Resolution(_ entry: NIP05CacheEntry) async throws {
+    func saveNIP05Resolution(_: NIP05CacheEntry) async throws {
         // Default implementation - cache implementations should override
     }
 
     /// Default implementation that does nothing
-    func invalidateNIP05(_ identifier: String, actualPubkey: String?) async throws {
+    func invalidateNIP05(_: String, actualPubkey _: String?) async throws {
         // Default implementation - cache implementations should override
     }
 
     /// Default implementation that always returns true (needs verification)
-    func needsNIP05Verification(_ identifier: String, maxAge: TimeInterval) async -> Bool {
+    func needsNIP05Verification(_: String, maxAge _: TimeInterval) async -> Bool {
         // Default implementation - cache implementations should override
         return true
     }
 
     /// Default implementation that returns empty array
-    func getUnverifiedNIP05s(limit: Int) async -> [NIP05CacheEntry] {
+    func getUnverifiedNIP05s(limit _: Int) async -> [NIP05CacheEntry] {
         // Default implementation - cache implementations should override
         return []
     }
 
     /// Default implementation that always returns true (allow verification)
-    func canVerifyDomain(_ domain: String) async -> Bool {
+    func canVerifyDomain(_: String) async -> Bool {
         // Default implementation - cache implementations should override
         return true
     }
 
     /// Default implementation that does nothing
-    func recordDomainVerificationAttempt(_ domain: String) async {
+    func recordDomainVerificationAttempt(_: String) async {
         // Default implementation - cache implementations should override
     }
 
@@ -555,39 +553,39 @@ public extension NDKCache {
 
     /// Default implementation that does nothing
     func saveRelayPreferences(
-        pubkey: String,
-        writeRelays: [String]?,
-        readRelays: [String]?,
-        fetchedAt: Date,
-        expiresAt: Date,
-        checkedRelays: Set<String>?
+        pubkey _: String,
+        writeRelays _: [String]?,
+        readRelays _: [String]?,
+        fetchedAt _: Date,
+        expiresAt _: Date,
+        checkedRelays _: Set<String>?
     ) async throws {
         // Default implementation - cache implementations should override
     }
 
     /// Default implementation that returns nil
     func getRelayPreferences(
-        pubkey: String
+        pubkey _: String
     ) async -> (writeRelays: [String]?, readRelays: [String]?, fetchedAt: Date, expiresAt: Date, checkedRelays: Set<String>?)? {
         // Default implementation - cache implementations should override
         return nil
     }
-    
+
     // MARK: - Default Profile Metadata Implementation
-    
+
     /// Default implementation that does nothing
-    func saveProfileMetadata(pubkey: String, metadata: [String: Any], updatedAt: Timestamp, eventId: String) async throws {
+    func saveProfileMetadata(pubkey _: String, metadata _: [String: Any], updatedAt _: Timestamp, eventId _: String) async throws {
         // Default implementation - cache implementations should override
     }
-    
+
     /// Default implementation that returns nil
-    func getProfileMetadata(pubkey: String) async -> (metadata: [String: Any], updatedAt: Timestamp, eventId: String)? {
+    func getProfileMetadata(pubkey _: String) async -> (metadata: [String: Any], updatedAt: Timestamp, eventId: String)? {
         // Default implementation - cache implementations should override
         return nil
     }
-    
+
     /// Default implementation that returns empty dictionary
-    func getMultipleProfileMetadata(pubkeys: [String]) async -> [String: (metadata: [String: Any], updatedAt: Timestamp, eventId: String)] {
+    func getMultipleProfileMetadata(pubkeys _: [String]) async -> [String: (metadata: [String: Any], updatedAt: Timestamp, eventId: String)] {
         // Default implementation - cache implementations should override
         return [:]
     }

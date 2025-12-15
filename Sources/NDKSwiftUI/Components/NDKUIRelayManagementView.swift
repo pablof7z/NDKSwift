@@ -1,5 +1,5 @@
-import SwiftUI
 import NDKSwiftCore
+import SwiftUI
 
 /// A unified relay management view for Nostr apps
 public struct NDKUIRelayManagementView: View {
@@ -10,11 +10,11 @@ public struct NDKUIRelayManagementView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var showingError = false
-    
+
     public init(ndk: NDK) {
         self.ndk = ndk
     }
-    
+
     public var body: some View {
         List {
             Section(header: Text("Connected Relays")) {
@@ -24,7 +24,7 @@ public struct NDKUIRelayManagementView: View {
                     })
                 }
             }
-            
+
             Section {
                 Button(action: { showingAddRelay = true }) {
                     HStack {
@@ -41,109 +41,104 @@ public struct NDKUIRelayManagementView: View {
         }
         .navigationTitle("Relay Management")
         #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.inline)
         #endif
-        .task {
-            await loadRelays()
-        }
-        .sheet(isPresented: $showingAddRelay) {
-            NavigationView {
-                AddRelaySheet(
-                    relayUrl: $newRelayUrl,
-                    onAdd: { url in
-                        Task {
-                            await addRelay(url)
+            .task {
+                await loadRelays()
+            }
+            .sheet(isPresented: $showingAddRelay) {
+                NavigationView {
+                    AddRelaySheet(
+                        relayUrl: $newRelayUrl,
+                        onAdd: { url in
+                            Task {
+                                await addRelay(url)
+                                showingAddRelay = false
+                                newRelayUrl = ""
+                            }
+                        },
+                        onCancel: {
                             showingAddRelay = false
                             newRelayUrl = ""
                         }
-                    },
-                    onCancel: {
-                        showingAddRelay = false
-                        newRelayUrl = ""
-                    }
-                )
+                    )
+                }
             }
-        }
-        .alert("Error", isPresented: $showingError) {
-            Button("OK") { }
-        } message: {
-            Text(errorMessage ?? "An error occurred")
-        }
-        .overlay {
-            if isLoading {
-                ProgressView()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color.black.opacity(0.3))
+            .alert("Error", isPresented: $showingError) {
+                Button("OK") {}
+            } message: {
+                Text(errorMessage ?? "An error occurred")
             }
-        }
+            .overlay {
+                if isLoading {
+                    ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color.black.opacity(0.3))
+                }
+            }
     }
-    
+
     private func loadRelays() async {
         relays = await ndk.relays
             .sorted { $0.url < $1.url }
     }
-    
+
     private func addRelay(_ urlString: String) async {
         isLoading = true
         defer { isLoading = false }
-        
+
         // Clean up URL and ensure WebSocket scheme
         let cleanUrl = RelayConstants.WebSocketScheme.ensureWebSocketScheme(urlString)
-        
+
         // Validate URL
         guard URLUtils.safeURL(cleanUrl) != nil else {
             errorMessage = "Invalid relay URL"
             showingError = true
             return
         }
-        
+
         // Check if already exists
         if relays.contains(where: { $0.url == cleanUrl }) {
             errorMessage = "Relay already added"
             showingError = true
             return
         }
-        
+
         // Add relay
         do {
-            let relay = await ndk.addRelay(cleanUrl)
-            if relay != nil {
-                await loadRelays()
-                
-                // Publish updated relay list
-                await publishRelayList()
-            } else {
-                errorMessage = "Failed to connect to relay"
-                showingError = true
-            }
-        }
-    }
-    
-    private func removeRelay(_ relay: NDKRelay) {
-        Task {
-            isLoading = true
-            defer { isLoading = false }
-            
-            await ndk.removeRelay(relay.url)
+            _ = await ndk.addRelay(cleanUrl)
             await loadRelays()
-            
+
             // Publish updated relay list
             await publishRelayList()
         }
     }
-    
+
+    private func removeRelay(_ relay: NDKRelay) {
+        Task {
+            isLoading = true
+            defer { isLoading = false }
+
+            await ndk.removeRelay(relay.url)
+            await loadRelays()
+
+            // Publish updated relay list
+            await publishRelayList()
+        }
+    }
+
     private func publishRelayList() async {
         guard ndk.signer != nil else { return }
-        
+
         do {
             // Create relay list from current relays
             let relayList = NDKRelayList(ndk: ndk)
-            
+
             // Add all relays with read/write access
             for relay in relays {
                 relayList.addRelay(relay.url, access: [.read, .write])
             }
-            
+
             // Sign and publish
             try await relayList.sign()
             _ = try await ndk.publishRelayList(relayList)
@@ -154,19 +149,20 @@ public struct NDKUIRelayManagementView: View {
 }
 
 // MARK: - Relay Row View
+
 private struct RelayRow: View {
     let relay: NDKRelay
     let onRemove: () -> Void
-    
+
     @State private var isConnected = false
     @State private var relayInfo: NDKRelayInformation?
-    
+
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text(formatRelayUrl(relay.url))
                     .font(.body)
-                
+
                 HStack(spacing: 12) {
                     // Connection status
                     HStack(spacing: 4) {
@@ -177,7 +173,7 @@ private struct RelayRow: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
-                    
+
                     // Supported NIPs if available
                     if let supportedNips = relayInfo?.supportedNips, !supportedNips.isEmpty {
                         Text("NIPs: \(supportedNips.prefix(3).map(String.init).joined(separator: ", "))\(supportedNips.count > 3 ? "..." : "")")
@@ -186,9 +182,9 @@ private struct RelayRow: View {
                     }
                 }
             }
-            
+
             Spacer()
-            
+
             Button(action: onRemove) {
                 Image(systemName: "trash")
                     .foregroundColor(.red)
@@ -201,7 +197,7 @@ private struct RelayRow: View {
             relayInfo = await relay.info
         }
     }
-    
+
     private func formatRelayUrl(_ url: String) -> String {
         var formatted = url
         // Remove WebSocket scheme prefix for display
@@ -219,12 +215,13 @@ private struct RelayRow: View {
 }
 
 // MARK: - Add Relay Sheet
+
 private struct AddRelaySheet: View {
     @Binding var relayUrl: String
     let onAdd: (String) -> Void
     let onCancel: () -> Void
     @FocusState private var isTextFieldFocused: Bool
-    
+
     // Common relay suggestions
     private let suggestedRelays = [
         "relay.damus.io",
@@ -234,39 +231,39 @@ private struct AddRelaySheet: View {
         "relay.nostr.wine",
         "relay.nostrgraph.net",
         "relay.current.fyi",
-        "relay.snort.social"
+        "relay.snort.social",
     ]
-    
+
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
                 Text("Add Relay")
                     .font(.headline)
                     .padding(.top)
-                
+
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Relay URL")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    
+
                     TextField("wss://relay.example.com", text: $relayUrl)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
-                        #if os(iOS)
+                    #if os(iOS)
                         .autocapitalization(.none)
                         .disableAutocorrection(true)
                         .keyboardType(.URL)
-                        #else
+                    #else
                         .disableAutocorrection(true)
-                        #endif
+                    #endif
                         .focused($isTextFieldFocused)
                 }
                 .padding(.horizontal)
-                
+
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Suggested Relays")
                         .font(.headline)
                         .padding(.horizontal)
-                    
+
                     ForEach(suggestedRelays, id: \.self) { relay in
                         Button(action: {
                             relayUrl = relay
@@ -276,12 +273,12 @@ private struct AddRelaySheet: View {
                                 Image(systemName: "network")
                                     .foregroundColor(.blue)
                                     .frame(width: 30)
-                                
+
                                 Text(relay)
                                     .foregroundColor(.primary)
-                                
+
                                 Spacer()
-                                
+
                                 Image(systemName: "chevron.right")
                                     .foregroundColor(.secondary)
                                     .font(.caption)
@@ -295,7 +292,7 @@ private struct AddRelaySheet: View {
                     }
                 }
                 .padding(.top)
-                
+
                 Spacer(minLength: 40)
             }
         }

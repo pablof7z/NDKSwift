@@ -15,21 +15,22 @@
  */
 
 #if !os(WASI)
-#if os(Linux)
-import CoreFoundation
+    #if os(Linux)
+        import CoreFoundation
+    #else
+        import Foundation
+        import NDKSwiftCore
+    #endif
 #else
-import Foundation
-import NDKSwiftCore
-#endif
-#else
-import SwiftOverlayShims
+    import SwiftOverlayShims
 #endif
 
 /// A boolean to see if the system is littleEndian
 let isLitteEndian: Bool = {
-  let number: UInt32 = 0x12345678
-  return number == number.littleEndian
+    let number: UInt32 = 0x1234_5678
+    return number == number.littleEndian
 }()
+
 /// Constant for the file id length
 let FileIdLength = 4
 /// Type aliases
@@ -39,85 +40,85 @@ public typealias SOffset = Int32
 public typealias VOffset = UInt16
 /// Maximum size for a buffer
 public let FlatBufferMaxSize = UInt32
-  .max << ((MemoryLayout<SOffset>.size * 8 - 1) - 1)
+    .max << ((MemoryLayout<SOffset>.size * 8 - 1) - 1)
 
 /// Protocol that All Scalars should conform to
 ///
 /// Scalar is used to conform all the numbers that can be represented in a FlatBuffer. It's used to write/read from the buffer.
 public protocol Scalar: Equatable {
-  associatedtype NumericValue
-  var convertedEndian: NumericValue { get }
+    associatedtype NumericValue
+    var convertedEndian: NumericValue { get }
 }
 
 extension Scalar where Self: Verifiable {}
 
-extension Scalar where Self: FixedWidthInteger {
-  /// Converts the value from BigEndian to LittleEndian
-  ///
-  /// Converts values to little endian on machines that work with BigEndian, however this is NOT TESTED yet.
-  public var convertedEndian: NumericValue {
-    self as! Self.NumericValue
-  }
+public extension Scalar where Self: FixedWidthInteger {
+    /// Converts the value from BigEndian to LittleEndian
+    ///
+    /// Converts values to little endian on machines that work with BigEndian, however this is NOT TESTED yet.
+    var convertedEndian: NumericValue {
+        self as! Self.NumericValue
+    }
 }
 
 extension Double: Scalar, Verifiable {
-  public typealias NumericValue = UInt64
+    public typealias NumericValue = UInt64
 
-  public var convertedEndian: UInt64 {
-    bitPattern.littleEndian
-  }
+    public var convertedEndian: UInt64 {
+        bitPattern.littleEndian
+    }
 }
 
 extension Float32: Scalar, Verifiable {
-  public typealias NumericValue = UInt32
+    public typealias NumericValue = UInt32
 
-  public var convertedEndian: UInt32 {
-    bitPattern.littleEndian
-  }
+    public var convertedEndian: UInt32 {
+        bitPattern.littleEndian
+    }
 }
 
 extension Bool: Scalar, Verifiable {
-  public var convertedEndian: UInt8 {
-    self == true ? 1 : 0
-  }
+    public var convertedEndian: UInt8 {
+        self == true ? 1 : 0
+    }
 
-  public typealias NumericValue = UInt8
+    public typealias NumericValue = UInt8
 }
 
 extension Int: Scalar, Verifiable {
-  public typealias NumericValue = Int
+    public typealias NumericValue = Int
 }
 
 extension Int8: Scalar, Verifiable {
-  public typealias NumericValue = Int8
+    public typealias NumericValue = Int8
 }
 
 extension Int16: Scalar, Verifiable {
-  public typealias NumericValue = Int16
+    public typealias NumericValue = Int16
 }
 
 extension Int32: Scalar, Verifiable {
-  public typealias NumericValue = Int32
+    public typealias NumericValue = Int32
 }
 
 extension Int64: Scalar, Verifiable {
-  public typealias NumericValue = Int64
+    public typealias NumericValue = Int64
 }
 
 extension UInt8: Scalar, Verifiable {
-  public typealias NumericValue = UInt8
+    public typealias NumericValue = UInt8
 }
 
 extension UInt16: Scalar, Verifiable {
-  public typealias NumericValue = UInt16
+    public typealias NumericValue = UInt16
 }
 
 extension UInt32: Scalar, Verifiable {
-  public typealias NumericValue = UInt32
+    public typealias NumericValue = UInt32
 }
 
 extension UInt64: Scalar, Verifiable {
-  public typealias NumericValue = UInt64
+    public typealias NumericValue = UInt64
 }
 
 public func FlatBuffersVersion_23_5_26() {}

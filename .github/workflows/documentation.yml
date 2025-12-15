@@ -1,0 +1,59 @@
+name: Documentation
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Swift
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "5.9"
+
+      - name: Build Documentation
+        run: |
+          swift package --allow-writing-to-package-directory \
+            generate-documentation --target NDKSwiftCore \
+            --disable-indexing \
+            --transform-for-static-hosting \
+            --hosting-base-path / \
+            --output-path docs
+
+          # If we want to combine multiple targets, we'd need a different strategy
+          # or build them separately and merge. For now, focusing on NDKSwiftCore
+          # as the primary library, but we can add others if needed.
+
+      - name: Create CNAME
+        run: echo "swift-docs.ndk.fyi" > docs/CNAME
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

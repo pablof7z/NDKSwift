@@ -30,7 +30,8 @@ public struct NDKZapReceipt {
     public var zapRequest: NDKZapRequest? {
         guard let json = descriptionJSON,
               let data = json.data(using: .utf8),
-              let requestEvent = JSONCoding.safeDecode(NDKEvent.self, from: data) else {
+              let requestEvent = JSONCoding.safeDecode(NDKEvent.self, from: data)
+        else {
             return nil
         }
         return NDKZapRequest(event: requestEvent)
@@ -95,7 +96,8 @@ public struct NDKZapReceipt {
         let effectiveRequest = zapRequest ?? self.zapRequest
         if let request = effectiveRequest,
            let requestAmount = request.amountMillisats,
-           let receiptAmount = amountMillisats {
+           let receiptAmount = amountMillisats
+        {
             guard requestAmount == receiptAmount else {
                 return false
             }
@@ -104,7 +106,8 @@ public struct NDKZapReceipt {
         // 3. Must have required tags
         guard bolt11 != nil,
               descriptionJSON != nil,
-              recipientPubkey != nil else {
+              recipientPubkey != nil
+        else {
             return false
         }
 
@@ -133,7 +136,8 @@ public struct NDKZapReceipt {
                [NostrConstants.TagName.pubkey,
                 NostrConstants.TagName.event,
                 NostrConstants.TagName.address,
-                NostrConstants.TagName.uppercasePubkey].contains(tagName) {
+                NostrConstants.TagName.uppercasePubkey].contains(tagName)
+            {
                 tags.append(tag)
             }
         }
@@ -166,10 +170,11 @@ public struct NDKZapReceipt {
 private func parseBolt11Amount(_ bolt11: String) -> Int64? {
     // Use comprehensive Bolt11 parser
     guard let invoice = Bolt11Parser.decode(string: bolt11),
-          let amount = invoice.amount else {
+          let amount = invoice.amount
+    else {
         return nil
     }
-    
+
     // Convert satoshis to millisatoshis
     return amount.int64
 }

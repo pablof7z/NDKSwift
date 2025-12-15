@@ -4,7 +4,7 @@ import Foundation
 public final class NDKPrivateKeySigner: NDKSigner {
     private let privateKey: PrivateKey
     private let _pubkey: PublicKey
-    
+
     /// Access to the private key for NIP-59 operations
     public var privateKeyForNIP59: PrivateKey {
         return privateKey
@@ -18,7 +18,7 @@ public final class NDKPrivateKeySigner: NDKSigner {
 
         self.privateKey = privateKey
         do {
-            self._pubkey = try Crypto.getPublicKey(from: privateKey)
+            _pubkey = try Crypto.getPublicKey(from: privateKey)
         } catch {
             throw NDKError.cryptoOperation(CryptoConstants.Operation.keyDerivation, nip: nil, error: error)
         }
@@ -130,12 +130,12 @@ public final class NDKPrivateKeySigner: NDKSigner {
 
     public func serialize() async throws -> Data {
         let payload: [String: Any] = [
-            "privateKey": privateKey
+            "privateKey": privateKey,
         ]
         return try NDKSignerSerialization.createContainer(type: Self.signerType, payload: payload)
     }
 
-    public static func deserialize(_ data: Data, ndk: NDK?) async throws -> NDKPrivateKeySigner {
+    public static func deserialize(_ data: Data, ndk _: NDK?) async throws -> NDKPrivateKeySigner {
         // The registry already extracted the payload, so we just need to decode it directly
         let payload = try JSONCoding.decode([String: String].self, from: data)
 

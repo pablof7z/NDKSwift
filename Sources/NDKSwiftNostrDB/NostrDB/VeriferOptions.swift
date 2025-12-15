@@ -15,43 +15,41 @@
  */
 
 #if !os(WASI)
-import Foundation
-import NDKSwiftCore
+    import Foundation
+    import NDKSwiftCore
 #else
-import SwiftOverlayShims
+    import SwiftOverlayShims
 #endif
 
 /// `VerifierOptions` is a set of options to verify a flatbuffer
 public struct VerifierOptions {
+    /// Maximum `Apparent` size if the buffer can be expanded into a DAG tree
+    var _maxApparentSize: UOffset
 
-  /// Maximum `Apparent` size if the buffer can be expanded into a DAG tree
-  internal var _maxApparentSize: UOffset
+    /// Maximum table count allowed in a buffer
+    var _maxTableCount: UOffset
 
-  /// Maximum table count allowed in a buffer
-  internal var _maxTableCount: UOffset
+    /// Maximum depth allowed in a buffer
+    var _maxDepth: UOffset
 
-  /// Maximum depth allowed in a buffer
-  internal var _maxDepth: UOffset
+    /// Ignoring missing null terminals in strings
+    var _ignoreMissingNullTerminators: Bool
 
-  /// Ignoring missing null terminals in strings
-  internal var _ignoreMissingNullTerminators: Bool
-
-  /// initializes the set of options for the verifier
-  /// - Parameters:
-  ///   - maxDepth: Maximum depth allowed in a buffer
-  ///   - maxTableCount: Maximum table count allowed in a buffer
-  ///   - maxApparentSize: Maximum `Apparent` size if the buffer can be expanded into a DAG tree
-  ///   - ignoreMissingNullTerminators: Ignoring missing null terminals in strings *Currently not supported in swift*
-  public init(
-    maxDepth: UOffset = 64,
-    maxTableCount: UOffset = 1000000,
-    maxApparentSize: UOffset = 1 << 31,
-    ignoreMissingNullTerminators: Bool = false)
-  {
-    _maxDepth = maxDepth
-    _maxTableCount = maxTableCount
-    _maxApparentSize = maxApparentSize
-    _ignoreMissingNullTerminators = ignoreMissingNullTerminators
-  }
-
+    /// initializes the set of options for the verifier
+    /// - Parameters:
+    ///   - maxDepth: Maximum depth allowed in a buffer
+    ///   - maxTableCount: Maximum table count allowed in a buffer
+    ///   - maxApparentSize: Maximum `Apparent` size if the buffer can be expanded into a DAG tree
+    ///   - ignoreMissingNullTerminators: Ignoring missing null terminals in strings *Currently not supported in swift*
+    public init(
+        maxDepth: UOffset = 64,
+        maxTableCount: UOffset = 1_000_000,
+        maxApparentSize: UOffset = 1 << 31,
+        ignoreMissingNullTerminators: Bool = false
+    ) {
+        _maxDepth = maxDepth
+        _maxTableCount = maxTableCount
+        _maxApparentSize = maxApparentSize
+        _ignoreMissingNullTerminators = ignoreMissingNullTerminators
+    }
 }

@@ -57,7 +57,8 @@ public enum URLNormalizer {
     private static func parseURLComponents(_ url: String) throws -> URLComponents {
         guard let urlComponents = URLComponents(string: url),
               let host = urlComponents.host,
-              !host.isEmpty else {
+              !host.isEmpty
+        else {
             throw URLNormalizationError.invalidURL(url)
         }
         return urlComponents
@@ -102,7 +103,8 @@ public enum URLNormalizer {
     private static func removeDefaultPorts(_ components: inout URLComponents) {
         if let port = components.port {
             if (components.scheme == "ws" && port == NormalizationConstants.defaultWSPort) ||
-                (components.scheme == "wss" && port == NormalizationConstants.defaultWSSPort) {
+                (components.scheme == "wss" && port == NormalizationConstants.defaultWSSPort)
+            {
                 components.port = nil
             }
         }

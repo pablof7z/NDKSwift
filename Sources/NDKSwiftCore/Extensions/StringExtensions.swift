@@ -7,7 +7,7 @@ public extension String {
     var nilIfEmpty: String? {
         return isEmpty ? nil : self
     }
-    
+
     /// Returns true if string has content after trimming whitespace
     var hasContent: Bool {
         return ValidationHelpers.hasContent(self)
@@ -66,34 +66,34 @@ public extension String {
     static func fromNpub(_ npub: String) throws -> String? {
         return try Bech32.pubkey(from: npub)
     }
-    
+
     /// Attempts to normalize a relay URL, returning the original string if normalization fails
     var normalizedRelayURL: String {
         URLNormalizer.tryNormalizeRelayUrl(self) ?? self
     }
-    
+
     /// Formats a relay URL for display by removing the WebSocket scheme prefix and trailing slash
     var formattedRelayURL: String {
         var formatted = self
-        
+
         // Remove WebSocket scheme prefix
         if formatted.hasPrefix("wss://") {
             formatted = String(formatted.dropFirst(6))
         } else if formatted.hasPrefix("ws://") {
             formatted = String(formatted.dropFirst(5))
         }
-        
+
         // Remove trailing slash
         if formatted.hasSuffix("/") {
             formatted = String(formatted.dropLast())
         }
-        
+
         return formatted
     }
-    
+
     /// Truncates a relay URL for compact display
     func truncatedRelayURL(maxLength: Int = 25) -> String {
-        let formatted = self.formattedRelayURL
+        let formatted = formattedRelayURL
         if formatted.count > maxLength {
             return String(formatted.prefix(maxLength - 3)) + "..."
         }

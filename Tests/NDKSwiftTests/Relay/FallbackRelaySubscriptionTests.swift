@@ -1,12 +1,11 @@
-import XCTest
 @testable import NDKSwiftCore
+import XCTest
 
-// TODO: These tests need to be updated to work without internal API access
-// They were testing fallback relay behavior which requires internal subscription manager access
+// Tests for fallback relay behavior require internal subscription manager access
+// and need to be rewritten for the current API
 
-// Placeholder class to keep the test file valid
 final class FallbackRelaySubscriptionTests: XCTestCase {
     func testPlaceholder() {
-        // Tests need to be rewritten for new API
+        // Placeholder until tests are rewritten
     }
 }

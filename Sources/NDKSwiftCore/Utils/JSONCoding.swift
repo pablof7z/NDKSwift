@@ -2,7 +2,6 @@ import Foundation
 
 /// Centralized JSON encoding/decoding utility for consistent behavior across NDKSwift
 public enum JSONCoding {
-
     // MARK: - Encoders
 
     /// Standard JSON encoder with sorted keys and without escaping slashes.
@@ -63,10 +62,9 @@ public enum JSONCoding {
     /// - Throws: `NDKError` if encoding fails or UTF-8 conversion fails
     public static func encodeToString<T: Encodable>(_ value: T) throws -> String {
         let data = try encode(value)
-        let string = try GuardHelpers.unwrap(
-            String(data: data, encoding: .utf8),
-            error: NDKError.failedTo("convert JSON data to UTF-8 string", message: "Type: \(T.self)")
-        )
+        guard let string = String(data: data, encoding: .utf8) else {
+            throw NDKError.failedTo("convert JSON data to UTF-8 string", message: "Type: \(T.self)")
+        }
         return string
     }
 
@@ -87,20 +85,18 @@ public enum JSONCoding {
     /// - Returns: Decoded object of type T
     /// - Throws: `NDKError` if UTF-8 conversion fails, `DecodingError` if decoding fails
     public static func decode<T: Decodable>(_ type: T.Type, from string: String) throws -> T {
-        let data = try GuardHelpers.unwrap(
-            string.data(using: .utf8),
-            error: NDKError.validationError("Invalid UTF-8 string")
-        )
+        guard let data = string.data(using: .utf8) else {
+            throw NDKError.validationError("Invalid UTF-8 string")
+        }
         return try decode(type, from: data)
     }
 
     /// Encode to dictionary representation
     public static func encodeToDictionary<T: Encodable>(_ value: T) throws -> [String: Any] {
         let data = try encode(value)
-        let dictionary = try GuardHelpers.unwrap(
-            try JSONSerialization.jsonObject(with: data) as? [String: Any],
-            error: NDKError.failedTo("convert JSON data to dictionary", message: "Type: \(T.self)")
-        )
+        guard let dictionary = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw NDKError.failedTo("convert JSON data to dictionary", message: "Type: \(T.self)")
+        }
         return dictionary
     }
 
@@ -115,20 +111,18 @@ public enum JSONCoding {
     /// Encode for Nostr message serialization (compact, no spaces)
     public static func encodeForNostr<T: Encodable>(_ value: T) throws -> String {
         let data = try encoder.encode(value)
-        let string = try GuardHelpers.unwrap(
-            String(data: data, encoding: .utf8),
-            error: NDKError.failedTo("encode Nostr message to UTF-8 string", message: "Type: \(T.self)")
-        )
+        guard let string = String(data: data, encoding: .utf8) else {
+            throw NDKError.failedTo("encode Nostr message to UTF-8 string", message: "Type: \(T.self)")
+        }
         return string
     }
 
     /// Encode with snake_case keys to string
     public static func encodeSnakeCaseToString<T: Encodable>(_ value: T) throws -> String {
         let data = try snakeCaseEncoder.encode(value)
-        let string = try GuardHelpers.unwrap(
-            String(data: data, encoding: .utf8),
-            error: NDKError.failedTo("encode snake_case JSON to UTF-8 string", message: "Type: \(T.self)")
-        )
+        guard let string = String(data: data, encoding: .utf8) else {
+            throw NDKError.failedTo("encode snake_case JSON to UTF-8 string", message: "Type: \(T.self)")
+        }
         return string
     }
 
@@ -155,28 +149,25 @@ public enum JSONCoding {
 
     /// Parse JSON string to Any (object or array)
     public static func parseJSON(from string: String) throws -> Any {
-        let data = try GuardHelpers.unwrap(
-            string.data(using: .utf8),
-            error: NDKError.validationError("Invalid UTF-8 string")
-        )
+        guard let data = string.data(using: .utf8) else {
+            throw NDKError.validationError("Invalid UTF-8 string")
+        }
         return try parseJSON(from: data)
     }
 
     /// Parse JSON data to dictionary
     public static func parseDictionary(from data: Data) throws -> [String: Any] {
-        let dict = try GuardHelpers.unwrap(
-            try parseJSON(from: data) as? [String: Any],
-            error: NDKError.parseError(for: "JSON dictionary", details: "Expected dictionary but got different type")
-        )
+        guard let dict = try parseJSON(from: data) as? [String: Any] else {
+            throw NDKError.parseError(for: "JSON dictionary", details: "Expected dictionary but got different type")
+        }
         return dict
     }
 
     /// Parse JSON string to dictionary
     public static func parseDictionary(from string: String) throws -> [String: Any] {
-        let data = try GuardHelpers.unwrap(
-            string.data(using: .utf8),
-            error: NDKError.validationError("Invalid UTF-8 string")
-        )
+        guard let data = string.data(using: .utf8) else {
+            throw NDKError.validationError("Invalid UTF-8 string")
+        }
         return try parseDictionary(from: data)
     }
 
@@ -184,10 +175,9 @@ public enum JSONCoding {
     public static func parseArray(from data: Data) throws -> [Any] {
         let parsed = try parseJSON(from: data)
         let actualType = String(describing: type(of: parsed))
-        let array = try GuardHelpers.unwrap(
-            parsed as? [Any],
-            error: NDKError.parseError(for: "JSON array", details: "Expected array but got \(actualType): \(String(describing: parsed).prefix(100))")
-        )
+        guard let array = parsed as? [Any] else {
+            throw NDKError.parseError(for: "JSON array", details: "Expected array but got \(actualType): \(String(describing: parsed).prefix(100))")
+        }
         return array
     }
 
@@ -196,10 +186,9 @@ public enum JSONCoding {
         guard !string.isEmpty else {
             throw NDKError.validationError("Empty string cannot be parsed as JSON array")
         }
-        let data = try GuardHelpers.unwrap(
-            string.data(using: .utf8),
-            error: NDKError.validationError("Invalid UTF-8 string")
-        )
+        guard let data = string.data(using: .utf8) else {
+            throw NDKError.validationError("Invalid UTF-8 string")
+        }
         return try parseArray(from: data)
     }
 
@@ -211,10 +200,9 @@ public enum JSONCoding {
     /// Serialize object to JSON string
     public static func serializeToString(_ object: Any) throws -> String {
         let data = try serialize(object)
-        let string = try GuardHelpers.unwrap(
-            String(data: data, encoding: .utf8),
-            error: NDKError.failedTo("serialize JSON data to UTF-8 string")
-        )
+        guard let string = String(data: data, encoding: .utf8) else {
+            throw NDKError.failedTo("serialize JSON data to UTF-8 string")
+        }
         return string
     }
 

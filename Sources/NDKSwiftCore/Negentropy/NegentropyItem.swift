@@ -56,7 +56,7 @@ public struct NegentropyItem: Comparable, Hashable, Sendable {
     public init(hexId: String, timestamp: UInt64) throws {
         do {
             let idData = try HexValidator.validate32ByteHex(hexId)
-            self.id = idData
+            id = idData
             self.timestamp = timestamp
         } catch {
             throw NegentropyError.invalidItemId
@@ -73,8 +73,8 @@ public struct NegentropyItem: Comparable, Hashable, Sendable {
     public init(event: NDKEvent) throws {
         do {
             let idData = try HexValidator.validate32ByteHex(event.id)
-            self.id = idData
-            self.timestamp = UInt64(event.createdAt)
+            id = idData
+            timestamp = UInt64(event.createdAt)
         } catch {
             throw NegentropyError.invalidItemId
         }
@@ -121,7 +121,7 @@ public enum NegentropyError: LocalizedError, Sendable {
             return "Failed to encode Negentropy message"
         case .decodingError:
             return "Failed to decode Negentropy message"
-        case .protocolError(let message):
+        case let .protocolError(message):
             return "Negentropy protocol error: \(message)"
         case .frameSizeExceeded:
             return "Frame size limit exceeded"

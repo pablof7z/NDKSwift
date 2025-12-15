@@ -2,7 +2,6 @@ import Foundation
 
 /// Centralized constants for Bech32 Human Readable Parts (HRP) used in Nostr
 public enum Bech32HRP {
-
     // MARK: - Basic Nostr Entities
 
     /// Public key encoding (32-byte public key)
@@ -41,13 +40,13 @@ public enum Bech32HRP {
     public static func isNostrEntity(_ string: String) -> Bool {
         let lowercased = string.lowercased()
         return lowercased.hasPrefix(npub) ||
-               lowercased.hasPrefix(nsec) ||
-               lowercased.hasPrefix(note) ||
-               lowercased.hasPrefix(nevent) ||
-               lowercased.hasPrefix(naddr) ||
-               lowercased.hasPrefix(nprofile) ||
-               lowercased.hasPrefix(nrelay) ||
-               lowercased.hasPrefix(lnurl)
+            lowercased.hasPrefix(nsec) ||
+            lowercased.hasPrefix(note) ||
+            lowercased.hasPrefix(nevent) ||
+            lowercased.hasPrefix(naddr) ||
+            lowercased.hasPrefix(nprofile) ||
+            lowercased.hasPrefix(nrelay) ||
+            lowercased.hasPrefix(lnurl)
     }
 
     /// Get the entity type from a bech32 string

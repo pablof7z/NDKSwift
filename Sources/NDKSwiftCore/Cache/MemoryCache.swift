@@ -30,45 +30,45 @@ public actor MemoryCache: NDKCache {
     // Tombstone cache for deletion events that arrive before the original event
     private var deletionTombstones: [String: Date] = [:]
     private let tombstoneTTL: TimeInterval = NetworkConstants.tombstoneTTL
-    
+
     // Cleanup task for tombstones
     private var cleanupTask: Task<Void, Never>?
-    
+
     // Reactive observation support
     private var eventObservers: [UUID: EventObserver] = [:]
     private var profileObservers: [UUID: ProfileObserver] = [:]
 
     public init() {
         // Initialize LRU cache with configured item limit for decrypted content
-        self.decryptedContent = LRUCache(capacity: NetworkConstants.defaultCacheCapacity)
-        
+        decryptedContent = LRUCache(capacity: NetworkConstants.defaultCacheCapacity)
+
         // Start periodic cleanup of expired tombstones
         Task { [weak self] in
             await self?.startTombstoneCleanup()
         }
     }
-    
+
     deinit {
         cleanupTask?.cancel()
     }
-    
+
     // MARK: - Observer Management
-    
+
     private func addEventObserver(id: UUID, observer: EventObserver) {
         eventObservers[id] = observer
     }
-    
+
     private func removeEventObserver(id: UUID) {
         eventObservers.removeValue(forKey: id)
     }
-    
+
     private func markObserverAsEmittedExisting(id: UUID) {
         if var observer = eventObservers[id] {
             observer.hasEmittedExisting = true
             eventObservers[id] = observer
         }
     }
-    
+
     private func notifyEventObservers(for event: NDKEvent) {
         for (_, observer) in eventObservers {
             // Check if event matches filter
@@ -143,7 +143,6 @@ public actor MemoryCache: NDKCache {
         events.removeValue(forKey: id)
         NDKLogger.log(.debug, category: .cache, "Deleted event \(id)")
     }
-
 
     // MARK: - Cache Management
 
@@ -255,7 +254,6 @@ public actor MemoryCache: NDKCache {
         return events.count
     }
 
-
     public func unconfirmedEventCount() async -> Int {
         return eventConfirmations.values.filter { !$0.isConfirmed }.count
     }
@@ -364,8 +362,8 @@ public actor MemoryCache: NDKCache {
 
     public func processEvent(
         _ event: NDKEvent,
-        from relay: String,
-        subscriptionId: String
+        from _: String,
+        subscriptionId _: String
     ) async throws {
         // Skip ephemeral events (20000-29999)
         if EventKind.isEphemeral(event.kind) {
@@ -421,40 +419,40 @@ public actor MemoryCache: NDKCache {
     }
 
     // MARK: - Tombstone Cleanup
-    
+
     private func startTombstoneCleanup() {
         cleanupTask = Task { [weak self] in
             while !Task.isCancelled {
                 // Wait for cleanup interval (1 hour)
                 try? await Task.sleep(nanoseconds: UInt64(TimeConstants.hour * 1_000_000_000))
-                
+
                 guard !Task.isCancelled else { break }
-                
+
                 // Clean up expired tombstones
                 await self?.cleanupExpiredTombstones()
             }
         }
     }
-    
+
     private func cleanupExpiredTombstones() async {
         let now = Date()
         var expiredKeys: [String] = []
-        
+
         for (eventId, tombstoneDate) in deletionTombstones {
             if now.timeIntervalSince(tombstoneDate) > tombstoneTTL {
                 expiredKeys.append(eventId)
             }
         }
-        
+
         for key in expiredKeys {
             deletionTombstones.removeValue(forKey: key)
         }
-        
+
         if !expiredKeys.isEmpty {
             NDKLogger.log(.debug, category: .cache, "Cleaned up \(expiredKeys.count) expired tombstones")
         }
     }
-    
+
     // MARK: - Reactive Observation
 
     public func observeEvents(
@@ -463,7 +461,7 @@ public actor MemoryCache: NDKCache {
     ) async -> AsyncThrowingStream<[NDKEvent], Error> {
         AsyncThrowingStream { continuation in
             let observerId = UUID()
-            
+
             Task {
                 // Create and store observer
                 let observer = EventObserver(
@@ -471,8 +469,8 @@ public actor MemoryCache: NDKCache {
                     continuation: continuation,
                     includeExisting: includeExisting
                 )
-                await self.addEventObserver(id: observerId, observer: observer)
-                
+                self.addEventObserver(id: observerId, observer: observer)
+
                 // If includeExisting, emit current matching events
                 if includeExisting {
                     do {
@@ -480,15 +478,15 @@ public actor MemoryCache: NDKCache {
                         if !existingEvents.isEmpty {
                             continuation.yield(existingEvents)
                         }
-                        await self.markObserverAsEmittedExisting(id: observerId)
+                        self.markObserverAsEmittedExisting(id: observerId)
                     } catch {
                         continuation.finish(throwing: error)
-                        await self.removeEventObserver(id: observerId)
+                        self.removeEventObserver(id: observerId)
                         return
                     }
                 }
             }
-            
+
             continuation.onTermination = { _ in
                 Task {
                     await self.removeEventObserver(id: observerId)
@@ -496,7 +494,7 @@ public actor MemoryCache: NDKCache {
             }
         }
     }
-    
+
     public func observeProfile(
         pubkey: String,
         includeExisting: Bool = true
@@ -509,7 +507,7 @@ public actor MemoryCache: NDKCache {
                 if includeExisting {
                     // First yield nil to indicate we're starting
                     continuation.yield(nil)
-                    
+
                     // Then fetch the actual profile
                     do {
                         let filter = NDKFilter(authors: [pubkey], kinds: [EventKind.metadata], limit: 1)
@@ -523,7 +521,7 @@ public actor MemoryCache: NDKCache {
                         return
                     }
                 }
-                
+
                 // Since MemoryCache doesn't have change notifications,
                 // we complete the stream after emitting existing profile
                 continuation.finish()

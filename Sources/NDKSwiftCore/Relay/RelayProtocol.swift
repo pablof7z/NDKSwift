@@ -8,7 +8,7 @@ public protocol RelayProtocol: AnyObject, Sendable {
     var connectionState: NDKRelayConnectionState { get async }
 
     /// Reference to NDK instance
-    var ndk: NDK? { get set }
+    var ndk: NDK? { get async }
 
     /// Connect to the relay
     func connect() async throws
@@ -34,4 +34,3 @@ public protocol RelayProtocol: AnyObject, Sendable {
     /// - Throws: If the relay is not connected or other network errors occur
     func publish(_ event: NDKEvent) async throws -> (success: Bool, message: String?)
 }
-

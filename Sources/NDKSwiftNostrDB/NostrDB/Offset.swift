@@ -15,19 +15,19 @@
  */
 
 #if !os(WASI)
-import Foundation
-import NDKSwiftCore
+    import Foundation
+    import NDKSwiftCore
 #else
-import SwiftOverlayShims
+    import SwiftOverlayShims
 #endif
 
 /// Offset object for all the Objects that are written into the buffer
 public struct Offset {
-  /// Offset of the object in the buffer
-  public var o: UOffset
-  /// Returns false if the offset is equal to zero
-  public var isEmpty: Bool { o == 0 }
+    /// Offset of the object in the buffer
+    public var o: UOffset
+    /// Returns false if the offset is equal to zero
+    public var isEmpty: Bool { o == 0 }
 
-  public init(offset: UOffset) { o = offset }
-  public init() { o = 0 }
+    public init(offset: UOffset) { o = offset }
+    public init() { o = 0 }
 }

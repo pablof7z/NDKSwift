@@ -1,11 +1,10 @@
+import CashuSwift
 import Foundation
 import NDKSwiftCore
-import CashuSwift
 
 /// Handles payment routing and execution for the Cashu wallet
 /// Consolidates all payment-related logic including cross-mint transfers
 actor WalletPaymentRouter {
-
     /// Execute a payment request
     static func executePayment(
         _ request: PaymentRequest,
@@ -69,11 +68,11 @@ actor WalletPaymentRouter {
 
         // Determine which mint to use and perform any necessary transfers
         switch paymentRoute {
-        case .direct(let mint):
+        case let .direct(mint):
             NDKLogger.log(.info, category: .wallet, "💸 Direct payment using mint: \(mint)")
             // No transfer needed, mint already has sufficient balance
 
-        case .crossMint(let sourceMint, let targetMint, let estimatedFee):
+        case let .crossMint(sourceMint, targetMint, estimatedFee):
             NDKLogger.log(.info, category: .wallet, "💱 Cross-mint transfer required from \(sourceMint) to \(targetMint)")
             if let fee = estimatedFee {
                 NDKLogger.log(.info, category: .wallet, "   Estimated fee: \(fee) sats")
@@ -81,7 +80,8 @@ actor WalletPaymentRouter {
 
             // Perform the transfer
             guard let sourceURL = URLUtils.safeURL(sourceMint),
-                  let targetURL = URLUtils.safeURL(targetMint) else {
+                  let targetURL = URLUtils.safeURL(targetMint)
+            else {
                 throw NDKError.invalidRequest(ErrorMessageConstants.invalid("mint URLs for transfer"))
             }
 
@@ -101,7 +101,7 @@ actor WalletPaymentRouter {
 
             // Funds are now in the target mint
 
-        case .impossible(let reason):
+        case let .impossible(reason):
             NDKLogger.log(.error, category: .wallet, "❌ Payment impossible: \(reason)")
             throw NDKError.insufficientBalance(amount: nutzapRequest.amountSats)
         }
@@ -111,8 +111,8 @@ actor WalletPaymentRouter {
         let nutzapEvent = try await Nutzap.send(
             wallet: wallet,
             amount: nutzapRequest.amountSats,
-            to: nutzapRequest.recipientPubkey,  // This is the Nostr pubkey
-            recipientP2PKKey: nutzapRequest.recipientP2PK,  // This is the P2PK key from payment request
+            to: nutzapRequest.recipientPubkey, // This is the Nostr pubkey
+            recipientP2PKKey: nutzapRequest.recipientP2PK, // This is the P2PK key from payment request
             comment: nutzapRequest.comment,
             eventId: nil,
             mints: mintsDict,
@@ -125,9 +125,9 @@ actor WalletPaymentRouter {
         // Use the appropriate mint URL from the route
         let mintUsed: URL
         switch paymentRoute {
-        case .direct(let mint):
+        case let .direct(mint):
             mintUsed = URLUtils.safeURL(mint) ?? nutzapRequest.acceptedMints[0]
-        case .crossMint(_, let targetMint, _):
+        case let .crossMint(_, targetMint, _):
             mintUsed = URLUtils.safeURL(targetMint) ?? nutzapRequest.acceptedMints[0]
         case .impossible:
             mintUsed = nutzapRequest.acceptedMints[0]
@@ -145,8 +145,8 @@ actor WalletPaymentRouter {
     static func executeLightningPayment(
         _ lightningRequest: LightningInvoiceRequest,
         wallet: NIP60Wallet,
-        mints: MintManager,
-        proofStateManager: ProofStateManager
+        mints _: MintManager,
+        proofStateManager _: ProofStateManager
     ) async throws -> PaymentConfirmation {
         NDKLogger.log(.debug, category: .wallet, "WalletPaymentRouter.executeLightningPayment - amount: \(lightningRequest.amountSats)")
         NDKLogger.log(.debug, category: .wallet, "WalletPaymentRouter.executeLightningPayment - invoice: \(lightningRequest.invoice)")

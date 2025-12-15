@@ -1,6 +1,6 @@
-import XCTest
 @testable import NDKSwiftCore
 import NDKSwiftSQLite
+import XCTest
 
 @available(iOS 17.0, macOS 14.0, *)
 final class NDKMetaSubscriptionTests: XCTestCase {
@@ -149,7 +149,7 @@ final class NDKMetaSubscriptionTests: XCTestCase {
 
         // Concurrent reads should be safe
         await withTaskGroup(of: Int.self) { group in
-            for _ in 0..<100 {
+            for _ in 0 ..< 100 {
                 group.addTask { @MainActor in
                     metaSub.events.count
                 }
@@ -180,7 +180,7 @@ final class NDKMetaSubscriptionTests: XCTestCase {
 
         // Concurrent calls to eventsTagging should be safe
         await withTaskGroup(of: [NDKEvent].self) { group in
-            for _ in 0..<50 {
+            for _ in 0 ..< 50 {
                 group.addTask {
                     await metaSub.eventsTagging(testEvent)
                 }
@@ -202,7 +202,7 @@ final class NDKMetaSubscriptionTests: XCTestCase {
         let sortModes: [NDKMetaSubscriptionSort] = [.time, .count, .tagTime, .uniqueAuthors]
 
         // Rapid sort changes should not crash
-        for _ in 0..<20 {
+        for _ in 0 ..< 20 {
             for mode in sortModes {
                 metaSub.sort = mode
             }
@@ -221,7 +221,7 @@ final class NDKMetaSubscriptionTests: XCTestCase {
 
         // Multiple concurrent clears should be safe
         await withTaskGroup(of: Void.self) { group in
-            for _ in 0..<10 {
+            for _ in 0 ..< 10 {
                 group.addTask { @MainActor in
                     await metaSub.clear()
                 }
@@ -271,7 +271,7 @@ final class NDKMetaSubscriptionStressTests: XCTestCase {
         // Hammer the subscription with concurrent operations
         await withTaskGroup(of: Void.self) { group in
             // Concurrent reads of events
-            for _ in 0..<50 {
+            for _ in 0 ..< 50 {
                 group.addTask { @MainActor in
                     _ = metaSub.events
                     _ = metaSub.count
@@ -290,7 +290,7 @@ final class NDKMetaSubscriptionStressTests: XCTestCase {
                 sig: "sig"
             )
 
-            for _ in 0..<50 {
+            for _ in 0 ..< 50 {
                 group.addTask {
                     _ = await metaSub.eventsTagging(testEvent)
                 }
@@ -298,7 +298,7 @@ final class NDKMetaSubscriptionStressTests: XCTestCase {
 
             // Concurrent sort changes
             let sortModes: [NDKMetaSubscriptionSort] = [.time, .count, .tagTime, .uniqueAuthors]
-            for i in 0..<20 {
+            for i in 0 ..< 20 {
                 group.addTask { @MainActor in
                     metaSub.sort = sortModes[i % sortModes.count]
                 }

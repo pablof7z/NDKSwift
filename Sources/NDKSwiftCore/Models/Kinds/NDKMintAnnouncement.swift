@@ -30,7 +30,8 @@ public struct NDKMintAnnouncement: Codable, Sendable {
                 descriptions: [String: String]? = nil, pubkey: String? = nil,
                 contact: [[String]]? = nil, motd: String? = nil,
                 units: [String]? = nil, nuts: [String: AnyCodable]? = nil,
-                icon: URL? = nil) {
+                icon: URL? = nil)
+    {
         self.mintURL = mintURL
         self.name = name
         self.description = description
@@ -49,26 +50,26 @@ public struct NDKMintAnnouncement: Codable, Sendable {
         let mintURLString = try container.decode(String.self, forKey: .mintURL)
         guard let url = URL(string: mintURLString) else {
             throw DecodingError.dataCorruptedError(forKey: .mintURL,
-                                                    in: container,
-                                                    debugDescription: "Invalid mint URL")
+                                                   in: container,
+                                                   debugDescription: "Invalid mint URL")
         }
-        self.mintURL = url
+        mintURL = url
 
-        self.name = try container.decodeIfPresent(String.self, forKey: .name)
-        self.description = try container.decodeIfPresent(String.self, forKey: .description)
-        self.descriptions = try container.decodeIfPresent([String: String].self, forKey: .descriptions)
-        self.pubkey = try container.decodeIfPresent(String.self, forKey: .pubkey)
-        self.contact = try container.decodeIfPresent([[String]].self, forKey: .contact)
-        self.motd = try container.decodeIfPresent(String.self, forKey: .motd)
-        self.units = try container.decodeIfPresent([String].self, forKey: .units)
+        name = try container.decodeIfPresent(String.self, forKey: .name)
+        description = try container.decodeIfPresent(String.self, forKey: .description)
+        descriptions = try container.decodeIfPresent([String: String].self, forKey: .descriptions)
+        pubkey = try container.decodeIfPresent(String.self, forKey: .pubkey)
+        contact = try container.decodeIfPresent([[String]].self, forKey: .contact)
+        motd = try container.decodeIfPresent(String.self, forKey: .motd)
+        units = try container.decodeIfPresent([String].self, forKey: .units)
 
         // Handle nuts as dynamic JSON
-        self.nuts = try container.decodeIfPresent([String: AnyCodable].self, forKey: .nuts)
+        nuts = try container.decodeIfPresent([String: AnyCodable].self, forKey: .nuts)
 
         if let iconString = try container.decodeIfPresent(String.self, forKey: .icon) {
-            self.icon = URL(string: iconString)
+            icon = URL(string: iconString)
         } else {
-            self.icon = nil
+            icon = nil
         }
     }
 
@@ -91,9 +92,10 @@ public struct NDKMintAnnouncement: Codable, Sendable {
 }
 
 // MARK: - NDKEvent Extension
-extension NDKEvent {
+
+public extension NDKEvent {
     /// Creates a mint announcement event (kind 38000)
-    public static func mintAnnouncement(announcement: NDKMintAnnouncement, pubkey: String, signer: NDKSigner, ndk: NDK) async throws -> NDKEvent {
+    static func mintAnnouncement(announcement: NDKMintAnnouncement, pubkey: String, signer: NDKSigner, ndk: NDK) async throws -> NDKEvent {
         let contentString = (try? JSONCoding.encodeToString(announcement)) ?? "{}"
 
         // Build tags for mint URL and units
@@ -117,10 +119,10 @@ extension NDKEvent {
     }
 
     /// Parses a mint announcement from the event content
-    public func parseMintAnnouncement() throws -> NDKMintAnnouncement? {
-        guard self.kind == EventKind.mintAnnouncement else { return nil }
+    func parseMintAnnouncement() throws -> NDKMintAnnouncement? {
+        guard kind == EventKind.mintAnnouncement else { return nil }
 
-        let eventContent = self.content
+        let eventContent = content
         let data = eventContent.data(using: .utf8) ?? Data()
         return try JSONCoding.decode(NDKMintAnnouncement.self, from: data)
     }

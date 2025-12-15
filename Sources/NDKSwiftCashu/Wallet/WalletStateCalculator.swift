@@ -1,9 +1,8 @@
-import NDKSwiftCore
 import CashuSwift
+import NDKSwiftCore
 
 /// Calculates the token changes needed based on a wallet state change
 actor WalletStateCalculator {
-
     /// Calculate which tokens need to be created/deleted based on proof changes
     static func calculateNewState(
         stateChange: WalletStateChange,

@@ -1,6 +1,6 @@
+import CashuSwift
 import Foundation
 import NDKSwiftCore
-import CashuSwift
 
 /// Status of a nutzap redemption attempt
 public enum NutzapRedemptionStatus: Sendable, Codable, Equatable {
@@ -44,11 +44,11 @@ public enum NutzapRedemptionStatus: Sendable, Codable, Equatable {
         switch self {
         case .pending:
             try container.encode("pending", forKey: .type)
-        case .redeemed(let at, let proofsCount):
+        case let .redeemed(at, proofsCount):
             try container.encode("redeemed", forKey: .type)
             try container.encode(at, forKey: .redeemedAt)
             try container.encode(proofsCount, forKey: .proofsCount)
-        case .failed(let error, let attempts, let lastAttempt):
+        case let .failed(error, attempts, lastAttempt):
             try container.encode("failed", forKey: .type)
             try container.encode(error, forKey: .error)
             try container.encode(attempts, forKey: .attempts)
@@ -88,7 +88,7 @@ public enum NutzapRedemptionError: Error, Sendable, Codable, Equatable {
     /// User-friendly error message
     public var userFriendlyMessage: String {
         switch self {
-        case .invalidProofs(let reason):
+        case let .invalidProofs(reason):
             return "Invalid proofs: \(reason)"
         case .p2pkLockedToUnknownKey:
             return "This nutzap is locked to a different key"
@@ -98,15 +98,15 @@ public enum NutzapRedemptionError: Error, Sendable, Codable, Equatable {
             return "Proof verification failed"
         case .invalidEventSignature:
             return "Invalid nutzap signature"
-        case .insufficientAmount(let expected, let actual):
+        case let .insufficientAmount(expected, actual):
             return "Insufficient amount: expected \(expected) sats, got \(actual) sats"
-        case .mintUnavailable(let mint, _):
+        case let .mintUnavailable(mint, _):
             return "Mint \(mint) is currently unavailable"
-        case .networkError(let message):
+        case let .networkError(message):
             return "Network error: \(message)"
-        case .temporaryMintError(let message):
+        case let .temporaryMintError(message):
             return "Temporary mint error: \(message)"
-        case .unknownError(let message):
+        case let .unknownError(message):
             return "Unknown error: \(message)"
         }
     }
@@ -168,35 +168,35 @@ public enum NutzapRedemptionError: Error, Sendable, Codable, Equatable {
         var container = encoder.container(keyedBy: CodingKeys.self)
 
         switch self {
-        case .invalidProofs(let reason):
+        case let .invalidProofs(reason):
             try container.encode("invalidProofs", forKey: .type)
             try container.encode(reason, forKey: .reason)
-        case .p2pkLockedToUnknownKey(let expected, let actual):
+        case let .p2pkLockedToUnknownKey(expected, actual):
             try container.encode("p2pkLockedToUnknownKey", forKey: .type)
             try container.encode(expected, forKey: .expectedPubkey)
             try container.encode(actual, forKey: .actualPubkey)
-        case .alreadySpent(let proofIds):
+        case let .alreadySpent(proofIds):
             try container.encode("alreadySpent", forKey: .type)
             try container.encode(proofIds, forKey: .proofIds)
         case .dleqVerificationFailed:
             try container.encode("dleqVerificationFailed", forKey: .type)
         case .invalidEventSignature:
             try container.encode("invalidEventSignature", forKey: .type)
-        case .insufficientAmount(let expected, let actual):
+        case let .insufficientAmount(expected, actual):
             try container.encode("insufficientAmount", forKey: .type)
             try container.encode(expected, forKey: .expected)
             try container.encode(actual, forKey: .actual)
-        case .mintUnavailable(let mint, let error):
+        case let .mintUnavailable(mint, error):
             try container.encode("mintUnavailable", forKey: .type)
             try container.encode(mint, forKey: .mint)
             try container.encode(error, forKey: .error)
-        case .networkError(let error):
+        case let .networkError(error):
             try container.encode("networkError", forKey: .type)
             try container.encode(error, forKey: .error)
-        case .temporaryMintError(let error):
+        case let .temporaryMintError(error):
             try container.encode("temporaryMintError", forKey: .type)
             try container.encode(error, forKey: .error)
-        case .unknownError(let error):
+        case let .unknownError(error):
             try container.encode("unknownError", forKey: .type)
             try container.encode(error, forKey: .error)
         }
@@ -228,6 +228,7 @@ public enum NutzapStatusFilter: Sendable {
 }
 
 // MARK: - LocalizedError conformance
+
 extension NutzapRedemptionError: LocalizedError {
     public var errorDescription: String? {
         return userFriendlyMessage

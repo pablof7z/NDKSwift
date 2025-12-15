@@ -1,6 +1,6 @@
+import CashuSwift
 import Foundation
 import NDKSwiftCore
-import CashuSwift
 import secp256k1
 
 /// NIP-60 wallet implementation for Cashu-based wallets
@@ -10,7 +10,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
     public let id = "nip60"
     public let displayName = "Cashu Wallet"
 
-    internal let ndk: NDK
+    let ndk: NDK
     public let p2pkManager: P2PKManager // Manages P2PK keys for receiving nutzaps
 
     // Relay health monitoring
@@ -18,7 +18,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
 
     // Wallet configuration relays (from kind 17375 event)
     public internal(set) var walletConfigRelays: [String] = []
-    
+
     // Resolved relays for wallet operations (publishing/fetching 7375 events)
     public internal(set) var resolvedWalletRelays: [String] = []
 
@@ -71,14 +71,14 @@ public actor NIP60Wallet: NDKPaymentProvider {
 
         self.ndk = ndk
         self.signer = signer
-        self.p2pkManager = P2PKManager()
-        self.eventManager = WalletEventManager(ndk: ndk)
-        self.mints = MintManager(cache: cache ?? ndk.cache)
-        self.healthMonitor = WalletHealthMonitor(
+        p2pkManager = P2PKManager()
+        eventManager = WalletEventManager(ndk: ndk)
+        mints = MintManager(cache: cache ?? ndk.cache)
+        healthMonitor = WalletHealthMonitor(
             eventManager: eventManager,
             ndk: ndk
         )
-        self.transactionHistory = WalletTransactionHistory(
+        transactionHistory = WalletTransactionHistory(
             ndk: ndk,
             signer: signer,
             eventManager: eventManager,
@@ -87,7 +87,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
     }
 
     // MARK: - Relay Resolution
-    
+
     /// Resolve which relays to use for wallet operations based on priority:
     /// 1. 17375 event relay tags if present
     /// 2. User's 10002 relay list if no relay tags
@@ -99,14 +99,14 @@ public actor NIP60Wallet: NDKPaymentProvider {
             NDKLogger.log(.info, category: .wallet, "📡 Using \(resolvedWalletRelays.count) relays from wallet config (17375)")
             return
         }
-        
+
         // 2. Fetch user's 10002 relay list
         if let relayList = try await ndk.fetchRelayList() {
             resolvedWalletRelays = relayList.writeRelays.map { $0.url }
             NDKLogger.log(.info, category: .wallet, "📡 Using \(resolvedWalletRelays.count) write relays from user's relay list (10002)")
             return
         }
-        
+
         // 3. Use currently connected relays
         let connectedRelays = await ndk.pool.connectedRelays()
         resolvedWalletRelays = connectedRelays.map { $0.url }
@@ -115,13 +115,12 @@ public actor NIP60Wallet: NDKPaymentProvider {
 
     // MARK: - Configuration Subscription
 
-
     /// Process configuration events (17375 and 10020)
     private func processConfigurationEvent(_ event: NDKEvent) async {
         NDKLogger.log(.info, category: .wallet, "🔄 processConfigurationEvent called with kind: \(event.kind)")
-        
+
         switch event.kind {
-        case EventKind.cashuWalletConfig:  // 17375
+        case EventKind.cashuWalletConfig: // 17375
             NDKLogger.log(.info, category: .wallet, "📋 Processing wallet config event (17375)")
 
             // Only process if this is newer than what we've seen
@@ -142,7 +141,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
                 await startWalletEventSubscription()
             }
 
-        case EventKind.blockedMints:  // Blocked mints
+        case EventKind.blockedMints: // Blocked mints
             await processBlockedMintsUpdate(event)
 
         default:
@@ -190,11 +189,11 @@ public actor NIP60Wallet: NDKPaymentProvider {
                     NDKFilter(
                         authors: [userPubkey],
                         kinds: [EventKind.cashuSpendingHistory]
-                    )
+                    ),
                 ]
 
                 // Use resolved wallet relays
-                let relayUrls: Set<String>? = resolvedWalletRelays.setOrNil
+                let relayURLs: Set<String>? = resolvedWalletRelays.setOrNil
 
                 NDKLogger.log(.debug, category: .wallet, "📡 Starting wallet event subscription with \(resolvedWalletRelays.isEmpty ? "default" : "\(resolvedWalletRelays.count) resolved") relays")
 
@@ -219,7 +218,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
                         filter: filter,
                         maxAge: 0,
                         cachePolicy: .cacheWithNetwork,
-                        relays: relayUrls,
+                        relays: relayURLs,
                         subscriptionId: subscriptionId
                     )
                     dataSources.append(dataSource)
@@ -288,7 +287,6 @@ public actor NIP60Wallet: NDKPaymentProvider {
                 // Process spending history to mark redeemed nutzaps
                 await startupRedemption.processSpendingHistory(event)
                 // Continue with normal processing
-                break
 
             default:
                 break
@@ -313,12 +311,10 @@ public actor NIP60Wallet: NDKPaymentProvider {
         }
     }
 
-
     /// Process wallet configuration from event
     /// This method extracts mints, relays, and P2PK keys from a wallet configuration event.
     /// Note: Mints that fail to load (e.g., due to network errors) will be skipped and not added to the wallet.
-    internal func processWalletConfiguration(event: NDKEvent) async {
-
+    func processWalletConfiguration(event: NDKEvent) async {
         NDKLogger.log(.debug, category: .wallet, "⚙️ Processing wallet configuration")
         NDKLogger.log(.debug, category: .wallet, "⚙️ Event ID: \(event.id)")
         NDKLogger.log(.debug, category: .wallet, "⚙️ Event Kind: \(event.kind)")
@@ -460,7 +456,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
 
         NDKLogger.log(.info, category: .wallet, "Successfully blacklisted mint: \(mintURL)")
     }
-    
+
     /// Remove a mint from the blacklist and publish the updated blocked mints event
     public func unblacklistMint(_ mintURL: String) async throws {
         NDKLogger.log(.info, category: .wallet, "Removing mint from blacklist: \(mintURL)")
@@ -515,7 +511,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
                 events.yield(NIP60WalletEvent(type: .mintsRemoved(Array(newlyBlacklisted))))
             }
         }
-        
+
         // Always emit blacklist update event when processing updates
         events.yield(NIP60WalletEvent(type: .blacklistUpdated(newBlacklistedMints)))
     }
@@ -588,7 +584,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
         return balancesByMint
     }
 
-    public func createInvoice(amount: Int64, description: String?) async throws -> String {
+    public func createInvoice(amount: Int64, description _: String?) async throws -> String {
         // Create a Lightning invoice through one of our mints
         let mintURLs = await mints.getMintURLs()
         guard let mintURL = mintURLs.first else {
@@ -606,12 +602,10 @@ public actor NIP60Wallet: NDKPaymentProvider {
         return quote.invoice
     }
 
-
-
     // MARK: - Nutzap Receiving
 
     /// Process an incoming nutzap event
-    internal func processIncomingNutzap(_ event: NDKEvent) async throws {
+    func processIncomingNutzap(_ event: NDKEvent) async throws {
         do {
             let mints = await mints.getAllMints()
             let keysets = mints.values.flatMap { $0.keysets }.reduce(into: [:]) { result, keyset in
@@ -623,15 +617,15 @@ public actor NIP60Wallet: NDKPaymentProvider {
                 wallet: self,
                 event: event,
                 mints: mints,
-            keysets: keysets,
-            proofStateManager: proofStateManager,
-            eventManager: eventManager,
-            p2pkManager: p2pkManager,
-            ndk: ndk,
-            signer: signer
-        )
+                keysets: keysets,
+                proofStateManager: proofStateManager,
+                eventManager: eventManager,
+                p2pkManager: p2pkManager,
+                ndk: ndk,
+                signer: signer
+            )
 
-        // Success - the status is already updated by processIncoming
+            // Success - the status is already updated by processIncoming
         } catch {
             // Map error and update status
             let redemptionError = Nutzap.mapToRedemptionError(error)
@@ -676,8 +670,6 @@ public actor NIP60Wallet: NDKPaymentProvider {
         return try await fulfill(request)
     }
 
-
-
     /// Send P2PK-locked proofs to a recipient
     public func send(
         amount: Int64,
@@ -710,7 +702,6 @@ public actor NIP60Wallet: NDKPaymentProvider {
         )
     }
 
-
     /// Transfer funds between mints using Lightning as a bridge
     /// This performs a melt operation on the source mint and a mint operation on the destination mint
     public func transferBetweenMints(
@@ -730,7 +721,6 @@ public actor NIP60Wallet: NDKPaymentProvider {
         )
     }
 
-
     /// Check proof states with all mints and reconcile wallet state
     /// This queries each mint for the status of our proofs and updates our local state accordingly
     public func checkAndReconcileProofStates() async throws {
@@ -744,9 +734,6 @@ public actor NIP60Wallet: NDKPaymentProvider {
 
         NDKLogger.log(.debug, category: .wallet, "🔍 Reconciliation complete - Checked: \(result.totalChecked), Spent: \(result.spentProofs.count), Pending: \(result.pendingProofs.count), Errors: \(result.errors)")
     }
-
-
-
 
     /// Check proof states for a specific mint
     public func checkProofStates(mintURL: URL) async throws -> [String: CashuSwift.Proof.ProofState] {
@@ -779,7 +766,6 @@ public actor NIP60Wallet: NDKPaymentProvider {
 
         return result
     }
-
 
     /// Request a mint quote for depositing via Lightning
     public func requestMint(
@@ -878,10 +864,11 @@ public actor NIP60Wallet: NDKPaymentProvider {
         }
     }
 
-
-
     /// Initialize wallet by subscribing to wallet events
     public func load() async throws {
+        // Register the Cashu fallback handler for Lightning-to-Nutzap conversions
+        await ndk.zapManager.register(fallbackHandler: CashuZapFallbackHandler())
+
         // Clear state before starting
         await proofStateManager.clear()
         await eventManager.clearTrackedEvents()
@@ -889,7 +876,6 @@ public actor NIP60Wallet: NDKPaymentProvider {
         walletConfigRelays = []
         newestConfigTimestamp = 0
         hasProcessedInitialConfig = false
-
 
         // Cancel any existing subscriptions
         configSubscriptionTask?.cancel()
@@ -1002,7 +988,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
         // Cancel existing monitor if any
         activeQuoteMonitors[quote.quoteId]?.cancel()
 
-        NDKLogger.log(.debug, category: .wallet, "📜 Starting quote tracking for \(quote.quoteId) - age: \(Int(age/60)) minutes")
+        NDKLogger.log(.debug, category: .wallet, "📜 Starting quote tracking for \(quote.quoteId) - age: \(Int(age / 60)) minutes")
 
         // Start monitoring with dynamic interval
         let task = Task { [weak self] in
@@ -1107,9 +1093,8 @@ public actor NIP60Wallet: NDKPaymentProvider {
     ///   - relays: Array of relay URLs to publish wallet events to
     ///   - publishMintList: Whether to publish a public mint list event (kind 10019)
     public func setup(mints: [String], relays: [String], publishMintList: Bool = true) async throws {
-
         // Update wallet configuration relays immediately
-        self.walletConfigRelays = relays
+        walletConfigRelays = relays
 
         // Get or create P2PK keypair
         let (p2pkPrivateKey, _) = try await p2pkManager.getOrCreateKeypair()
@@ -1125,7 +1110,6 @@ public actor NIP60Wallet: NDKPaymentProvider {
 
         // Optionally publish mint list (kind 10019)
         if publishMintList {
-
             // Get P2PK public key for nutzaps
             let p2pkPubkey = try await getP2PKPubkey()
 
@@ -1140,9 +1124,6 @@ public actor NIP60Wallet: NDKPaymentProvider {
 
         // The wallet event processor will handle the incoming event and configure the mints
     }
-
-
-
 
     // MARK: - Centralized State Management
 
@@ -1207,10 +1188,6 @@ public actor NIP60Wallet: NDKPaymentProvider {
 
     private var lastNotifiedBalance: Int64 = -1 // Start with -1 to ensure first balance notification
 
-
-
-
-
     // MARK: - Proof Access
 
     /// Get all unspent proofs grouped by mint
@@ -1218,7 +1195,6 @@ public actor NIP60Wallet: NDKPaymentProvider {
     public func getUnspentProofs() async -> [String: [CashuSwift.Proof]] {
         return await proofStateManager.getAvailableProofsByMint()
     }
-
 
     /// Create a token from specific proofs without P2PK locking
     /// This is used for offline token generation where exact proofs are specified
@@ -1239,8 +1215,8 @@ public actor NIP60Wallet: NDKPaymentProvider {
 
         // Update wallet state (mark proofs as spent)
         let stateChange = WalletStateChange(
-            store: [],  // No new proofs to store
-            destroy: proofs,  // Mark these proofs as spent
+            store: [], // No new proofs to store
+            destroy: proofs, // Mark these proofs as spent
             mint: mint.absoluteString
         )
 
@@ -1271,7 +1247,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
                 NDKLogger.log(.warning, category: .wallet, "Failed to resolve wallet relays: \(error)")
             }
         }
-        
+
         // Use the actual resolved relays that events are published to
         let relaysToCheck = resolvedWalletRelays.compactMap { NDKRelay(url: $0) }
         let status = await healthMonitor.getWalletHealthStatus(walletRelays: relaysToCheck)
@@ -1354,7 +1330,6 @@ public actor NIP60Wallet: NDKPaymentProvider {
 
     // MARK: - Internal Helpers
 
-
     /// Stop the wallet and clean up resources
     public func stop() async {
         // Cancel subscriptions
@@ -1385,7 +1360,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
         return try await healthMonitor.checkAndReconcileProofStates(
             proofStateManager: proofStateManager,
             mints: allMints,
-            mintManager: self.mints,
+            mintManager: mints,
             signer: signer
         )
     }
@@ -1554,7 +1529,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
 
         for nutzap in failedNutzaps {
             // Only retry if the error is retryable
-            if case .failed(let error, _, _) = nutzap.status, error.isRetryable {
+            if case let .failed(error, _, _) = nutzap.status, error.isRetryable {
                 do {
                     let result = try await redeemNutzap(nutzap.eventId)
                     results.append((nutzap.eventId, result))
@@ -1580,7 +1555,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
     private func redeemWithRetry(_ event: NDKEvent, maxAttempts: Int) async throws -> NutzapRedemptionResult {
         var lastError: Error?
 
-        for attempt in 1...maxAttempts {
+        for attempt in 1 ... maxAttempts {
             do {
                 // Get mints and construct keysets dictionary
                 let allMints = await mints.getAllMints()
@@ -1623,7 +1598,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
 
     /// Get current attempt count from status
     private func getCurrentAttempts(_ status: NutzapRedemptionStatus) -> Int {
-        if case .failed(_, let attempts, _) = status {
+        if case let .failed(_, attempts, _) = status {
             return attempts
         }
         return 0

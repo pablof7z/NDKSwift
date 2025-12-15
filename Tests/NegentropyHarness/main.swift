@@ -15,13 +15,13 @@ var stderr = FileHandle.standardError
 extension FileHandle: @retroactive TextOutputStream {
     public func write(_ string: String) {
         guard let data = string.data(using: .utf8) else { return }
-        self.write(data)
+        write(data)
     }
 }
 
 // Helper for Data comparison
 func compareData(_ a: Data, _ b: Data) -> Int {
-    for i in 0..<min(a.count, b.count) {
+    for i in 0 ..< min(a.count, b.count) {
         if a[i] < b[i] { return -1 }
         if a[i] > b[i] { return 1 }
     }
@@ -36,58 +36,58 @@ func compareData(_ a: Data, _ b: Data) -> Int {
 class NegentropyStorageVector: NegentropyStorage {
     private var items: [NegentropyItem] = []
     private var sealed = false
-    
+
     func addItem(_ item: NegentropyItem) throws {
         guard !sealed else { throw NegentropyError.protocolError("already sealed") }
         items.append(item)
     }
-    
+
     func seal() async throws {
         guard !sealed else { throw NegentropyError.protocolError("already sealed") }
         sealed = true
-        
+
         // Sort items
         items.sort()
-        
+
         // Check for duplicates
-        for i in 1..<items.count {
-            if items[i-1] == items[i] {
+        for i in 1 ..< items.count {
+            if items[i - 1] == items[i] {
                 throw NegentropyError.protocolError("duplicate item")
             }
         }
     }
-    
+
     func getItems(in range: NegentropyRange) async throws -> [NegentropyItem] {
         guard sealed else { throw NegentropyError.protocolError("not sealed") }
-        
+
         return items.filter { item in
             // Check lower bound
             if let lower = range.lower {
                 if item.timestamp < lower.timestamp { return false }
                 if item.timestamp == lower.timestamp && compareData(item.id, lower.id) < 0 { return false }
             }
-            
+
             // Check upper bound
             if let upper = range.upper {
                 if item.timestamp > upper.timestamp { return false }
                 if item.timestamp == upper.timestamp && compareData(item.id, upper.id) >= 0 { return false }
             }
-            
+
             return true
         }
     }
-    
+
     func getRangeInfo(_ range: NegentropyRange) async throws -> (fingerprint: Data, count: Int) {
         let items = try await getItems(in: range)
         let accumulator = NegentropyAccumulator.from(items)
         return (fingerprint: accumulator.fingerprint(), count: items.count)
     }
-    
-    func addItems(_ items: [NegentropyItem]) async throws {
+
+    func addItems(_: [NegentropyItem]) async throws {
         // Not needed for test harness
     }
-    
-    func removeItems(_ ids: [Data]) async throws {
+
+    func removeItems(_: [Data]) async throws {
         // Not needed for test harness
     }
 }
@@ -96,9 +96,9 @@ class NegentropyStorageVector: NegentropyStorage {
 while let line = readLine() {
     let parts = line.split(separator: ",")
     guard !parts.isEmpty else { continue }
-    
+
     let command = String(parts[0])
-    
+
     switch command {
     case "item":
         guard parts.count >= 3 else {
@@ -117,7 +117,7 @@ while let line = readLine() {
             print("Error adding item: \(error)", to: &stderr)
             exit(1)
         }
-        
+
     case "seal":
         Task {
             do {
@@ -128,7 +128,7 @@ while let line = readLine() {
                 exit(1)
             }
         }
-        
+
     case "initiate":
         Task {
             guard let negentropy = negentropy else {
@@ -143,7 +143,7 @@ while let line = readLine() {
                 exit(1)
             }
         }
-        
+
     case "msg":
         guard parts.count >= 2 else {
             print("Error: missing message data", to: &stderr)
@@ -154,7 +154,7 @@ while let line = readLine() {
             print("Error: bad message format", to: &stderr)
             exit(1)
         }
-        
+
         Task {
             guard let negentropy = negentropy else {
                 print("Error: not sealed", to: &stderr)
@@ -162,14 +162,14 @@ while let line = readLine() {
             }
             do {
                 let (responseData, haveIds, needIds) = try await negentropy.reconcile(msgData)
-                
+
                 for id in haveIds {
                     print("have,\(id)")
                 }
                 for id in needIds {
                     print("need,\(id)")
                 }
-                
+
                 if let data = responseData {
                     print("msg,\(data.hexString)")
                 } else {
@@ -180,7 +180,7 @@ while let line = readLine() {
                 exit(1)
             }
         }
-        
+
     default:
         print("Error: unknown command: \(command)", to: &stderr)
         exit(1)

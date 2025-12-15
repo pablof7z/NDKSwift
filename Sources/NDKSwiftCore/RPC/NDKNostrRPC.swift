@@ -37,26 +37,26 @@ public struct NDKRPCResponse {
 public actor NDKNostrRPC {
     private let ndk: NDK
     private let localSigner: NDKPrivateKeySigner
-    private let relayUrls: [String]
+    private let relayURLs: [String]
     private var encryptionScheme: NDKEncryptionScheme = .nip44
     private var pendingRequests: [String: CheckedContinuation<NDKRPCResponse, Error>] = [:]
     private var timeoutTasks: [String: Task<Void, Never>] = [:]
 
-    init(ndk: NDK, localSigner: NDKPrivateKeySigner, relayUrls: [String]) {
+    init(ndk: NDK, localSigner: NDKPrivateKeySigner, relayURLs: [String]) {
         self.ndk = ndk
         self.localSigner = localSigner
-        self.relayUrls = relayUrls
+        self.relayURLs = relayURLs
     }
-    
+
     deinit {
         // Cancel all pending timeout tasks
         timeoutTasks.values.forEach { $0.cancel() }
         timeoutTasks.removeAll()
-        
+
         // Resolve any pending continuations with a cancellation error
         pendingRequests.values.forEach { $0.resume(throwing: NDKError.cancelled) }
         pendingRequests.removeAll()
-        
+
         NDKLogger.log(.debug, category: .auth, "NDKNostrRPC deinitialized")
     }
 
@@ -84,7 +84,8 @@ public actor NDKNostrRPC {
         let id = json["id"] as? String ?? ""
 
         if let method = json["method"] as? String,
-           let params = json["params"] as? [String] {
+           let params = json["params"] as? [String]
+        {
             return NDKRPCRequest(
                 id: id,
                 pubkey: event.pubkey,
@@ -121,7 +122,7 @@ public actor NDKNostrRPC {
         let request: [String: Any] = [
             "id": id,
             "method": method,
-            "params": params
+            "params": params,
         ]
 
         let requestData = try JSONSerialization.data(withJSONObject: request)
@@ -140,10 +141,10 @@ public actor NDKNostrRPC {
         NDKLogger.log(.debug, category: .auth, "Created and signed event - id: \(event.id)")
 
         // Prepare target relays
-        let targetRelayUrls = relayUrls.setOrNil
+        let targetRelayUrls = relayURLs.setOrNil
 
         // Publish event
-        let publishDescription = targetRelayUrls != nil ? "to specific relays: \(relayUrls)" : "to all connected relays"
+        let publishDescription = targetRelayUrls != nil ? "to specific relays: \(relayURLs)" : "to all connected relays"
         NDKLogger.log(.info, category: .auth, "Publishing \(publishDescription)")
 
         let publishedRelays = try await ndk.publish(event, to: targetRelayUrls)
@@ -151,9 +152,9 @@ public actor NDKNostrRPC {
         NDKLogger.log(.info, category: .auth, "Published to relays: \(publishedRelays.map { $0.url })")
 
         // If publishing to specific relays failed, try direct send as fallback
-        if !relayUrls.isEmpty && publishedRelays.isEmpty {
+        if !relayURLs.isEmpty, publishedRelays.isEmpty {
             NDKLogger.log(.warning, category: .auth, "\(ErrorMessageConstants.failedTo("publish to any relay"))! Attempting direct send fallback...")
-            await attemptDirectSend(event: event, to: relayUrls)
+            await attemptDirectSend(event: event, to: relayURLs)
         }
     }
 
@@ -226,15 +227,15 @@ public actor NDKNostrRPC {
             continuation.resume(throwing: NDKError.timeout(operation: "RPC request", seconds: Int(NetworkConstants.timeoutRPCRequest)))
         }
     }
-    
+
     private func cleanupRequest(id: String) async {
         pendingRequests.removeValue(forKey: id)
         timeoutTasks[id]?.cancel()
         timeoutTasks.removeValue(forKey: id)
     }
 
-    private func attemptDirectSend(event: NDKEvent, to relayUrls: [String]) async {
-        for url in relayUrls {
+    private func attemptDirectSend(event: NDKEvent, to relayURLs: [String]) async {
+        for url in relayURLs {
             if let relay = (await ndk.relays).first(where: { $0.url == url }) {
                 NDKLogger.log(.debug, category: .auth, "Attempting direct send to \(url)")
                 do {

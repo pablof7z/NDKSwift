@@ -1,6 +1,6 @@
+import CashuSwift
 import Foundation
 import NDKSwiftCore
-import CashuSwift
 
 /// Represents the result of a deposit monitoring operation
 public enum DepositMonitoringResult {
@@ -18,7 +18,7 @@ public enum DepositMintError: LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .requiresUserIntervention(let op, _):
+        case let .requiresUserIntervention(op, _):
             return "\(ErrorMessageConstants.failedTo("mint tokens at \(op.mintURL)")) after Lightning deposit was confirmed. Quote ID: \(op.quoteId)"
         }
     }
@@ -50,7 +50,6 @@ private func splitIntoBase2(_ amount: Int) -> [Int] {
 
 /// Functions for handling Lightning deposits to Cashu mints
 public enum CashuDeposit {
-
     // MARK: - Deposit Operations
 
     /// Request a mint quote for depositing via Lightning
@@ -77,7 +76,7 @@ public enum CashuDeposit {
         )
 
         // If persistQuote is true and signer is provided, save it as a NIP-60 quote event
-        var eventId: String? = nil
+        var eventId: String?
         if persistQuote, let signer = signer {
             eventId = try await eventManager.saveQuoteEvent(quote: quote, signer: signer, relays: relays)
         }
@@ -177,7 +176,7 @@ public enum CashuDeposit {
                             }
                         } catch {
                             // If it's a specific error indicating deposit not ready, continue polling
-                            if case NDKError.walletError(let message) = error, message.contains("Deposit not ready") {
+                            if case let NDKError.walletError(message) = error, message.contains("Deposit not ready") {
                                 // Expected - deposit not ready yet, continue polling
                             } else if case CashuError.quoteNotPaid = error {
                                 // Also handle CashuError.quoteNotPaid for compatibility
@@ -265,7 +264,6 @@ public enum CashuDeposit {
             throw NDKError.depositNotReady("Deposit not yet received by mint")
         }
 
-
         // Create mint quote with request details for issue function
         var mintQuote = statusResponse
         mintQuote.requestDetail = CashuSwift.Bolt11.RequestMintQuote(
@@ -286,7 +284,7 @@ public enum CashuDeposit {
         )
 
         // Check if user notification is required
-        if wasUserNotified && proofs.isEmpty {
+        if wasUserNotified, proofs.isEmpty {
             throw NDKError.paymentFailed(reason: "Mint operation requires user intervention after reaching retry limit")
         }
 

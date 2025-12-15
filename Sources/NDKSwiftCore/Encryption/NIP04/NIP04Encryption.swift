@@ -8,32 +8,25 @@ import secp256k1
 ///
 /// Specification: https://github.com/nostr-protocol/nips/blob/master/04.md
 public enum NIP04 {
-
     /// Compute shared secret using ECDH
     /// - Parameters:
     ///   - privateKey: Sender's private key (hex)
     ///   - pubkey: Recipient's public key (hex)
     /// - Returns: 32-byte shared secret
     static func computeSharedSecret(privateKey: PrivateKey, pubkey: PublicKey) throws -> Data {
-        let privKeyData = try GuardHelpers.unwrap(
-            Data(hexString: privateKey),
-            error: Crypto.CryptoError.invalidKeyLength
-        )
-        try GuardHelpers.require(
-            privKeyData,
-            condition: { $0.count == 32 },
-            error: Crypto.CryptoError.invalidKeyLength
-        )
+        guard let privKeyData = Data(hexString: privateKey) else {
+            throw Crypto.CryptoError.invalidKeyLength
+        }
+        guard privKeyData.count == 32 else {
+            throw Crypto.CryptoError.invalidKeyLength
+        }
 
-        let pubkeyData = try GuardHelpers.unwrap(
-            Data(hexString: pubkey),
-            error: Crypto.CryptoError.invalidKeyLength
-        )
-        try GuardHelpers.require(
-            pubkeyData,
-            condition: { $0.count == 32 },
-            error: Crypto.CryptoError.invalidKeyLength
-        )
+        guard let pubkeyData = Data(hexString: pubkey) else {
+            throw Crypto.CryptoError.invalidKeyLength
+        }
+        guard pubkeyData.count == 32 else {
+            throw Crypto.CryptoError.invalidKeyLength
+        }
 
         // Create private key for key agreement
         let privKey = try secp256k1.KeyAgreement.PrivateKey(dataRepresentation: privKeyData)
@@ -116,10 +109,9 @@ public enum NIP04 {
     }
 
     private static func encryptAES(message: String, key: Data, iv: Data) throws -> Data {
-        let messageData = try GuardHelpers.unwrap(
-            message.data(using: .utf8),
-            error: Crypto.CryptoError.invalidPoint
-        )
+        guard let messageData = message.data(using: .utf8) else {
+            throw Crypto.CryptoError.invalidPoint
+        }
 
         // Ensure key is 32 bytes for AES-256
         guard key.count == 32 else {
@@ -147,10 +139,9 @@ public enum NIP04 {
         // Remove PKCS7 padding
         let unpaddedData = try pkcs7Unpad(Data(decrypted))
 
-        let message = try GuardHelpers.unwrap(
-            String(data: unpaddedData, encoding: .utf8),
-            error: Crypto.CryptoError.invalidPoint
-        )
+        guard let message = String(data: unpaddedData, encoding: .utf8) else {
+            throw Crypto.CryptoError.invalidPoint
+        }
 
         return message
     }
@@ -164,10 +155,9 @@ public enum NIP04 {
 
     /// Remove PKCS7 padding
     private static func pkcs7Unpad(_ data: Data) throws -> Data {
-        let lastByte = try GuardHelpers.unwrap(
-            data.last,
-            error: Crypto.CryptoError.invalidPoint
-        )
+        guard let lastByte = data.last else {
+            throw Crypto.CryptoError.invalidPoint
+        }
 
         let paddingLength = Int(lastByte)
         guard paddingLength > 0 && paddingLength <= 16 && paddingLength <= data.count else {
@@ -176,7 +166,7 @@ public enum NIP04 {
 
         // Verify all padding bytes are the same
         let paddingStart = data.count - paddingLength
-        for i in paddingStart..<data.count {
+        for i in paddingStart ..< data.count {
             if data[i] != lastByte {
                 throw Crypto.CryptoError.invalidPoint
             }

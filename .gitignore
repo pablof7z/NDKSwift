@@ -29,3 +29,5 @@ Examples/NutsackiOS/.build/
 
 # Log files
 *.log
+.worktrees/
+.worktrees/

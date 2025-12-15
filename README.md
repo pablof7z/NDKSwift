@@ -174,7 +174,7 @@ try event.sign(with: signer)
 
 ## 📚 Learn More
 
-**Documentation**: [Full docs](Documentation/) including [Getting Started](Documentation/GETTING_STARTED.md), [API Reference](Documentation/API_REFERENCE.md), and [Architecture](Documentation/ARCHITECTURE.md)
+**Documentation**: [Full docs](Documentation/) including [Getting Started](Documentation/GettingStarted/Guide.md), [API Reference](Documentation/Reference/API.md), and [Architecture](Documentation/Architecture/Overview.md)
 
 **Examples**: Check out the [Examples](Examples/) directory for runnable demos
 
@@ -208,9 +208,45 @@ swift test --verbose
 - Swift 5.5+
 - Xcode 13.0+
 
+## 🛠 Development
+
+### Pre-Commit Hooks
+
+This repository includes a pre-commit hook to maintain code quality and prevent common Swift anti-patterns.
+
+The hook will **block commits** that contain:
+- Force casts (`as!`) - Use safe casting (`as?`) instead
+
+The hook will **warn** about (but not block):
+- Force unwraps (`!`) in unsafe contexts
+- `@unchecked Sendable`
+- `nonisolated(unsafe)`
+- Underscore-prefixed properties
+
+**To enable the pre-commit hook:**
+
+```bash
+# The script is already in the repository
+chmod +x scripts/validate-code-quality.sh
+
+# Install the hook (run from repository root)
+cp scripts/validate-code-quality.sh .git/hooks/pre-commit
+chmod +x .git/hooks/pre-commit
+```
+
+**To bypass the hook** in exceptional cases (not recommended):
+```bash
+git commit --no-verify -m "your message"
+```
+
+**Run quality checks manually:**
+```bash
+./scripts/validate-code-quality.sh
+```
+
 ## 🤝 Contributing
 
-We welcome contributions! Check out our [Architecture Overview](Documentation/ARCHITECTURE.md) to understand the codebase structure.
+We welcome contributions! Check out our [Architecture Overview](Documentation/Architecture/Overview.md) to understand the codebase structure.
 
 ## 📄 License
 

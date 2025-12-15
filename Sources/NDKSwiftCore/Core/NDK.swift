@@ -11,22 +11,17 @@ public protocol NDKAuthenticationDelegate: AnyObject, Sendable {
 }
 
 /// Main entry point for NDKSwift
-/// **Sendable Conformance**: Uses @unchecked Sendable because:
-/// - NDK is designed as a singleton-style coordinator accessed from multiple contexts
-/// - Internal state is protected by actors (PendingAuthEventsManager, etc.)
-/// - Mutable properties (signer, cache, pool) are thread-safe types or accessed via MainActor
-/// - Typical usage pattern: created once, configured early, then used read-only
-public final class NDK: @unchecked Sendable {
+public final class NDK {
     // MARK: - Core Properties
 
     /// Active signer for this NDK instance
     public var signer: NDKSigner?
 
     /// Active session data for reactive filters
-    public internal(set) var sessionData: NDKSessionData?
+    public var sessionData: NDKSessionData?
 
     /// Cache for storing events (always present, defaults to in-memory)
-    public var cache: NDKCache
+    public let cache: NDKCache
 
     /// Active user (derived from signer)
     public var activeUser: NDKUser? {
@@ -42,10 +37,10 @@ public final class NDK: @unchecked Sendable {
     }
 
     /// Whether debug mode is enabled
-    public var debugMode: Bool = false
+    public let debugMode: Bool
 
     /// Signature verification configuration
-    public var signatureVerificationConfig: NDKSignatureVerificationConfig
+    public let signatureVerificationConfig: NDKSignatureVerificationConfig
 
     /// Signature verification delegate
     public weak var signatureVerificationDelegate: NDKSignatureVerificationDelegate?
@@ -54,157 +49,140 @@ public final class NDK: @unchecked Sendable {
     public weak var authenticationDelegate: NDKAuthenticationDelegate?
 
     /// Whether outbox model is enabled (default: true)
-    public var outboxEnabled: Bool = true
+    public let outboxEnabled: Bool
 
     /// Outbox configuration
-    public var outboxConfig: NDKOutboxConfig = .default
+    public let outboxConfig: NDKOutboxConfig
 
     /// Configuration for automatic client tagging (NIP-89)
-    public var clientTagConfig: NDKClientTagConfig?
+    public let clientTagConfig: NDKClientTagConfig?
 
-    /// Actor to manage thread-safe access to pending auth events
-    private actor PendingAuthEventsManager {
-        private var pendingAuthEvents: [EventID: NDKRelay] = [:]
-        
-        func setPendingAuthEvent(eventId: EventID, relay: NDKRelay) {
-            pendingAuthEvents[eventId] = relay
+    /// Track pending auth events by event ID to relay (thread-safe via actor)
+    private let pendingAuthEvents = PendingAuthEvents()
+
+    private actor PendingAuthEvents {
+        private var events: [EventID: NDKRelay] = [:]
+
+        func remove(for eventId: EventID) -> NDKRelay? {
+            events.removeValue(forKey: eventId)
         }
-        
-        func removePendingAuthEvent(for eventId: EventID) -> NDKRelay? {
-            return pendingAuthEvents.removeValue(forKey: eventId)
+
+        func set(eventId: EventID, relay: NDKRelay) {
+            events[eventId] = relay
         }
     }
-    
-    /// Track pending auth events by event ID to relay
-    private let pendingAuthEventsManager = PendingAuthEventsManager()
 
     // MARK: - Outbox API
 
     /// Outbox manager - provides simplified API for outbox operations
-    public private(set) lazy var outbox: NDKOutboxManager = {
-        NDKOutboxManager(ndk: self)
-    }()
+    public private(set) lazy var outbox: NDKOutboxManager = .init(ndk: self)
 
     // MARK: - Internal Components
 
     /// Event publishing and management
-    internal var eventManager: NDKEventManager!
+    lazy var eventManager: NDKEventManager = {
+        NDKEventManager(ndk: self, cache: self.cache)
+    }()
 
     /// Relay pool management
-    public var pool: NDKPool!
+    public lazy var pool: NDKPool = {
+        NDKPool(ndk: self)
+    }()
 
     /// User and profile management
-    public private(set) var profileManager: NDKProfileManager!
+    public lazy var profileManager: NDKProfileManager = {
+        NDKProfileManager(ndk: self)
+    }()
 
     /// Event tracker for managing event metadata
-    public let eventTracker: NDKEventTracker = NDKEventTracker()
+    public let eventTracker: NDKEventTracker = .init()
 
     /// Internal subscription manager for NDKSubscriptionManager
-    internal var internalSubscriptionManager: InternalSubscriptionManager!
+    lazy var internalSubscriptionManager: InternalSubscriptionManager = {
+        InternalSubscriptionManager(ndk: self)
+    }()
 
     /// Signature verification sampler
-    private let signatureVerificationSampler: NDKSignatureVerificationSampler
-
+    private lazy var signatureVerificationSampler: NDKSignatureVerificationSampler = {
+        NDKSignatureVerificationSampler(config: self.signatureVerificationConfig)
+    }()
 
     /// Data requirement manager for declarative data access
-    internal var dataRequirementManager: NDKSubscriptionManager?
+    lazy var dataRequirementManager: NDKSubscriptionManager = {
+        NDKSubscriptionManager(ndk: self)
+    }()
 
     /// Initial relay URLs to add after construction
-    private var initialRelayUrls: [RelayURL] = []
-    
+    private var initialRelayURLs: [RelayURL] = []
+
     /// Track whether connect() has been called
     private var hasConnected = false
 
     // MARK: - Lazy Internal Components
 
-    internal var _relayRanker: NDKRelayRanker?
-    internal var _relaySelector: NDKRelaySelector?
-    internal var _publishingStrategy: NDKPublishingStrategy?
-    internal var _nip05Manager: NIP05Manager?
-    internal var _blossomServerManager: NDKBlossomServerManager?
+    lazy var relayRanker: NDKRelayRanker = {
+        NDKRelayRanker(ndk: self, tracker: outbox)
+    }()
 
-    // MARK: - Computed Properties
+    lazy var relaySelector: NDKRelaySelector = {
+        NDKRelaySelector(ndk: self, tracker: outbox, ranker: relayRanker)
+    }()
 
-    /// Helper to lazily initialize properties
-    internal func lazyInit<T>(_ storage: inout T?, creator: () -> T) -> T {
-        if let existing = storage {
-            return existing
-        }
-        let newValue = creator()
-        storage = newValue
-        return newValue
-    }
-
-    internal var relaySelector: NDKRelaySelector {
-        lazyInit(&_relaySelector) {
-            NDKRelaySelector(ndk: self, tracker: outbox, ranker: relayRanker)
-        }
-    }
+    lazy var publishingStrategy: NDKPublishingStrategy = {
+        NDKPublishingStrategy(ndk: self, selector: relaySelector, ranker: relayRanker)
+    }()
 
     /// NIP-05 manager for efficient resolution and caching
-    public var nip05Manager: NIP05Manager {
-        lazyInit(&_nip05Manager) {
-            NIP05Manager(ndk: self)
-        }
-    }
-    
+    public lazy var nip05Manager: NIP05Manager = {
+        NIP05Manager(ndk: self)
+    }()
+
     /// Blossom server manager for managing server lists and uploads
-    public var blossomServerManager: NDKBlossomServerManager {
-        lazyInit(&_blossomServerManager) {
-            NDKBlossomServerManager(ndk: self)
-        }
-    }
+    public lazy var blossomServerManager: NDKBlossomServerManager = {
+        NDKBlossomServerManager(ndk: self)
+    }()
 
     // MARK: - Initialization
 
     /// Initialize NDK with a custom cache instance
     /// - Parameters:
-    ///   - relayUrls: Initial relay URLs to connect to
+    ///   - relayURLs: Initial relay URLs to connect to
     ///   - signer: Optional signer for signing events
     ///   - cache: Custom cache instance. If nil, uses MemoryCache
     ///   - signatureVerificationConfig: Configuration for signature verification
+    ///   - debugMode: Whether debug mode is enabled
+    ///   - outboxEnabled: Whether outbox model is enabled
+    ///   - outboxConfig: Outbox configuration
+    ///   - clientTagConfig: Configuration for automatic client tagging
     public init(
-        relayUrls: [RelayURL] = [],
+        relayURLs: [RelayURL] = [],
         signer: NDKSigner? = nil,
+        sessionData: NDKSessionData? = nil,
         cache: NDKCache? = nil,
-        signatureVerificationConfig: NDKSignatureVerificationConfig = .default
+        signatureVerificationConfig: NDKSignatureVerificationConfig = .default,
+        debugMode: Bool = false,
+        outboxEnabled: Bool = true,
+        outboxConfig: NDKOutboxConfig = .default,
+        clientTagConfig: NDKClientTagConfig? = nil
     ) {
         self.signer = signer
+        self.sessionData = sessionData
         self.cache = cache ?? MemoryCache()
         self.signatureVerificationConfig = signatureVerificationConfig
-        self.signatureVerificationSampler = NDKSignatureVerificationSampler(config: signatureVerificationConfig)
-        
-        // Auth manager is now lazy-initialized on first access from MainActor
+        self.debugMode = debugMode
+        self.outboxEnabled = outboxEnabled
+        self.outboxConfig = outboxConfig
+        self.clientTagConfig = clientTagConfig
 
-        // Initialize internal subscription manager (must be early for event routing)
-        self.internalSubscriptionManager = InternalSubscriptionManager(ndk: self)
-
-        // Initialize core managers
-        // Note: These are initialized directly (not lazy) because they're essential
-        // for basic NDK operation and have interdependencies during startup
-        self.eventManager = NDKEventManager(
-            ndk: self,
-            cache: self.cache
-        )
-
-        self.pool = NDKPool(
-            ndk: self
-        )
-
-        self.profileManager = NDKProfileManager(
-            ndk: self
-        )
-
-        // Initialize data requirement manager for declarative API
-        self.dataRequirementManager = NDKSubscriptionManager(ndk: self)
+        // All managers are now lazy-initialized on first access
+        // This avoids initialization order issues with 'self'
 
         // Set shared NDK instance for NDKEventBuilder
         NDKEventBuilder.setSharedNDK(self)
 
         // Store relay URLs for later initialization
-        self.initialRelayUrls = relayUrls
+        initialRelayURLs = relayURLs
     }
-
 
     // MARK: - Relay Management (Delegated to Pool)
 
@@ -256,7 +234,6 @@ public final class NDK: @unchecked Sendable {
                     NDKLogger.log(.info, category: .relay, "Relay disconnected! Total: \(connectedCount)")
                 default:
                     NDKLogger.log(.trace, category: .relay, "Other change: \(change)")
-                    break
                 }
             }
 
@@ -292,7 +269,7 @@ public final class NDK: @unchecked Sendable {
     @discardableResult
     public func addRelay(_ url: RelayURL, origin: NDKRelayOrigin = .explicit) async -> NDKRelay {
         let relay = await pool.addRelay(url, origin: origin)
-        
+
         if hasConnected {
             // Auto-connect the relay since connect() has already been called
             NDKLogger.log(.info, category: .relay, "Auto-connecting relay \(url) since connect() has been called")
@@ -305,10 +282,9 @@ public final class NDK: @unchecked Sendable {
             // Warn that the relay won't be connected until connect() is called
             NDKLogger.log(.warning, category: .relay, "⚠️ Relay \(url) added but not connected. Call connect() to establish connections to all relays.")
         }
-        
+
         return relay
     }
-
 
     /// Remove a relay from the pool
     public func removeRelay(_ url: RelayURL) async {
@@ -346,18 +322,18 @@ public final class NDK: @unchecked Sendable {
     /// Initialize relays that were passed to the constructor
     /// This should be called before connect() to ensure relays are added
     public func initializeRelays() async {
-        for url in initialRelayUrls {
+        for url in initialRelayURLs {
             await addRelay(url)
         }
-        initialRelayUrls.removeAll() // Clear after adding
+        initialRelayURLs.removeAll() // Clear after adding
     }
 
     /// Initiates WebSocket connections to all relays in the pool.
     /// Connections are managed automatically with reconnection logic.
     public func connect() async {
         // Ensure initial relays are added first
-        if !initialRelayUrls.isEmpty {
-            NDKLogger.log(.info, category: .relay, "Adding \(initialRelayUrls.count) initial relay(s) from configuration")
+        if !initialRelayURLs.isEmpty {
+            NDKLogger.log(.info, category: .relay, "Adding \(initialRelayURLs.count) initial relay(s) from configuration")
             await initializeRelays()
         }
 
@@ -371,7 +347,7 @@ public final class NDK: @unchecked Sendable {
 
         NDKLogger.log(.info, category: .relay, "Connecting to all relays in pool")
         await pool.connectAll()
-        
+
         // Mark that connect has been called
         hasConnected = true
     }
@@ -395,15 +371,15 @@ public final class NDK: @unchecked Sendable {
     ///   - logRawJSON: If true, logs the raw JSON for debugging
     /// - Returns: Set of relays that accepted the event
     /// - Throws: NDKError if publishing fails
-    public func publish(_ event: NDKEvent, to relayUrls: Set<String>? = nil, logRawJSON: Bool = false) async throws -> Set<NDKRelay> {
-        if let relayUrls = relayUrls {
-            try await eventManager.publish(event: event, to: relayUrls, logRawJSON: logRawJSON)
+    public func publish(_ event: NDKEvent, to relayURLs: Set<String>? = nil, logRawJSON: Bool = false) async throws -> Set<NDKRelay> {
+        if let relayURLs = relayURLs {
+            try await eventManager.publish(event: event, to: relayURLs, logRawJSON: logRawJSON)
         } else {
             try await eventManager.publish(event, logRawJSON: logRawJSON)
         }
     }
 
-    public func publish(_ builder: (NDKEventBuilder) -> NDKEventBuilder) async throws -> (event: NDKEvent, relays: Set<NDKRelay>) {
+    public func publish(_ builder: @Sendable (NDKEventBuilder) -> NDKEventBuilder) async throws -> (event: NDKEvent, relays: Set<NDKRelay>) {
         try await eventManager.publish(builder)
     }
 
@@ -421,41 +397,6 @@ public final class NDK: @unchecked Sendable {
     }
 
     // MARK: - Declarative Data Access
-
-    /// Create a declarative data source for observing events
-    ///
-    /// The returned data source automatically manages subscriptions, caching,
-    /// and lifecycle. It's the primary API for accessing Nostr data.
-    ///
-    /// ## Usage
-    /// ```swift
-    /// let profileData = NDKSubscription<NDKUserMetadata>(
-    ///     ndk: ndk,
-    ///     filter: NDKFilter(authors: [pubkey], kinds: [0])
-    /// ) { event in
-    ///     // Transform event to metadata
-    ///     NDKUserMetadata(event: event)
-    /// }
-    /// ```
-    ///
-    /// - Parameters:
-    ///   - filter: The filter to match events against
-    ///   - transform: Optional transform function to convert NDKEvent to custom type
-    /// - Returns: A data source that can be observed for changes
-    @MainActor
-    public func dataSource(
-        filter: NDKFilter
-    ) -> NDKSubscription<NDKEvent> {
-        NDKSubscription(ndk: self, filter: filter) { $0 }
-    }
-
-    @MainActor
-    public func dataSource<T>(
-        filter: NDKFilter,
-        transform: @escaping (NDKEvent) -> T?
-    ) -> NDKSubscription<T> {
-        NDKSubscription(ndk: self, filter: filter, transform: transform)
-    }
 
     /// Observe events matching a filter with automatic subscription management
     ///
@@ -507,7 +448,7 @@ public final class NDK: @unchecked Sendable {
     ) -> NDKSubscription<NDKEvent> {
         // Smart default: close on EOSE if maxAge > 0, otherwise stay open
         let shouldCloseOnEose = closeOnEose ?? (maxAge > 0)
-        
+
         return NDKSubscription(
             ndk: self,
             filter: filter,
@@ -519,7 +460,7 @@ public final class NDK: @unchecked Sendable {
             closeOnEose: shouldCloseOnEose
         )
     }
-    
+
     /// Subscribe to events with custom options
     public func subscribe(
         filter: NDKFilter,
@@ -545,7 +486,7 @@ public final class NDK: @unchecked Sendable {
     ) -> NDKSubscription<T> {
         // Smart default: close on EOSE if maxAge > 0, otherwise stay open
         let shouldCloseOnEose = closeOnEose ?? (maxAge > 0)
-        
+
         return NDKSubscription(
             ndk: self,
             filter: filter,
@@ -558,8 +499,6 @@ public final class NDK: @unchecked Sendable {
             transform: transform
         )
     }
-    
-
 
     // MARK: - User Management
 
@@ -611,8 +550,8 @@ public final class NDK: @unchecked Sendable {
 
     func processEvent(_ event: NDKEvent, subscriptionId: String, from relay: RelayProtocol) async {
         NDKLogger.log(.trace, category: .subscription,
-                     "🌐 [NDK] Processing event \(event.id.prefix(8))... for subscription '\(subscriptionId)' from relay \(relay.url)")
-        
+                      "🌐 [NDK] Processing event \(event.id.prefix(8))... for subscription '\(subscriptionId)' from relay \(relay.url)")
+
         // Track that we've seen this event on this relay
         // If this is the first time we see this event, also set it as the source relay
         let seenRelays = await eventTracker.getSeenOnRelays(eventId: event.id)
@@ -621,7 +560,7 @@ public final class NDK: @unchecked Sendable {
         } else {
             await eventTracker.markSeen(eventId: event.id, relay: relay.url)
         }
-        
+
         // Process event through cache for observation
         do {
             try await cache.processEvent(event, from: relay.url, subscriptionId: subscriptionId)
@@ -633,7 +572,7 @@ public final class NDK: @unchecked Sendable {
         if let ndkRelay = relay as? NDKRelay {
             // Process through internal subscription manager with correct subscription ID
             NDKLogger.log(.trace, category: .subscription,
-                         "🔄 [NDK] Forwarding to InternalSubscriptionManager with subscription '\(subscriptionId)'")
+                          "🔄 [NDK] Forwarding to InternalSubscriptionManager with subscription '\(subscriptionId)'")
             await internalSubscriptionManager.processEvent(event, subscriptionId: subscriptionId, from: ndkRelay)
         } else {
             NDKLogger.log(.warning, category: .event, "⚠️ Relay is not NDKRelay type - cannot route to subscription manager")
@@ -648,14 +587,14 @@ public final class NDK: @unchecked Sendable {
 
     func processOKMessage(eventId: EventID, accepted: Bool, message: String?, from relay: RelayProtocol) async {
         // Check if this is an auth event response
-        let authRelay = await pendingAuthEventsManager.removePendingAuthEvent(for: eventId)
-        
+        let authRelay = await pendingAuthEvents.remove(for: eventId)
+
         if let authRelay = authRelay {
             if accepted {
                 // Authentication successful
                 await authRelay.updateConnectionState(.authenticated)
                 NDKLogger.log(.info, category: .auth, "Successfully authenticated with relay \(relay.url)")
-                
+
                 // Trigger retry of failed publishes
                 await retryFailedPublishesForRelay(authRelay)
             } else {
@@ -665,7 +604,7 @@ public final class NDK: @unchecked Sendable {
             }
             return
         }
-        
+
         // Regular event processing
         if accepted {
             // Always confirm event in cache
@@ -683,7 +622,7 @@ public final class NDK: @unchecked Sendable {
         NDKLogger.log(.info, category: .relay, "Notice from \(relay.url): \(message)")
     }
 
-    func processCount(subscriptionId: String, count: Int, from relay: RelayProtocol) {
+    func processCount(subscriptionId _: String, count: Int, from relay: RelayProtocol) {
         // Count messages not supported in declarative API yet
         NDKLogger.log(.debug, category: .event, "Received COUNT from \(relay.url): \(count)")
     }
@@ -735,17 +674,17 @@ public final class NDK: @unchecked Sendable {
                 NostrConstants.JSONField.kind: authEvent.kind,
                 NostrConstants.JSONField.tags: authEvent.tags,
                 NostrConstants.JSONField.content: authEvent.content,
-                NostrConstants.JSONField.sig: authEvent.sig
+                NostrConstants.JSONField.sig: authEvent.sig,
             ]
             let authMessage: [Any] = ["AUTH", eventDict]
             let jsonData = try JSONSerialization.data(withJSONObject: authMessage, options: [.withoutEscapingSlashes])
             let jsonString = String(data: jsonData, encoding: .utf8) ?? ""
-            
+
             // Track pending auth event - moved inside try block after authEvent is created
-            await pendingAuthEventsManager.setPendingAuthEvent(eventId: authEvent.id, relay: ndkRelay)
-            
+            await pendingAuthEvents.set(eventId: authEvent.id, relay: ndkRelay)
+
             try await relay.send(jsonString)
-            
+
             // The OK response will trigger state change to authenticated
         } catch {
             NDKLogger.log(.error, category: .auth, "Failed to respond to auth challenge: \(error)")
@@ -755,7 +694,7 @@ public final class NDK: @unchecked Sendable {
     }
 
     // MARK: - Authentication Helpers
-    
+
     /// Retry failed publishes after successful authentication
     private func retryFailedPublishesForRelay(_ relay: NDKRelay) async {
         await eventManager.retryAuthenticatedEvents(for: relay)
@@ -794,7 +733,7 @@ public final class NDK: @unchecked Sendable {
     /// Set a custom delegate for signature verification
     /// - Parameter delegate: The delegate that will handle signature verification decisions
     public func setSignatureVerificationDelegate(_ delegate: NDKSignatureVerificationDelegate) async {
-        self.signatureVerificationDelegate = delegate
+        signatureVerificationDelegate = delegate
     }
 
     // MARK: - Advanced Pool Access (for internal use)
@@ -805,16 +744,16 @@ public final class NDK: @unchecked Sendable {
     }
 
     /// Get a specific relay - primarily for internal use
-    internal func getRelay(for url: RelayURL) async -> NDKRelay? {
+    func getRelay(for url: RelayURL) async -> NDKRelay? {
         await pool.getRelay(for: url)
     }
-    
+
     /// Get the authors that caused us to connect to each relay through the outbox model
     /// - Returns: Dictionary mapping relay URLs to the authors whose relay lists included them
     public func getRelayAuthorMapping() async -> [RelayURL: [String]] {
         await pool.getRelayAuthorMapping()
     }
-    
+
     /// Get the authors that caused us to connect to a specific relay
     /// - Parameter url: The relay URL to check
     /// - Returns: Array of author pubkeys that caused this relay connection (empty for explicit relays)
@@ -825,7 +764,7 @@ public final class NDK: @unchecked Sendable {
     // MARK: - NIP-77 Support
 
     /// Process NIP-77 Negentropy message from relay
-    internal func processNIP77Message(_ message: NostrMessage, from relay: NDKRelay) async {
+    func processNIP77Message(_ message: NostrMessage, from relay: NDKRelay) async {
         NDKLogger.log(.debug, category: .sync, "Processing NIP-77 message from \(relay.url)")
 
         // Get the sync handler for this relay
@@ -843,7 +782,6 @@ public final class NDK: @unchecked Sendable {
             NDKLogger.log(.error, category: .sync, "❌ Failed to handle NIP-77 message: \(error)")
         }
     }
-
 
     // MARK: - NIP-05 Search
 
@@ -863,7 +801,6 @@ public final class NDK: @unchecked Sendable {
         }
         return results
     }
-    
 
     /// Verify a NIP-05 identifier for a user
     /// - Parameters:
@@ -881,17 +818,16 @@ public final class NDK: @unchecked Sendable {
     }
 
     // MARK: - Internal Fetch Utilities
-    
+
     // MARK: - Subscription Metrics
-    
+
     /// Get current subscription grouping metrics
     public func getSubscriptionMetrics() async -> MetricsSnapshot {
         await NDKSubscriptionMetrics.getSnapshot()
     }
-    
+
     /// Reset subscription grouping metrics
     public func resetSubscriptionMetrics() async {
         await NDKSubscriptionMetrics.reset()
     }
-
 }

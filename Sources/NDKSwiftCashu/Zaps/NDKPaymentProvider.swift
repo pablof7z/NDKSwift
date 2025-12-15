@@ -1,5 +1,5 @@
-import Foundation
 import CashuSwift
+import Foundation
 import NDKSwiftCore
 
 // Core payment types (PaymentRequest, PaymentConfirmation, NDKPaymentProvider, PaymentError)
@@ -26,11 +26,11 @@ public struct CashuPaymentConfirmation: PaymentConfirmation {
     public let timestamp: Date
     public let proofs: [CashuSwift.Proof]
     public let change: [CashuSwift.Proof]?
-    public let mintURL: URL  // The mint that was actually used
+    public let mintURL: URL // The mint that was actually used
 
     public init(proofs: [CashuSwift.Proof], change: [CashuSwift.Proof]? = nil, mintURL: URL) {
-        self.amountSats = proofs.reduce(Int64(0)) { $0 + Int64($1.amount) }
-        self.timestamp = Date()
+        amountSats = proofs.reduce(Int64(0)) { $0 + Int64($1.amount) }
+        timestamp = Date()
         self.proofs = proofs
         self.change = change
         self.mintURL = mintURL

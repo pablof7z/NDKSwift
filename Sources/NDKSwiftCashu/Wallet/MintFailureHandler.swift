@@ -40,9 +40,9 @@ public actor MintFailureHandler {
     /// Handle a mint failure error from payment operations
     public func handlePaymentError(_ error: Error) async throws {
         // Check if this is a mint failure that requires user intervention
-        if case MintFailureError.requiresUserIntervention(let operation, _, _, _, let paymentProof) = error {
+        if case let MintFailureError.requiresUserIntervention(operation, _, _, _, paymentProof) = error {
             try await handleMintFailure(operation, paymentProof: paymentProof)
-        } else if case DepositMintError.requiresUserIntervention(let operation, _) = error {
+        } else if case let DepositMintError.requiresUserIntervention(operation, _) = error {
             try await handleDepositFailure(operation)
         } else {
             // Re-throw other errors
@@ -172,10 +172,10 @@ public actor MintFailureHandler {
 }
 
 /// Example UI implementation for SwiftUI apps
-public struct MintFailureAlert {
+public enum MintFailureAlert {
     public static func present(
-        operation: PendingMintOperation,
-        error: Error
+        operation _: PendingMintOperation,
+        error _: Error
     ) async -> MintFailureUserDecision {
         // In a real SwiftUI app, this would present an alert
         // For now, we'll return a default decision

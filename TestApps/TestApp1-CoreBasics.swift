@@ -23,14 +23,14 @@ import NDKSwift
 
 // MARK: - Test Configuration
 
-let TIMEOUT_SHORT = 2_000_000_000  // 2 seconds
+let TIMEOUT_SHORT = 2_000_000_000 // 2 seconds
 let TIMEOUT_MEDIUM = 5_000_000_000 // 5 seconds
-let TIMEOUT_LONG = 10_000_000_000  // 10 seconds
+let TIMEOUT_LONG = 10_000_000_000 // 10 seconds
 
 let TEST_RELAYS = [
     "wss://relay.damus.io",
     "wss://relay.primal.net",
-    "wss://nos.lol"
+    "wss://nos.lol",
 ]
 
 // MARK: - Test Helpers
@@ -155,7 +155,7 @@ func testSignerCreation() async throws {
     // Test 2.5: Invalid hex key
     printTest("Error handling - invalid hex key")
     do {
-        let _ = try NDKPrivateKeySigner(privateKey: "invalid")
+        _ = try NDKPrivateKeySigner(privateKey: "invalid")
         printFailure("Should have thrown error for invalid key")
     } catch {
         printSuccess("Correctly throws error for invalid hex key")
@@ -272,7 +272,7 @@ func testBasicEventPublishing() async throws {
     printTest("Publish without signer (error case)")
     let ndkNoSigner = NDK(relayUrls: TEST_RELAYS)
     do {
-        let _ = try await ndkNoSigner.publish { builder in
+        _ = try await ndkNoSigner.publish { builder in
             builder.content("This should fail")
         }
         printFailure("Should have thrown error without signer")

@@ -1,6 +1,6 @@
-import Foundation
 import CryptoKit
 import CryptoSwift
+import Foundation
 import secp256k1
 
 /// NIP-44: Encrypted Direct Messages (Version 2)
@@ -17,7 +17,6 @@ import secp256k1
 ///
 /// Specification: https://github.com/nostr-protocol/nips/blob/master/44.md
 public enum NIP44 {
-
     /// NIP-44 specific errors
     public enum NIP44Error: LocalizedError {
         case unsupportedVersion
@@ -46,7 +45,7 @@ public enum NIP44 {
     }
 
     /// NIP-44 constants
-    private struct Constants {
+    private enum Constants {
         static let version: UInt8 = 0x02
         static let salt = "nip44-v2".data(using: .utf8)!
         static let minPlaintextSize = 1
@@ -61,7 +60,7 @@ public enum NIP44 {
         static let conversationKeySize = 32
         static let macSize = 32
         static let chunkSizeThreshold = 256
-        static let expandedKeySize = 76  // 32 (chacha key) + 12 (nonce) + 32 (hmac key)
+        static let expandedKeySize = 76 // 32 (chacha key) + 12 (nonce) + 32 (hmac key)
         static let chachaKeySize = 32
         static let chachaNonceSize = 12
         static let hmacKeySize = 32
@@ -84,14 +83,14 @@ public enum NIP44 {
 
     /// Pad plaintext according to NIP-44
     static func pad(_ plaintext: String) throws -> Data {
-        let unpadded = try GuardHelpers.unwrap(
-            plaintext.data(using: .utf8),
-            error: Crypto.CryptoError.invalidPoint
-        )
+        guard let unpadded = plaintext.data(using: .utf8) else {
+            throw Crypto.CryptoError.invalidPoint
+        }
 
         let unpaddedLen = unpadded.count
         guard unpaddedLen >= Constants.minPlaintextSize &&
-              unpaddedLen <= Constants.maxPlaintextSize else {
+            unpaddedLen <= Constants.maxPlaintextSize
+        else {
             throw NIP44Error.invalidPayloadSize
         }
 
@@ -122,15 +121,15 @@ public enum NIP44 {
 
         guard unpaddedLen > 0,
               padded.count >= 2 + unpaddedLen,
-              padded.count == calcPaddedLen(unpaddedLen) + 2 else {
+              padded.count == calcPaddedLen(unpaddedLen) + 2
+        else {
             throw NIP44Error.invalidPadding
         }
 
-        let unpadded = padded[2..<(2 + unpaddedLen)]
-        let plaintext = try GuardHelpers.unwrap(
-            String(data: unpadded, encoding: .utf8),
-            error: NIP44Error.invalidPadding
-        )
+        let unpadded = padded[2 ..< (2 + unpaddedLen)]
+        guard let plaintext = String(data: unpadded, encoding: .utf8) else {
+            throw NIP44Error.invalidPadding
+        }
 
         return plaintext
     }
@@ -168,7 +167,7 @@ public enum NIP44 {
         let privateKeyBytes = [UInt8](privKeyData)
 
         // Use secp256k1_ecdh with custom callback to extract only x-coordinate
-        guard secp256k1_ecdh(secp256k1.Context.rawRepresentation, &sharedSecret, &pubkey, privateKeyBytes, { (output, x32, _, _) in
+        guard secp256k1_ecdh(secp256k1.Context.rawRepresentation, &sharedSecret, &pubkey, privateKeyBytes, { output, x32, _, _ in
             // Copy only the x-coordinate (32 bytes for secp256k1)
             memcpy(output, x32, Constants.sharedSecretSize)
             return 1
@@ -204,9 +203,9 @@ public enum NIP44 {
 
         // Convert SymmetricKey to Data
         let keysData = keys.withUnsafeBytes { Data($0) }
-        let chachaKey = Data(keysData[0..<32])
-        let chachaNonce = Data(keysData[32..<44])
-        let hmacKey = Data(keysData[44..<76])
+        let chachaKey = Data(keysData[0 ..< 32])
+        let chachaNonce = Data(keysData[32 ..< 44])
+        let hmacKey = Data(keysData[44 ..< 76])
 
         return (chachaKey, chachaNonce, hmacKey)
     }
@@ -216,14 +215,12 @@ public enum NIP44 {
         // Get message keys
         let (chachaKey, chachaNonce, hmacKey) = try getMessageKeys(conversationKey: conversationKey, nonce: nonce)
 
-
         // Pad plaintext
         let padded = try pad(plaintext)
 
         // Encrypt with ChaCha20
         let chacha = try ChaCha20(key: Array(chachaKey), iv: Array(chachaNonce))
         let ciphertext = try chacha.encrypt(Array(padded))
-
 
         // Calculate HMAC with AAD (nonce + ciphertext)
         var aad = Data()
@@ -260,10 +257,9 @@ public enum NIP44 {
         }
 
         // Decode base64
-        let data = try GuardHelpers.unwrap(
-            Data(base64Encoded: payload),
-            error: NIP44Error.invalidPayloadSize
-        )
+        guard let data = Data(base64Encoded: payload) else {
+            throw NIP44Error.invalidPayloadSize
+        }
 
         let dlen = data.count
         guard dlen >= Constants.minDataSize && dlen <= Constants.maxDataSize else {
@@ -276,9 +272,9 @@ public enum NIP44 {
             throw NIP44Error.unsupportedVersion
         }
 
-        let nonce = data[1..<(1 + Constants.nonceSize)]
-        let ciphertext = data[(1 + Constants.nonceSize)..<(dlen - Constants.macSize)]
-        let mac = data[(dlen - Constants.macSize)..<dlen]
+        let nonce = data[1 ..< (1 + Constants.nonceSize)]
+        let ciphertext = data[(1 + Constants.nonceSize) ..< (dlen - Constants.macSize)]
+        let mac = data[(dlen - Constants.macSize) ..< dlen]
 
         // Get message keys
         let (chachaKey, chachaNonce, hmacKey) = try getMessageKeys(conversationKey: conversationKey, nonce: Data(nonce))

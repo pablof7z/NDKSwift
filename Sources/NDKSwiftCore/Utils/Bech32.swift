@@ -158,6 +158,7 @@ public extension Bech32 {
         let hrp = String(string[..<separatorIndex]).lowercased()
         return hrp.nilIfEmpty
     }
+
     /// Encode a public key to npub format
     static func npub(from pubkey: PublicKey) throws -> String {
         let data: Data

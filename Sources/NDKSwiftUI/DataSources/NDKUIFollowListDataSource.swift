@@ -1,7 +1,7 @@
 import Foundation
 import NDKSwiftCore
-import SwiftUI
 import Observation
+import SwiftUI
 
 // MARK: - Follow List Data Source
 
@@ -18,7 +18,7 @@ public class NDKUIFollowListDataSource {
     @ObservationIgnored private var observationTask: Task<Void, Never>?
 
     public init(ndk: NDK, pubkey: String) {
-        self.dataSource = ndk.subscribe(
+        dataSource = ndk.subscribe(
             filter: NDKFilter(
                 authors: [pubkey],
                 kinds: [EventKind.contacts]

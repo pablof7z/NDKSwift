@@ -1,5 +1,5 @@
 //
-//  NdbTagIterators.swift
+//  NdbTagIterator.swift
 //  damus
 //
 //  Created by William Casarin on 2023-07-21.
@@ -8,7 +8,6 @@
 import Foundation
 import NDKSwiftCore
 import NostrDB
-
 
 /// The sequence of strings in a single nostr event tag
 ///
@@ -30,7 +29,7 @@ struct TagSequence: Sequence {
     }
 
     func strings() -> [String] {
-        return self.map { $0.string() }
+        return map { $0.string() }
     }
 
     subscript(index: Int) -> NdbTagElem {
@@ -67,6 +66,6 @@ struct TagIterator: IteratorProtocol {
     init(note: NdbNote, tag: ndb_tag_ptr) {
         self.note = note
         self.tag = tag
-        self.index = 0
+        index = 0
     }
 }

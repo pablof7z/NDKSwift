@@ -6,11 +6,8 @@ This directory contains technical documentation for developers working on NDKSwi
 
 ### Implementation Plans
 - **[NIP-29 Implementation Plan](NIP-29-Implementation-Plan.md)** - Detailed plan for implementing community moderation features
-- **[NIP-60/61 Implementation Plan](NIP-60-61-Implementation-Plan.md)** - Wallet protocol implementation with Cashu integration
 
 ### Technical Analysis
-- **[Test Coverage Analysis](TEST_COVERAGE_ANALYSIS.md)** - Current test coverage report and gap analysis
-- **[Test Implementation Plan](TEST_IMPLEMENTATION_PLAN.md)** - Comprehensive testing strategy and implementation roadmap
 
 ### Performance Testing
 - **Large Subscription Performance Tests** - Tests for handling 10,000+ events and 100+ concurrent subscriptions

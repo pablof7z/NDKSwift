@@ -1,31 +1,5 @@
 import Foundation
 
-/// Extension to NDK for internal outbox model support
-extension NDK {
-    // MARK: - Internal Outbox Components
-
-
-    /// Relay ranker for intelligent selection
-    var relayRanker: NDKRelayRanker {
-        lazyInit(&_relayRanker) {
-            NDKRelayRanker(ndk: self, tracker: outbox)
-        }
-    }
-
-
-    /// Publishing strategy for outbox model
-    var publishingStrategy: NDKPublishingStrategy {
-        lazyInit(&_publishingStrategy) {
-            NDKPublishingStrategy(
-                ndk: self,
-                selector: relaySelector,
-                ranker: relayRanker
-            )
-        }
-    }
-
-}
-
 /// NDK Outbox Configuration
 public struct NDKOutboxConfig {
     /// Relays to blacklist from outbox selection

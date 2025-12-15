@@ -21,15 +21,14 @@ enum WalletEventParsingUtils {
             value: event.content,
             scheme: scheme
         )
-        
-        let data = try GuardHelpers.unwrap(
-            decryptedContent.data(using: .utf8),
-            error: NDKError.invalidContent("Decrypted content not valid UTF-8 for event \(event.id)")
-        )
-        
+
+        guard let data = decryptedContent.data(using: .utf8) else {
+            throw NDKError.invalidContent("Decrypted content not valid UTF-8 for event \(event.id)")
+        }
+
         return try JSONCoding.decode(T.self, from: data)
     }
-    
+
     /// Decrypts event content and attempts to parse it, returning nil on failure
     /// - Parameters:
     ///   - event: The event containing encrypted content
@@ -48,7 +47,7 @@ enum WalletEventParsingUtils {
             return nil
         }
     }
-    
+
     /// Validates that an event has the expected kind and required tags
     /// - Parameters:
     ///   - event: The event to validate
@@ -63,7 +62,7 @@ enum WalletEventParsingUtils {
         guard event.kind == expectedKind else {
             throw NDKError.invalidDataFormat("event kind", details: "Expected kind \(expectedKind) but got \(event.kind)")
         }
-        
+
         for tagName in requiredTags {
             if event.tags(withName: tagName).isEmpty {
                 throw NDKError.missingRequired(tagName, in: "event \(event.id)")

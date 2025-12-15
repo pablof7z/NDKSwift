@@ -19,11 +19,11 @@ public actor NDKNWCWallet: NDKPaymentProvider {
     public let displayName = "Nostr Wallet Connect"
 
     public let ndk: NDK
-    nonisolated public let connectionURI: NWCConnectionURI
+    public nonisolated let connectionURI: NWCConnectionURI
 
     private let signer: NDKSigner
     private let requestBuilder: NWCRequestBuilder
-    nonisolated private let responseHandler: NWCResponseHandler
+    private nonisolated let responseHandler: NWCResponseHandler
     private var _status: NWCConnectionStatus = .disconnected
     private var _walletInfo: GetInfoResponse?
     private var _cachedBalance: Int64?
@@ -47,13 +47,13 @@ public actor NDKNWCWallet: NDKPaymentProvider {
     public init(ndk: NDK, connectionURI: String) async throws {
         self.ndk = ndk
         self.connectionURI = try NWCConnectionURI(uri: connectionURI)
-        self.signer = try self.connectionURI.createSigner()
-        self.requestBuilder = NWCRequestBuilder(
+        signer = try self.connectionURI.createSigner()
+        requestBuilder = NWCRequestBuilder(
             ndk: ndk,
             walletPubkey: self.connectionURI.walletPubkey,
             signer: signer
         )
-        self.responseHandler = NWCResponseHandler(
+        responseHandler = NWCResponseHandler(
             ndk: ndk,
             signer: signer,
             relayURLs: Array(self.connectionURI.normalizedRelayURLs())
@@ -64,13 +64,13 @@ public actor NDKNWCWallet: NDKPaymentProvider {
     public init(ndk: NDK, connectionURI: NWCConnectionURI) async throws {
         self.ndk = ndk
         self.connectionURI = connectionURI
-        self.signer = try connectionURI.createSigner()
-        self.requestBuilder = NWCRequestBuilder(
+        signer = try connectionURI.createSigner()
+        requestBuilder = NWCRequestBuilder(
             ndk: ndk,
             walletPubkey: connectionURI.walletPubkey,
             signer: signer
         )
-        self.responseHandler = NWCResponseHandler(
+        responseHandler = NWCResponseHandler(
             ndk: ndk,
             signer: signer,
             relayURLs: Array(connectionURI.normalizedRelayURLs())
@@ -260,7 +260,8 @@ public actor NDKNWCWallet: NDKPaymentProvider {
         // Check cache
         if let cachedBalance = _cachedBalance,
            let lastCheck = _lastBalanceCheck,
-           Date().timeIntervalSince(lastCheck) < balanceCacheDuration {
+           Date().timeIntervalSince(lastCheck) < balanceCacheDuration
+        {
             return GetBalanceResponse(balance: cachedBalance)
         }
 
@@ -281,7 +282,6 @@ public actor NDKNWCWallet: NDKPaymentProvider {
 
         return response
     }
-
 
     // MARK: - NDKPaymentProvider Protocol
 
@@ -411,7 +411,7 @@ public actor NDKNWCWallet: NDKPaymentProvider {
                 // Shouldn't happen, but handle gracefully by attempting connection
                 try await connect()
             }
-        case .error(let message):
+        case let .error(message):
             throw NDKError.walletError(message: "Wallet connection error: \(message)")
         }
     }
@@ -419,9 +419,9 @@ public actor NDKNWCWallet: NDKPaymentProvider {
 
 // MARK: - Convenience Factory
 
-extension NDK {
+public extension NDK {
     /// Create an NWC wallet from a connection URI
-    public func createNWCWallet(connectionURI: String) async throws -> NDKNWCWallet {
+    func createNWCWallet(connectionURI: String) async throws -> NDKNWCWallet {
         let wallet = try await NDKNWCWallet(ndk: self, connectionURI: connectionURI)
         try await wallet.connect()
         return wallet
