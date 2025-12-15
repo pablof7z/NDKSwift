@@ -34,14 +34,14 @@ class NdbTxn<T>: RawNdbTxnAccessible {
         generation = ndb.generation
         if let active_txn = Thread.current.threadDictionary["ndb_txn"] as? ndb_txn,
            let txn_generation = Thread.current.threadDictionary["txn_generation"] as? Int,
+           let ref_count = Thread.current.threadDictionary["ndb_txn_ref_count"] as? Int,
            txn_generation == ndb.generation
         {
             // some parent thread is active, use that instead
             print("txn: inherited txn")
             txn = active_txn
             inherited = true
-            generation = Thread.current.threadDictionary["txn_generation"] as! Int
-            let ref_count = Thread.current.threadDictionary["ndb_txn_ref_count"] as! Int
+            generation = txn_generation
             let new_ref_count = ref_count + 1
             Thread.current.threadDictionary["ndb_txn_ref_count"] = new_ref_count
         } else {
@@ -165,14 +165,14 @@ class SafeNdbTxn<T: ~Copyable> {
         let inherited: Bool
         if let active_txn = Thread.current.threadDictionary["ndb_txn"] as? ndb_txn,
            let txn_generation = Thread.current.threadDictionary["txn_generation"] as? Int,
+           let ref_count = Thread.current.threadDictionary["ndb_txn_ref_count"] as? Int,
            txn_generation == ndb.generation
         {
             // some parent thread is active, use that instead
             print("txn: inherited txn")
             txn = active_txn
             inherited = true
-            generation = Thread.current.threadDictionary["txn_generation"] as! Int
-            let ref_count = Thread.current.threadDictionary["ndb_txn_ref_count"] as! Int
+            generation = txn_generation
             let new_ref_count = ref_count + 1
             Thread.current.threadDictionary["ndb_txn_ref_count"] = new_ref_count
         } else {
