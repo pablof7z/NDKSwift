@@ -325,6 +325,18 @@ struct ndb_stat {
 	struct ndb_stat_counts other_kinds;
 };
 
+// Dynamic kind statistics - tracks ALL kinds individually
+struct ndb_kind_stat {
+	uint32_t kind;
+	struct ndb_stat_counts counts;
+};
+
+struct ndb_kind_stats {
+	struct ndb_kind_stat *kinds;
+	size_t count;
+	size_t capacity;
+};
+
 #define MAX_TEXT_SEARCH_RESULTS 128
 #define MAX_TEXT_SEARCH_WORDS 8
 
@@ -611,6 +623,10 @@ int ndb_query(struct ndb_txn *txn, struct ndb_filter *filters, int num_filters, 
 // STATS
 int ndb_stat(struct ndb *ndb, struct ndb_stat *stat);
 void ndb_stat_counts_init(struct ndb_stat_counts *counts);
+
+// Dynamic kind stats - returns all kinds individually
+int ndb_stat_all_kinds(struct ndb *ndb, struct ndb_kind_stats *stats);
+void ndb_kind_stats_free(struct ndb_kind_stats *stats);
 
 // NOTE
 const char *ndb_note_content(struct ndb_note *note);

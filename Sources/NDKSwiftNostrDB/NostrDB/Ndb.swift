@@ -121,7 +121,7 @@ public struct NdbStatCounts: Sendable {
 public struct NdbStat: Sendable {
     /// Per-database statistics
     public let databases: [NdbDatabase: NdbStatCounts]
-    /// Per-kind statistics keyed by actual Nostr kind number
+    /// Per-kind statistics keyed by actual Nostr kind number (ALL kinds, not just common ones)
     public let kinds: [UInt64: NdbStatCounts]
 
     /// Total number of events across all kinds
@@ -747,15 +747,15 @@ class Ndb: @unchecked Sendable {
     func stat() -> NdbStat? {
         guard !is_closed else { return nil }
 
+        // Get database stats using the original API
         var cStat = ndb_stat()
-        let result = ndb_stat(ndb.ndb, &cStat)
-        guard result == 1 else { return nil }
+        let dbResult = ndb_stat(ndb.ndb, &cStat)
+        guard dbResult == 1 else { return nil }
 
-        // Convert C struct to Swift types
+        // Convert database stats to Swift types
         var databases: [NdbDatabase: NdbStatCounts] = [:]
         for db in NdbDatabase.allCases {
             let dbIndex = db.rawValue
-            // Access the tuple elements using withUnsafePointer
             let counts = withUnsafePointer(to: &cStat.dbs) { ptr -> ndb_stat_counts in
                 ptr.withMemoryRebound(to: ndb_stat_counts.self, capacity: 16) { arrayPtr in
                     arrayPtr[dbIndex]
@@ -768,20 +768,24 @@ class Ndb: @unchecked Sendable {
             )
         }
 
-        // Build kinds dictionary using actual Nostr kind numbers
+        // Get ALL kinds using the new dynamic API
+        var kindStats = ndb_kind_stats()
+        let kindResult = ndb_stat_all_kinds(ndb.ndb, &kindStats)
+        defer { ndb_kind_stats_free(&kindStats) }
+
+        guard kindResult == 1 else { return nil }
+
+        // Convert kind stats to Swift dictionary
         var kinds: [UInt64: NdbStatCounts] = [:]
-        for commonKind in NdbCommonKind.allCases {
-            let kindIndex = commonKind.rawValue
-            let counts = withUnsafePointer(to: &cStat.common_kinds) { ptr -> ndb_stat_counts in
-                ptr.withMemoryRebound(to: ndb_stat_counts.self, capacity: 15) { arrayPtr in
-                    arrayPtr[kindIndex]
-                }
+        if let kindsPtr = kindStats.kinds {
+            for i in 0..<kindStats.count {
+                let entry = kindsPtr[i]
+                kinds[UInt64(entry.kind)] = NdbStatCounts(
+                    keySize: entry.counts.key_size,
+                    valueSize: entry.counts.value_size,
+                    count: entry.counts.count
+                )
             }
-            kinds[commonKind.kindNumber] = NdbStatCounts(
-                keySize: counts.key_size,
-                valueSize: counts.value_size,
-                count: counts.count
-            )
         }
 
         return NdbStat(

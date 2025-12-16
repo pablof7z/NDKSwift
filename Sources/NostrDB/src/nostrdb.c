@@ -7759,6 +7759,97 @@ int ndb_stat(struct ndb *ndb, struct ndb_stat *stat)
 	return 1;
 }
 
+// Helper to find or create a kind entry in the stats array
+static struct ndb_kind_stat *ndb_kind_stats_find_or_create(struct ndb_kind_stats *stats, uint32_t kind)
+{
+	// Search for existing entry
+	for (size_t i = 0; i < stats->count; i++) {
+		if (stats->kinds[i].kind == kind) {
+			return &stats->kinds[i];
+		}
+	}
+
+	// Need to add new entry - grow array if needed
+	if (stats->count >= stats->capacity) {
+		size_t new_capacity = stats->capacity == 0 ? 32 : stats->capacity * 2;
+		struct ndb_kind_stat *new_kinds = realloc(stats->kinds, new_capacity * sizeof(struct ndb_kind_stat));
+		if (!new_kinds) {
+			return NULL;
+		}
+		stats->kinds = new_kinds;
+		stats->capacity = new_capacity;
+	}
+
+	// Initialize new entry
+	struct ndb_kind_stat *entry = &stats->kinds[stats->count];
+	entry->kind = kind;
+	ndb_stat_counts_init(&entry->counts);
+	stats->count++;
+
+	return entry;
+}
+
+int ndb_stat_all_kinds(struct ndb *ndb, struct ndb_kind_stats *stats)
+{
+	int rc;
+	MDB_cursor *cur;
+	MDB_val k, v;
+	MDB_dbi db;
+	struct ndb_txn txn;
+	struct ndb_note *note;
+
+	// Initialize stats
+	stats->kinds = NULL;
+	stats->count = 0;
+	stats->capacity = 0;
+
+	if (!ndb_begin_query(ndb, &txn)) {
+		fprintf(stderr, "ndb_stat_all_kinds failed at ndb_begin_query\n");
+		return 0;
+	}
+
+	// Only iterate the notes database
+	db = ndb->lmdb.dbs[NDB_DB_NOTE];
+
+	if ((rc = mdb_cursor_open(txn.mdb_txn, db, &cur))) {
+		fprintf(stderr, "ndb_stat_all_kinds: mdb_cursor_open failed, error '%s'\n",
+				mdb_strerror(rc));
+		ndb_end_query(&txn);
+		return 0;
+	}
+
+	// Iterate all notes and collect kind stats
+	while (mdb_cursor_get(cur, &k, &v, MDB_NEXT) == 0) {
+		note = v.mv_data;
+		struct ndb_kind_stat *entry = ndb_kind_stats_find_or_create(stats, note->kind);
+		if (!entry) {
+			// Allocation failed
+			mdb_cursor_close(cur);
+			ndb_end_query(&txn);
+			ndb_kind_stats_free(stats);
+			return 0;
+		}
+		entry->counts.count++;
+		entry->counts.key_size += k.mv_size;
+		entry->counts.value_size += v.mv_size;
+	}
+
+	mdb_cursor_close(cur);
+	ndb_end_query(&txn);
+
+	return 1;
+}
+
+void ndb_kind_stats_free(struct ndb_kind_stats *stats)
+{
+	if (stats->kinds) {
+		free(stats->kinds);
+		stats->kinds = NULL;
+	}
+	stats->count = 0;
+	stats->capacity = 0;
+}
+
 /// Push an element to the current tag
 ///
 /// Basic idea is to call ndb_builder_new_tag
