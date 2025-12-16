@@ -20,7 +20,9 @@ let package = Package(
             name: "MarkdownDemoFeature",
             dependencies: [
                 .product(name: "NDKSwiftCore", package: "pluggable-renderers"),
-                .product(name: "NDKSwiftUI", package: "pluggable-renderers")
+                .product(name: "NDKSwiftUI", package: "pluggable-renderers"),
+                .product(name: "NDKSwiftSQLite", package: "pluggable-renderers"),
+                .product(name: "NDKSwiftNostrDB", package: "pluggable-renderers")
             ]
         ),
         .testTarget(
