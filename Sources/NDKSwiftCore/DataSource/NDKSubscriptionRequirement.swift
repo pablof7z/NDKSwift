@@ -16,8 +16,8 @@ actor NDKSubscriptionRequirement {
     // Event deduplication
     private var seenEventIds = Set<EventID>()
 
-    // Observers
-    private var observers: [(id: RequirementID, stream: AsyncStream<NDKEvent>, continuation: AsyncStream<NDKEvent>.Continuation, filter: NDKFilter)] = []
+    // Observers - yields batches of events for efficient UI updates
+    private var observers: [(id: RequirementID, stream: AsyncStream<[NDKEvent]>, continuation: AsyncStream<[NDKEvent]>.Continuation, filter: NDKFilter)] = []
 
     // Relay update observers
     private var relayUpdateObservers: [(id: RequirementID, stream: AsyncStream<RelayUpdate>, continuation: AsyncStream<RelayUpdate>.Continuation)] = []
@@ -61,8 +61,9 @@ actor NDKSubscriptionRequirement {
     }
 
     /// Add an observer for events matching this requirement
-    func addObserver(id: RequirementID, individualFilter: NDKFilter) -> AsyncStream<NDKEvent> {
-        let (stream, continuation) = AsyncStream<NDKEvent>.makeStream()
+    /// Returns a stream of event batches for efficient UI updates
+    func addObserver(id: RequirementID, individualFilter: NDKFilter) -> AsyncStream<[NDKEvent]> {
+        let (stream, continuation) = AsyncStream<[NDKEvent]>.makeStream()
         observers.append((id: id, stream: stream, continuation: continuation, filter: individualFilter))
         return stream
     }
@@ -88,10 +89,8 @@ actor NDKSubscriptionRequirement {
 
                 do {
                     for try await events in eventStream {
-                        // Process each batch of events
-                        for event in events {
-                            await self.handleCacheEvent(event)
-                        }
+                        // Yield entire batch directly - preserves cache batching
+                        await self.handleCacheEvents(events)
                     }
                 } catch {
                     NDKLogger.log(.error, category: .subscription,
@@ -230,20 +229,29 @@ actor NDKSubscriptionRequirement {
         }
     }
 
-    /// Handle event from cache
-    private func handleCacheEvent(_ event: NDKEvent) async {
-        guard !seenEventIds.contains(event.id) else { return }
-        seenEventIds.insert(event.id)
+    /// Handle batch of events from cache
+    /// Yields entire batch to observers for efficient UI updates
+    private func handleCacheEvents(_ events: [NDKEvent]) async {
+        // Filter out already-seen events
+        let newEvents = events.filter { !seenEventIds.contains($0.id) }
+        guard !newEvents.isEmpty else { return }
 
-        // Notify observers whose filters match
+        // Mark all as seen
+        for event in newEvents {
+            seenEventIds.insert(event.id)
+        }
+
+        // Notify observers with filtered batch
         for (_, _, continuation, individualFilter) in observers {
-            if individualFilter.matches(event: event) {
-                continuation.yield(event)
+            let matching = newEvents.filter { individualFilter.matches(event: $0) }
+            if !matching.isEmpty {
+                continuation.yield(matching)
             }
         }
     }
 
     /// Handle event from network
+    /// Yields as single-element array for consistent batch semantics
     func handleNetworkEvent(_ event: NDKEvent, from relay: NDKRelay?) async {
         // Update EOSE tracker
         await eoseTracker.trackEventReceived()
@@ -265,10 +273,10 @@ actor NDKSubscriptionRequirement {
             }
         }
 
-        // Notify observers whose filters match
+        // Notify observers with single-element batch
         for (_, _, continuation, individualFilter) in observers {
             if individualFilter.matches(event: event) {
-                continuation.yield(event)
+                continuation.yield([event])
             }
         }
     }

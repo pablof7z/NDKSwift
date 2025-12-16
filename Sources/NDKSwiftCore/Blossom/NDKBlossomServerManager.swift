@@ -171,10 +171,13 @@ public class NDKBlossomServerManager {
             let dataSource = ndk.subscribe(filter: filter, maxAge: 300, cachePolicy: .cacheWithNetwork)
 
             var foundEvent = false
-            for await event in dataSource.events {
-                parseUserServersFromEvent(event)
-                foundEvent = true
-                break // We only need the first event
+            for await batch in dataSource.events {
+                for event in batch {
+                    parseUserServersFromEvent(event)
+                    foundEvent = true
+                    break // We only need the first event
+                }
+                if foundEvent { break }
             }
 
             if !foundEvent {
@@ -277,31 +280,33 @@ public class NDKBlossomServerManager {
             var serverInfos: [NDKBlossomServerInfo] = []
             var seenUrls = Set<String>()
 
-            for await event in dataSource.events {
-                if Task.isCancelled { break }
+            for await batch in dataSource.events {
+                for event in batch {
+                    if Task.isCancelled { break }
 
-                let serverInfo = NDKBlossomServerInfo(from: event)
+                    let serverInfo = NDKBlossomServerInfo(from: event)
 
-                // Only add if we haven't seen this URL before and it's valid
-                if !serverInfo.url.isEmpty && !seenUrls.contains(serverInfo.url) {
-                    seenUrls.insert(serverInfo.url)
-                    serverInfos.append(serverInfo)
+                    // Only add if we haven't seen this URL before and it's valid
+                    if !serverInfo.url.isEmpty && !seenUrls.contains(serverInfo.url) {
+                        seenUrls.insert(serverInfo.url)
+                        serverInfos.append(serverInfo)
 
-                    NDKLogger.log(.debug, category: .general, "NDKBlossomServerManager - Found server: \(serverInfo.name) at \(serverInfo.url)")
+                        NDKLogger.log(.debug, category: .general, "NDKBlossomServerManager - Found server: \(serverInfo.name) at \(serverInfo.url)")
 
-                    // Update UI incrementally
-                    let sortedServers = serverInfos.sorted { server1, server2 in
-                        // Sort free servers first, then by name
-                        if server1.isPaid == server2.isPaid && server1.isWhitelisted == server2.isWhitelisted {
-                            return server1.name < server2.name
+                        // Update UI incrementally
+                        let sortedServers = serverInfos.sorted { server1, server2 in
+                            // Sort free servers first, then by name
+                            if server1.isPaid == server2.isPaid && server1.isWhitelisted == server2.isWhitelisted {
+                                return server1.name < server2.name
+                            }
+                            if server1.isPaid != server2.isPaid {
+                                return !server1.isPaid
+                            }
+                            return !server1.isWhitelisted
                         }
-                        if server1.isPaid != server2.isPaid {
-                            return !server1.isPaid
+                        await MainActor.run {
+                            discoveredServers = sortedServers
                         }
-                        return !server1.isWhitelisted
-                    }
-                    await MainActor.run {
-                        discoveredServers = sortedServers
                     }
                 }
             }

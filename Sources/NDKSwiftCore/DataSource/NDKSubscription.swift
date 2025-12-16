@@ -31,9 +31,10 @@ public final class NDKSubscription<T> {
     public private(set) var isLoading: Bool = false
     public private(set) var error: Error?
 
-    /// AsyncStream for consuming events as they arrive
-    public let events: AsyncStream<T>
-    private let eventsContinuation: AsyncStream<T>.Continuation
+    /// AsyncStream for consuming event batches as they arrive
+    /// Batches are yielded directly from cache (bulk) or network (single-element)
+    public let events: AsyncStream<[T]>
+    private let eventsContinuation: AsyncStream<[T]>.Continuation
 
     /// Relay-level updates (events, EOSE, closed)
     public let relayUpdates: AsyncStream<RelayUpdate>
@@ -73,12 +74,6 @@ public final class NDKSubscription<T> {
             ids.removeAll()
         }
     }
-
-    /// Batch buffer for MainActor updates
-    /// Accumulates events and flushes them in a single MainActor operation
-    /// This eliminates UI flickering when loading bulk data from cache
-    private var pendingBatch: [T] = []
-    private var flushTask: Task<Void, Never>?
 
     /// Initialize a data source for NDKEvent objects
     public convenience init(
@@ -142,8 +137,8 @@ public final class NDKSubscription<T> {
 
         NDKLogger.log(.trace, category: .subscription, "🏗️ NDKSubscription init - filter: \(filter), maxAge: \(maxAge), cachePolicy: \(cachePolicy)", correlationId: correlationId)
 
-        // Set up the AsyncStream for events
-        var continuation: AsyncStream<T>.Continuation!
+        // Set up the AsyncStream for event batches
+        var continuation: AsyncStream<[T]>.Continuation!
         events = AsyncStream { cont in
             continuation = cont
         }
@@ -191,8 +186,8 @@ public final class NDKSubscription<T> {
 
         NDKLogger.log(.trace, category: .subscription, "🏗️ NDKSubscription init with options - filter: \(filter), maxAge: \(maxAge), cachePolicy: \(cachePolicy)", correlationId: correlationId)
 
-        // Set up the AsyncStream for events
-        var continuation: AsyncStream<T>.Continuation!
+        // Set up the AsyncStream for event batches
+        var continuation: AsyncStream<[T]>.Continuation!
         events = AsyncStream { cont in
             continuation = cont
         }
@@ -215,7 +210,6 @@ public final class NDKSubscription<T> {
     deinit {
         NDKLogger.log(.trace, category: .subscription, "🔚 NDKSubscription deinit - Cleaning up resources", correlationId: correlationId)
         task?.cancel()
-        flushTask?.cancel()
         eventsContinuation.finish()
         relayUpdatesContinuation.finish()
         let handle = requirementHandle
@@ -248,11 +242,11 @@ public final class NDKSubscription<T> {
             )
             requirementHandle = handle
 
-            // Process events from the stream
+            // Process event batches from the stream
             Task { [weak self] in
                 guard let self = self else { return }
-                for await event in eventStream {
-                    await self.handleEvent(event)
+                for await batch in eventStream {
+                    await self.handleEvents(batch)
                 }
             }
 
@@ -271,51 +265,31 @@ public final class NDKSubscription<T> {
 
     // MARK: - Event Handling
 
-    private func handleEvent(_ event: NDKEvent) async {
-        // Check if we've already processed this event (thread-safe via actor)
-        let alreadyProcessed = await processedEventIds.contains(event.id)
-        if !alreadyProcessed {
+    /// Handle a batch of events
+    /// Updates data array directly - no debouncing needed since batches come pre-batched
+    private func handleEvents(_ events: [NDKEvent]) async {
+        var newTransformed: [T] = []
+
+        for event in events {
+            // Check if we've already processed this event (thread-safe via actor)
+            let alreadyProcessed = await processedEventIds.contains(event.id)
+            if alreadyProcessed { continue }
             await processedEventIds.insert(event.id)
-        }
 
-        guard !alreadyProcessed else {
-            return
-        }
-
-        if let transformed = transform(event) {
-            // Yield to AsyncStream immediately (for programmatic consumers)
-            eventsContinuation.yield(transformed)
-
-            // Add to pending batch for UI update
-            pendingBatch.append(transformed)
-
-            // Cancel previous flush task and schedule new one
-            // Events arriving within 1ms get batched together
-            flushTask?.cancel()
-            flushTask = Task { [weak self] in
-                // Wait 1ms for more events to arrive
-                try? await Task.sleep(for: .milliseconds(1))
-                // Check cancellation after sleep (deinit may have cancelled us)
-                guard !Task.isCancelled else { return }
-                await self?.flushBatch()
+            if let transformed = transform(event) {
+                newTransformed.append(transformed)
+            } else {
+                NDKLogger.log(.debug, category: .subscription, "❌ [NDKSubscription] Transform failed - event not added to data - id: \(event.id.prefix(10)), correlationId: \(correlationId)")
             }
-        } else {
-            NDKLogger.log(.debug, category: .subscription, "❌ [NDKSubscription] Transform failed - event not added to data - id: \(event.id.prefix(10)), correlationId: \(correlationId)")
         }
-    }
 
-    /// Flush pending batch to MainActor
-    /// Updates the observable data array in a single operation
-    private func flushBatch() async {
-        guard !pendingBatch.isEmpty else { return }
+        guard !newTransformed.isEmpty else { return }
 
-        let batch = pendingBatch
-        pendingBatch.removeAll()
-        flushTask = nil
+        // Yield batch to AsyncStream (for programmatic consumers)
+        eventsContinuation.yield(newTransformed)
 
-        // Single MainActor update for entire batch
-        // Use weak self to prevent crash if subscription is deallocated
-        // during the await (race between deinit and MainActor scheduling)
+        // Update data array directly (for UI consumers)
+        let batch = newTransformed
         await MainActor.run { [weak self] in
             self?.data.append(contentsOf: batch)
         }
@@ -326,9 +300,9 @@ public final class NDKSubscription<T> {
     public func handleRelayUpdate(_ update: RelayUpdate) async {
         relayUpdatesContinuation.yield(update)
 
-        // Also process events directly
+        // Also process events directly (as single-element batch)
         if case let .event(event, _) = update {
-            await handleEvent(event)
+            await handleEvents([event])
         }
     }
 
@@ -337,11 +311,6 @@ public final class NDKSubscription<T> {
         NDKLogger.log(.info, category: .subscription, "🔄 Refreshing data source", correlationId: correlationId)
         data.removeAll()
         await processedEventIds.clear()
-
-        // Clear pending batch
-        flushTask?.cancel()
-        flushTask = nil
-        pendingBatch.removeAll()
 
         if let handle = requirementHandle {
             NDKLogger.log(.trace, category: .subscription, "Releasing existing requirement handle", correlationId: correlationId)
@@ -378,7 +347,10 @@ public final class NDKSubscription<T> {
 
                 // Create a new iterator to avoid consuming the main stream
                 var iterator = self.events.makeAsyncIterator()
-                return await iterator.next()
+                if let batch = await iterator.next(), let first = batch.first {
+                    return first
+                }
+                return nil
             }
 
             // EOSE monitoring task
@@ -463,8 +435,8 @@ public final class NDKSubscription<T> {
 
                 // Start event collection
                 eventTask = Task {
-                    for await event in self.events {
-                        collected.append(event)
+                    for await batch in self.events {
+                        collected.append(contentsOf: batch)
                         if let limit = limit, collected.count >= limit {
                             break
                         }
@@ -504,6 +476,7 @@ public final class NDKSubscription<T> {
 
     /// Create an AsyncStream that emits events and completes on EOSE
     /// Useful for one-shot queries that need to process events as they arrive
+    /// Note: Returns individual events (flattened from batches) for convenience
     public var eventsUntilEOSE: AsyncStream<T> {
         AsyncStream { continuation in
             Task { [weak self] in
@@ -512,10 +485,12 @@ public final class NDKSubscription<T> {
                     return
                 }
 
-                // Start forwarding events
+                // Start forwarding events (flatten batches)
                 let eventTask = Task {
-                    for await event in self.events {
-                        continuation.yield(event)
+                    for await batch in self.events {
+                        for event in batch {
+                            continuation.yield(event)
+                        }
                     }
                 }
 
@@ -559,18 +534,14 @@ public final class NDKSubscription<T> {
         return nil
     }
 
-    /// Process cached events
+    /// Process cached events as a batch
     private func processCachedEvents(_ events: [NDKEvent]) async {
-        for event in events {
-            await handleEvent(event)
-        }
+        await handleEvents(events)
     }
 
-    /// Process fetched events
+    /// Process fetched events as a batch
     private func processFetchedEvents(_ events: [NDKEvent]) async {
-        for event in events {
-            await handleEvent(event)
-        }
+        await handleEvents(events)
     }
 
     /// Update the filter for this data source
@@ -593,11 +564,6 @@ public final class NDKSubscription<T> {
 
         // Clear processed events (thread-safe via actor)
         await processedEventIds.clear()
-
-        // Clear pending batch
-        flushTask?.cancel()
-        flushTask = nil
-        pendingBatch.removeAll()
 
         // Clear current data
         await MainActor.run {
@@ -665,9 +631,9 @@ public final class NDKSubscription<T> {
             self.isLoading = false
         }
 
-        // Process events from the nested subscription
-        for await event in subscription.events {
-            await handleEvent(event)
+        // Process event batches from the nested subscription
+        for await batch in subscription.events {
+            await handleEvents(batch)
         }
     }
 }

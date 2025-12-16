@@ -38,21 +38,23 @@ public class NDKUIFollowListDataSource {
         observationTask = Task { @MainActor in
             var latestEvent: NDKEvent?
 
-            for await event in dataSource.events {
-                // Keep only the most recent event
-                if latestEvent == nil || event.createdAt > latestEvent!.createdAt {
-                    latestEvent = event
+            for await batch in dataSource.events {
+                for event in batch {
+                    // Keep only the most recent event
+                    if latestEvent == nil || event.createdAt > latestEvent!.createdAt {
+                        latestEvent = event
 
-                    // Extract follow list from event
-                    let pubkeys = event.tags
-                        .filter { tag in
-                            tag.count >= 2 && tag[0] == "p"
-                        }
-                        .map { tag in
-                            tag[1]
-                        }
-                    followList = Set(pubkeys)
-                    lastUpdate = Date(timeIntervalSince1970: TimeInterval(event.createdAt))
+                        // Extract follow list from event
+                        let pubkeys = event.tags
+                            .filter { tag in
+                                tag.count >= 2 && tag[0] == "p"
+                            }
+                            .map { tag in
+                                tag[1]
+                            }
+                        followList = Set(pubkeys)
+                        lastUpdate = Date(timeIntervalSince1970: TimeInterval(event.createdAt))
+                    }
                 }
             }
         }

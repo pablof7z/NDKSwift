@@ -191,16 +191,18 @@ public class NDKSessionData {
         // Start processing events in background - don't block
         Task {
             // Process events as they arrive from the data source
-            for await event in dataSource.events {
-                switch event.kind {
-                case EventKind.contacts where needsFollowList:
-                    processFollowListEvent(event, fromCache: false)
-                case EventKind.muteList where needsMuteList:
-                    processMuteListEvent(event, fromCache: false)
-                case EventKind.blockedRelays where needsBlockedRelays:
-                    processBlockedRelaysEvent(event, fromCache: false)
-                default:
-                    break
+            for await batch in dataSource.events {
+                for event in batch {
+                    switch event.kind {
+                    case EventKind.contacts where needsFollowList:
+                        processFollowListEvent(event, fromCache: false)
+                    case EventKind.muteList where needsMuteList:
+                        processMuteListEvent(event, fromCache: false)
+                    case EventKind.blockedRelays where needsBlockedRelays:
+                        processBlockedRelaysEvent(event, fromCache: false)
+                    default:
+                        break
+                    }
                 }
             }
         }

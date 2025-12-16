@@ -312,8 +312,10 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
 
         // Start listening to events
         subscriptionTask = Task { [weak self] in
-            for await event in dataSource.events {
-                await self?.handleIncomingEvent(event)
+            for await batch in dataSource.events {
+                for event in batch {
+                    await self?.handleIncomingEvent(event)
+                }
             }
         }
     }

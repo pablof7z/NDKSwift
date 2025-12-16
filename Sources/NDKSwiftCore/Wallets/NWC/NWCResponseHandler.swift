@@ -54,28 +54,30 @@ public struct NWCResponseHandler {
         let responseTask = Task { () -> T in
             NDKLogger.log(.trace, category: .wallet, "[NWC Response] Waiting for response event...")
 
-            for await responseEvent in dataSource.events {
-                NDKLogger.log(.debug, category: .wallet, "[NWC Response] Got response event:")
-                NDKLogger.log(.trace, category: .wallet, "[NWC Response]   ID: \(responseEvent.id)")
-                NDKLogger.log(.trace, category: .wallet, "[NWC Response]   Pubkey: \(responseEvent.pubkey)")
-                NDKLogger.log(.trace, category: .wallet, "[NWC Response]   Tags: \(responseEvent.tags)")
+            for await batch in dataSource.events {
+                for responseEvent in batch {
+                    NDKLogger.log(.debug, category: .wallet, "[NWC Response] Got response event:")
+                    NDKLogger.log(.trace, category: .wallet, "[NWC Response]   ID: \(responseEvent.id)")
+                    NDKLogger.log(.trace, category: .wallet, "[NWC Response]   Pubkey: \(responseEvent.pubkey)")
+                    NDKLogger.log(.trace, category: .wallet, "[NWC Response]   Tags: \(responseEvent.tags)")
 
-                // Decrypt the content
-                let senderPubkey = responseEvent.pubkey
-                NDKLogger.log(.trace, category: .wallet, "[NWC Response] Decrypting content from \(senderPubkey)")
-                let eventContent = responseEvent.content
-                let decryptedContent = try await signer.decrypt(
-                    senderPubkey: senderPubkey,
-                    value: eventContent,
-                    scheme: .nip04
-                )
-                NDKLogger.log(.trace, category: .wallet, "[NWC Response] Decrypted content: \(decryptedContent)")
+                    // Decrypt the content
+                    let senderPubkey = responseEvent.pubkey
+                    NDKLogger.log(.trace, category: .wallet, "[NWC Response] Decrypting content from \(senderPubkey)")
+                    let eventContent = responseEvent.content
+                    let decryptedContent = try await signer.decrypt(
+                        senderPubkey: senderPubkey,
+                        value: eventContent,
+                        scheme: .nip04
+                    )
+                    NDKLogger.log(.trace, category: .wallet, "[NWC Response] Decrypted content: \(decryptedContent)")
 
-                // Parse and return the response
-                let result = try parseResponse(decryptedContent, expectedType: responseType)
+                    // Parse and return the response
+                    let result = try parseResponse(decryptedContent, expectedType: responseType)
 
-                // AsyncStream will clean up automatically
-                return result
+                    // AsyncStream will clean up automatically
+                    return result
+                }
             }
 
             // If we get here, subscription ended without response
@@ -171,42 +173,44 @@ public struct NWCResponseHandler {
         var responses: [String: Result<T, NDKError>] = [:]
 
         let responseTask = Task<[String: Result<T, NDKError>], Error> {
-            for await event in dataSource.events {
-                // Get the d-tag for this response
-                let eventTags = event.tags
-                guard let dTag = eventTags.first(where: { $0.count >= 2 && $0[0] == "d" }),
-                      dTag.count > 1
-                else {
-                    continue
-                }
-
-                let dTagValue = dTag[1]
-
-                // Decrypt and parse the response
-                do {
-                    // Get wallet service pubkey from p-tag
+            for await batch in dataSource.events {
+                for event in batch {
+                    // Get the d-tag for this response
                     let eventTags = event.tags
-                    guard let pTag = eventTags.first(where: { $0.count >= 2 && $0[0] == "p" }) else {
+                    guard let dTag = eventTags.first(where: { $0.count >= 2 && $0[0] == "d" }),
+                          dTag.count > 1
+                    else {
                         continue
                     }
-                    let walletPubkey = pTag[1]
 
-                    let eventContent = event.content
-                    let decrypted = try await signer.decrypt(
-                        senderPubkey: walletPubkey,
-                        value: eventContent,
-                        scheme: .nip04
-                    )
+                    let dTagValue = dTag[1]
 
-                    let parsed = try parseResponse(decrypted, expectedType: responseType)
-                    responses[dTagValue] = .success(parsed)
-                } catch {
-                    responses[dTagValue] = .failure(error as? NDKError ?? NDKError.invalidResponse(from: "Parse error: \(error)"))
-                }
+                    // Decrypt and parse the response
+                    do {
+                        // Get wallet service pubkey from p-tag
+                        let eventTags = event.tags
+                        guard let pTag = eventTags.first(where: { $0.count >= 2 && $0[0] == "p" }) else {
+                            continue
+                        }
+                        let walletPubkey = pTag[1]
 
-                // Check if we have enough responses
-                if responses.count >= expectedCount {
-                    return responses
+                        let eventContent = event.content
+                        let decrypted = try await signer.decrypt(
+                            senderPubkey: walletPubkey,
+                            value: eventContent,
+                            scheme: .nip04
+                        )
+
+                        let parsed = try parseResponse(decrypted, expectedType: responseType)
+                        responses[dTagValue] = .success(parsed)
+                    } catch {
+                        responses[dTagValue] = .failure(error as? NDKError ?? NDKError.invalidResponse(from: "Parse error: \(error)"))
+                    }
+
+                    // Check if we have enough responses
+                    if responses.count >= expectedCount {
+                        return responses
+                    }
                 }
             }
 
@@ -268,56 +272,58 @@ public struct NWCResponseHandler {
                 )
 
                 let task = Task {
-                    for await event in dataSource.events {
-                        // Check if this is an NWC notification (no e-tag)
-                        let eventTags = event.tags
-                        guard !eventTags.contains(where: { $0.count >= 1 && $0[0] == "e" }) else {
-                            continue
-                        }
+                    for await batch in dataSource.events {
+                        for event in batch {
+                            // Check if this is an NWC notification (no e-tag)
+                            let eventTags = event.tags
+                            guard !eventTags.contains(where: { $0.count >= 1 && $0[0] == "e" }) else {
+                                continue
+                            }
 
-                        // Get wallet service pubkey from p-tag
-                        guard let pTag = eventTags.first(where: { $0.count >= 2 && $0[0] == "p" }) else {
-                            continue
-                        }
-                        let walletPubkey = pTag[1]
+                            // Get wallet service pubkey from p-tag
+                            guard let pTag = eventTags.first(where: { $0.count >= 2 && $0[0] == "p" }) else {
+                                continue
+                            }
+                            let walletPubkey = pTag[1]
 
-                        // Decrypt the notification
-                        do {
-                            let eventContent = event.content
-                            let decrypted = try await signer.decrypt(
-                                senderPubkey: walletPubkey,
-                                value: eventContent,
-                                scheme: .nip04
-                            )
-
-                            // Parse as notification
-                            let json: [String: Any]
+                            // Decrypt the notification
                             do {
-                                json = try JSONCoding.parseDictionary(from: decrypted)
+                                let eventContent = event.content
+                                let decrypted = try await signer.decrypt(
+                                    senderPubkey: walletPubkey,
+                                    value: eventContent,
+                                    scheme: .nip04
+                                )
+
+                                // Parse as notification
+                                let json: [String: Any]
+                                do {
+                                    json = try JSONCoding.parseDictionary(from: decrypted)
+                                } catch {
+                                    NDKLogger.log(.warning, category: .wallet, "Failed to parse NWC notification JSON from event \(event.id): \(error.localizedDescription)")
+                                    continue
+                                }
+
+                                guard let notificationType = json["notification_type"] as? String,
+                                      let notificationData = json["notification"] as? [String: Any]
+                                else {
+                                    NDKLogger.log(.warning, category: .wallet, "NWC notification missing required fields")
+                                    continue
+                                }
+
+                                // Convert notification data back to JSON for parsing
+                                let paymentNotification = try JSONCoding.decodeFromDictionary(PaymentNotification.self, from: notificationData)
+
+                                let notification = NWCNotification(
+                                    notificationType: notificationType,
+                                    notification: paymentNotification
+                                )
+
+                                continuation.yield(notification)
                             } catch {
-                                NDKLogger.log(.warning, category: .wallet, "Failed to parse NWC notification JSON from event \(event.id): \(error.localizedDescription)")
+                                // Silently ignore parse errors for notifications
                                 continue
                             }
-
-                            guard let notificationType = json["notification_type"] as? String,
-                                  let notificationData = json["notification"] as? [String: Any]
-                            else {
-                                NDKLogger.log(.warning, category: .wallet, "NWC notification missing required fields")
-                                continue
-                            }
-
-                            // Convert notification data back to JSON for parsing
-                            let paymentNotification = try JSONCoding.decodeFromDictionary(PaymentNotification.self, from: notificationData)
-
-                            let notification = NWCNotification(
-                                notificationType: notificationType,
-                                notification: paymentNotification
-                            )
-
-                            continuation.yield(notification)
-                        } catch {
-                            // Silently ignore parse errors for notifications
-                            continue
                         }
                     }
 

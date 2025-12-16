@@ -255,8 +255,10 @@ public actor NIP60Wallet: NDKPaymentProvider {
                 await withTaskGroup(of: Void.self) { group in
                     for dataSource in dataSources {
                         group.addTask {
-                            for await event in dataSource.events {
-                                await self.processWalletEvent(event)
+                            for await batch in dataSource.events {
+                                for event in batch {
+                                    await self.processWalletEvent(event)
+                                }
                             }
                         }
                     }
@@ -955,10 +957,12 @@ public actor NIP60Wallet: NDKPaymentProvider {
 
             // Process configuration events as they arrive
             var configEventCount = 0
-            for await event in dataSource.events {
-                configEventCount += 1
-                NDKLogger.log(.info, category: .wallet, "📥 Received configuration event #\(configEventCount) - kind: \(event.kind), id: \(event.id)")
-                await self.processConfigurationEvent(event)
+            for await batch in dataSource.events {
+                for event in batch {
+                    configEventCount += 1
+                    NDKLogger.log(.info, category: .wallet, "📥 Received configuration event #\(configEventCount) - kind: \(event.kind), id: \(event.id)")
+                    await self.processConfigurationEvent(event)
+                }
             }
 
             // Clean up EOSE monitoring task
