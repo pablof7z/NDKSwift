@@ -299,6 +299,246 @@ struct NDKRelayConfig {
 }
 ```
 
+## Observability & Introspection
+
+Relay selection is complex. When something doesn't work, developers need to understand *why*. The system provides full introspection - not just logging, but a queryable, streamable API that apps and developer tools can interact with.
+
+### Design Principle
+
+Everything the intelligence layer does should be **queryable, streamable, and explorable**.
+
+### Live State Queries
+
+```swift
+extension RelayIntelligence {
+    // Pool state
+    var poolSnapshot: PoolSnapshot { get }
+    var connectedRelays: Set<RelayURL> { get }
+    var persistentRelays: Set<RelayURL> { get }
+
+    // Hint index introspection
+    var hintIndex: HintIndexIntrospection { get }
+
+    // Cache state
+    var nip65Cache: NIP65CacheIntrospection { get }
+
+    // Stats
+    var stats: RelayIntelligenceStats { get }
+
+    // Active operations
+    var activePublishes: [PublishOperation] { get }
+    var activeSubscriptions: [SubscriptionOperation] { get }
+    var pendingDiscoveries: [DiscoveryOperation] { get }
+}
+```
+
+### Hint Index Introspection
+
+```swift
+protocol HintIndexIntrospection {
+    // Query
+    func hints(for pubkey: String) -> [HintEntry]
+    func hints(for eventId: String) -> [HintEntry]
+    func hints(for address: EventAddress) -> [HintEntry]
+
+    // Browse
+    var allPubkeys: Set<String> { get }
+    var recentHints: [HintEntry] { get }
+
+    // Stats
+    var count: Int { get }
+    var topRelays: [(RelayURL, Int)] { get }
+
+    // Mutations (for debugging/testing)
+    func clear()
+    func inject(pubkey: String, relay: RelayURL, source: HintSource)
+}
+```
+
+### Operation Tracking
+
+Every publish/fetch/subscribe is a trackable operation:
+
+```swift
+struct PublishOperation: Identifiable {
+    let id: UUID
+    let event: NDKEvent
+    let startedAt: Date
+    let state: OperationState
+    let decisionTrace: DecisionTrace
+    var relayStatuses: [RelayURL: RelayOperationStatus]
+}
+
+struct DecisionTrace {
+    let id: UUID
+    let operation: OperationType
+    var steps: [DecisionStep]
+}
+
+struct DecisionStep {
+    let timestamp: Date
+    let source: RelaySource  // nip65Cache, hintIndex, indexerQuery, etc.
+    let relays: Set<RelayURL>
+    let reasoning: String
+    let duration: TimeInterval?
+}
+```
+
+### Event Stream
+
+Reactive stream for building UIs and debugging tools:
+
+```swift
+extension RelayIntelligence {
+    var events: AsyncStream<IntelligenceEvent> { get }
+    func events(for operation: UUID) -> AsyncStream<IntelligenceEvent>
+    func events(for relay: RelayURL) -> AsyncStream<IntelligenceEvent>
+}
+
+enum IntelligenceEvent {
+    case decisionStarted(DecisionTrace)
+    case decisionStep(traceId: UUID, DecisionStep)
+    case decisionCompleted(traceId: UUID, relays: Set<RelayURL>)
+
+    case connectionAttempt(RelayURL)
+    case connectionSuccess(RelayURL, latency: TimeInterval)
+    case connectionFailed(RelayURL, Error)
+
+    case publishAttempt(eventId: String, relay: RelayURL)
+    case publishSuccess(eventId: String, relay: RelayURL)
+    case publishFailed(eventId: String, relay: RelayURL, Error)
+
+    case hintRecorded(pubkey: String?, eventId: String?, relay: RelayURL, source: HintSource)
+    case poolEviction(RelayURL, reason: EvictionReason)
+}
+```
+
+### Decision Explanation
+
+"Why did you do that?" / "What would you do if?"
+
+```swift
+extension RelayIntelligence {
+    // Explain a past decision
+    func explain(operationId: UUID) -> DecisionExplanation
+
+    // Simulate without executing
+    func simulate(publish event: NDKEvent) -> SimulatedDecision
+    func simulate(fetch filter: NDKFilter) -> SimulatedDecision
+    func simulate(reach pubkey: String) -> SimulatedDecision
+}
+
+struct SimulatedDecision {
+    let wouldUseRelays: Set<RelayURL>
+    let explanation: DecisionExplanation
+}
+```
+
+### Recording Sessions
+
+For debugging and bug reports:
+
+```swift
+extension RelayIntelligence {
+    func startRecording() -> RecordingSession
+    var recentOperations: [CompletedOperation] { get }
+}
+
+struct RecordingSession {
+    let id: UUID
+    var events: [IntelligenceEvent]
+    func stop() -> Recording
+}
+
+struct Recording {
+    let events: [IntelligenceEvent]
+    func toJSON() -> Data
+    func toMarkdown() -> String
+}
+```
+
+### Diagnostic Report
+
+Export full state for debugging:
+
+```swift
+extension RelayIntelligence {
+    func diagnosticReport() -> DiagnosticReport
+}
+
+struct DiagnosticReport {
+    let poolSnapshot: PoolSnapshot
+    let hintIndexStats: HintIndexStats
+    let recentOperations: [CompletedOperation]
+    let stats: RelayIntelligenceStats
+
+    func toMarkdown() -> String
+    func toJSON() -> Data
+}
+```
+
+Example output:
+```markdown
+# Relay Intelligence Diagnostic Report
+Generated: 2025-12-16 14:32:00
+
+## Pool State
+- Connected: 8 relays
+- Persistent: 4 (indexer: 2, outbox: 1, inbox: 1)
+- Dynamic: 4
+
+## Hint Index
+- 1,247 pubkey hints
+- Top relays: relay.damus.io (342), nos.lol (298)
+
+## Recent Operations
+| Time | Type | Relays | Duration | Result |
+|------|------|--------|----------|--------|
+| 14:31:45 | publish | 3 | 67ms | 3/3 confirmed |
+
+## Stats (last hour)
+- NIP-65 cache hit rate: 78%
+- Avg discovery time: 52ms
+```
+
+### Developer Tools Integration
+
+Observable object for SwiftUI developer tools:
+
+```swift
+@Observable
+class RelayIntelligenceInspector {
+    var poolSnapshot: PoolSnapshot
+    var activeOperations: [any Operation]
+    var recentEvents: [IntelligenceEvent]
+    var selectedOperation: (any Operation)?
+
+    func simulatePublish(_ event: NDKEvent)
+    func clearHintIndex()
+    func disconnectRelay(_ url: RelayURL)
+}
+```
+
+### Script-Friendly Usage
+
+```swift
+// Explore hint index
+print(ndk.relayIntelligence.hintIndex.hints(for: "alice-pubkey"))
+
+// Simulate without executing
+let sim = ndk.relayIntelligence.simulate(reach: "alice-pubkey")
+print(sim.explanation.summary)
+
+// Watch events live
+for await event in ndk.relayIntelligence.events {
+    print(event)
+}
+
+// Export diagnostic report
+let report = ndk.relayIntelligence.diagnosticReport()
+print(report.toMarkdown())
+```
+
 ## Future Enhancements (Not in Initial Implementation)
 
 1. **Hint confidence scoring** - Recent observations weighted higher
