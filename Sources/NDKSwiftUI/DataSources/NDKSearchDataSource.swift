@@ -83,27 +83,32 @@ public final class NDKSearchDataSource {
             return
         }
 
-        // Execute search
-        searchTask = Task { @MainActor in
-            isLoading = true
-            error = nil
+        // Execute search OFF main thread
+        searchTask = Task {
+            // Set loading state on main thread
+            await MainActor.run {
+                isLoading = true
+                error = nil
+            }
 
             do {
-                // Check if NDK has nostrdb cache
+                // Check if NDK has nostrdb cache (off main thread)
                 guard let cache = ndk.cache as? NDKNostrDBCache else {
                     throw SearchError.nostrdbNotAvailable
                 }
 
-                // Perform search
+                // Perform search (off main thread - won't block UI)
                 let results = await cache.textSearch(query, limit: limit)
 
-                // Update results if not cancelled
-                if !Task.isCancelled {
+                // Update results on main thread only if not cancelled
+                await MainActor.run {
+                    guard !Task.isCancelled else { return }
                     events = results
                     isLoading = false
                 }
             } catch {
-                if !Task.isCancelled {
+                await MainActor.run {
+                    guard !Task.isCancelled else { return }
                     self.error = error
                     self.events = []
                     self.isLoading = false

@@ -2,62 +2,6 @@ import SwiftUI
 import NDKSwiftCore
 import NDKSwiftUI
 
-// MARK: - Article Card Type Aliases
-
-/// Article RichText with Hero card (maps to Default style)
-typealias ArticleHeroRichText = NDKUIRichTextView<
-    DefaultMentionView,
-    DefaultHashtagView,
-    DefaultLinkView,
-    DefaultImageView,
-    ArticleCardHero
->
-
-/// Article RichText with Compact card
-typealias ArticleCompactRichText = NDKUIRichTextView<
-    CompactMentionView,
-    CompactHashtagView,
-    DefaultLinkView,
-    DefaultImageView,
-    ArticleCardCompact
->
-
-/// Article RichText with Portrait card (maps to Pill style)
-typealias ArticlePortraitRichText = NDKUIRichTextView<
-    PillMentionView,
-    PillHashtagView,
-    DefaultLinkView,
-    DefaultImageView,
-    ArticleCardPortrait
->
-
-/// Article Markdown with Hero card (maps to Default style)
-typealias ArticleHeroMarkdown = NDKUIMarkdownView<
-    DefaultMentionView,
-    DefaultHashtagView,
-    DefaultLinkView,
-    DefaultImageView,
-    ArticleCardHero
->
-
-/// Article Markdown with Compact card
-typealias ArticleCompactMarkdown = NDKUIMarkdownView<
-    CompactMentionView,
-    CompactHashtagView,
-    DefaultLinkView,
-    DefaultImageView,
-    ArticleCardCompact
->
-
-/// Article Markdown with Portrait card (maps to Pill style)
-typealias ArticlePortraitMarkdown = NDKUIMarkdownView<
-    PillMentionView,
-    PillHashtagView,
-    DefaultLinkView,
-    DefaultImageView,
-    ArticleCardPortrait
->
-
 // MARK: - ShowcaseTabView
 
 /// Showcase tab displaying all renderer variations for each entity type

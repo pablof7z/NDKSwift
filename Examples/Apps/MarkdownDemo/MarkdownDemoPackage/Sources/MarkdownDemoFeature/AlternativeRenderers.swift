@@ -2,6 +2,17 @@ import SwiftUI
 import NDKSwiftCore
 import NDKSwiftUI
 
+// MARK: - Renderer Style
+
+/// Available renderer style variations
+public enum RendererStyle: String, CaseIterable, Identifiable {
+    case `default` = "Default"
+    case compact = "Compact"
+    case pill = "Pill"
+
+    public var id: String { rawValue }
+}
+
 // MARK: - Image/Media Utility Components
 
 /// Media carousel - displays multiple images with horizontal scrolling
@@ -220,6 +231,33 @@ public typealias ArticleCompactRichText = NDKUIRichTextView<
 public typealias ArticlePortraitRichText = NDKUIRichTextView<
     DefaultMentionView,
     DefaultHashtagView,
+    DefaultLinkView,
+    DefaultImageView,
+    ArticleCardPortrait
+>
+
+/// Article Markdown with Hero card (maps to Default style)
+public typealias ArticleHeroMarkdown = NDKUIMarkdownView<
+    DefaultMentionView,
+    DefaultHashtagView,
+    DefaultLinkView,
+    DefaultImageView,
+    ArticleCardHero
+>
+
+/// Article Markdown with Compact card
+public typealias ArticleCompactMarkdown = NDKUIMarkdownView<
+    CompactMentionView,
+    CompactHashtagView,
+    DefaultLinkView,
+    DefaultImageView,
+    ArticleCardCompact
+>
+
+/// Article Markdown with Portrait card (maps to Pill style)
+public typealias ArticlePortraitMarkdown = NDKUIMarkdownView<
+    PillMentionView,
+    PillHashtagView,
     DefaultLinkView,
     DefaultImageView,
     ArticleCardPortrait
