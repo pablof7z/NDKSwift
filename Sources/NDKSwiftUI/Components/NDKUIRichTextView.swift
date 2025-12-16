@@ -1,45 +1,34 @@
 import NDKSwiftCore
 import SwiftUI
 
-/// A comprehensive rich text view that renders parsed Nostr content with reactive profile loading and interactive elements
-public struct NDKUIRichTextView: View {
-    private let ndk: NDK
+// MARK: - Generic Rich Text View
+
+/// A generic rich text view that renders parsed Nostr content with pluggable renderers
+public struct NDKUIRichTextView<
+    Mention: MentionRenderer,
+    Hashtag: HashtagRenderer,
+    Link: LinkRenderer,
+    Image: ImageRenderer,
+    Event: EventRenderer
+>: View {
     let content: String
     let tags: [Tag]
     let currentUserPubkey: PublicKey?
     let showLinkPreviews: Bool
-    let style: Style
+
+    @Environment(\.ndk) private var ndk
     @State private var parsedContent: NDKParsedContent?
-    @State private var profileCache: [String: NDKUserMetadata] = [:]
-    @State private var profileTasks: [String: Task<Void, Never>] = [:]
-    @State private var trackedPubkeys: Set<String> = []
-
-    // Callbacks
-    private var onLinkTapped: ((URL) -> Void)?
-    private var onHashtagTapped: ((String) -> Void)?
-    private var onMentionTapped: ((String) -> Void)?
-    private var onEventTapped: ((String) -> Void)?
-
-    public enum Style {
-        case full // Full rendering with previews
-        case compact // Inline rendering without previews
-        case minimal // Basic text only
-    }
 
     public init(
-        ndk: NDK,
         content: String,
         tags: [Tag] = [],
         currentUserPubkey: PublicKey? = nil,
-        showLinkPreviews: Bool = true,
-        style: Style = .full
+        showLinkPreviews: Bool = true
     ) {
-        self.ndk = ndk
         self.content = content
         self.tags = tags
         self.currentUserPubkey = currentUserPubkey
-        self.showLinkPreviews = showLinkPreviews && style == .full
-        self.style = style
+        self.showLinkPreviews = showLinkPreviews
     }
 
     public var body: some View {
@@ -47,22 +36,10 @@ public struct NDKUIRichTextView: View {
             if let parsed = parsedContent {
                 VStack(alignment: .leading, spacing: 8) {
                     renderComponents(parsed.components)
-                        .onAppear {
-                            loadProfilesForComponents(parsed.components)
-                        }
 
-                    // Show URL previews below the text
                     if showLinkPreviews {
-                        ForEach(extractURLs(from: parsed.components), id: \.absoluteString) { url in
-                            NDKUIURLPreview(url: url, style: previewStyle)
-                                .padding(.top, 4)
-                        }
-
-                        // Show event previews
-                        ForEach(extractEventReferences(from: parsed.components), id: \.self) { reference in
-                            NDKUIEventPreview(ndk: ndk, eventReference: reference)
-                                .padding(.top, 4)
-                        }
+                        renderImagePreviews(from: parsed.components)
+                        renderEventPreviews(from: parsed.components)
                     }
                 }
             } else {
@@ -72,50 +49,101 @@ public struct NDKUIRichTextView: View {
                     }
             }
         }
-        .onDisappear {
-            // Cancel all profile loading tasks
-            for task in profileTasks.values {
-                task.cancel()
+    }
+
+    private func parseContent() async {
+        guard let ndk = ndk else { return }
+        let parsed = await ndk.parseContent(content, tags: tags, currentUserPubkey: currentUserPubkey)
+        await MainActor.run {
+            self.parsedContent = parsed
+        }
+    }
+
+    @ViewBuilder
+    private func renderComponents(_ components: [NDKParsedContent.Component]) -> some View {
+        let merged = mergeTextComponents(components)
+        FlowLayout(alignment: .leading, spacing: 0) {
+            ForEach(Array(merged.enumerated()), id: \.offset) { _, component in
+                renderComponent(component)
             }
         }
     }
 
-    // MARK: - Modifiers
+    @ViewBuilder
+    private func renderComponent(_ component: NDKParsedContent.Component) -> some View {
+        switch component {
+        case .text(let text):
+            Text(text)
 
-    public func onLinkTapped(_ action: @escaping (URL) -> Void) -> Self {
-        var copy = self
-        copy.onLinkTapped = action
-        return copy
+        case .userMention(let pubkey, let npub):
+            Mention(pubkey: pubkey, npub: npub, onTap: nil)
+
+        case .nprofileMention(let nprofile):
+            // Decode nprofile to extract pubkey
+            if let decoded = try? ContentTagger.decodeNostrEntity(nprofile),
+               let pubkey = decoded.pubkey {
+                Mention(pubkey: pubkey, npub: nprofile, onTap: nil)
+            } else {
+                Text("@\(String(nprofile.prefix(16)))...")
+                    .foregroundColor(.accentColor)
+            }
+
+        case .hashtag(let tag):
+            Hashtag(tag: tag, onTap: nil)
+
+        case .url(let url):
+            if isImageURL(url) {
+                if !showLinkPreviews {
+                    Link(url: url, onTap: nil)
+                }
+                // Images rendered separately in preview section when showLinkPreviews is true
+            } else {
+                Link(url: url, onTap: nil)
+            }
+
+        case .eventMention, .noteMention, .neventMention:
+            // Event mentions rendered separately in preview section
+            EmptyView()
+        }
     }
-
-    public func onHashtagTapped(_ action: @escaping (String) -> Void) -> Self {
-        var copy = self
-        copy.onHashtagTapped = action
-        return copy
-    }
-
-    public func onMentionTapped(_ action: @escaping (String) -> Void) -> Self {
-        var copy = self
-        copy.onMentionTapped = action
-        return copy
-    }
-
-    public func onEventTapped(_ action: @escaping (String) -> Void) -> Self {
-        var copy = self
-        copy.onEventTapped = action
-        return copy
-    }
-
-    // MARK: - Private Methods
 
     @ViewBuilder
-    private func renderComponents(_ components: [NDKParsedContent.Component]) -> some View {
-        // Combine adjacent text components for better text flow
-        let mergedComponents = mergeTextComponents(components)
+    private func renderImagePreviews(from components: [NDKParsedContent.Component]) -> some View {
+        let imageURLs = components.compactMap { component -> URL? in
+            if case .url(let url) = component, isImageURL(url) {
+                return url
+            }
+            return nil
+        }
 
-        // Create text with attributed components
-        mergedComponents.reduce(Text("")) { result, component in
-            result + renderComponent(component)
+        ForEach(Array(imageURLs.prefix(3).enumerated()), id: \.offset) { _, url in
+            Image(url: url, onTap: nil)
+                .padding(.top, 4)
+        }
+    }
+
+    @ViewBuilder
+    private func renderEventPreviews(from components: [NDKParsedContent.Component]) -> some View {
+        let references = extractEventReferences(from: components)
+
+        ForEach(Array(references.prefix(2).enumerated()), id: \.offset) { _, reference in
+            EventPreviewLoader<Event>(reference: reference, onTap: nil)
+                .padding(.top, 4)
+        }
+    }
+
+    private func extractEventReferences(from components: [NDKParsedContent.Component]) -> [EventPreviewLoader<Event>.Reference] {
+        components.compactMap { component -> EventPreviewLoader<Event>.Reference? in
+            switch component {
+            case .eventMention(let eventId):
+                return .eventId(eventId)
+            case .noteMention(let note):
+                return .note(note)
+            case .neventMention(let nevent):
+                return .nevent(nevent)
+            default:
+                return nil
+            }
         }
     }
 
@@ -125,7 +153,7 @@ public struct NDKUIRichTextView: View {
 
         for component in components {
             switch component {
-            case let .text(text):
+            case .text(let text):
                 currentText += text
             default:
                 if !currentText.isEmpty {
@@ -143,130 +171,6 @@ public struct NDKUIRichTextView: View {
         return merged
     }
 
-    private func renderComponent(_ component: NDKParsedContent.Component) -> Text {
-        switch component {
-        case let .text(text):
-            return Text(text)
-
-        case let .userMention(pubkey, npub):
-            let displayName = profileCache[pubkey]?.displayName ?? profileCache[pubkey]?.name
-            let text = displayName != nil ? "@\(displayName!)" : "@\(String(npub.prefix(16)))..."
-            return Text(text)
-                .foregroundColor(.ndkAccent)
-                .fontWeight(mentionFontWeight)
-
-        case let .nprofileMention(nprofile):
-            // For now, just show truncated nprofile
-            return Text("@\(String(nprofile.prefix(16)))...")
-                .foregroundColor(.ndkAccent)
-                .fontWeight(mentionFontWeight)
-
-        case let .eventMention(eventId):
-            return Text("📝 \(String(eventId.prefix(8)))...")
-                .foregroundColor(.ndkAccent)
-                .underline()
-
-        case let .noteMention(note):
-            return Text("📝 \(String(note.prefix(16)))...")
-                .foregroundColor(.ndkAccent)
-                .underline()
-
-        case let .neventMention(nevent):
-            return Text("📝 \(String(nevent.prefix(16)))...")
-                .foregroundColor(.ndkAccent)
-                .underline()
-
-        case let .hashtag(tag):
-            return Text("#\(tag)")
-                .foregroundColor(.ndkAccent)
-                .fontWeight(hashtagFontWeight)
-
-        case let .url(url):
-            // Don't render image URLs as text if we're showing previews
-            if showLinkPreviews && isImageURL(url) {
-                return Text("")
-            } else {
-                return Text(url.absoluteString)
-                    .foregroundColor(.ndkAccent)
-                    .underline()
-            }
-        }
-    }
-
-    private func parseContent() async {
-        let parsed = await ndk.parseContent(content, tags: tags, currentUserPubkey: currentUserPubkey)
-
-        await MainActor.run {
-            self.parsedContent = parsed
-        }
-    }
-
-    private func loadProfilesForComponents(_ components: [NDKParsedContent.Component]) {
-        for component in components {
-            switch component {
-            case let .userMention(pubkey, _):
-                loadProfile(for: pubkey)
-            default:
-                break
-            }
-        }
-    }
-
-    private func loadProfile(for pubkey: String) {
-        // Skip if already loading or loaded
-        guard !trackedPubkeys.contains(pubkey) else { return }
-
-        trackedPubkeys.insert(pubkey)
-
-        let task = Task {
-            let profileStream = await ndk.profileManager.subscribe(for: pubkey, maxAge: TimeConstants.hour)
-
-            for await profile in profileStream {
-                if let profile = profile {
-                    await MainActor.run {
-                        self.profileCache[pubkey] = profile
-                    }
-                    break // We only need the first profile
-                }
-            }
-        }
-
-        profileTasks[pubkey] = task
-    }
-
-    private func extractURLs(from components: [NDKParsedContent.Component]) -> [URL] {
-        var urls: [URL] = []
-
-        for component in components {
-            if case let .url(url) = component {
-                urls.append(url)
-            }
-        }
-
-        // Limit to first 3 URLs to avoid overwhelming the UI
-        return Array(urls.prefix(3))
-    }
-
-    private func extractEventReferences(from components: [NDKParsedContent.Component]) -> [NDKUIEventPreview.EventReference] {
-        var references: [NDKUIEventPreview.EventReference] = []
-
-        for component in components {
-            switch component {
-            case let .eventMention(eventId):
-                references.append(.eventId(eventId))
-            case let .noteMention(note):
-                references.append(.note(note))
-            case let .neventMention(nevent):
-                references.append(.nevent(nevent))
-            default:
-                break
-            }
-        }
-
-        // Limit to first 2 event references
-        return Array(references.prefix(2))
-    }
-
     private func isImageURL(_ url: URL) -> Bool {
         let imageExtensions = ["jpg", "jpeg", "png", "gif", "webp", "heic", "svg", "bmp", "tiff"]
         let pathExtension = url.pathExtension.lowercased()
@@ -275,7 +179,6 @@ public struct NDKUIRichTextView: View {
             return true
         }
 
-        // Also check if URL contains image extension before query params
         let urlString = url.absoluteString.lowercased()
         for ext in imageExtensions {
             if urlString.contains(".\(ext)?") || urlString.contains(".\(ext)&") || urlString.contains(".\(ext)#") {
@@ -285,35 +188,76 @@ public struct NDKUIRichTextView: View {
 
         return false
     }
+}
 
-    // MARK: - Style Properties
+// MARK: - Default Typealias
 
-    private var previewStyle: NDKUIURLPreview.Style {
-        switch style {
-        case .full: return .full
-        case .compact: return .compact
-        case .minimal: return .minimal
+/// Convenience typealias for NDKUIRichTextView with all default renderers
+public typealias NDKRichText = NDKUIRichTextView<
+    DefaultMentionView,
+    DefaultHashtagView,
+    DefaultLinkView,
+    DefaultImageView,
+    DefaultEventView
+>
+
+// MARK: - Simple Flow Layout
+
+struct FlowLayout: Layout {
+    var alignment: HorizontalAlignment = .leading
+    var spacing: CGFloat = 4
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let result = arrangeSubviews(proposal: proposal, subviews: subviews)
+        return result.size
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = arrangeSubviews(proposal: proposal, subviews: subviews)
+
+        for (index, position) in result.positions.enumerated() {
+            subviews[index].place(
+                at: CGPoint(x: bounds.minX + position.x, y: bounds.minY + position.y),
+                proposal: ProposedViewSize(result.sizes[index])
+            )
         }
     }
 
-    private var mentionFontWeight: Font.Weight {
-        switch style {
-        case .full, .compact: return .semibold
-        case .minimal: return .regular
-        }
-    }
+    private func arrangeSubviews(proposal: ProposedViewSize, subviews: Subviews) -> (size: CGSize, positions: [CGPoint], sizes: [CGSize]) {
+        let maxWidth = proposal.width ?? .infinity
+        var positions: [CGPoint] = []
+        var sizes: [CGSize] = []
+        var currentX: CGFloat = 0
+        var currentY: CGFloat = 0
+        var lineHeight: CGFloat = 0
+        var totalHeight: CGFloat = 0
+        var totalWidth: CGFloat = 0
 
-    private var hashtagFontWeight: Font.Weight {
-        switch style {
-        case .full, .compact: return .medium
-        case .minimal: return .regular
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            sizes.append(size)
+
+            if currentX + size.width > maxWidth && currentX > 0 {
+                currentX = 0
+                currentY += lineHeight + spacing
+                lineHeight = 0
+            }
+
+            positions.append(CGPoint(x: currentX, y: currentY))
+            currentX += size.width + spacing
+            lineHeight = max(lineHeight, size.height)
+            totalWidth = max(totalWidth, currentX)
+            totalHeight = currentY + lineHeight
         }
+
+        return (CGSize(width: totalWidth, height: totalHeight), positions, sizes)
     }
 }
 
-// MARK: - NDKUIEventPreview
+// MARK: - NDKUIEventPreview (Legacy - kept for backwards compatibility during transition)
 
 /// A view for previewing event references
+/// Note: Consider using EventPreviewLoader<DefaultEventView> for new code
 public struct NDKUIEventPreview: View {
     let ndk: NDK
     let eventReference: EventReference
@@ -408,34 +352,6 @@ public struct NDKUIEventPreview: View {
     }
 }
 
-// MARK: - Inline Version
-
-/// A simpler text-only version for use in list views
-public struct NDKUIRichTextInline: View {
-    private let ndk: NDK
-    let content: String
-    let tags: [Tag]
-    let currentUserPubkey: PublicKey?
-
-    public init(ndk: NDK, content: String, tags: [Tag] = [], currentUserPubkey: PublicKey? = nil) {
-        self.ndk = ndk
-        self.content = content
-        self.tags = tags
-        self.currentUserPubkey = currentUserPubkey
-    }
-
-    public var body: some View {
-        NDKUIRichTextView(
-            ndk: ndk,
-            content: content,
-            tags: tags,
-            currentUserPubkey: currentUserPubkey,
-            showLinkPreviews: false,
-            style: .minimal
-        )
-    }
-}
-
 // MARK: - Preview
 
 #if DEBUG
@@ -444,17 +360,18 @@ public struct NDKUIRichTextInline: View {
             let mockNDK = NDK(relayURLs: [])
 
             VStack(spacing: 20) {
-                NDKUIRichTextView(
-                    ndk: mockNDK,
-                    content: "Hello @npub1234... check out #bitcoin at https://example.com",
-                    style: .full
+                // Using default renderers via typealias
+                NDKRichText(
+                    content: "Hello @npub1234... check out #bitcoin at https://example.com"
                 )
+                .ndk(mockNDK)
 
-                NDKUIRichTextView(
-                    ndk: mockNDK,
-                    content: "Simple inline text with #nostr",
-                    style: .minimal
+                // Explicit generic parameters
+                NDKUIRichTextView<DefaultMentionView, DefaultHashtagView, DefaultLinkView, DefaultImageView, DefaultEventView>(
+                    content: "Simple text with #nostr",
+                    showLinkPreviews: false
                 )
+                .ndk(mockNDK)
             }
             .padding()
         }
