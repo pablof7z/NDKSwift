@@ -89,12 +89,14 @@ public struct EventPreviewLoader<Event: EventRenderer>: View {
 
         let dataSource = ndk.subscribe(filter: filter)
 
-        for await fetchedEvent in dataSource.events {
-            await MainActor.run {
-                self.event = fetchedEvent
-                self.isLoading = false
+        for await fetchedEvents in dataSource.events {
+            if let firstEvent = fetchedEvents.first {
+                await MainActor.run {
+                    self.event = firstEvent
+                    self.isLoading = false
+                }
+                break
             }
-            break
         }
 
         await MainActor.run {
