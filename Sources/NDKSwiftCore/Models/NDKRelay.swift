@@ -81,6 +81,7 @@ public enum NDKRelayConnectionState: Equatable, Codable, Sendable {
 public struct NDKRelayStats: Sendable, Equatable {
     public var connectedAt: Date?
     public var lastMessageAt: Date?
+    public var lastActivityAt: Date?
     public var messagesSent: Int = 0
     public var messagesReceived: Int = 0
     public var bytesReceived: Int = 0
@@ -95,6 +96,7 @@ public struct NDKRelayStats: Sendable, Equatable {
     public init(
         connectedAt: Date? = nil,
         lastMessageAt: Date? = nil,
+        lastActivityAt: Date? = nil,
         messagesSent: Int = 0,
         messagesReceived: Int = 0,
         bytesReceived: Int = 0,
@@ -106,6 +108,7 @@ public struct NDKRelayStats: Sendable, Equatable {
     ) {
         self.connectedAt = connectedAt
         self.lastMessageAt = lastMessageAt
+        self.lastActivityAt = lastActivityAt
         self.messagesSent = messagesSent
         self.messagesReceived = messagesReceived
         self.bytesReceived = bytesReceived
@@ -279,6 +282,10 @@ actor RelayStateActor {
         return stats
     }
 
+    func recordActivity() {
+        stats.lastActivityAt = Date()
+    }
+
     func updateSignatureStats(_ updater: (inout NDKRelaySignatureStats) -> Void) {
         updater(&stats.signatureStats)
     }
@@ -442,6 +449,28 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
     public var stats: NDKRelayStats {
         get async {
             await stateActor.getStats()
+        }
+    }
+
+    /// Record activity on this relay (updates lastActivityAt timestamp)
+    ///
+    /// Called automatically when messages are sent or received.
+    /// Can also be called manually to mark the relay as active.
+    public func recordActivity() async {
+        await stateActor.recordActivity()
+    }
+
+    /// Time in seconds since last activity on this relay
+    ///
+    /// Returns `.infinity` if no activity has been recorded.
+    /// Used for idle relay eviction decisions.
+    public var idleTime: TimeInterval {
+        get async {
+            let stats = await stateActor.getStats()
+            guard let lastActivity = stats.lastActivityAt else {
+                return .infinity
+            }
+            return Date().timeIntervalSince(lastActivity)
         }
     }
 
@@ -696,6 +725,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
         await stateActor.updateStats {
             $0.messagesSent += 1
             $0.bytesSent += message.count
+            $0.lastActivityAt = Date()
         }
     }
 
@@ -705,6 +735,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
             $0.messagesReceived += 1
             $0.bytesReceived += message.count
             $0.lastMessageAt = Date()
+            $0.lastActivityAt = Date()
         }
 
         // Parse and route message
