@@ -240,43 +240,118 @@ public actor HintIndex {
         totalEntries = 0
     }
 
+    /// Get unique relay URLs for an address
+    public func relayURLs(forAddress address: String) -> Set<RelayURL> {
+        return Set(hints(forAddress: address).map { $0.relay })
+    }
+
     // MARK: - Private
+
+    /// Entry type for tracking during eviction
+    private enum EntryKeyType {
+        case pubkey
+        case eventId
+        case address
+    }
+
+    /// Reference to a specific entry for eviction
+    private struct EntryRef {
+        let keyType: EntryKeyType
+        let key: String
+        let entryIndex: Int
+        let recordedAt: Date
+    }
 
     private func evictIfNeeded() {
         guard totalEntries > maxSize else { return }
 
-        // Simple eviction: remove oldest entries from each map
+        // True LRU eviction: collect all entries, sort by recordedAt, remove oldest
         // Remove 10% buffer to avoid frequent evictions
-        let evictCount = totalEntries - maxSize + (maxSize / 10)
-        var evicted = 0
+        let targetSize = maxSize - (maxSize / 10)
+        let evictCount = totalEntries - targetSize
 
-        // Evict from pubkey hints first (typically the largest)
+        // Collect all entries with their references
+        var allEntries: [EntryRef] = []
+
         for (key, hints) in pubkeyHints {
-            if evicted >= evictCount { break }
-            if hints.count > 1 {
-                pubkeyHints[key] = Array(hints.dropFirst())
-                evicted += 1
-                totalEntries -= 1
+            for (index, hint) in hints.enumerated() {
+                allEntries.append(EntryRef(keyType: .pubkey, key: key, entryIndex: index, recordedAt: hint.recordedAt))
             }
         }
 
-        // Then event hints
         for (key, hints) in eventIdHints {
-            if evicted >= evictCount { break }
-            if hints.count > 1 {
-                eventIdHints[key] = Array(hints.dropFirst())
-                evicted += 1
-                totalEntries -= 1
+            for (index, hint) in hints.enumerated() {
+                allEntries.append(EntryRef(keyType: .eventId, key: key, entryIndex: index, recordedAt: hint.recordedAt))
             }
         }
 
-        // Then address hints
         for (key, hints) in addressHints {
-            if evicted >= evictCount { break }
-            if hints.count > 1 {
-                addressHints[key] = Array(hints.dropFirst())
-                evicted += 1
+            for (index, hint) in hints.enumerated() {
+                allEntries.append(EntryRef(keyType: .address, key: key, entryIndex: index, recordedAt: hint.recordedAt))
+            }
+        }
+
+        // Sort by recordedAt (oldest first)
+        allEntries.sort { $0.recordedAt < $1.recordedAt }
+
+        // Track which entries to remove (by key and indices)
+        var pubkeyIndicesToRemove: [String: Set<Int>] = [:]
+        var eventIdIndicesToRemove: [String: Set<Int>] = [:]
+        var addressIndicesToRemove: [String: Set<Int>] = [:]
+
+        // Mark oldest entries for removal
+        for i in 0 ..< min(evictCount, allEntries.count) {
+            let entry = allEntries[i]
+            switch entry.keyType {
+            case .pubkey:
+                pubkeyIndicesToRemove[entry.key, default: []].insert(entry.entryIndex)
+            case .eventId:
+                eventIdIndicesToRemove[entry.key, default: []].insert(entry.entryIndex)
+            case .address:
+                addressIndicesToRemove[entry.key, default: []].insert(entry.entryIndex)
+            }
+        }
+
+        // Remove marked entries (iterate in reverse to preserve indices)
+        for (key, indices) in pubkeyIndicesToRemove {
+            guard var hints = pubkeyHints[key] else { continue }
+            let sortedIndices = indices.sorted(by: >)
+            for index in sortedIndices {
+                hints.remove(at: index)
                 totalEntries -= 1
+            }
+            if hints.isEmpty {
+                pubkeyHints.removeValue(forKey: key)
+            } else {
+                pubkeyHints[key] = hints
+            }
+        }
+
+        for (key, indices) in eventIdIndicesToRemove {
+            guard var hints = eventIdHints[key] else { continue }
+            let sortedIndices = indices.sorted(by: >)
+            for index in sortedIndices {
+                hints.remove(at: index)
+                totalEntries -= 1
+            }
+            if hints.isEmpty {
+                eventIdHints.removeValue(forKey: key)
+            } else {
+                eventIdHints[key] = hints
+            }
+        }
+
+        for (key, indices) in addressIndicesToRemove {
+            guard var hints = addressHints[key] else { continue }
+            let sortedIndices = indices.sorted(by: >)
+            for index in sortedIndices {
+                hints.remove(at: index)
+                totalEntries -= 1
+            }
+            if hints.isEmpty {
+                addressHints.removeValue(forKey: key)
+            } else {
+                addressHints[key] = hints
             }
         }
     }
