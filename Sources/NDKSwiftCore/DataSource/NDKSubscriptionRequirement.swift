@@ -403,12 +403,12 @@ actor NDKSubscriptionRequirement {
     // MARK: - Test Introspection
 
     /// Get the expected relays from the EOSE tracker (for testing)
-    public func getExpectedRelaysForTesting() async -> Set<RelayURL> {
+    func getExpectedRelaysForTesting() async -> Set<RelayURL> {
         await eoseTracker.getExpectedRelays()
     }
 
     /// Get the relays that have sent EOSE (for testing)
-    public func getEOSEsSeenForTesting() async -> Set<RelayURL> {
+    func getEOSEsSeenForTesting() async -> Set<RelayURL> {
         await eoseTracker.getEOSEsSeen()
     }
 }

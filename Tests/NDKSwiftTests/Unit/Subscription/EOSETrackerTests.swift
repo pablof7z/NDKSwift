@@ -287,22 +287,22 @@ final class EOSETrackerTests: XCTestCase {
         // Simulate EOSE from outbox relay
         await outboxMock.sendEOSE(subscriptionId: "test-eose-sub")
 
-        // Check EOSEs seen
-        let eosesSeen = await requirement.getEOSEsSeenForTesting()
-
         // If fallback relay is active, simulate its EOSE too
         if activeRelays.contains(fallbackRelayURL.normalizedRelayURL) {
             await fallbackMock.sendEOSE(subscriptionId: "test-eose-sub")
 
-            // Small delay for async processing
-            try await Task.sleep(nanoseconds: 50_000_000)
+            // Wait for EOSE to be tracked
+            try await waitForCondition(timeout: 1.0) {
+                let seen = await requirement.getEOSEsSeenForTesting()
+                return seen.contains(fallbackRelayURL.normalizedRelayURL)
+            }
 
             let finalEosesSeen = await requirement.getEOSEsSeenForTesting()
 
             // Verify fallback EOSE was tracked (not ignored with warning)
-            XCTAssertTrue(finalEosesSeen.contains(fallbackRelayURL.normalizedRelayURL) ||
-                         finalEosesSeen.contains(outboxRelayURL.normalizedRelayURL),
-                         "At least one EOSE should be tracked. EOSEs seen: \(finalEosesSeen)")
+            // This is the key assertion - the fix ensures fallback relay EOSE is expected and tracked
+            XCTAssertTrue(finalEosesSeen.contains(fallbackRelayURL.normalizedRelayURL),
+                         "Fallback relay EOSE should be tracked after the fix. EOSEs seen: \(finalEosesSeen)")
         }
 
         await requirement.cancel()
