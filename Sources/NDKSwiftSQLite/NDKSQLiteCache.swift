@@ -1903,7 +1903,7 @@ public actor NDKSQLiteCache: NDKCache {
 // MARK: - Cache Statistics Models
 
 /// Statistics about cached events
-public struct CacheStatistics {
+public struct CacheStatistics: Sendable {
     public let totalEvents: Int
     public let eventsByKind: [Int: Int]
 
