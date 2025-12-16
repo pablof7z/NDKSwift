@@ -475,8 +475,10 @@ struct RendererDemoView: View {
 |-----------|-------------|
 | **Protocols** | `MentionRenderer`, `HashtagRenderer`, `LinkRenderer`, `ImageRenderer`, `EventRenderer` |
 | **Default Implementations** | `DefaultMentionView`, `DefaultHashtagView`, `DefaultLinkView`, `DefaultImageView`, `DefaultEventView` |
-| **Generic View** | `NDKUIRichTextView<M, H, L, I, E>` |
-| **Convenience Typealias** | `NDKRichText` (all defaults) |
+| **Plain-Text View** | `NDKUIRichTextView<M, H, L, I, E>` |
+| **Markdown View** | `NDKUIMarkdownView<M, H, L, I, E>` |
+| **Block Config** | `MarkdownBlockConfig` (headings, code blocks, blockquotes, lists) |
+| **Convenience Typealiases** | `NDKRichText`, `NDKMarkdown` (all defaults) |
 | **Callbacks** | Both direct (init param) and environment-based |
 | **Performance** | Zero AnyView - full type safety |
 
@@ -495,15 +497,229 @@ struct RendererDemoView: View {
 
 ---
 
+## Markdown Support
+
+Both plain-text and markdown views share the same inline renderer protocols. The only difference is markdown has additional block-level structure.
+
+### Rendering Paths
+
+```
+Plain-text (kind:1 notes):
+    ContentParser → NDKParsedContent.Component → Inline Renderers
+
+Markdown (kind:30023 articles):
+    MarkdownParser → MarkdownBlock → Block Config (styling)
+                                   → MarkdownInline → Inline Renderers (shared)
+```
+
+### Markdown View
+
+```swift
+// MARK: - Generic Markdown View
+
+struct NDKUIMarkdownView<
+    Mention: MentionRenderer,
+    Hashtag: HashtagRenderer,
+    Link: LinkRenderer,
+    Image: ImageRenderer,
+    Event: EventRenderer
+>: View {
+    let content: String
+    let tags: [Tag]
+    let blockConfig: MarkdownBlockConfig
+
+    @Environment(NDK.self) private var ndk
+    @State private var parsedBlocks: [MarkdownBlock] = []
+
+    init(
+        content: String,
+        tags: [Tag] = [],
+        blockConfig: MarkdownBlockConfig = .default
+    ) {
+        self.content = content
+        self.tags = tags
+        self.blockConfig = blockConfig
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: blockConfig.blockSpacing) {
+            ForEach(Array(parsedBlocks.enumerated()), id: \.offset) { _, block in
+                renderBlock(block)
+            }
+        }
+        .task {
+            parsedBlocks = MarkdownParser.parse(content)
+        }
+    }
+
+    @ViewBuilder
+    private func renderBlock(_ block: MarkdownBlock) -> some View {
+        switch block {
+        case .heading(let level, let text):
+            Text(text)
+                .font(blockConfig.headingFont(for: level))
+                .foregroundColor(blockConfig.headingColor)
+
+        case .paragraph(let inlines):
+            renderInlines(inlines)
+
+        case .codeBlock(let language, let code):
+            CodeBlockView(language: language, code: code, config: blockConfig)
+
+        case .blockquote(let inlines):
+            HStack(spacing: 0) {
+                Rectangle()
+                    .fill(blockConfig.blockquoteBorderColor)
+                    .frame(width: 3)
+                renderInlines(inlines)
+                    .padding(.leading, 12)
+            }
+
+        case .list(let items, let ordered):
+            ListBlockView(items: items, ordered: ordered, config: blockConfig) { inlines in
+                renderInlines(inlines)
+            }
+
+        case .horizontalRule:
+            Divider()
+        }
+    }
+
+    @ViewBuilder
+    private func renderInlines(_ inlines: [MarkdownInline]) -> some View {
+        // Renders inline content using the same generic renderers
+        // Mention, Hashtag, Link, Image, Event
+    }
+}
+
+// MARK: - Default Typealias
+
+typealias NDKMarkdown = NDKUIMarkdownView<
+    DefaultMentionView,
+    DefaultHashtagView,
+    DefaultLinkView,
+    DefaultImageView,
+    DefaultEventView
+>
+```
+
+### Block Configuration
+
+```swift
+// MARK: - Markdown Block Configuration
+
+struct MarkdownBlockConfig {
+    // Spacing
+    var blockSpacing: CGFloat = 12
+    var listItemSpacing: CGFloat = 4
+    var listIndent: CGFloat = 20
+
+    // Headings
+    var headingColor: Color = .primary
+    func headingFont(for level: Int) -> Font {
+        switch level {
+        case 1: return .largeTitle.bold()
+        case 2: return .title.bold()
+        case 3: return .title2.bold()
+        case 4: return .title3.bold()
+        case 5: return .headline
+        default: return .subheadline.bold()
+        }
+    }
+
+    // Code blocks
+    var codeBackgroundColor: Color = Color(.systemGray6)
+    var codeFont: Font = .system(.body, design: .monospaced)
+    var codeCornerRadius: CGFloat = 8
+    var codePadding: CGFloat = 12
+
+    // Blockquotes
+    var blockquoteBorderColor: Color = .accentColor
+    var blockquoteTextColor: Color = .secondary
+
+    // Presets
+    static let `default` = MarkdownBlockConfig()
+
+    static let minimal = MarkdownBlockConfig(
+        blockSpacing: 8,
+        codeBackgroundColor: .clear,
+        codePadding: 0
+    )
+
+    static let compact = MarkdownBlockConfig(
+        blockSpacing: 6,
+        listItemSpacing: 2
+    )
+}
+```
+
+### Usage Examples
+
+```swift
+// Simple markdown - use defaults
+NDKMarkdown(content: article.content, tags: article.tags)
+
+// Custom block styling
+NDKMarkdown(
+    content: article.content,
+    tags: article.tags,
+    blockConfig: .compact
+)
+
+// Custom inline renderers + block config
+typealias MyAppMarkdown = NDKUIMarkdownView<
+    BrandedMentionView,
+    ChipHashtagView,
+    PreviewLinkView,
+    GalleryImageView,
+    CustomEventView
+>
+
+MyAppMarkdown(
+    content: article.content,
+    tags: article.tags,
+    blockConfig: MarkdownBlockConfig(
+        headingColor: .brand,
+        codeBackgroundColor: .codeBackground
+    )
+)
+```
+
+### Shared Renderer Typealiases
+
+```swift
+// For apps that want consistent rendering across both formats:
+typealias MyAppRenderers = (
+    Mention: BrandedMentionView,
+    Hashtag: ChipHashtagView,
+    Link: PreviewLinkView,
+    Image: GalleryImageView,
+    Event: CustomEventView
+)
+
+// Then define both:
+typealias MyRichText = NDKUIRichTextView<
+    BrandedMentionView, ChipHashtagView, PreviewLinkView, GalleryImageView, CustomEventView
+>
+
+typealias MyMarkdown = NDKUIMarkdownView<
+    BrandedMentionView, ChipHashtagView, PreviewLinkView, GalleryImageView, CustomEventView
+>
+```
+
+---
+
 ## Files to Create/Modify
+
+### Core Renderer Infrastructure
 
 1. **New: `Sources/NDKSwiftUI/Components/Renderers/RendererProtocols.swift`**
    - Callback type aliases
-   - Renderer protocols
+   - Renderer protocols (MentionRenderer, HashtagRenderer, etc.)
 
 2. **New: `Sources/NDKSwiftUI/Components/Renderers/RendererEnvironment.swift`**
-   - Environment keys
-   - View modifiers
+   - Environment keys for callbacks
+   - View modifiers (onMentionTap, onHashtagTap, etc.)
 
 3. **New: `Sources/NDKSwiftUI/Components/Renderers/DefaultRenderers.swift`**
    - DefaultMentionView
@@ -513,11 +729,29 @@ struct RendererDemoView: View {
    - DefaultEventView
 
 4. **New: `Sources/NDKSwiftUI/Components/Renderers/EventPreviewLoader.swift`**
-   - EventPreviewLoader helper
+   - EventPreviewLoader helper for async event loading
+
+### Plain-Text View
 
 5. **New/Replace: `Sources/NDKSwiftUI/Components/NDKUIRichTextView.swift`**
-   - Generic NDKUIRichTextView
+   - Generic NDKUIRichTextView<M, H, L, I, E>
    - NDKRichText typealias
 
-6. **Update: Demo app**
+### Markdown View
+
+6. **New: `Sources/NDKSwiftUI/Components/Renderers/MarkdownBlockConfig.swift`**
+   - MarkdownBlockConfig struct
+   - Presets (default, minimal, compact)
+
+7. **New/Replace: `Sources/NDKSwiftUI/Components/NDKUIMarkdownView.swift`**
+   - Generic NDKUIMarkdownView<M, H, L, I, E>
+   - NDKMarkdown typealias
+   - Block rendering with config
+   - Inline rendering using shared renderer protocols
+
+### Demo App
+
+8. **Update: `Examples/Apps/MarkdownDemo/`**
    - Showcase runtime switching between renderer styles
+   - Demo both plain-text and markdown rendering
+   - Show custom renderer implementations
