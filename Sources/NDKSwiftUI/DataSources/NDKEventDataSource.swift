@@ -51,6 +51,11 @@ public final class NDKEventDataSource: @preconcurrency NDKSubscriptionProtocol {
     private let dataSource: NDKSubscription<NDKEvent>
     @ObservationIgnored private var observationTask: Task<Void, Never>?
 
+    /// Batch buffer for accumulating events before UI update
+    /// Accumulates incoming events and flushes them in batches to reduce UI updates
+    @ObservationIgnored private var pendingBatch: [NDKEvent] = []
+    @ObservationIgnored private var flushTask: Task<Void, Never>?
+
     // MARK: - Initialization
 
     /// Initialize an event data source with a filter
@@ -91,9 +96,33 @@ public final class NDKEventDataSource: @preconcurrency NDKSubscriptionProtocol {
             var eventList: [NDKEvent] = []
 
             for await event in dataSource.events {
-                eventList.append(event)
+                // Add event to pending batch
+                pendingBatch.append(event)
 
-                // Sort events
+                // Cancel previous flush task and schedule new one
+                // Events arriving within 10ms get batched together
+                flushTask?.cancel()
+                flushTask = Task { @MainActor [weak self] in
+                    // Wait for more events to arrive
+                    try? await Task.sleep(for: .milliseconds(10))
+                    guard !Task.isCancelled, let self = self else { return }
+
+                    // Flush pending batch to event list
+                    eventList.append(contentsOf: self.pendingBatch)
+                    self.pendingBatch.removeAll(keepingCapacity: true)
+
+                    // Sort and update UI once per batch
+                    self.events = self.sortDescending
+                        ? eventList.sorted { $0.createdAt > $1.createdAt }
+                        : eventList.sorted { $0.createdAt < $1.createdAt }
+                }
+            }
+
+            // Flush any remaining events
+            if !pendingBatch.isEmpty {
+                eventList.append(contentsOf: pendingBatch)
+                pendingBatch.removeAll()
+
                 events = sortDescending
                     ? eventList.sorted { $0.createdAt > $1.createdAt }
                     : eventList.sorted { $0.createdAt < $1.createdAt }
