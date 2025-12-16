@@ -564,6 +564,46 @@ public actor NDKPool {
         return preparedRelays
     }
 
+    // MARK: - Idle Relay Eviction
+
+    /// Evict idle non-persistent relays from the pool
+    ///
+    /// Removes relays that:
+    /// - Are not persistent (isPersistent == false)
+    /// - Have been idle for longer than the threshold
+    ///
+    /// - Parameter idleThreshold: Time in seconds after which a relay is considered idle
+    /// - Returns: Set of relay URLs that were evicted
+    public func evictIdleRelays(idleThreshold: TimeInterval) async -> Set<RelayURL> {
+        var evictedUrls = Set<RelayURL>()
+
+        for relay in relays {
+            // Skip persistent relays
+            let isPersistent = await relay.isPersistent
+            if isPersistent {
+                continue
+            }
+
+            // Check idle time
+            let idleTime = await relay.idleTime
+            if idleTime >= idleThreshold {
+                evictedUrls.insert(relay.url)
+            }
+        }
+
+        // Remove evicted relays
+        for url in evictedUrls {
+            await removeRelay(url)
+            NDKLogger.log(.info, category: .relay, "🗑️ Evicted idle relay: \(url)")
+        }
+
+        if !evictedUrls.isEmpty {
+            NDKLogger.log(.info, category: .relay, "🧹 Evicted \(evictedUrls.count) idle relays")
+        }
+
+        return evictedUrls
+    }
+
     // MARK: - Private Helpers
 
     private func handleRelayConnected(_ relay: NDKRelay) async {
