@@ -60,7 +60,7 @@ public struct NDKUIRichTextView: View {
 
                         // Show event previews
                         ForEach(extractEventReferences(from: parsed.components), id: \.self) { reference in
-                            NDKUIEventPreview(eventReference: reference)
+                            NDKUIEventPreview(ndk: ndk, eventReference: reference)
                                 .padding(.top, 4)
                         }
                     }
@@ -155,20 +155,6 @@ public struct NDKUIRichTextView: View {
                 .foregroundColor(.ndkAccent)
                 .fontWeight(mentionFontWeight)
 
-        case let .npubMention(npub):
-            // Try to get pubkey and load profile
-            if let pubkey = try? String.fromNpub(npub) {
-                let displayName = profileCache[pubkey]?.displayName ?? profileCache[pubkey]?.name
-                let text = displayName != nil ? "@\(displayName!)" : "@\(String(npub.prefix(16)))..."
-                return Text(text)
-                    .foregroundColor(.ndkAccent)
-                    .fontWeight(mentionFontWeight)
-            } else {
-                return Text("@\(String(npub.prefix(16)))...")
-                    .foregroundColor(.ndkAccent)
-                    .fontWeight(mentionFontWeight)
-            }
-
         case let .nprofileMention(nprofile):
             // For now, just show truncated nprofile
             return Text("@\(String(nprofile.prefix(16)))...")
@@ -220,10 +206,6 @@ public struct NDKUIRichTextView: View {
             switch component {
             case let .userMention(pubkey, _):
                 loadProfile(for: pubkey)
-            case let .npubMention(npub):
-                if let pubkey = try? String.fromNpub(npub) {
-                    loadProfile(for: pubkey)
-                }
             default:
                 break
             }
@@ -331,9 +313,13 @@ public struct NDKUIRichTextView: View {
 
 // MARK: - NDKUIEventPreview
 
-/// A view for previewing event references (stub for now)
+/// A view for previewing event references
 public struct NDKUIEventPreview: View {
+    let ndk: NDK
     let eventReference: EventReference
+
+    @State private var event: NDKEvent?
+    @State private var isLoading = true
 
     public enum EventReference: Hashable {
         case eventId(String)
@@ -341,20 +327,84 @@ public struct NDKUIEventPreview: View {
         case nevent(String)
     }
 
+    public init(ndk: NDK, eventReference: EventReference) {
+        self.ndk = ndk
+        self.eventReference = eventReference
+    }
+
     public var body: some View {
-        HStack {
-            Image(systemName: "doc.text")
-                .foregroundColor(.ndkAccent)
-
-            Text("Event preview")
-                .font(.caption)
-                .foregroundColor(.secondary)
-
-            Spacer()
+        Group {
+            if let event = event {
+                NDKUIEventView(ndk: ndk, event: event, style: .embedded, showInteractions: false)
+            } else if isLoading {
+                HStack {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Loading event...")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding()
+                .background(Color.ndkSecondaryBackground)
+                .cornerRadius(8)
+            } else {
+                HStack {
+                    Image(systemName: "exclamationmark.triangle")
+                        .foregroundColor(.orange)
+                    Text("Event not found")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding()
+                .background(Color.ndkSecondaryBackground)
+                .cornerRadius(8)
+            }
         }
-        .padding()
-        .background(Color.ndkSecondaryBackground)
-        .cornerRadius(8)
+        .task {
+            await loadEvent()
+        }
+    }
+
+    private func loadEvent() async {
+        guard let eventId = extractEventId() else {
+            await MainActor.run {
+                isLoading = false
+            }
+            return
+        }
+
+        let filter = NDKFilter(ids: [eventId])
+        let dataSource = ndk.subscribe(filter: filter)
+
+        for await event in dataSource.events {
+            await MainActor.run {
+                self.event = event
+                self.isLoading = false
+            }
+            break // Only need first match
+        }
+
+        // If no event found after subscription completes
+        await MainActor.run {
+            if self.event == nil {
+                self.isLoading = false
+            }
+        }
+    }
+
+    private func extractEventId() -> String? {
+        switch eventReference {
+        case .eventId(let id):
+            return id
+        case .note(let note):
+            return try? Bech32.eventId(from: note)
+        case .nevent(let nevent):
+            // For nevent, decode the TLV to extract the event ID
+            if let decoded = try? ContentTagger.decodeNostrEntity(nevent) {
+                return decoded.eventId
+            }
+            return nil
+        }
     }
 }
 
