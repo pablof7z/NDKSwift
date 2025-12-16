@@ -3,6 +3,10 @@ import NDKSwiftCore
 
 // MARK: - Environment Keys
 
+private struct NDKKey: EnvironmentKey {
+    static let defaultValue: NDK? = nil
+}
+
 private struct OnMentionTapKey: EnvironmentKey {
     static let defaultValue: MentionTapHandler? = nil
 }
@@ -26,6 +30,11 @@ private struct OnEventTapKey: EnvironmentKey {
 // MARK: - EnvironmentValues Extension
 
 extension EnvironmentValues {
+    public var ndk: NDK? {
+        get { self[NDKKey.self] }
+        set { self[NDKKey.self] = newValue }
+    }
+
     public var onMentionTap: MentionTapHandler? {
         get { self[OnMentionTapKey.self] }
         set { self[OnMentionTapKey.self] = newValue }
@@ -55,6 +64,10 @@ extension EnvironmentValues {
 // MARK: - View Modifiers
 
 extension View {
+    public func ndk(_ ndk: NDK) -> some View {
+        environment(\.ndk, ndk)
+    }
+
     public func onMentionTap(_ handler: @escaping MentionTapHandler) -> some View {
         environment(\.onMentionTap, handler)
     }
