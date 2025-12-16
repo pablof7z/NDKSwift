@@ -15,11 +15,28 @@ struct FeedTabView: View {
     @State private var followListDataSource: NDKUIFollowListDataSource?
     @State private var eventDataSource: NDKEventDataSource?
     @State private var lastTappedItem = ""
+    @State private var searchDataSource: NDKSearchDataSource?
+    @State private var searchText: String = ""
 
     var body: some View {
         NavigationView {
             Group {
-                if let eventDataSource = eventDataSource {
+                // Show search results when searching
+                if !searchText.isEmpty, let searchDataSource = searchDataSource {
+                    if searchDataSource.isLoading {
+                        ProgressView("Searching...")
+                    } else if searchDataSource.events.isEmpty {
+                        ContentUnavailableView(
+                            "No Results",
+                            systemImage: "magnifyingglass",
+                            description: Text("No notes found matching '\(searchText)'")
+                        )
+                    } else {
+                        feedList(events: searchDataSource.events)
+                    }
+                }
+                // Show regular feed when not searching
+                else if let eventDataSource = eventDataSource {
                     if eventDataSource.events.isEmpty && eventDataSource.isLoading {
                         ProgressView("Loading feed...")
                     } else if eventDataSource.events.isEmpty {
@@ -41,17 +58,29 @@ struct FeedTabView: View {
                     ProgressView("Initializing...")
                 }
             }
-            .navigationTitle("Feed (\(eventDataSource?.events.count ?? 0))")
+            .navigationTitle("Feed (\(searchText.isEmpty ? (eventDataSource?.events.count ?? 0) : (searchDataSource?.events.count ?? 0)))")
             .navigationBarTitleDisplayMode(.inline)
         }
         .safeAreaInset(edge: .bottom) {
-            if !lastTappedItem.isEmpty {
-                tappedItemBanner
+            VStack(spacing: 0) {
+                if !lastTappedItem.isEmpty {
+                    tappedItemBanner
+                }
+
+                // Search bar
+                NDKUISearchBar(text: $searchText, onClear: {
+                    searchDataSource?.clear()
+                })
             }
         }
         .task {
             // Create the follow list data source - reactive updates handle the rest
             followListDataSource = NDKUIFollowListDataSource(ndk: ndk, pubkey: testPubkey)
+            // Create search data source
+            searchDataSource = NDKSearchDataSource(ndk: ndk)
+        }
+        .onChange(of: searchText) { _, newValue in
+            searchDataSource?.search(query: newValue)
         }
         .onChange(of: followListDataSource?.followList) { _, newFollowList in
             updateEventSubscription(for: newFollowList)
@@ -94,10 +123,7 @@ struct FeedTabView: View {
     private func richTextContent(for event: NDKEvent) -> some View {
         switch rendererStyle {
         case .default:
-            DefaultStyleRichText(
-                content: event.content,
-                showLinkPreviews: true
-            )
+            DefaultStyleRichText(content: event.content)
             .ndk(ndk)
             .onMentionTap { pubkey in lastTappedItem = "Mention: @\(pubkey.prefix(8))..." }
             .onHashtagTap { tag in lastTappedItem = "Hashtag: #\(tag)" }
@@ -106,10 +132,7 @@ struct FeedTabView: View {
             .onEventTap { event in lastTappedItem = "Event: \(event.id.prefix(8))..." }
 
         case .compact:
-            CompactStyleRichText(
-                content: event.content,
-                showLinkPreviews: true
-            )
+            CompactStyleRichText(content: event.content)
             .ndk(ndk)
             .onMentionTap { pubkey in lastTappedItem = "Mention: @\(pubkey.prefix(8))..." }
             .onHashtagTap { tag in lastTappedItem = "Hashtag: #\(tag)" }
@@ -118,10 +141,7 @@ struct FeedTabView: View {
             .onEventTap { event in lastTappedItem = "Event: \(event.id.prefix(8))..." }
 
         case .pill:
-            PillStyleRichText(
-                content: event.content,
-                showLinkPreviews: true
-            )
+            PillStyleRichText(content: event.content)
             .ndk(ndk)
             .onMentionTap { pubkey in lastTappedItem = "Mention: @\(pubkey.prefix(8))..." }
             .onHashtagTap { tag in lastTappedItem = "Hashtag: #\(tag)" }

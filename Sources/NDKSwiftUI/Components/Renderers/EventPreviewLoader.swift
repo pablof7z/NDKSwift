@@ -7,6 +7,7 @@ public struct EventPreviewLoader<Event: EventRenderer>: View {
         case eventId(String)
         case note(String)
         case nevent(String)
+        case naddr(String)
     }
 
     let reference: Reference
@@ -91,6 +92,11 @@ public struct EventPreviewLoader<Event: EventRenderer>: View {
             return try? Bech32.eventId(from: note)
         case .nevent(let nevent):
             if let decoded = try? ContentTagger.decodeNostrEntity(nevent) {
+                return decoded.eventId
+            }
+            return nil
+        case .naddr(let naddr):
+            if let decoded = try? ContentTagger.decodeNostrEntity(naddr) {
                 return decoded.eventId
             }
             return nil
