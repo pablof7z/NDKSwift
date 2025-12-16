@@ -1,7 +1,7 @@
 import Foundation
 
 /// Source of a relay hint - where we learned about this relay for a user/event
-public enum HintSource: Sendable, Equatable {
+public enum HintSource: Sendable, Equatable, Hashable {
     /// From NIP-19 bech32 encoding (nevent, nprofile, naddr)
     case nip19
     /// Event was observed arriving from this relay
@@ -25,5 +25,40 @@ public struct HintEntry: Sendable, Equatable {
         self.relay = relay
         self.source = source
         self.recordedAt = recordedAt
+    }
+}
+
+/// Represents a relay's mention frequency in the hint index
+public struct RelayMention: Sendable, Equatable {
+    /// The relay URL
+    public let relay: RelayURL
+    /// How many times this relay appears in hints
+    public let mentionCount: Int
+
+    public init(relay: RelayURL, mentionCount: Int) {
+        self.relay = relay
+        self.mentionCount = mentionCount
+    }
+}
+
+/// Statistics about the hint index
+public struct HintIndexStatistics: Sendable, Equatable {
+    /// Number of unique pubkeys with hints
+    public let pubkeyCount: Int
+    /// Number of unique event IDs with hints
+    public let eventIdCount: Int
+    /// Number of unique addresses with hints
+    public let addressCount: Int
+    /// Total number of hint entries
+    public let totalEntries: Int
+    /// Number of unique relays across all hints
+    public let uniqueRelayCount: Int
+
+    public init(pubkeyCount: Int, eventIdCount: Int, addressCount: Int, totalEntries: Int, uniqueRelayCount: Int) {
+        self.pubkeyCount = pubkeyCount
+        self.eventIdCount = eventIdCount
+        self.addressCount = addressCount
+        self.totalEntries = totalEntries
+        self.uniqueRelayCount = uniqueRelayCount
     }
 }
