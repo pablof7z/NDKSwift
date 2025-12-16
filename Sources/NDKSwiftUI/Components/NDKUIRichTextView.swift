@@ -376,12 +376,15 @@ public struct NDKUIEventPreview: View {
         let filter = NDKFilter(ids: [eventId])
         let dataSource = ndk.subscribe(filter: filter)
 
-        for await event in dataSource.events {
-            await MainActor.run {
-                self.event = event
-                self.isLoading = false
+        for await batch in dataSource.events {
+            for event in batch {
+                await MainActor.run {
+                    self.event = event
+                    self.isLoading = false
+                }
+                break // Only need first match
             }
-            break // Only need first match
+            break
         }
 
         // If no event found after subscription completes

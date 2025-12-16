@@ -528,8 +528,10 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
             )
 
             // Process relay lists as they arrive
-            for await event in dataSource.events {
-                await processRelayListEvent(event)
+            for await batch in dataSource.events {
+                for event in batch {
+                    await processRelayListEvent(event)
+                }
             }
 
             NDKLogger.log(.info, category: .outbox, "✅ Relay discovery completed for \(authors.count) authors")
@@ -916,9 +918,11 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         await withTaskGroup(of: Void.self) { group in
             // Task 1: Collect events
             group.addTask {
-                for await event in dataSource.events {
-                    if relayListEvent == nil || event.createdAt > relayListEvent!.createdAt {
-                        relayListEvent = event
+                for await batch in dataSource.events {
+                    for event in batch {
+                        if relayListEvent == nil || event.createdAt > relayListEvent!.createdAt {
+                            relayListEvent = event
+                        }
                     }
                 }
             }

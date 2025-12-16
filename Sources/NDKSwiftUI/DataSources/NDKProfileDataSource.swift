@@ -85,10 +85,12 @@ public final class NDKProfileDataSource: @preconcurrency NDKSubscriptionProtocol
 
     private func observeProfileData() {
         observationTask = Task { @MainActor in
-            for await event in dataSource.events {
-                // Update with the most recent profile event
-                if metadata == nil || event.createdAt > (metadata?.updatedAt ?? 0) {
-                    metadata = NDKUserMetadata(event: event)
+            for await batch in dataSource.events {
+                for event in batch {
+                    // Update with the most recent profile event
+                    if metadata == nil || event.createdAt > (metadata?.updatedAt ?? 0) {
+                        metadata = NDKUserMetadata(event: event)
+                    }
                 }
             }
         }

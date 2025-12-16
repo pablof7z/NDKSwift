@@ -179,25 +179,27 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
             throw ZapError.timeoutWaitingForReceipt
         }
 
-        for await event in dataSource.events {
-            let receipt = NDKZapReceipt(event: event)
+        for await batch in dataSource.events {
+            for event in batch {
+                let receipt = NDKZapReceipt(event: event)
 
-            // Check if this receipt matches our zap request
-            let receiptZapRequestId = receipt.zapRequestId
-            if let zapRequestId = zapRequestId,
-               receiptZapRequestId == zapRequestId
-            {
-                // Validate the receipt if we have provider pubkey
-                if let providerPubkey = providerPubkey {
-                    let isValid = receipt.validate(lnurlProviderPubkey: providerPubkey)
-                    if isValid {
+                // Check if this receipt matches our zap request
+                let receiptZapRequestId = receipt.zapRequestId
+                if let zapRequestId = zapRequestId,
+                   receiptZapRequestId == zapRequestId
+                {
+                    // Validate the receipt if we have provider pubkey
+                    if let providerPubkey = providerPubkey {
+                        let isValid = receipt.validate(lnurlProviderPubkey: providerPubkey)
+                        if isValid {
+                            timeoutTask.cancel()
+                            return event
+                        }
+                    } else {
+                        // No provider pubkey to validate against, accept the receipt
                         timeoutTask.cancel()
                         return event
                     }
-                } else {
-                    // No provider pubkey to validate against, accept the receipt
-                    timeoutTask.cancel()
-                    return event
                 }
             }
         }

@@ -210,11 +210,13 @@ public final class NDKFetchedEvent {
         let cancellation = self.cancellation
 
         Task { [weak self] in
-            for await newEvent in subscription.events {
-                guard !cancellation.isCancelled else { break }
-                guard let self else { break }
+            for await batch in subscription.events {
+                for newEvent in batch {
+                    guard !cancellation.isCancelled else { break }
+                    guard let self else { break }
 
-                await self.handleEvent(newEvent)
+                    await self.handleEvent(newEvent)
+                }
             }
 
             await MainActor.run { [weak self] in

@@ -369,8 +369,10 @@ private class ZapState: ObservableObject {
         )
 
         // Process zap events
-        for await _ in dataSource.events {
-            await updateZapState(from: dataSource.data, ndk: ndk)
+        for await batch in dataSource.events {
+            for _ in batch {
+                await updateZapState(from: dataSource.data, ndk: ndk)
+            }
         }
     }
 

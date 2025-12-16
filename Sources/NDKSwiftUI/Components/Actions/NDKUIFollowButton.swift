@@ -313,8 +313,10 @@ private class FollowState: ObservableObject {
         )
 
         // Process contact list events
-        for await _ in dataSource.events {
-            await updateFollowState(from: dataSource.data)
+        for await batch in dataSource.events {
+            for _ in batch {
+                await updateFollowState(from: dataSource.data)
+            }
         }
     }
 

@@ -121,11 +121,14 @@ public class NDKRelayListManager {
 
             let dataSource = ndk.subscribe(filter: filter, maxAge: 300, cachePolicy: .cacheWithNetwork)
 
-            for await event in dataSource.events {
-                relayList = NDKRelayList.fromEvent(event, ndk: ndk)
+            for await batch in dataSource.events {
+                for event in batch {
+                    relayList = NDKRelayList.fromEvent(event, ndk: ndk)
 
-                // Connect to relays from the list
-                await connectToRelayList()
+                    // Connect to relays from the list
+                    await connectToRelayList()
+                    break
+                }
                 break
             }
 

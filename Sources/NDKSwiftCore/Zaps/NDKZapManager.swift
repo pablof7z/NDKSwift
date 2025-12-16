@@ -278,36 +278,38 @@ public actor NDKZapManager: ZapManaging {
                         cachePolicy: .cacheWithNetwork
                     )
 
-                    for await event in dataSource.events {
-                        let eventKind = event.kind
-                        if eventKind == EventKind.zapReceipt {
-                            let receipt = NDKZapReceipt(event: event)
-                            do {
-                                if let zapInfo = try await self.validateAndParseZapReceipt(receipt) {
-                                    continuation.yield(zapInfo)
+                    for await batch in dataSource.events {
+                        for event in batch {
+                            let eventKind = event.kind
+                            if eventKind == EventKind.zapReceipt {
+                                let receipt = NDKZapReceipt(event: event)
+                                do {
+                                    if let zapInfo = try await self.validateAndParseZapReceipt(receipt) {
+                                        continuation.yield(zapInfo)
+                                    }
+                                } catch {
+                                    NDKLogger.log(.warning, category: .wallet, "Failed to validate zap receipt \(receipt.event.id): \(error.localizedDescription)")
                                 }
-                            } catch {
-                                NDKLogger.log(.warning, category: .wallet, "Failed to validate zap receipt \(receipt.event.id): \(error.localizedDescription)")
+                            } else if eventKind == 9321 { // nutzap
+                                // In Core we might not have full NDKNutzap model if it depends on CashuSwift.
+                                // But we can parse basic info.
+
+                                let recipientPubkey = event.tags.first(where: { $0.first == "p" })?[safe: 1] ?? ""
+                                // amount is tag "amount"
+                                let amountStr = event.tags.first(where: { $0.first == "amount" })?[safe: 1] ?? "0"
+                                let totalAmount = Int64(amountStr) ?? 0
+
+                                let zapInfo = ZapInfo(
+                                    type: .nutzap,
+                                    amountSats: totalAmount,
+                                    sender: event.pubkey,
+                                    recipient: recipientPubkey,
+                                    comment: event.content,
+                                    timestamp: Date(nostrTimestamp: event.createdAt),
+                                    event: event
+                                )
+                                continuation.yield(zapInfo)
                             }
-                        } else if eventKind == 9321 { // nutzap
-                            // In Core we might not have full NDKNutzap model if it depends on CashuSwift.
-                            // But we can parse basic info.
-
-                            let recipientPubkey = event.tags.first(where: { $0.first == "p" })?[safe: 1] ?? ""
-                            // amount is tag "amount"
-                            let amountStr = event.tags.first(where: { $0.first == "amount" })?[safe: 1] ?? "0"
-                            let totalAmount = Int64(amountStr) ?? 0
-
-                            let zapInfo = ZapInfo(
-                                type: .nutzap,
-                                amountSats: totalAmount,
-                                sender: event.pubkey,
-                                recipient: recipientPubkey,
-                                comment: event.content,
-                                timestamp: Date(nostrTimestamp: event.createdAt),
-                                event: event
-                            )
-                            continuation.yield(zapInfo)
                         }
                     }
                     continuation.finish()
