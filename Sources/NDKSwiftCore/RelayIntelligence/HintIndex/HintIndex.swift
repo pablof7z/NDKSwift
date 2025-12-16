@@ -131,6 +131,105 @@ public actor HintIndex {
         return addressHints.count
     }
 
+    // MARK: - Introspection
+
+    /// Get all pubkey hints (for debugging/diagnostics)
+    public var allPubkeyHints: [String: [HintEntry]] {
+        return pubkeyHints
+    }
+
+    /// Get all event ID hints (for debugging/diagnostics)
+    public var allEventIdHints: [String: [HintEntry]] {
+        return eventIdHints
+    }
+
+    /// Get all address hints (for debugging/diagnostics)
+    public var allAddressHints: [String: [HintEntry]] {
+        return addressHints
+    }
+
+    /// Get relays ranked by how often they appear in hints
+    public func mostKnownRelays(limit: Int) -> [RelayMention] {
+        var relayCounts: [RelayURL: Int] = [:]
+
+        // Count pubkey hints
+        for hints in pubkeyHints.values {
+            for hint in hints {
+                relayCounts[hint.relay, default: 0] += 1
+            }
+        }
+
+        // Count event ID hints
+        for hints in eventIdHints.values {
+            for hint in hints {
+                relayCounts[hint.relay, default: 0] += 1
+            }
+        }
+
+        // Count address hints
+        for hints in addressHints.values {
+            for hint in hints {
+                relayCounts[hint.relay, default: 0] += 1
+            }
+        }
+
+        // Sort by count descending and take top N
+        let sorted = relayCounts.sorted { $0.value > $1.value }
+        return Array(sorted.prefix(limit)).map { RelayMention(relay: $0.key, mentionCount: $0.value) }
+    }
+
+    /// Comprehensive statistics about the hint index
+    public var statistics: HintIndexStatistics {
+        var uniqueRelays = Set<RelayURL>()
+
+        for hints in pubkeyHints.values {
+            for hint in hints {
+                uniqueRelays.insert(hint.relay)
+            }
+        }
+        for hints in eventIdHints.values {
+            for hint in hints {
+                uniqueRelays.insert(hint.relay)
+            }
+        }
+        for hints in addressHints.values {
+            for hint in hints {
+                uniqueRelays.insert(hint.relay)
+            }
+        }
+
+        return HintIndexStatistics(
+            pubkeyCount: pubkeyHints.count,
+            eventIdCount: eventIdHints.count,
+            addressCount: addressHints.count,
+            totalEntries: totalEntries,
+            uniqueRelayCount: uniqueRelays.count
+        )
+    }
+
+    /// Breakdown of hints by source
+    public var sourceBreakdown: [HintSource: Int] {
+        var breakdown: [HintSource: Int] = [:]
+
+        for hints in pubkeyHints.values {
+            for hint in hints {
+                breakdown[hint.source, default: 0] += 1
+            }
+        }
+        for hints in eventIdHints.values {
+            for hint in hints {
+                breakdown[hint.source, default: 0] += 1
+            }
+        }
+        for hints in addressHints.values {
+            for hint in hints {
+                breakdown[hint.source, default: 0] += 1
+            }
+        }
+
+        return breakdown
+    }
+
     // MARK: - Management
 
     /// Clear all hints
