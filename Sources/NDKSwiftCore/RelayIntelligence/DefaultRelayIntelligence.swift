@@ -1,6 +1,10 @@
 import Foundation
 
 /// Default implementation of RelayIntelligence that uses HintIndex and pool relays
+///
+/// Note: @unchecked Sendable is safe here because:
+/// - `ndk` is weak and only read (never mutated after init)
+/// - `eventStream` is let (immutable after init) and IntelligenceEventStream is an actor
 public final class DefaultRelayIntelligence: RelayIntelligence, @unchecked Sendable {
     private weak var ndk: NDK?
     private let eventStream: IntelligenceEventStream?

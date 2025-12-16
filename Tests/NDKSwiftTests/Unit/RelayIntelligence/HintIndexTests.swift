@@ -146,4 +146,75 @@ final class HintIndexTests: XCTestCase {
         XCTAssertTrue(eventHints.isEmpty)
         XCTAssertEqual(count, 0)
     }
+
+    // MARK: - Eviction
+
+    func test_eviction_removesSingleEntryKeys() async {
+        // Create a small HintIndex to test eviction
+        let smallIndex = HintIndex(maxSize: 5)
+
+        // Add 5 entries (at max size)
+        for i in 0 ..< 5 {
+            await smallIndex.recordHint(pubkey: "pub\(i)", relay: "wss://relay\(i).com", source: .nip19)
+        }
+
+        // Verify we have 5 entries
+        var count = await smallIndex.count
+        XCTAssertEqual(count, 5)
+
+        // Add one more - should trigger eviction
+        await smallIndex.recordHint(pubkey: "pub-new", relay: "wss://new-relay.com", source: .nip19)
+
+        // Verify eviction happened (should be under or at 90% of maxSize = ~4-5)
+        count = await smallIndex.count
+        XCTAssertLessThanOrEqual(count, 5, "Should have evicted entries to stay under maxSize")
+
+        // The newest entry should still be there
+        let newHints = await smallIndex.hints(for: "pub-new")
+        XCTAssertEqual(newHints.count, 1, "Newest entry should survive eviction")
+    }
+
+    func test_eviction_usesLRU() async {
+        // Create a small HintIndex to test LRU eviction
+        let smallIndex = HintIndex(maxSize: 3)
+
+        // Add entries with a small delay to ensure different timestamps
+        await smallIndex.recordHint(pubkey: "oldest", relay: "wss://oldest.com", source: .nip19)
+        try? await Task.sleep(nanoseconds: 10_000_000) // 10ms
+
+        await smallIndex.recordHint(pubkey: "middle", relay: "wss://middle.com", source: .nip19)
+        try? await Task.sleep(nanoseconds: 10_000_000) // 10ms
+
+        await smallIndex.recordHint(pubkey: "newest", relay: "wss://newest.com", source: .nip19)
+
+        // All 3 should be present
+        var count = await smallIndex.count
+        XCTAssertEqual(count, 3)
+
+        // Add one more - should trigger LRU eviction of oldest
+        await smallIndex.recordHint(pubkey: "very-newest", relay: "wss://very-newest.com", source: .nip19)
+
+        // Oldest should be evicted (LRU)
+        let oldestHints = await smallIndex.hints(for: "oldest")
+        XCTAssertTrue(oldestHints.isEmpty, "Oldest entry should be evicted (LRU)")
+
+        // Newest entries should still be there
+        let newestHints = await smallIndex.hints(for: "very-newest")
+        XCTAssertEqual(newestHints.count, 1, "Very newest entry should survive")
+    }
+
+    // MARK: - Address Helper
+
+    func test_relayURLs_forAddress_returnsUniqueRelays() async {
+        let address = "30023:abc123:my-article"
+
+        await hintIndex.recordHint(address: address, relay: "wss://relay1.com", source: .nip19)
+        await hintIndex.recordHint(address: address, relay: "wss://relay1.com", source: .eventObserved)
+        await hintIndex.recordHint(address: address, relay: "wss://relay2.com", source: .nip19)
+
+        let relays = await hintIndex.relayURLs(forAddress: address)
+        XCTAssertEqual(relays.count, 2)
+        XCTAssertTrue(relays.contains("wss://relay1.com/"))
+        XCTAssertTrue(relays.contains("wss://relay2.com/"))
+    }
 }
