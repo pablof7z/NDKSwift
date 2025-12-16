@@ -45,10 +45,10 @@ public struct NDKUIRichTextView<
                 }
             } else {
                 Text(content)
-                    .task {
-                        await parseContent()
-                    }
             }
+        }
+        .task(id: content) {
+            await parseContent()
         }
     }
 

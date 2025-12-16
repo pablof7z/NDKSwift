@@ -291,7 +291,7 @@ enum MarkdownParser {
             }
 
             // Check for bold
-            if index < text.index(text.endIndex, offsetBy: -1) &&
+            if index < text.index(text.endIndex, offsetBy: -2) &&
                 text[index] == "*" && text[text.index(after: index)] == "*"
             {
                 if !currentText.isEmpty {
@@ -329,7 +329,7 @@ enum MarkdownParser {
             }
 
             // Check for images and links
-            if text[index] == "!" && index < text.index(text.endIndex, offsetBy: -1) &&
+            if text[index] == "!" && index < text.index(text.endIndex, offsetBy: -2) &&
                 text[text.index(after: index)] == "["
             {
                 if !currentText.isEmpty {
