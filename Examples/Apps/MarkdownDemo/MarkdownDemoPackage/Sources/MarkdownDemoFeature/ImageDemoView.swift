@@ -12,9 +12,9 @@ public struct ImageDemoView: View {
 
     let imageURLs = [
         URL(string: "https://blossom.primal.net/f7a062caeb2cb27401b452b2d97b46ed3e7cac97aef86becb60004c4f3c4fca5.jpg")!,
+        URL(string: "https://r2a.primal.net/uploads2/d/f3/bd/df3bdd118f7db2cdf57821f958033db07dfd9de72248e6869734cbb9e2e8c130.png")!,
         URL(string: "https://blossom.primal.net/f7a062caeb2cb27401b452b2d97b46ed3e7cac97aef86becb60004c4f3c4fca5.jpg")!,
-        URL(string: "https://blossom.primal.net/f7a062caeb2cb27401b452b2d97b46ed3e7cac97aef86becb60004c4f3c4fca5.jpg")!,
-        URL(string: "https://blossom.primal.net/f7a062caeb2cb27401b452b2d97b46ed3e7cac97aef86becb60004c4f3c4fca5.jpg")!
+        URL(string: "https://r2a.primal.net/uploads2/d/f3/bd/df3bdd118f7db2cdf57821f958033db07dfd9de72248e6869734cbb9e2e8c130.png")!
     ]
 
     let ndk: NDK
