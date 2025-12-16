@@ -107,36 +107,38 @@ public actor NDKProfileManager {
                 let dataSource = ndk.subscribe(filter: filter, maxAge: maxAge)
 
                 // Process events from data source
-                for await event in dataSource.events {
-                    let metadata = NDKUserMetadata(event: event, ndk: ndk)
+                for await batch in dataSource.events {
+                    for event in batch {
+                        let metadata = NDKUserMetadata(event: event, ndk: ndk)
 
-                    // Update memory cache
-                    updateCache(pubkey: pubkey, metadata: metadata)
+                        // Update memory cache
+                        updateCache(pubkey: pubkey, metadata: metadata)
 
-                    // Save parsed metadata to SQLite cache
-                    if let parsedData = metadata.metadata {
-                        do {
-                            try await ndk.cache.saveProfileMetadata(
-                                pubkey: pubkey,
-                                metadata: parsedData,
-                                updatedAt: event.createdAt,
-                                eventId: event.id
-                            )
-                        } catch {
-                            NDKLogger.log(.warning, category: .cache, "Failed to save profile metadata for \(pubkey.prefix(8)): \(error.localizedDescription)")
+                        // Save parsed metadata to SQLite cache
+                        if let parsedData = metadata.metadata {
+                            do {
+                                try await ndk.cache.saveProfileMetadata(
+                                    pubkey: pubkey,
+                                    metadata: parsedData,
+                                    updatedAt: event.createdAt,
+                                    eventId: event.id
+                                )
+                            } catch {
+                                NDKLogger.log(.warning, category: .cache, "Failed to save profile metadata for \(pubkey.prefix(8)): \(error.localizedDescription)")
+                            }
                         }
-                    }
 
-                    // Notify all observers for this pubkey
-                    activeObservations[pubkey]?.forEach { wrapper in
-                        wrapper.continuation.yield(metadata)
-                    }
+                        // Notify all observers for this pubkey
+                        activeObservations[pubkey]?.forEach { wrapper in
+                            wrapper.continuation.yield(metadata)
+                        }
 
-                    // Save event to persistent cache
-                    do {
-                        try await ndk.cache.saveEvent(event)
-                    } catch {
-                        NDKLogger.log(.warning, category: .cache, "Failed to save profile event \(event.id.prefix(8)) to cache: \(error.localizedDescription)")
+                        // Save event to persistent cache
+                        do {
+                            try await ndk.cache.saveEvent(event)
+                        } catch {
+                            NDKLogger.log(.warning, category: .cache, "Failed to save profile event \(event.id.prefix(8)) to cache: \(error.localizedDescription)")
+                        }
                     }
                 }
 

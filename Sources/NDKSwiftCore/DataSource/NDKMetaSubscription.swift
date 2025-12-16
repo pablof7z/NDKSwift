@@ -233,9 +233,11 @@ public final class NDKMetaSubscription {
                 }
             }
 
-            for await pointerEvent in subscription.events {
-                guard let self = self else { return }
-                await self.handlePointerEvent(pointerEvent)
+            for await batch in subscription.events {
+                for pointerEvent in batch {
+                    guard let self = self else { return }
+                    await self.handlePointerEvent(pointerEvent)
+                }
             }
         }
 

@@ -39,19 +39,21 @@ public class NDKUIMultipleProfilesDataSource {
         observationTask = Task { @MainActor in
             var latestEvents: [String: NDKEvent] = [:]
 
-            for await event in dataSource.events {
-                // Keep only the latest event per author
-                if let existing = latestEvents[event.pubkey] {
-                    if event.createdAt > existing.createdAt {
+            for await batch in dataSource.events {
+                for event in batch {
+                    // Keep only the latest event per author
+                    if let existing = latestEvents[event.pubkey] {
+                        if event.createdAt > existing.createdAt {
+                            latestEvents[event.pubkey] = event
+                        }
+                    } else {
                         latestEvents[event.pubkey] = event
                     }
-                } else {
-                    latestEvents[event.pubkey] = event
-                }
 
-                // Rebuild profiles dictionary
-                profiles = latestEvents.mapValues { NDKUserMetadata(event: $0) }
-                    .compactMapValues { $0 }
+                    // Rebuild profiles dictionary
+                    profiles = latestEvents.mapValues { NDKUserMetadata(event: $0) }
+                        .compactMapValues { $0 }
+                }
             }
         }
 

@@ -107,11 +107,13 @@ public actor WalletTransactionHistory {
                 // Observe spending history events
                 group.addTask {
                     guard let dataSource = await self.historyDataSource else { return }
-                    for await event in dataSource.events {
-                        do {
-                            try await self.processSpendingHistoryEvent(event)
-                        } catch {
-                            NDKLogger.log(.error, category: .wallet, "Error processing history event: \(error)")
+                    for await batch in dataSource.events {
+                        for event in batch {
+                            do {
+                                try await self.processSpendingHistoryEvent(event)
+                            } catch {
+                                NDKLogger.log(.error, category: .wallet, "Error processing history event: \(error)")
+                            }
                         }
                     }
                 }
@@ -119,8 +121,10 @@ public actor WalletTransactionHistory {
                 // Observe nutzap events
                 group.addTask {
                     guard let dataSource = await self.nutzapDataSource else { return }
-                    for await event in dataSource.events {
-                        await self.processNutzapEvent(event)
+                    for await batch in dataSource.events {
+                        for event in batch {
+                            await self.processNutzapEvent(event)
+                        }
                     }
                 }
             }

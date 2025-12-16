@@ -54,7 +54,7 @@ actor NDKSubscriptionManager {
         isGroupable: Bool = true,
         groupableDelay: TimeInterval? = nil,
         groupableDelayType: NDKSubscriptionDelayType? = nil
-    ) async -> (handle: NDKSubscriptionRequirementHandle, events: AsyncStream<NDKEvent>, relayUpdates: AsyncStream<RelayUpdate>) {
+    ) async -> (handle: NDKSubscriptionRequirementHandle, events: AsyncStream<[NDKEvent]>, relayUpdates: AsyncStream<RelayUpdate>) {
         let requirementId = RequirementID()
         let correlationId = requirementId.uuidString.prefix(8)
 
@@ -143,7 +143,7 @@ actor NDKSubscriptionManager {
         isGroupable: Bool,
         groupableDelay: TimeInterval?,
         groupableDelayType: NDKSubscriptionDelayType?
-    ) async -> (NDKSubscriptionRequirement, AsyncStream<NDKEvent>, AsyncStream<RelayUpdate>) {
+    ) async -> (NDKSubscriptionRequirement, AsyncStream<[NDKEvent]>, AsyncStream<RelayUpdate>) {
         // Optimize filter for cache - remove event IDs we already have
         let optimizedFilter = await optimizeFilterForCache(filter) ?? filter
 

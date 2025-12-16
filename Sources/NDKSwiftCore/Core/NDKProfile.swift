@@ -72,19 +72,21 @@ public final class NDKProfile {
                 cachePolicy: .cacheWithNetwork
             )
 
-            for await event in subscription.events {
-                guard !cancellation.isCancelled else { break }
-                guard let self else { break }
+            for await batch in subscription.events {
+                for event in batch {
+                    guard !cancellation.isCancelled else { break }
+                    guard let self else { break }
 
-                let newMetadata = NDKUserMetadata(event: event, ndk: ndk)
+                    let newMetadata = NDKUserMetadata(event: event, ndk: ndk)
 
-                // Only update if newer
-                if let existingMetadata = self.metadata {
-                    if newMetadata.updatedAt > existingMetadata.updatedAt {
+                    // Only update if newer
+                    if let existingMetadata = self.metadata {
+                        if newMetadata.updatedAt > existingMetadata.updatedAt {
+                            self.metadata = newMetadata
+                        }
+                    } else {
                         self.metadata = newMetadata
                     }
-                } else {
-                    self.metadata = newMetadata
                 }
             }
         }

@@ -133,11 +133,13 @@ public actor NDKPool {
 
                 var latestEvent: NDKEvent?
 
-                for await event in dataSource.events {
-                    // Always process the latest event
-                    if latestEvent == nil || event.createdAt > latestEvent!.createdAt {
-                        latestEvent = event
-                        await processBlockedRelayListUpdate(event)
+                for await batch in dataSource.events {
+                    for event in batch {
+                        // Always process the latest event
+                        if latestEvent == nil || event.createdAt > latestEvent!.createdAt {
+                            latestEvent = event
+                            await processBlockedRelayListUpdate(event)
+                        }
                     }
                 }
             }

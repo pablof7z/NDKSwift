@@ -90,10 +90,11 @@ public final class NDKEventDataSource: @preconcurrency NDKSubscriptionProtocol {
         observationTask = Task { @MainActor in
             var eventList: [NDKEvent] = []
 
-            for await event in dataSource.events {
-                eventList.append(event)
+            // Batches come pre-batched from upstream - no debouncing needed
+            for await batch in dataSource.events {
+                eventList.append(contentsOf: batch)
 
-                // Sort events
+                // Sort and update UI once per batch
                 events = sortDescending
                     ? eventList.sorted { $0.createdAt > $1.createdAt }
                     : eventList.sorted { $0.createdAt < $1.createdAt }

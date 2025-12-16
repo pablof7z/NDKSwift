@@ -132,29 +132,31 @@ public extension NDK {
 
                 // Stream events with mute and optional WOT filtering
                 NDKLogger.log(.info, category: .subscription, "🔍 [ReactiveFilter] Starting to iterate dataSource.events...")
-                for await event in dataSource.events {
-                    eventCount += 1
-                    NDKLogger.log(.info, category: .subscription, "🔍 [ReactiveFilter] Received event #\(eventCount) from \(event.pubkey.prefix(8))...")
+                for await batch in dataSource.events {
+                    for event in batch {
+                        eventCount += 1
+                        NDKLogger.log(.info, category: .subscription, "🔍 [ReactiveFilter] Received event #\(eventCount) from \(event.pubkey.prefix(8))...")
 
-                    // Skip muted pubkeys
-                    if sessionData.isMuted(event.pubkey) {
-                        NDKLogger.log(.debug, category: .subscription, "🔍 [ReactiveFilter] Skipping muted pubkey: \(event.pubkey.prefix(8))...")
-                        continue
-                    }
-
-                    // Apply WOT filter if configured
-                    if let wotConfig = reactiveFilter.wotConfig {
-                        guard sessionData.passesWOTFilter(
-                            event.pubkey,
-                            config: wotConfig
-                        ) else {
-                            NDKLogger.log(.debug, category: .subscription, "🔍 [ReactiveFilter] Event failed WOT filter")
+                        // Skip muted pubkeys
+                        if sessionData.isMuted(event.pubkey) {
+                            NDKLogger.log(.debug, category: .subscription, "🔍 [ReactiveFilter] Skipping muted pubkey: \(event.pubkey.prefix(8))...")
                             continue
                         }
-                    }
 
-                    NDKLogger.log(.info, category: .subscription, "🔍 [ReactiveFilter] Yielding event to stream")
-                    continuation.yield(event)
+                        // Apply WOT filter if configured
+                        if let wotConfig = reactiveFilter.wotConfig {
+                            guard sessionData.passesWOTFilter(
+                                event.pubkey,
+                                config: wotConfig
+                            ) else {
+                                NDKLogger.log(.debug, category: .subscription, "🔍 [ReactiveFilter] Event failed WOT filter")
+                                continue
+                            }
+                        }
+
+                        NDKLogger.log(.info, category: .subscription, "🔍 [ReactiveFilter] Yielding event to stream")
+                        continuation.yield(event)
+                    }
                 }
                 NDKLogger.log(.info, category: .subscription, "🔍 [ReactiveFilter] Finished iterating dataSource.events")
 
