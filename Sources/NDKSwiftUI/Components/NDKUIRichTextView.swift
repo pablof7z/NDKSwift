@@ -338,8 +338,7 @@ public struct NDKUIEventPreview: View {
 
                 // Explicit generic parameters
                 NDKUIRichTextView<DefaultMentionView, DefaultHashtagView, DefaultLinkView, DefaultImageView, DefaultEventView>(
-                    content: "Simple text with #nostr",
-                    showLinkPreviews: false
+                    content: "Simple text with #nostr"
                 )
                 .ndk(mockNDK)
             }

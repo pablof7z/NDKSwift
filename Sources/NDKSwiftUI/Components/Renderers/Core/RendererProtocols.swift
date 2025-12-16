@@ -33,5 +33,6 @@ public protocol ImageRenderer: View {
 
 @MainActor
 public protocol EventRenderer: View {
+    var event: NDKEvent { get }
     init(event: NDKEvent, onTap: EventTapHandler?)
 }
