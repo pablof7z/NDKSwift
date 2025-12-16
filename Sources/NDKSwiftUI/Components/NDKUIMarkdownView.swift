@@ -32,7 +32,7 @@ public struct NDKUIMarkdownView<
                 renderBlock(block)
             }
         }
-        .task {
+        .task(id: content) {
             parsedBlocks = MarkdownParser.parse(content)
         }
     }
