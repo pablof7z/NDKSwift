@@ -186,12 +186,12 @@ actor EOSETracker {
     // MARK: - Test Introspection
 
     /// Get the expected relays (for testing purposes)
-    public func getExpectedRelays() -> Set<RelayURL> {
+    func getExpectedRelays() -> Set<RelayURL> {
         expectedRelays
     }
 
     /// Get the relays that have sent EOSE (for testing purposes)
-    public func getEOSEsSeen() -> Set<RelayURL> {
+    func getEOSEsSeen() -> Set<RelayURL> {
         eosesSeen
     }
 
