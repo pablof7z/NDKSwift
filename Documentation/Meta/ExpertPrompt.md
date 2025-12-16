@@ -1758,6 +1758,66 @@ func loadUserPostsFromFollows() async {
 5. **Stream Everything**: Use `for await` loops to update UI as each piece arrives
 6. **Only Wait for Dependencies**: The rare case where query B needs results from query A
 
+#### ⚠️ The fetchEvent API: Use RARELY (1% of cases)
+
+NDKSwift provides a `fetchEvent()` API, but it **violates the event-streaming philosophy** and should only be used for **rare edge cases**.
+
+**When NOT to use fetchEvent (99% of cases):**
+- ❌ **Event previews** in timelines → Show placeholder, stream the event progressively
+- ❌ **Author profiles** → Show pubkey, enhance with metadata as it arrives
+- ❌ **Thread context** → Stream events and update as they arrive
+- ❌ **Quote posts** → Show reference, load quoted content progressively
+- ❌ **Any UI that can show SOMETHING without the complete event**
+
+**When TO use fetchEvent (1% of cases):**
+- ✅ **Article detail page** (`/article/[id]`) → Literally nothing to show without the article content
+- ✅ **Dedicated event viewer** (`/e/[id]`) → The entire page IS the event
+- ✅ **Critical blocking dependency** → Operation B truly cannot proceed without event A
+
+**Example of WRONG vs RIGHT:**
+
+```swift
+// ❌ WRONG: Using fetchEvent for event preview
+struct EventPreview: View {
+    @State private var fetchedEvent: NDKFetchedEvent?
+
+    var body: some View {
+        if let event = fetchedEvent?.event {
+            EventCard(event: event)
+        } else {
+            ProgressView() // User sees spinner - BAD!
+        }
+    }
+    .task {
+        fetchedEvent = ndk.fetchEvent(eventId) // Blocks with spinner
+    }
+}
+
+// ✅ RIGHT: Using streaming for event preview
+struct EventPreview: View {
+    @State private var event: NDKEvent?
+
+    var body: some View {
+        if let event = event {
+            EventCard(event: event)
+        } else {
+            EventPlaceholder() // User sees something immediately - GOOD!
+        }
+    }
+    .task {
+        let subscription = ndk.subscribe(filter: filter, cachePolicy: .cacheWithNetwork)
+        for await event in subscription.events {
+            self.event = event
+            break
+        }
+    }
+}
+```
+
+**Key Question:** *"Can I show SOMETHING to the user without this event?"*
+- If **YES** → Use `subscribe()` with streaming
+- If **NO** → Consider if fetchEvent is appropriate (rare)
+
 #### Network Reality:
 
 Remember that in Nostr:
