@@ -368,7 +368,7 @@ enum MarkdownParser {
 
             // Check for Nostr entities
             if text[index] == "@" || text[index] == "#" ||
-                (index <= text.index(text.endIndex, offsetBy: -5) &&
+                (text.distance(from: index, to: text.endIndex) >= 5 &&
                     String(text[index ..< text.index(index, offsetBy: 5)]).starts(with: "nostr"))
             {
                 if !currentText.isEmpty {
