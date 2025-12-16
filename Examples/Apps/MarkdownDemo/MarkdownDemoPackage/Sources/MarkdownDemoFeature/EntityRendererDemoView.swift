@@ -10,91 +10,99 @@ public struct EntityRendererDemoView: View {
     @State private var linkRenderer = LinkRendererType.simple
     @State private var hashtagRenderer = HashtagRendererType.highlighted
     @State private var codeBlockRenderer = CodeBlockRendererType.standard
-    @State private var selectedStyle = 0
     @State private var lastTappedItem = ""
+    @State private var editableContent: String
 
     let ndk: NDK
 
     public init(ndk: NDK) {
         self.ndk = ndk
+        self._editableContent = State(initialValue: Self.defaultContent)
     }
 
     enum ImageRendererType: String, CaseIterable {
-        case hidden = "Hidden"
+        case none = "None (raw URL)"
         case placeholder = "Placeholder (🖼)"
         case asyncImage = "Async Image"
         case fullImage = "Full Image with Zoom"
     }
 
     enum MentionRendererType: String, CaseIterable {
-        case hidden = "Hidden"
+        case none = "None (raw npub)"
         case inline = "Inline (@user)"
         case highlighted = "Highlighted"
         case profileCard = "Profile Card"
     }
 
     enum EventRendererType: String, CaseIterable {
-        case hidden = "Hidden"
+        case none = "None (raw note/nevent)"
         case reference = "Reference (note1...)"
         case quote = "Quote Card"
         case preview = "Event Preview"
     }
 
     enum LinkRendererType: String, CaseIterable {
-        case hidden = "Hidden"
+        case none = "None (raw URL)"
         case simple = "Simple Link"
         case preview = "Link Preview"
         case button = "Button Style"
     }
 
     enum HashtagRendererType: String, CaseIterable {
-        case hidden = "Hidden"
+        case none = "None (raw #tag)"
         case plain = "Plain Text"
         case highlighted = "Highlighted #tag"
         case chip = "Chip Style"
     }
 
     enum CodeBlockRendererType: String, CaseIterable {
-        case hidden = "Hidden"
+        case none = "None (raw code)"
         case standard = "Standard"
         case themed = "Syntax Themed"
         case minimal = "Minimal"
     }
 
-    private let styles = [
-        ("Default", MarkdownConfiguration()),
-        ("Minimal", .minimal),
-        ("Dark", .dark),
-        ("Nostr", .nostr),
-        ("Compact", .compact)
-    ]
-
     public var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // Configuration Panel
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        // Style selector
-                        HStack {
-                            Text("Overall Style:")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+        TabView {
+            // Preview Tab
+            NavigationView {
+                renderContent()
+                    .navigationTitle("Preview")
+                    .navigationBarTitleDisplayMode(.inline)
+            }
+            .tabItem {
+                Label("Preview", systemImage: "eye")
+            }
 
-                            Picker("Style", selection: $selectedStyle) {
-                                ForEach(0..<styles.count, id: \.self) { index in
-                                    Text(styles[index].0).tag(index)
-                                }
-                            }
-                            .pickerStyle(.menu)
-                        }
-
-                        Divider()
-
-                        Text("Entity Renderers")
+            // Edit Tab
+            NavigationView {
+                VStack(spacing: 0) {
+                    HStack {
+                        Text("Edit Markdown")
                             .font(.headline)
+                        Spacer()
+                        Button("Reset") {
+                            editableContent = Self.defaultContent
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    .padding()
 
-                        // Entity type renderers
+                    TextEditor(text: $editableContent)
+                        .font(.system(.body, design: .monospaced))
+                        .padding(8)
+                }
+                .navigationTitle("Edit")
+                .navigationBarTitleDisplayMode(.inline)
+            }
+            .tabItem {
+                Label("Edit", systemImage: "pencil")
+            }
+
+            // Settings Tab
+            NavigationView {
+                List {
+                    Section("Entity Renderers") {
                         rendererPicker("Images:", selection: $imageRenderer)
                         rendererPicker("Mentions:", selection: $mentionRenderer)
                         rendererPicker("Events:", selection: $eventRenderer)
@@ -102,55 +110,29 @@ public struct EntityRendererDemoView: View {
                         rendererPicker("Hashtags:", selection: $hashtagRenderer)
                         rendererPicker("Code Blocks:", selection: $codeBlockRenderer)
                     }
-                    .padding()
-                    .background(Color.gray.opacity(0.05))
-                }
-                .frame(maxHeight: 280)
 
-                Divider()
-
-                // Last tapped item indicator
-                if !lastTappedItem.isEmpty {
-                    HStack {
-                        Image(systemName: "hand.tap.fill")
-                            .foregroundColor(.blue)
-                        Text("Tapped: \(lastTappedItem)")
-                            .font(.caption)
-                        Spacer()
-                        Button("Clear") {
-                            lastTappedItem = ""
+                    if !lastTappedItem.isEmpty {
+                        Section("Last Tapped") {
+                            HStack {
+                                Image(systemName: "hand.tap.fill")
+                                    .foregroundColor(.blue)
+                                Text(lastTappedItem)
+                                    .font(.caption)
+                                Spacer()
+                                Button("Clear") {
+                                    lastTappedItem = ""
+                                }
+                                .font(.caption)
+                            }
                         }
-                        .font(.caption)
                     }
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
-                    .background(Color.blue.opacity(0.1))
                 }
-
-                Divider()
-
-                // Content display
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        renderContent()
-                            .padding()
-
-                        // Source markdown
-                        DisclosureGroup("View Source Markdown") {
-                            Text(comprehensiveContent)
-                                .font(.system(.caption, design: .monospaced))
-                                .padding()
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(Color.gray.opacity(0.1))
-                                .cornerRadius(8)
-                        }
-                        .padding(.horizontal)
-                    }
-                    .padding(.vertical)
-                }
+                .navigationTitle("Settings")
+                .navigationBarTitleDisplayMode(.inline)
             }
-            .navigationTitle("Entity Renderer Demo")
-            .navigationBarTitleDisplayMode(.inline)
+            .tabItem {
+                Label("Settings", systemImage: "gearshape")
+            }
         }
     }
 
@@ -164,7 +146,7 @@ public struct EntityRendererDemoView: View {
                 .font(.caption)
                 .frame(width: 90, alignment: .leading)
 
-            Picker(label, selection: selection) {
+            Picker("", selection: selection) {
                 ForEach(Array(T.allCases), id: \.self) { option in
                     Text(option.rawValue).tag(option)
                 }
@@ -177,9 +159,9 @@ public struct EntityRendererDemoView: View {
     private func renderContent() -> some View {
         // Use custom renderer based on settings
         CustomEntityRenderer(
-            content: comprehensiveContent,
+            content: editableContent,
             ndk: ndk,
-            style: styles[selectedStyle].1,
+            style: MarkdownConfiguration(),
             imageRenderer: imageRenderer,
             mentionRenderer: mentionRenderer,
             eventRenderer: eventRenderer,
@@ -192,8 +174,7 @@ public struct EntityRendererDemoView: View {
         )
     }
 
-    private var comprehensiveContent: String {
-        """
+    private static let defaultContent = """
         Just discovered this amazing Nostr library! 🚀
 
         Check out the docs at https://ndk.fyi for more info.
@@ -211,14 +192,14 @@ public struct EntityRendererDemoView: View {
         And here's a note worth checking out:
         nostr:nevent1qgsxu35yyt0mwjjh8pcz4zprhxegz69t4wr9t74vk6zne58wzh0waycppemhxue69uhkummn9ekx7mp0qqsq3zms08nzx3a72cgc0jtsd0g0g9fdx0f9jvp69kp05peuvmrpj5g0w639m
         """
-    }
 }
 
 // MARK: - Custom Entity Renderer
 
+@MainActor
 struct CustomEntityRenderer: View {
     let content: String
-    let ndk: NDK
+    nonisolated(unsafe) let ndk: NDK
     let style: MarkdownConfiguration
     let imageRenderer: EntityRendererDemoView.ImageRendererType
     let mentionRenderer: EntityRendererDemoView.MentionRendererType
@@ -228,39 +209,382 @@ struct CustomEntityRenderer: View {
     let codeBlockRenderer: EntityRendererDemoView.CodeBlockRendererType
     let onTap: (String) -> Void
 
+    @State private var parsedContent: NDKParsedContent?
+
     var body: some View {
-        // Use NDKUIRichTextView which properly loads and displays user profiles for mentions
-        NDKUIRichTextView(
-            ndk: ndk,
-            content: content,
-            showLinkPreviews: linkRenderer == .preview,
-            style: richTextStyle
-        )
-        .onMentionTapped { pubkey in
-            onTap("Mention: @\(pubkey.prefix(8))... (using \(mentionRenderer.rawValue))")
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                if let parsed = parsedContent {
+                    renderGroupedComponents(parsed.components)
+                } else {
+                    Text(content)
+                }
+            }
+            .padding()
         }
-        .onHashtagTapped { tag in
-            onTap("Hashtag: #\(tag) (using \(hashtagRenderer.rawValue))")
-        }
-        .onLinkTapped { url in
-            onTap("Link: \(url.absoluteString) (using \(linkRenderer.rawValue))")
-        }
-        .onEventTapped { eventId in
-            onTap("Event: \(eventId.prefix(8))... (using \(eventRenderer.rawValue))")
+        .task(id: content) {
+            parsedContent = await ndk.parseContent(content)
         }
     }
 
-    private var richTextStyle: NDKUIRichTextView.Style {
-        switch mentionRenderer {
-        case .inline:
-            return .compact
-        case .profileCard:
-            return .full
-        case .highlighted:
-            return .full
-        case .hidden:
-            return .minimal
+    @ViewBuilder
+    private func renderGroupedComponents(_ components: [NDKParsedContent.Component]) -> some View {
+        let groups = groupComponents(components)
+
+        ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
+            switch group {
+            case .inline(let inlineComponents):
+                renderInlineComponents(inlineComponents)
+            case .block(let component):
+                renderComponent(component)
+            }
         }
+    }
+
+    private enum ComponentGroup {
+        case inline([NDKParsedContent.Component])
+        case block(NDKParsedContent.Component)
+    }
+
+    private func groupComponents(_ components: [NDKParsedContent.Component]) -> [ComponentGroup] {
+        var groups: [ComponentGroup] = []
+        var currentInlineGroup: [NDKParsedContent.Component] = []
+
+        for component in components {
+            if isBlockComponent(component) {
+                // Flush current inline group
+                if !currentInlineGroup.isEmpty {
+                    groups.append(.inline(currentInlineGroup))
+                    currentInlineGroup = []
+                }
+                // Add block component
+                groups.append(.block(component))
+            } else {
+                // Accumulate inline component
+                currentInlineGroup.append(component)
+            }
+        }
+
+        // Flush remaining inline components
+        if !currentInlineGroup.isEmpty {
+            groups.append(.inline(currentInlineGroup))
+        }
+
+        return groups
+    }
+
+    private func isBlockComponent(_ component: NDKParsedContent.Component) -> Bool {
+        switch component {
+        case .url(let url):
+            return isImageURL(url) || linkRenderer == .preview
+        case .noteMention, .neventMention, .eventMention:
+            return eventRenderer == .quote || eventRenderer == .preview
+        default:
+            return false
+        }
+    }
+
+    @ViewBuilder
+    private func renderInlineComponents(_ components: [NDKParsedContent.Component]) -> some View {
+        components.reduce(Text("")) { result, component in
+            result + renderInlineComponent(component)
+        }
+    }
+
+    private func renderInlineComponent(_ component: NDKParsedContent.Component) -> Text {
+        switch component {
+        case .text(let text):
+            return Text(text)
+                .font(style.bodyFont)
+                .foregroundColor(style.textColor)
+
+        case .userMention(let pubkey, _):
+            return renderInlineMention(pubkey: pubkey)
+
+        case .hashtag(let tag):
+            return renderInlineHashtag(tag)
+
+        case .url(let url):
+            if isImageURL(url) {
+                // Image URL - only show inline if image renderer is .none
+                if imageRenderer == .none {
+                    return Text(url.absoluteString)
+                }
+                return Text("")
+            } else {
+                // Regular link
+                if linkRenderer == .none {
+                    return Text(url.absoluteString)
+                } else if linkRenderer != .preview {
+                    return Text(url.absoluteString)
+                        .foregroundColor(style.linkColor)
+                        .underline()
+                }
+                return Text("")
+            }
+
+        case .noteMention(let note):
+            if eventRenderer == .none {
+                return Text("nostr:\(note)")
+            } else if eventRenderer == .reference {
+                return Text("📝 \(note.prefix(16))...")
+                    .foregroundColor(style.nostrEntityColor)
+            }
+            return Text("")
+
+        case .neventMention(let nevent):
+            if eventRenderer == .none {
+                return Text("nostr:\(nevent)")
+            } else if eventRenderer == .reference {
+                return Text("📝 \(nevent.prefix(16))...")
+                    .foregroundColor(style.nostrEntityColor)
+            }
+            return Text("")
+
+        case .eventMention(let eventId):
+            if eventRenderer == .none {
+                return Text(eventId)
+            } else if eventRenderer == .reference {
+                return Text("📝 \(eventId.prefix(8))...")
+                    .foregroundColor(style.nostrEntityColor)
+            }
+            return Text("")
+
+        case .nprofileMention(let nprofile):
+            return Text("@\(nprofile.prefix(16))...")
+                .foregroundColor(style.mentionColor)
+        }
+    }
+
+    private func renderInlineMention(pubkey: String) -> Text {
+        switch mentionRenderer {
+        case .none:
+            // Show raw npub format
+            if let npub = try? String.toNpub(pubkey) {
+                return Text("nostr:\(npub)")
+            }
+            return Text(pubkey)
+        case .inline:
+            // For inline mode, just show @username without components
+            return Text("@\(pubkey.prefix(8))...")
+                .foregroundColor(style.mentionColor)
+        case .highlighted:
+            return Text("@\(pubkey.prefix(8))...")
+                .font(style.mentionFont)
+                .foregroundColor(style.mentionColor)
+        case .profileCard:
+            // For profile card in inline context, use icon + name
+            return Text("👤 @\(pubkey.prefix(8))...")
+                .foregroundColor(style.mentionColor)
+        }
+    }
+
+    private func renderInlineHashtag(_ tag: String) -> Text {
+        switch hashtagRenderer {
+        case .none:
+            return Text("#\(tag)")
+        case .plain:
+            return Text("#\(tag)")
+                .foregroundColor(style.textColor)
+        case .highlighted, .chip:
+            return Text("#\(tag)")
+                .foregroundColor(style.hashtagColor)
+                .fontWeight(.medium)
+        }
+    }
+
+    @ViewBuilder
+    private func renderComponent(_ component: NDKParsedContent.Component) -> some View {
+        switch component {
+        case .text(let text):
+            Text(text)
+                .font(style.bodyFont)
+                .foregroundColor(style.textColor)
+
+        case .userMention(let pubkey, let npub):
+            renderMention(pubkey: pubkey, npub: npub)
+
+        case .hashtag(let tag):
+            renderHashtag(tag)
+
+        case .url(let url):
+            renderURL(url)
+
+        case .noteMention(let note), .neventMention(let note):
+            renderEventReference(note)
+
+        case .eventMention(let eventId):
+            renderEventReference(eventId)
+
+        case .nprofileMention(let nprofile):
+            Text("@\(nprofile.prefix(16))...")
+                .foregroundColor(style.mentionColor)
+        }
+    }
+
+    @ViewBuilder
+    private func renderMention(pubkey: String, npub: String) -> some View {
+        switch mentionRenderer {
+        case .none:
+            Text("nostr:\(npub)")
+        case .inline:
+            NDKUIDisplayName(ndk: ndk, pubkey: pubkey)
+                .foregroundColor(style.mentionColor)
+                .onTapGesture {
+                    onTap("Mention: @\(pubkey.prefix(8))... (Inline)")
+                }
+        case .highlighted:
+            NDKUIDisplayName(ndk: ndk, pubkey: pubkey)
+                .font(style.mentionFont)
+                .foregroundColor(style.mentionColor)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(style.mentionColor.opacity(0.15))
+                .cornerRadius(4)
+                .onTapGesture {
+                    onTap("Mention: @\(pubkey.prefix(8))... (Highlighted)")
+                }
+        case .profileCard:
+            // For profile card, show name with profile picture
+            HStack(spacing: 8) {
+                NDKUIProfilePicture(ndk: ndk, pubkey: pubkey, size: 24)
+                NDKUIDisplayName(ndk: ndk, pubkey: pubkey)
+                    .foregroundColor(style.mentionColor)
+            }
+            .padding(8)
+            .background(Color.secondary.opacity(0.1))
+            .cornerRadius(8)
+            .onTapGesture {
+                onTap("Mention: @\(pubkey.prefix(8))... (Profile Card)")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func renderHashtag(_ tag: String) -> some View {
+        switch hashtagRenderer {
+        case .none:
+            Text("#\(tag)")
+        case .plain:
+            Text("#\(tag)")
+                .foregroundColor(style.textColor)
+        case .highlighted:
+            Text("#\(tag)")
+                .foregroundColor(style.hashtagColor)
+                .fontWeight(.medium)
+                .onTapGesture {
+                    onTap("Hashtag: #\(tag) (Highlighted)")
+                }
+        case .chip:
+            Text("#\(tag)")
+                .font(.caption)
+                .foregroundColor(style.hashtagColor)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(style.hashtagColor.opacity(0.15))
+                .cornerRadius(12)
+                .onTapGesture {
+                    onTap("Hashtag: #\(tag) (Chip)")
+                }
+        }
+    }
+
+    @ViewBuilder
+    private func renderURL(_ url: URL) -> some View {
+        // Check if it's an image URL
+        if isImageURL(url) {
+            renderImage(url)
+        } else {
+            renderLink(url)
+        }
+    }
+
+    @ViewBuilder
+    private func renderImage(_ url: URL) -> some View {
+        switch imageRenderer {
+        case .none:
+            Text(url.absoluteString)
+        case .placeholder:
+            Text("🖼")
+                .font(.largeTitle)
+        case .asyncImage:
+            CachedAsyncImage(url: url) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: .infinity)
+                    .frame(maxHeight: 300)
+                    .cornerRadius(8)
+            } placeholder: {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .frame(maxHeight: 300)
+            }
+        case .fullImage:
+            CachedAsyncImage(url: url) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: .infinity)
+                    .cornerRadius(8)
+            } placeholder: {
+                ProgressView()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func renderLink(_ url: URL) -> some View {
+        switch linkRenderer {
+        case .none:
+            Text(url.absoluteString)
+        case .simple:
+            Link(url.absoluteString, destination: url)
+                .foregroundColor(style.linkColor)
+                .onTapGesture {
+                    onTap("Link: \(url.absoluteString) (Simple)")
+                }
+        case .preview:
+            NDKUIURLPreview(url: url, style: .compact)
+        case .button:
+            Button(action: {
+                onTap("Link: \(url.absoluteString) (Button)")
+            }) {
+                Text(url.host ?? url.absoluteString)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(style.linkColor.opacity(0.15))
+                    .foregroundColor(style.linkColor)
+                    .cornerRadius(8)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func renderEventReference(_ reference: String) -> some View {
+        switch eventRenderer {
+        case .none:
+            Text("nostr:\(reference)")
+        case .reference:
+            Text("📝 \(reference.prefix(16))...")
+                .foregroundColor(style.nostrEntityColor)
+                .onTapGesture {
+                    onTap("Event: \(reference.prefix(8))... (Reference)")
+                }
+        case .quote, .preview:
+            // Extract event ID and show preview
+            if let eventId = try? Bech32.eventId(from: reference) {
+                NDKUIEventPreview(ndk: ndk, eventReference: .eventId(eventId))
+            } else {
+                Text("📝 \(reference.prefix(16))...")
+                    .foregroundColor(style.nostrEntityColor)
+            }
+        }
+    }
+
+    private func isImageURL(_ url: URL) -> Bool {
+        let imageExtensions = ["jpg", "jpeg", "png", "gif", "webp", "heic", "svg", "bmp", "tiff"]
+        return imageExtensions.contains(url.pathExtension.lowercased())
     }
 }
 
