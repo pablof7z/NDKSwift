@@ -89,6 +89,13 @@ public final class NDK {
     /// Outbox manager - provides simplified API for outbox operations
     public private(set) lazy var outbox: NDKOutboxManager = .init(ndk: self)
 
+    // MARK: - Relay Intelligence
+
+    /// Hint index for learning where users and events are found
+    public lazy var hintIndex: HintIndex = {
+        HintIndex()
+    }()
+
     // MARK: - Internal Components
 
     /// Event publishing and management
