@@ -315,12 +315,13 @@ public struct NDKUIRichTextView: View {
 
 /// A view for previewing event references
 ///
-/// Uses the modern `fetchEvent` API for efficient, cache-first event loading with automatic updates.
+/// Follows NDKSwift's event-streaming philosophy: shows placeholder immediately,
+/// updates progressively as event arrives. Never blocks with loading spinners.
 public struct NDKUIEventPreview: View {
     let ndk: NDK
     let eventReference: EventReference
 
-    @State private var fetchedEvent: NDKFetchedEvent?
+    @State private var event: NDKEvent?
 
     public enum EventReference: Hashable {
         case eventId(String)
@@ -335,46 +336,67 @@ public struct NDKUIEventPreview: View {
 
     public var body: some View {
         Group {
-            if let event = fetchedEvent?.event {
+            if let event = event {
                 NDKUIEventView(ndk: ndk, event: event, style: .embedded, showInteractions: false)
-            } else if fetchedEvent?.isLoading == true {
-                HStack {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("Loading event...")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                .padding()
-                .background(Color.ndkSecondaryBackground)
-                .cornerRadius(8)
-            } else if fetchedEvent?.error != nil {
-                HStack {
-                    Image(systemName: "exclamationmark.triangle")
-                        .foregroundColor(.orange)
-                    Text("Event not found")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                .padding()
-                .background(Color.ndkSecondaryBackground)
-                .cornerRadius(8)
+            } else {
+                // Show placeholder immediately - never a loading spinner
+                EventPlaceholder()
             }
         }
         .task {
-            fetchedEvent = ndk.fetchEvent(extractIdentifier())
+            await streamEvent()
         }
     }
 
-    private func extractIdentifier() -> String {
+    private func streamEvent() async {
+        guard let eventId = extractEventId() else { return }
+
+        let filter = NDKFilter(ids: [eventId])
+        let subscription = ndk.subscribe(filter: filter, cachePolicy: .cacheWithNetwork)
+
+        // Stream events progressively - update UI as they arrive
+        for await event in subscription.events {
+            await MainActor.run {
+                self.event = event
+            }
+            break // First event is enough for preview
+        }
+    }
+
+    private func extractEventId() -> String? {
         switch eventReference {
         case .eventId(let id):
             return id
         case .note(let note):
-            return note
+            return try? Bech32.eventId(from: note)
         case .nevent(let nevent):
-            return nevent
+            if let decoded = try? ContentTagger.decodeNostrEntity(nevent) {
+                return decoded.eventId
+            }
+            return nil
         }
+    }
+
+    @ViewBuilder
+    private func EventPlaceholder() -> some View {
+        HStack {
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Color.gray.opacity(0.2))
+                .frame(width: 40, height: 40)
+
+            VStack(alignment: .leading, spacing: 4) {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color.gray.opacity(0.2))
+                    .frame(height: 12)
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color.gray.opacity(0.15))
+                    .frame(height: 10)
+                    .frame(width: 120)
+            }
+        }
+        .padding()
+        .background(Color.ndkSecondaryBackground)
+        .cornerRadius(8)
     }
 }
 

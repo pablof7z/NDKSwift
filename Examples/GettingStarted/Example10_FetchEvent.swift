@@ -3,8 +3,16 @@ import NDKSwift
 
 enum Example10_FetchEvent {
     static func run() async throws {
-        print("🚀 NDKSwift Example: Fetch Single Events")
-        print("=========================================\n")
+        print("⚠️  NDKSwift Example: Fetch Single Events (RARELY NEEDED)")
+        print("=========================================================")
+        print("")
+        print("⚠️  IMPORTANT: This API is for RARE edge cases only!")
+        print("⚠️  Most of the time you should use subscribe() with streaming.")
+        print("⚠️  Only use fetchEvent when there's NOTHING to show without the event.")
+        print("")
+        print("✅ Acceptable: Article detail page - can't show article without content")
+        print("❌ NOT acceptable: Event previews, profiles, threads - show placeholder & stream")
+        print("")
 
         // Setup NDK with cache
         let ndk = NDK(
@@ -109,22 +117,32 @@ enum Example10_FetchEvent {
         print("\n👋 Disconnecting...")
         await ndk.disconnect()
 
-        print("\n📚 Key Concepts:")
-        print("━━━━━━━━━━━━━━━━")
-        print("✓ fetchEvent() returns NDKFetchedEvent with observable properties")
-        print("✓ Non-replaceable events: cached versions skip network (instant load)")
-        print("✓ Replaceable events: return cached immediately, update when newer found")
-        print("✓ Supports hex, note1, nevent1, naddr1 identifiers")
-        print("✓ Intelligently uses relay hints from bech32 and tags")
-        print("✓ Falls back to outbox model using author pubkey hints")
-        print("✓ Perfect for SwiftUI with @State binding")
+        print("\n⚠️  When to Use fetchEvent (1% of cases):")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("✅ Article detail page (/article/[id]) - NOTHING to show without article")
+        print("✅ Dedicated event viewer (/e/[id]) - the whole page IS the event")
+        print("✅ Critical dependency - operation B truly cannot proceed without event A")
 
-        print("\n💡 Use Cases:")
-        print("━━━━━━━━━━━━")
-        print("• Event previews in timeline (quote posts, mentions)")
-        print("• Thread/reply chains")
-        print("• Notification feeds")
-        print("• Event detail views")
-        print("• Any single-event lookup scenario")
+        print("\n❌ When NOT to Use fetchEvent (99% of cases):")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("❌ Event previews (quote posts, mentions) → Show placeholder, stream progressively")
+        print("❌ Thread/reply chains → Stream and update as events arrive")
+        print("❌ User profiles in timeline → Show pubkey, enhance with metadata stream")
+        print("❌ Notification feeds → Stream with for await loops")
+        print("❌ Any UI that can show SOMETHING without the event")
+
+        print("\n📚 Technical Details:")
+        print("━━━━━━━━━━━━━━━━━━━━")
+        print("• Returns NDKFetchedEvent with observable properties")
+        print("• Non-replaceable events: cached versions skip network")
+        print("• Replaceable events: update when newer found")
+        print("• Supports hex, note1, nevent1, naddr1 identifiers")
+        print("• Uses relay hints from bech32 and outbox model")
+
+        print("\n🎯 Core Philosophy:")
+        print("━━━━━━━━━━━━━━━━━━")
+        print("NDKSwift embraces event-streaming with progressive UI updates.")
+        print("Always show SOMETHING immediately, then enhance as data arrives.")
+        print("Reserve fetchEvent for the rare cases where blocking is unavoidable.")
     }
 }

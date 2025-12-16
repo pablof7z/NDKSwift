@@ -132,9 +132,25 @@ func replyToEvent(_ originalEvent: NDKEvent, content: String) async throws -> ND
 }
 ```
 
-## Fetching Single Events
+## Fetching Single Events ⚠️ RARELY NEEDED
 
-The `fetchEvent` API provides a modern, cache-first approach for loading individual events with automatic updates and intelligent relay selection.
+> **IMPORTANT**: `fetchEvent()` is for **RARE edge cases only**. NDKSwift's core philosophy is **event-streaming with progressive UI updates**. You should almost always use `subscribe()` with `for await` loops instead.
+
+### When NOT to Use fetchEvent (99% of cases)
+
+❌ **DON'T use for event previews** - Show placeholder, stream progressively
+❌ **DON'T use for author profiles** - Show pubkey, enhance with metadata
+❌ **DON'T use for thread context** - Stream and update as events arrive
+❌ **DON'T use for quote posts** - Show reference, load content progressively
+❌ **DON'T use for any UI that can show SOMETHING without the event**
+
+### When TO Use fetchEvent (1% of cases)
+
+✅ **Article detail page** (`/article/[id]`) - Literally nothing to show without the article content
+✅ **Dedicated event viewer** (`/e/[id]`) - The whole page IS the event
+✅ **Critical dependency** - When operation B truly cannot proceed without event A
+
+The `fetchEvent` API provides a simplified wrapper for these rare cases where blocking is acceptable.
 
 ### Basic Event Fetching
 
@@ -184,125 +200,96 @@ let fetched = ndk.fetchEvent(tag: aTag)
 // 3. All connected relays as fallback
 ```
 
-### SwiftUI Integration
+### RARE Use Case: Article Detail Page
+
+This is one of the few cases where `fetchEvent` is appropriate - there's literally nothing to show without the article content:
 
 ```swift
-struct EventDetailView: View {
-    let eventId: String
+// ✅ ACCEPTABLE: Article detail page - can't show anything without the article
+struct ArticleDetailView: View {
+    let articleId: String  // NIP-23 long-form article
     let ndk: NDK
 
     @State private var fetched: NDKFetchedEvent?
 
     var body: some View {
         Group {
-            if let event = fetched?.event {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(event.content)
-                    Text("By: \(event.pubkey)")
-                        .font(.caption)
+            if let article = fetched?.event {
+                // Show the full article
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text(article.title)
+                            .font(.title)
+                        Text(article.content)
+                    }
                 }
-            } else if fetched?.isLoading == true {
-                ProgressView("Loading...")
-            } else if let error = fetched?.error {
-                Text("Error: \(error.localizedDescription)")
-                    .foregroundColor(.red)
+            } else {
+                // Placeholder while loading
+                ProgressView("Loading article...")
             }
         }
         .task {
-            fetched = ndk.fetchEvent(eventId)
+            fetched = ndk.fetchEvent(articleId)
         }
     }
 }
 ```
 
-### Handling Quoted Events (NIP-18)
+### WRONG Pattern: Event Preview (Use Streaming Instead!)
 
 ```swift
-struct QuotePostView: View {
-    let event: NDKEvent
-    let ndk: NDK
-
-    @State private var quotedEvent: NDKFetchedEvent?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Main post content
-            Text(event.content)
-
-            // Quoted event preview
-            if let quoted = quotedEvent?.event {
-                QuotedEventCard(event: quoted)
-                    .padding(.leading)
-            } else if quotedEvent?.isLoading == true {
-                ProgressView("Loading quote...")
-            }
-        }
-        .task {
-            // Find "q" tag (NIP-18 quote reference)
-            if let qTag = event.tags.first(where: { $0[0] == "q" }) {
-                quotedEvent = ndk.fetchEvent(tag: qTag)
-            }
-        }
-    }
-}
-```
-
-### Thread View with Reply Chain
-
-```swift
-struct ThreadView: View {
+// ❌ WRONG: Using fetchEvent for event previews
+struct EventPreviewWrong: View {
     let eventId: String
     let ndk: NDK
 
-    @State private var currentEvent: NDKFetchedEvent?
-    @State private var rootEvent: NDKFetchedEvent?
-    @State private var replyToEvent: NDKFetchedEvent?
+    @State private var fetched: NDKFetchedEvent?
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                // Root of thread (if exists)
-                if let root = rootEvent?.event {
-                    EventCard(event: root)
-                        .opacity(0.6)
-                }
-
-                // Reply context (if exists)
-                if let reply = replyToEvent?.event {
-                    EventCard(event: reply)
-                        .opacity(0.8)
-                }
-
-                // Current event
-                if let current = currentEvent?.event {
-                    EventCard(event: current)
-                }
-            }
-            .padding()
+        if let event = fetched?.event {
+            Text(event.content)
+        } else {
+            ProgressView()  // BAD: Loading spinner!
         }
         .task {
-            currentEvent = ndk.fetchEvent(eventId)
+            fetched = ndk.fetchEvent(eventId)  // BAD: Blocking!
+        }
+    }
+}
 
-            // Fetch reply chain from NIP-10 "e" tags
-            if let tags = currentEvent?.event?.tags {
-                // Root event (marked with "root" or first tag)
-                if let rootTag = tags.first(where: { $0[safe: 3] == "root" }) {
-                    rootEvent = ndk.fetchEvent(tag: rootTag)
-                }
+// ✅ RIGHT: Stream events progressively
+struct EventPreviewRight: View {
+    let eventId: String
+    let ndk: NDK
 
-                // Direct reply (marked with "reply")
-                if let replyTag = tags.first(where: { $0[safe: 3] == "reply" }) {
-                    replyToEvent = ndk.fetchEvent(tag: replyTag)
-                }
+    @State private var event: NDKEvent?
+
+    var body: some View {
+        if let event = event {
+            Text(event.content)
+        } else {
+            // Show placeholder immediately - never a spinner
+            EventPlaceholder()
+        }
+        .task {
+            let subscription = ndk.subscribe(
+                filter: NDKFilter(ids: [eventId]),
+                cachePolicy: .cacheWithNetwork
+            )
+
+            // Stream - updates as events arrive
+            for await event in subscription.events {
+                self.event = event
+                break
             }
         }
     }
 }
 ```
 
-### Cache Behavior
+### Understanding Cache Behavior (When fetchEvent IS Used)
 
-The `fetchEvent` API implements intelligent cache-first loading:
+When you do use `fetchEvent()` for those rare blocking scenarios, it implements intelligent caching:
 
 ```swift
 // Non-replaceable events (kinds 1, 4, etc.)
@@ -324,14 +311,13 @@ let fetched = ndk.fetchEvent(profileEventId)
 // then updates UI automatically when newer version arrives
 ```
 
-### Key Benefits
+**Technical Details (for the 1% of cases where fetchEvent is appropriate):**
+- Cache-first loading for non-replaceable events
+- Automatic updates for replaceable events when newer versions arrive
+- Extracts and uses relay hints from bech32 and tags
+- Falls back to outbox model with author's write relays
 
-- **Cache-First**: Non-replaceable events skip network when cached
-- **Automatic Updates**: Replaceable events update when newer versions arrive
-- **Observable**: Perfect for SwiftUI's reactive model with `@State`
-- **Relay Hints**: Automatically extracts and uses hints from bech32 and tags
-- **Outbox Model**: Falls back to author's write relays when hints unavailable
-- **Proper Cleanup**: Subscriptions cancel automatically when view disappears
+**Remember:** For 99% of use cases, prefer `subscribe()` with `for await` streaming instead.
 
 ## Subscription Patterns
 
