@@ -3,15 +3,15 @@ import NDKSwiftCore
 import NDKSwiftSQLite
 import NDKSwiftNostrDB
 
-enum CacheType: String, CaseIterable, Identifiable {
+public enum CacheType: String, CaseIterable, Identifiable {
     case sqlite = "SQLite"
     case nostrdb = "NostrDB"
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    var displayName: String { rawValue }
+    public var displayName: String { rawValue }
 
-    var description: String {
+    public var description: String {
         switch self {
         case .sqlite:
             return "Full-featured SQL cache with GRDB. 13 migrations, reactive observations."
@@ -20,7 +20,7 @@ enum CacheType: String, CaseIterable, Identifiable {
         }
     }
 
-    var isAvailableOnCurrentPlatform: Bool {
+    public var isAvailableOnCurrentPlatform: Bool {
         #if targetEnvironment(simulator)
         if self == .nostrdb {
             return false
@@ -29,11 +29,11 @@ enum CacheType: String, CaseIterable, Identifiable {
         return true
     }
 
-    static var availableCases: [CacheType] {
+    public static var availableCases: [CacheType] {
         allCases.filter { $0.isAvailableOnCurrentPlatform }
     }
 
-    func createCache() async throws -> NDKCache {
+    public func createCache() async throws -> NDKCache {
         switch self {
         case .sqlite:
             return try await NDKSQLiteCache(path: nil, debugMode: true)
@@ -46,10 +46,10 @@ enum CacheType: String, CaseIterable, Identifiable {
     }
 }
 
-enum CacheError: Error, LocalizedError {
+public enum CacheError: Error, LocalizedError {
     case platformNotSupported
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .platformNotSupported:
             return "NostrDB cache is not supported on iOS Simulator"
