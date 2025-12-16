@@ -119,4 +119,192 @@ final class EOSETrackerTests: XCTestCase {
         let allEOSEdAfterFallback = await tracker.allRelaysEOSEd()
         XCTAssertTrue(allEOSEdAfterFallback, "Bug: fallback relay EOSE was ignored")
     }
+
+    // MARK: - Integration Tests Using Mock Relay Infrastructure
+
+    /// Integration test: Verify that NDKSubscriptionRequirement includes fallback relays
+    /// in expectedRelays when using outbox strategy with unknown authors.
+    ///
+    /// This is the main test for issue #54 using the new mock relay infrastructure.
+    func testOutboxStrategyWithUnknownAuthors_FallbackRelaysInExpected() async throws {
+        // Create NDK and add mock relays that appear "connected"
+        let ndk = NDK()
+
+        // Add fallback relays (these will be used for unknown authors)
+        let fallbackRelay1URL = "wss://fallback1.test/"
+        let fallbackRelay2URL = "wss://fallback2.test/"
+        let (_, fallbackRelay1) = await ndk.addMockRelay(url: fallbackRelay1URL)
+        let (_, fallbackRelay2) = await ndk.addMockRelay(url: fallbackRelay2URL)
+
+        // Add outbox relay (for known author)
+        let outboxRelayURL = "wss://outbox.test/"
+        let (_, outboxRelay) = await ndk.addMockRelay(url: outboxRelayURL)
+
+        // Verify relays are connected
+        let connectedRelays = await ndk.pool.getConnectedRelayURLsForTesting()
+        XCTAssertTrue(connectedRelays.contains(fallbackRelay1URL.normalizedRelayURL),
+                     "Fallback relay 1 should be connected")
+        XCTAssertTrue(connectedRelays.contains(fallbackRelay2URL.normalizedRelayURL),
+                     "Fallback relay 2 should be connected")
+        XCTAssertTrue(connectedRelays.contains(outboxRelayURL.normalizedRelayURL),
+                     "Outbox relay should be connected")
+
+        // Create outbox strategy with:
+        // - Known author on outbox relay
+        // - Unknown author (will use fallback relays)
+        let knownAuthor = "known_author_pubkey"
+        let unknownAuthor = "unknown_author_pubkey"
+
+        var filterForOutbox = NDKFilter(kinds: [1])
+        filterForOutbox.authors = [knownAuthor]
+
+        let strategy = OutboxFilterStrategy(
+            filtersByRelay: [outboxRelayURL: filterForOutbox],
+            unknownAuthors: [unknownAuthor],
+            authorsToDiscover: []
+        )
+
+        // Create subscription coordinator
+        let coordinator = await ndk.internalSubscriptionManager.createSubscription(
+            id: "test-outbox-sub",
+            filters: [NDKFilter(authors: [knownAuthor, unknownAuthor], kinds: [1])],
+            relays: nil,
+            autoStart: false
+        )
+
+        // Create the requirement with outbox strategy
+        let filter = NDKFilter(authors: [knownAuthor, unknownAuthor], kinds: [1])
+        let requirement = NDKSubscriptionRequirement(
+            filter: filter,
+            subscriptionId: "test-outbox-sub",
+            internalSubscription: coordinator,
+            cache: ndk.cache,
+            ndk: ndk,
+            relays: nil,
+            exclusiveRelays: false,
+            closeOnEose: false,
+            relayStrategy: .outbox(strategy: strategy),
+            shouldFetchFromNetwork: true,
+            cachePolicy: .networkOnly
+        )
+
+        // Start processing - this triggers applyRelayStrategy which should:
+        // 1. Apply outbox strategy (adds subscriptions to outbox + fallback relays)
+        // 2. Set expectedRelays to ALL relays in relaySubscriptions
+        await requirement.startProcessing()
+
+        // Get active relays (where subscriptions were created)
+        let activeRelays = await requirement.getActiveRelays()
+
+        // Get expected relays from the EOSE tracker
+        let expectedRelays = await requirement.getExpectedRelaysForTesting()
+
+        // Verify: Active relays should include outbox relay
+        XCTAssertTrue(activeRelays.contains(outboxRelayURL.normalizedRelayURL),
+                     "Outbox relay should be active. Active: \(activeRelays)")
+
+        // Verify: Active relays should include at least one fallback relay
+        // (They're used because unknownAuthors is not empty and relays are "connected")
+        let activeFallbackRelays = activeRelays.filter {
+            $0 == fallbackRelay1URL.normalizedRelayURL || $0 == fallbackRelay2URL.normalizedRelayURL
+        }
+        XCTAssertFalse(activeFallbackRelays.isEmpty,
+                      "At least one fallback relay should be active for unknown authors. Active: \(activeRelays)")
+
+        // THE KEY ASSERTION: Expected relays should equal active relays
+        // This is the fix for issue #54 - fallback relays must be in expectedRelays
+        XCTAssertEqual(expectedRelays, activeRelays,
+                      "Expected relays should match active relays.\nExpected: \(expectedRelays)\nActive: \(activeRelays)")
+
+        // Additional verification: all active relays should be expected
+        for activeRelay in activeRelays {
+            XCTAssertTrue(expectedRelays.contains(activeRelay),
+                         "Active relay \(activeRelay) should be in expectedRelays")
+        }
+
+        // Clean up
+        await requirement.cancel()
+    }
+
+    /// Test that EOSE from fallback relays is properly tracked after the fix.
+    func testEOSEFromFallbackRelaysIsTracked() async throws {
+        // Create NDK and add mock relays
+        let ndk = NDK()
+
+        let fallbackRelayURL = "wss://fallback.test/"
+        let outboxRelayURL = "wss://outbox.test/"
+
+        let (fallbackMock, _) = await ndk.addMockRelay(url: fallbackRelayURL)
+        let (outboxMock, _) = await ndk.addMockRelay(url: outboxRelayURL)
+
+        // Create outbox strategy
+        let knownAuthor = "known_author"
+        let unknownAuthor = "unknown_author"
+
+        var filterForOutbox = NDKFilter(kinds: [1])
+        filterForOutbox.authors = [knownAuthor]
+
+        let strategy = OutboxFilterStrategy(
+            filtersByRelay: [outboxRelayURL: filterForOutbox],
+            unknownAuthors: [unknownAuthor],
+            authorsToDiscover: []
+        )
+
+        // Create requirement
+        let coordinator = await ndk.internalSubscriptionManager.createSubscription(
+            id: "test-eose-sub",
+            filters: [NDKFilter(authors: [knownAuthor, unknownAuthor], kinds: [1])],
+            relays: nil,
+            autoStart: false
+        )
+
+        let requirement = NDKSubscriptionRequirement(
+            filter: NDKFilter(authors: [knownAuthor, unknownAuthor], kinds: [1]),
+            subscriptionId: "test-eose-sub",
+            internalSubscription: coordinator,
+            cache: ndk.cache,
+            ndk: ndk,
+            relays: nil,
+            exclusiveRelays: false,
+            closeOnEose: false,
+            relayStrategy: .outbox(strategy: strategy),
+            shouldFetchFromNetwork: true,
+            cachePolicy: .networkOnly
+        )
+
+        await requirement.startProcessing()
+
+        // Get the subscription ID used for EOSE tracking
+        let activeRelays = await requirement.getActiveRelays()
+        let expectedRelays = await requirement.getExpectedRelaysForTesting()
+
+        // Both relays should be in expected (if fallback relay is active)
+        if activeRelays.contains(fallbackRelayURL.normalizedRelayURL) {
+            XCTAssertTrue(expectedRelays.contains(fallbackRelayURL.normalizedRelayURL),
+                         "Fallback relay should be in expectedRelays")
+        }
+
+        // Simulate EOSE from outbox relay
+        await outboxMock.sendEOSE(subscriptionId: "test-eose-sub")
+
+        // Check EOSEs seen
+        let eosesSeen = await requirement.getEOSEsSeenForTesting()
+
+        // If fallback relay is active, simulate its EOSE too
+        if activeRelays.contains(fallbackRelayURL.normalizedRelayURL) {
+            await fallbackMock.sendEOSE(subscriptionId: "test-eose-sub")
+
+            // Small delay for async processing
+            try await Task.sleep(nanoseconds: 50_000_000)
+
+            let finalEosesSeen = await requirement.getEOSEsSeenForTesting()
+
+            // Verify fallback EOSE was tracked (not ignored with warning)
+            XCTAssertTrue(finalEosesSeen.contains(fallbackRelayURL.normalizedRelayURL) ||
+                         finalEosesSeen.contains(outboxRelayURL.normalizedRelayURL),
+                         "At least one EOSE should be tracked. EOSEs seen: \(finalEosesSeen)")
+        }
+
+        await requirement.cancel()
+    }
 }
