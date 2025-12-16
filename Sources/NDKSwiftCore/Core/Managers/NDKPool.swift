@@ -21,6 +21,10 @@ public actor NDKPool {
     /// Set of relay URLs that were explicitly added by the developer
     private var explicitRelayUrls: Set<String> = []
 
+    /// NIP-77 sync handlers indexed by normalized relay URL
+    /// This must be an instance property (not static) to benefit from actor isolation
+    var syncHandlers: [String: NIP77SyncHandler] = [:]
+
     /// Stream of relay pool changes for event-driven observation
     private let poolChangeStream: AsyncStream<NDKPoolChangeEvent>
     private let poolChangeContinuation: AsyncStream<NDKPoolChangeEvent>.Continuation
