@@ -1,5 +1,8 @@
 import SwiftUI
 import NDKSwiftCore
+#if canImport(UIKit)
+import UIKit
+#endif
 
 /// Hero article card renderer with large image and prominent title
 /// Best for featured content or detail views
@@ -29,7 +32,7 @@ public struct ArticleCardHero: ArticleCardRenderer {
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Hero Image with gradient overlay
-            if let imageURL = extractImage(from: event) {
+            if let imageURL = article.imageURL {
                 ZStack(alignment: .bottomLeading) {
                     CachedAsyncImage(url: imageURL) { image in
                         image
@@ -55,7 +58,7 @@ public struct ArticleCardHero: ArticleCardRenderer {
             // Content section
             VStack(alignment: .leading, spacing: 8) {
                 // Title
-                if let title = extractTitle(from: event) {
+                if let title = article.title {
                     Text(title)
                         .font(.title2)
                         .fontWeight(.bold)
@@ -63,7 +66,7 @@ public struct ArticleCardHero: ArticleCardRenderer {
                 }
 
                 // Summary
-                if let summary = extractSummary(from: event) {
+                if let summary = article.summary {
                     Text(summary)
                         .font(.body)
                         .foregroundStyle(.secondary)
@@ -75,9 +78,9 @@ public struct ArticleCardHero: ArticleCardRenderer {
                     HStack(spacing: 8) {
                         // Author with profile picture
                         HStack(spacing: 6) {
-                            NDKUIProfilePicture(ndk: ndk, pubkey: event.pubkey, size: 20)
+                            NDKUIProfilePicture(ndk: ndk, pubkey: article.pubkey, size: 20)
 
-                            NDKUIUsername(ndk: ndk, pubkey: event.pubkey)
+                            NDKUIUsername(ndk: ndk, pubkey: article.pubkey)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -86,26 +89,23 @@ public struct ArticleCardHero: ArticleCardRenderer {
                             .font(.caption)
                             .foregroundStyle(.secondary)
 
-                        NDKUIRelativeTime(timestamp: event.createdAt)
+                        NDKUIRelativeTime(timestamp: article.createdAt)
                             .font(.caption)
                             .foregroundStyle(.secondary)
 
-                        // Reading time estimate
-                        if let readingTime = estimateReadingTime(from: event) {
-                            Text("•")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                        Text("•")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
 
-                            Text("\(readingTime) min read")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
+                        Text("\(article.readingTime) min read")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 }
             }
             .padding(16)
         }
-        .background(Color(.secondarySystemBackground))
+        .background(Color.ndkSecondaryBackground)
         .cornerRadius(12)
         .onTapGesture {
             (onTap ?? envOnTap)?(event)
