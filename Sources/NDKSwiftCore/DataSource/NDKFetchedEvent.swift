@@ -42,19 +42,22 @@ public final class NDKFetchedEvent {
     /// Active subscription for network fetch
     private var subscription: NDKSubscription<NDKEvent>?
 
+    /// Task handle to prevent undefined behavior if deallocated before task starts
+    private var fetchTask: Task<Void, Never>?
+
     // MARK: - Initialization
 
     init(ndk: NDK, identifier: String) {
         self.ndk = ndk
-        Task { await startFetching(identifier: identifier) }
+        fetchTask = Task { await startFetching(identifier: identifier) }
     }
 
     init(ndk: NDK, tag: Tag) {
         self.ndk = ndk
-        Task { await startFetching(tag: tag) }
+        fetchTask = Task { await startFetching(tag: tag) }
     }
 
-    deinit {
+    nonisolated deinit {
         cancellation.cancel()
     }
 
@@ -69,19 +72,38 @@ public final class NDKFetchedEvent {
         do {
             // Parse identifier and extract hints
             let filter = try NostrIdentifier.createFilter(from: identifier)
-            guard let eventId = filter.ids?.first else {
-                throw NDKError.invalidEventID("No event ID found in identifier")
-            }
 
             // Extract relay hints from bech32 if available
             var relayHints: [String]?
+            var pubkeyHint: String?
+            var isAddressable = false
+
             if Bech32.isBech32(identifier) {
-                if let decoded = try? ContentTagger.decodeNostrEntity(identifier) {
+                do {
+                    let decoded = try ContentTagger.decodeNostrEntity(identifier)
                     relayHints = decoded.relays
+                    pubkeyHint = decoded.pubkey
+
+                    // Check if it's an addressable event (naddr1)
+                    if decoded.type == "naddr" {
+                        isAddressable = true
+                    }
+                } catch {
+                    NDKLogger.log(.warning, category: .general, "Failed to decode bech32 identifier: \(error.localizedDescription)")
                 }
             }
 
-            await performFetch(eventId: eventId, filter: filter, bech32Relays: relayHints, tagRelayHint: nil, pubkeyHint: nil)
+            // For addressable events (naddr1), use the filter directly with kind/author/d-tag
+            // For regular events (note1, nevent1, hex), use event ID
+            if isAddressable {
+                // Addressable events use kind + author + d-tag, no specific event ID
+                await performFetch(eventId: nil, filter: filter, bech32Relays: relayHints, tagRelayHint: nil, pubkeyHint: pubkeyHint, isAddressable: true)
+            } else {
+                guard let eventId = filter.ids?.first else {
+                    throw NDKError.invalidEventID("No event ID found in identifier")
+                }
+                await performFetch(eventId: eventId, filter: filter, bech32Relays: relayHints, tagRelayHint: nil, pubkeyHint: pubkeyHint, isAddressable: false)
+            }
         } catch {
             self.error = error
             self.isLoading = false
@@ -94,39 +116,76 @@ public final class NDKFetchedEvent {
         isLoading = true
         error = nil
 
-        // Parse tag format: ["e", "event-id", "relay-hint", "marker", "pubkey-hint"]
-        let (eventId, relayHint, pubkeyHint) = extractHintsFromTag(tag)
+        // Parse tag format:
+        // "e" tag: ["e", "event-id", "relay-hint", "marker", "pubkey-hint"]
+        // "a" tag: ["a", "kind:pubkey:d-tag", "relay-hint", "marker"]
+        let (identifier, relayHint, pubkeyHint, tagType) = extractHintsFromTag(tag)
 
-        guard let eventId else {
-            error = NDKError.invalidEventID("Tag missing event ID")
+        guard let identifier else {
+            error = NDKError.invalidEventID("Tag missing identifier")
             isLoading = false
             return
         }
 
-        let filter = NDKFilter(ids: [eventId])
-        await performFetch(eventId: eventId, filter: filter, bech32Relays: nil, tagRelayHint: relayHint, pubkeyHint: pubkeyHint)
+        // Handle "a" tags (addressable events)
+        if tagType == "a" {
+            // Parse kind:pubkey:d-tag format
+            let components = identifier.split(separator: ":").map(String.init)
+            guard components.count == 3,
+                  let kind = Int(components[0]),
+                  !components[1].isEmpty,
+                  !components[2].isEmpty else {
+                error = NDKError.invalidEventID("Invalid 'a' tag format, expected kind:pubkey:d-tag")
+                isLoading = false
+                return
+            }
+
+            let author = components[1]
+            let dTag = components[2]
+
+            let filter = NDKFilter(
+                authors: [author],
+                kinds: [kind],
+                tags: ["d": Set([dTag])]
+            )
+            await performFetch(eventId: nil, filter: filter, bech32Relays: nil, tagRelayHint: relayHint, pubkeyHint: author, isAddressable: true)
+        } else {
+            // Handle "e" tags (regular events)
+            let filter = NDKFilter(ids: [identifier])
+            await performFetch(eventId: identifier, filter: filter, bech32Relays: nil, tagRelayHint: relayHint, pubkeyHint: pubkeyHint, isAddressable: false)
+        }
     }
 
     private func performFetch(
-        eventId: String,
+        eventId: String?,
         filter: NDKFilter,
         bech32Relays: [String]?,
         tagRelayHint: String?,
-        pubkeyHint: String?
+        pubkeyHint: String?,
+        isAddressable: Bool
     ) async {
         guard let ndk else { return }
 
-        // Check cache first
-        let cachedEvent = await ndk.cache.getEvent(id: eventId)
+        // Check cache first (only for non-addressable events with specific IDs)
+        if let eventId, !isAddressable {
+            let cachedEvent = await ndk.cache.getEvent(id: eventId)
 
-        if let cachedEvent {
-            // Set cached event immediately
-            self.event = cachedEvent
+            if let cachedEvent {
+                // Set cached event immediately
+                self.event = cachedEvent
 
-            // For non-replaceable events, we have the canonical version - skip network
-            if !cachedEvent.isReplaceable && !cachedEvent.isParameterizedReplaceable {
-                self.isLoading = false
-                return
+                // For non-replaceable events, we have the canonical version - skip network
+                if !cachedEvent.isReplaceable && !cachedEvent.isParameterizedReplaceable {
+                    self.isLoading = false
+                    return
+                }
+            }
+        } else if isAddressable {
+            // For addressable events, query cache by filter
+            // Always fetch from network as we need the latest version
+            if let cachedEvents = try? await ndk.cache.queryEvents(filter),
+               let latestCached = cachedEvents.sorted(by: { $0.createdAt > $1.createdAt }).first {
+                self.event = latestCached
             }
         }
 
@@ -169,7 +228,11 @@ public final class NDKFetchedEvent {
     private func handleEvent(_ newEvent: NDKEvent) async {
         if let currentEvent = event {
             // Only update if newer (for replaceable events)
-            if newEvent.createdAt > currentEvent.createdAt {
+            // Handle nil/zero createdAt: treat as oldest possible
+            let newTimestamp = newEvent.createdAt
+            let currentTimestamp = currentEvent.createdAt
+
+            if newTimestamp > currentTimestamp {
                 self.event = newEvent
             }
         } else {
@@ -180,17 +243,26 @@ public final class NDKFetchedEvent {
 
     // MARK: - Helper Methods
 
-    /// Extract hints from NIP-10 tag: ["e", "event-id", "relay-hint", "marker", "pubkey-hint"]
-    private func extractHintsFromTag(_ tag: Tag) -> (eventId: String?, relayHint: String?, pubkeyHint: String?) {
-        guard tag.first == "e", tag.count >= 2 else {
-            return (nil, nil, nil)
+    /// Extract hints from NIP-10 tags:
+    /// "e" tag: ["e", "event-id", "relay-hint", "marker", "pubkey-hint"]
+    /// "a" tag: ["a", "kind:pubkey:d-tag", "relay-hint", "marker"]
+    private func extractHintsFromTag(_ tag: Tag) -> (identifier: String?, relayHint: String?, pubkeyHint: String?, tagType: String?) {
+        guard tag.count >= 2 else {
+            return (nil, nil, nil, nil)
         }
 
-        let eventId = tag[1]
-        let relayHint = tag.count > 2 && !tag[2].isEmpty ? tag[2] : nil
-        let pubkeyHint = tag.count > 4 && !tag[4].isEmpty ? tag[4] : nil
+        let tagType = tag[0]
+        guard tagType == "e" || tagType == "a" else {
+            return (nil, nil, nil, nil)
+        }
 
-        return (eventId, relayHint, pubkeyHint)
+        let identifier = tag[1]
+        let relayHint = tag.count > 2 && !tag[2].isEmpty ? tag[2] : nil
+
+        // Pubkey hint only exists in "e" tags (position 4)
+        let pubkeyHint = tagType == "e" && tag.count > 4 && !tag[4].isEmpty ? tag[4] : nil
+
+        return (identifier, relayHint, pubkeyHint, tagType)
     }
 
     /// Select relays using priority: bech32 > tag > outbox > all connected

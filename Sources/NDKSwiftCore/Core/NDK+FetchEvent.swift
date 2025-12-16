@@ -40,23 +40,27 @@ extension NDK {
 
     /// Fetch a single event from a NIP-10 tag reference with relay and pubkey hints.
     ///
-    /// This method supports the full NIP-10 tag format with optional relay and pubkey hints:
-    /// `["e", "event-id", "relay-hint", "marker", "pubkey-hint"]`
+    /// This method supports both "e" and "a" tag formats:
+    /// - "e" tag: `["e", "event-id", "relay-hint", "marker", "pubkey-hint"]` (regular events)
+    /// - "a" tag: `["a", "kind:pubkey:d-tag", "relay-hint", "marker"]` (addressable events)
     ///
     /// The method uses a priority-based relay selection:
     /// 1. Relay hint from tag (element [2])
-    /// 2. Pubkey hint with outbox model (element [4]) - queries author's write relays
+    /// 2. Pubkey hint with outbox model (element [4] for "e" tags) - queries author's write relays
     /// 3. All connected relays as fallback
     ///
-    /// ## Example
+    /// ## Examples
     /// ```swift
-    /// // Fetch from NIP-10 tag with relay and pubkey hints
-    /// let tag = ["e", "abc123...", "wss://relay.com", "reply", "author-pubkey"]
-    /// let fetched = ndk.fetchEvent(tag: tag)
-    /// // Uses relay hint and falls back to author's write relays via outbox model
+    /// // Fetch from "e" tag with relay and pubkey hints
+    /// let eTag = ["e", "abc123...", "wss://relay.com", "reply", "author-pubkey"]
+    /// let fetched = ndk.fetchEvent(tag: eTag)
+    ///
+    /// // Fetch from "a" tag for addressable event
+    /// let aTag = ["a", "30023:pubkey123...:identifier", "wss://relay.com"]
+    /// let fetched = ndk.fetchEvent(tag: aTag)
     /// ```
     ///
-    /// - Parameter tag: NIP-10 tag array
+    /// - Parameter tag: NIP-10 tag array ("e" or "a")
     /// - Returns: Observable event that updates when newer versions arrive
     @MainActor
     public func fetchEvent(tag: Tag) -> NDKFetchedEvent {
