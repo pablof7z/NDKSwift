@@ -23,6 +23,7 @@ public struct DefaultImageView: ImageRenderer {
                 image
                     .resizable()
                     .aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: .infinity)
                     .onTapGesture {
                         (onTap ?? envOnTap)?(url)
                     }
