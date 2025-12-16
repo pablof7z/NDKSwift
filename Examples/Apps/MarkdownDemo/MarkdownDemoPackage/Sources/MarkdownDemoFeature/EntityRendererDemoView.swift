@@ -2,11 +2,12 @@ import SwiftUI
 import NDKSwiftCore
 import NDKSwiftUI
 
-/// Demo showcasing the pluggable renderer system
+/// Demo showcasing the pluggable renderer system with selectable renderer styles
 public struct EntityRendererDemoView: View {
     @State private var lastTappedItem = ""
     @State private var editableContent: String
     @State private var selectedTab = 0
+    @State private var rendererStyle: RendererStyle = .default
 
     let ndk: NDK
 
@@ -21,31 +22,17 @@ public struct EntityRendererDemoView: View {
             NavigationView {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        NDKRichText(
-                            content: editableContent,
-                            showLinkPreviews: true
-                        )
-                        .ndk(ndk)
-                        .onMentionTap { pubkey in
-                            lastTappedItem = "Mention: @\(pubkey.prefix(8))..."
-                        }
-                        .onHashtagTap { tag in
-                            lastTappedItem = "Hashtag: #\(tag)"
-                        }
-                        .onLinkTap { url in
-                            lastTappedItem = "Link: \(url.host ?? url.absoluteString)"
-                        }
-                        .onImageTap { url in
-                            lastTappedItem = "Image: \(url.lastPathComponent)"
-                        }
-                        .onEventTap { event in
-                            lastTappedItem = "Event: \(event.id.prefix(8))..."
-                        }
+                        richTextContent
                     }
                     .padding()
                 }
-                .navigationTitle("NDKRichText")
+                .navigationTitle("Rich Text")
                 .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        styleMenu
+                    }
+                }
             }
             .tabItem {
                 Label("Rich Text", systemImage: "text.bubble")
@@ -56,30 +43,36 @@ public struct EntityRendererDemoView: View {
             NavigationView {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        NDKMarkdown(
-                            content: markdownContent,
-                            blockConfig: .default
-                        )
-                        .ndk(ndk)
-                        .onMentionTap { pubkey in
-                            lastTappedItem = "Mention: @\(pubkey.prefix(8))..."
-                        }
-                        .onHashtagTap { tag in
-                            lastTappedItem = "Hashtag: #\(tag)"
-                        }
-                        .onLinkTap { url in
-                            lastTappedItem = "Link: \(url.host ?? url.absoluteString)"
-                        }
+                        markdownContent
                     }
                     .padding()
                 }
-                .navigationTitle("NDKMarkdown")
+                .navigationTitle("Markdown")
                 .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        styleMenu
+                    }
+                }
             }
             .tabItem {
                 Label("Markdown", systemImage: "doc.richtext")
             }
             .tag(1)
+
+            // Feed Tab - Kind:1 events from follows
+            FeedTabView(ndk: ndk, rendererStyle: rendererStyle)
+                .tabItem {
+                    Label("Feed", systemImage: "list.bullet")
+                }
+                .tag(2)
+
+            // Articles Tab - Kind:30023 events from follows
+            ArticlesTabView(ndk: ndk, rendererStyle: rendererStyle)
+                .tabItem {
+                    Label("Articles", systemImage: "doc.text")
+                }
+                .tag(3)
 
             // Edit Tab
             NavigationView {
@@ -105,7 +98,7 @@ public struct EntityRendererDemoView: View {
             .tabItem {
                 Label("Edit", systemImage: "pencil")
             }
-            .tag(2)
+            .tag(4)
         }
         .safeAreaInset(edge: .bottom) {
             if !lastTappedItem.isEmpty {
@@ -127,6 +120,107 @@ public struct EntityRendererDemoView: View {
         }
     }
 
+    // MARK: - Style Menu
+
+    private var styleMenu: some View {
+        Menu {
+            ForEach(RendererStyle.allCases) { style in
+                Button {
+                    rendererStyle = style
+                } label: {
+                    HStack {
+                        Text(style.rawValue)
+                        if rendererStyle == style {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            Label("Style", systemImage: "paintbrush")
+        }
+    }
+
+    // MARK: - Rich Text Content
+
+    @ViewBuilder
+    private var richTextContent: some View {
+        switch rendererStyle {
+        case .default:
+            DefaultStyleRichText(
+                content: editableContent,
+                showLinkPreviews: true
+            )
+            .ndk(ndk)
+            .onMentionTap { pubkey in lastTappedItem = "Mention: @\(pubkey.prefix(8))..." }
+            .onHashtagTap { tag in lastTappedItem = "Hashtag: #\(tag)" }
+            .onLinkTap { url in lastTappedItem = "Link: \(url.host ?? url.absoluteString)" }
+            .onImageTap { url in lastTappedItem = "Image: \(url.lastPathComponent)" }
+            .onEventTap { event in lastTappedItem = "Event: \(event.id.prefix(8))..." }
+
+        case .compact:
+            CompactStyleRichText(
+                content: editableContent,
+                showLinkPreviews: true
+            )
+            .ndk(ndk)
+            .onMentionTap { pubkey in lastTappedItem = "Mention: @\(pubkey.prefix(8))..." }
+            .onHashtagTap { tag in lastTappedItem = "Hashtag: #\(tag)" }
+            .onLinkTap { url in lastTappedItem = "Link: \(url.host ?? url.absoluteString)" }
+            .onImageTap { url in lastTappedItem = "Image: \(url.lastPathComponent)" }
+            .onEventTap { event in lastTappedItem = "Event: \(event.id.prefix(8))..." }
+
+        case .pill:
+            PillStyleRichText(
+                content: editableContent,
+                showLinkPreviews: true
+            )
+            .ndk(ndk)
+            .onMentionTap { pubkey in lastTappedItem = "Mention: @\(pubkey.prefix(8))..." }
+            .onHashtagTap { tag in lastTappedItem = "Hashtag: #\(tag)" }
+            .onLinkTap { url in lastTappedItem = "Link: \(url.host ?? url.absoluteString)" }
+            .onImageTap { url in lastTappedItem = "Image: \(url.lastPathComponent)" }
+            .onEventTap { event in lastTappedItem = "Event: \(event.id.prefix(8))..." }
+        }
+    }
+
+    // MARK: - Markdown Content
+
+    @ViewBuilder
+    private var markdownContent: some View {
+        switch rendererStyle {
+        case .default:
+            DefaultStyleMarkdown(
+                content: editableContent,
+                blockConfig: .default
+            )
+            .ndk(ndk)
+            .onMentionTap { pubkey in lastTappedItem = "Mention: @\(pubkey.prefix(8))..." }
+            .onHashtagTap { tag in lastTappedItem = "Hashtag: #\(tag)" }
+            .onLinkTap { url in lastTappedItem = "Link: \(url.host ?? url.absoluteString)" }
+
+        case .compact:
+            CompactStyleMarkdown(
+                content: editableContent,
+                blockConfig: .default
+            )
+            .ndk(ndk)
+            .onMentionTap { pubkey in lastTappedItem = "Mention: @\(pubkey.prefix(8))..." }
+            .onHashtagTap { tag in lastTappedItem = "Hashtag: #\(tag)" }
+            .onLinkTap { url in lastTappedItem = "Link: \(url.host ?? url.absoluteString)" }
+
+        case .pill:
+            PillStyleMarkdown(
+                content: editableContent,
+                blockConfig: .default
+            )
+            .ndk(ndk)
+            .onMentionTap { pubkey in lastTappedItem = "Mention: @\(pubkey.prefix(8))..." }
+            .onHashtagTap { tag in lastTappedItem = "Hashtag: #\(tag)" }
+            .onLinkTap { url in lastTappedItem = "Link: \(url.host ?? url.absoluteString)" }
+        }
+    }
+
     private static let defaultContent = """
         Just discovered this amazing Nostr library!
 
@@ -142,34 +236,6 @@ public struct EntityRendererDemoView: View {
         And here's a note worth checking out:
         nostr:nevent1qgsxu35yyt0mwjjh8pcz4zprhxegz69t4wr9t74vk6zne58wzh0waycppemhxue69uhkummn9ekx7mp0qqsq3zms08nzx3a72cgc0jtsd0g0g9fdx0f9jvp69kp05peuvmrpj5g0w639m
         """
-
-    private var markdownContent: String {
-        """
-        # Pluggable Renderers Demo
-
-        This demonstrates **NDKMarkdown** rendering with support for:
-
-        ## Nostr Entities
-        - Mentions: nostr:npub1l2vyh47mk2p0qlsku7hg0vn29faehy9hy34ygaclpn66ukqp3afqutajft
-        - Hashtags: #nostr #bitcoin
-
-        ## Links and Images
-        Check out [NDK docs](https://ndk.fyi) for more info.
-
-        ![Demo image](https://r2a.primal.net/uploads2/d/f3/bd/df3bdd118f7db2cdf57821f958033db07dfd9de72248e6869734cbb9e2e8c130.png)
-
-        ## Code Blocks
-        ```swift
-        let ndk = NDK(relayURLs: ["wss://relay.damus.io"])
-        ```
-
-        > This is a blockquote showing markdown support
-
-        1. First ordered item
-        2. Second ordered item
-        3. Third ordered item
-        """
-    }
 }
 
 // MARK: - Preview
