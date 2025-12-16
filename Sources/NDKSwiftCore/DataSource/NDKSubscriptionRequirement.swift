@@ -268,6 +268,11 @@ actor NDKSubscriptionRequirement {
             NDKLogger.log(.warning, category: .cache, "Failed to save event \(event.id.prefix(8)) to cache: \(error.localizedDescription)")
         }
 
+        // Record hint in HintIndex - learn where this author's events are found
+        if let relay = relay, let ndk = ndk {
+            await ndk.hintIndex.recordEventObservation(pubkey: event.pubkey, eventId: event.id, relay: relay.url)
+        }
+
         // Notify relay update observers if we have relay info
         if let relay = relay {
             for (_, _, continuation) in relayUpdateObservers {
