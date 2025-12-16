@@ -75,6 +75,13 @@ public actor HintIndex {
         evictIfNeeded()
     }
 
+    /// Record hints when an event is observed from a relay
+    /// Records both pubkey and eventId hints with .eventObserved source
+    public func recordEventObservation(pubkey: String, eventId: String, relay: RelayURL) {
+        recordHint(pubkey: pubkey, relay: relay, source: .eventObserved)
+        recordHint(eventId: eventId, relay: relay, source: .eventObserved)
+    }
+
     // MARK: - Retrieving Hints
 
     /// Get all hints for a pubkey
