@@ -1,5 +1,4 @@
 import NDKSwiftCore
-import os.log
 import SwiftUI
 
 // MARK: - NDKUIDisplayName
@@ -28,12 +27,11 @@ import SwiftUI
 public struct NDKUIDisplayName: View {
     // MARK: - Properties
 
-    private let ndk: NDK
     private let pubkey: String
     private let fallbackStyle: FallbackStyle
     private var tapAction: (() -> Void)?
 
-    @State private var metadata: NDKUserMetadata?
+    @State private var profileDataSource: NDKProfileDataSource
 
     // MARK: - Supporting Types
 
@@ -55,9 +53,13 @@ public struct NDKUIDisplayName: View {
         pubkey: String,
         fallbackStyle: FallbackStyle = .npub
     ) {
-        self.ndk = ndk
         self.pubkey = pubkey
         self.fallbackStyle = fallbackStyle
+        self._profileDataSource = State(wrappedValue: NDKProfileDataSource(
+            ndk: ndk,
+            pubkey: pubkey,
+            maxAge: TimeConstants.hour
+        ))
     }
 
     /// Initialize with NDK instance and NDKUser
@@ -81,42 +83,18 @@ public struct NDKUIDisplayName: View {
                 tapAction?()
             }
             .accessibilityLabel("User name: \(displayText)")
-            .task(id: pubkey) {
-                os_log(.debug, "NDKUIDisplayName: Starting profile observation for %{public}@", pubkey)
-                var receivedProfile = false
-
-                for await metadata in await ndk.profileManager.subscribe(for: pubkey) {
-                    receivedProfile = true
-                    os_log(.debug, "NDKUIDisplayName: Received metadata for %{public}@: %{public}@", pubkey, metadata?.displayName ?? metadata?.name ?? "<nil>")
-
-                    self.metadata = metadata
-                }
-
-                if !receivedProfile {
-                    os_log(.debug, "NDKUIDisplayName: No profiles received for %{public}@", pubkey)
-                }
-            }
     }
 
     // MARK: - Public Properties
 
     /// The resolved display text for this user
     public var displayText: String {
-        // Try display name first
-        if let displayName = metadata?.displayName,
-           displayName.hasContent
-        {
-            return displayName
+        // If we have metadata, use the data source's display name logic
+        if profileDataSource.metadata != nil {
+            return profileDataSource.displayName
         }
 
-        // Try regular name
-        if let name = metadata?.name,
-           name.hasContent
-        {
-            return name
-        }
-
-        // Fall back based on style
+        // Otherwise use custom fallback based on style
         return fallbackText
     }
 
@@ -143,8 +121,6 @@ public struct NDKUIDisplayName: View {
         return copy
     }
 }
-
-// MARK: - NDKUIUsername
 
 // MARK: - Preview
 
@@ -177,13 +153,6 @@ public struct NDKUIDisplayName: View {
                         fallbackStyle: .pubkey
                     )
                     .font(.caption)
-
-                    Divider()
-
-                    // Username variant would need similar update
-                    Text("NDKUIUsername needs update")
-                        .font(.body)
-                        .foregroundStyle(.secondary)
                 }
             }
             .padding()
