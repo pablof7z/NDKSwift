@@ -106,6 +106,13 @@ public struct EntityRendererDemoView: View {
                     Label("Settings", systemImage: "gear")
                 }
                 .tag(5)
+
+            // Showcase Tab
+            ShowcaseTabView(ndk: ndk)
+                .tabItem {
+                    Label("Showcase", systemImage: "square.grid.2x2")
+                }
+                .tag(6)
         }
         .safeAreaInset(edge: .bottom) {
             if !lastTappedItem.isEmpty {
