@@ -416,7 +416,9 @@ enum MarkdownParser {
     }
 
     private static func parseBold(_ text: String, from startIndex: String.Index) -> ([MarkdownInline]?, String.Index) {
-        guard startIndex < text.index(text.endIndex, offsetBy: -3),
+        // Need at least 4 chars for **x** pattern
+        let distanceToEnd = text.distance(from: startIndex, to: text.endIndex)
+        guard distanceToEnd >= 4,
               text[startIndex] == "*",
               text[text.index(after: startIndex)] == "*"
         else {
@@ -426,13 +428,14 @@ enum MarkdownParser {
         var index = text.index(startIndex, offsetBy: 2)
         var content = ""
 
-        while index < text.index(text.endIndex, offsetBy: -1) {
-            if text[index] == "*", text[text.index(after: index)] == "*" {
+        while index < text.endIndex {
+            let nextIndex = text.index(after: index)
+            if text[index] == "*", nextIndex < text.endIndex, text[nextIndex] == "*" {
                 let inlines = parseInline(content)
                 return (inlines, text.index(index, offsetBy: 2))
             }
             content.append(text[index])
-            index = text.index(after: index)
+            index = nextIndex
         }
 
         return (nil, startIndex)
@@ -598,8 +601,8 @@ enum MarkdownParser {
                 entityLength = str.count
             case let .npub(id), let .nprofile(id), let .note(id),
                  let .nevent(id), let .naddr(id):
-                // These entities include their prefix in the parsed content
-                entityLength = id.count + 4 // prefix length
+                // Bech32 strings already include their full prefix (npub1..., note1..., etc.)
+                entityLength = id.count
             case let .hashtag(tag):
                 entityLength = tag.count + 1 // include #
             case let .url(url):
