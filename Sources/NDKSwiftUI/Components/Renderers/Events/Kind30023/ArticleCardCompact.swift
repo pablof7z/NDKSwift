@@ -1,5 +1,8 @@
 import SwiftUI
 import NDKSwiftCore
+#if canImport(UIKit)
+import UIKit
+#endif
 
 /// Compact article card renderer showing title, summary, and thumbnail
 /// Best for feed/list views where space is limited
@@ -29,7 +32,7 @@ public struct ArticleCardCompact: ArticleCardRenderer {
     public var body: some View {
         HStack(spacing: 12) {
             // Thumbnail
-            if let imageURL = extractImage(from: event) {
+            if let imageURL = article.imageURL {
                 CachedAsyncImage(url: imageURL) { image in
                     image
                         .resizable()
@@ -45,14 +48,14 @@ public struct ArticleCardCompact: ArticleCardRenderer {
             // Content
             VStack(alignment: .leading, spacing: 4) {
                 // Title
-                if let title = extractTitle(from: event) {
+                if let title = article.title {
                     Text(title)
                         .font(.headline)
                         .lineLimit(2)
                 }
 
                 // Summary
-                if let summary = extractSummary(from: event) {
+                if let summary = article.summary {
                     Text(summary)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -80,7 +83,7 @@ public struct ArticleCardCompact: ArticleCardRenderer {
             Spacer(minLength: 0)
         }
         .padding(12)
-        .background(Color(.secondarySystemBackground))
+        .background(Color.ndkSecondaryBackground)
         .cornerRadius(12)
         .onTapGesture {
             (onTap ?? envOnTap)?(event)

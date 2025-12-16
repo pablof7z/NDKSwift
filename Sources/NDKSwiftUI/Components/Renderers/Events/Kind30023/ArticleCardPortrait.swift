@@ -1,5 +1,8 @@
 import SwiftUI
 import NDKSwiftCore
+#if canImport(UIKit)
+import UIKit
+#endif
 
 /// Portrait/vertical article card renderer with tall cover image
 /// Best for grid layouts and card-based UIs
@@ -29,7 +32,7 @@ public struct ArticleCardPortrait: ArticleCardRenderer {
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Cover Image (tall portrait aspect ratio)
-            if let imageURL = extractImage(from: event) {
+            if let imageURL = article.imageURL {
                 CachedAsyncImage(url: imageURL) { image in
                     image
                         .resizable()
@@ -45,7 +48,7 @@ public struct ArticleCardPortrait: ArticleCardRenderer {
             // Content section
             VStack(alignment: .leading, spacing: 6) {
                 // Title
-                if let title = extractTitle(from: event) {
+                if let title = article.title {
                     Text(title)
                         .font(.headline)
                         .fontWeight(.semibold)
@@ -68,7 +71,7 @@ public struct ArticleCardPortrait: ArticleCardRenderer {
             .padding(12)
         }
         .frame(width: 240)
-        .background(Color(.secondarySystemBackground))
+        .background(Color.ndkSecondaryBackground)
         .cornerRadius(12)
         .onTapGesture {
             (onTap ?? envOnTap)?(event)
