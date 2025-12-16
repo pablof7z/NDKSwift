@@ -107,12 +107,47 @@ public struct EntityRendererDemoView: View {
                 }
                 .tag(5)
 
-            // Showcase Tab
-            ShowcaseTabView(ndk: ndk)
+            // Mentions Demo Tab
+            MentionDemoView(ndk: ndk)
                 .tabItem {
-                    Label("Showcase", systemImage: "square.grid.2x2")
+                    Label("Mentions", systemImage: "at")
                 }
                 .tag(6)
+
+            // Hashtags Demo Tab
+            HashtagDemoView(ndk: ndk)
+                .tabItem {
+                    Label("Hashtags", systemImage: "number")
+                }
+                .tag(7)
+
+            // Links Demo Tab
+            LinkDemoView(ndk: ndk)
+                .tabItem {
+                    Label("Links", systemImage: "link")
+                }
+                .tag(8)
+
+            // Images Demo Tab
+            ImageDemoView(ndk: ndk)
+                .tabItem {
+                    Label("Images", systemImage: "photo")
+                }
+                .tag(9)
+
+            // Events Demo Tab
+            EventDemoView(ndk: ndk)
+                .tabItem {
+                    Label("Events", systemImage: "note.text")
+                }
+                .tag(10)
+
+            // Articles Demo Tab
+            ArticleDemoView(ndk: ndk)
+                .tabItem {
+                    Label("Articles", systemImage: "doc.text")
+                }
+                .tag(11)
         }
         .safeAreaInset(edge: .bottom) {
             if !lastTappedItem.isEmpty {
@@ -161,10 +196,7 @@ public struct EntityRendererDemoView: View {
     private var richTextContent: some View {
         switch rendererStyle {
         case .default:
-            DefaultStyleRichText(
-                content: editableContent,
-                showLinkPreviews: true
-            )
+            DefaultStyleRichText(content: editableContent)
             .ndk(ndk)
             .onMentionTap { pubkey in lastTappedItem = "Mention: @\(pubkey.prefix(8))..." }
             .onHashtagTap { tag in lastTappedItem = "Hashtag: #\(tag)" }
@@ -173,10 +205,7 @@ public struct EntityRendererDemoView: View {
             .onEventTap { event in lastTappedItem = "Event: \(event.id.prefix(8))..." }
 
         case .compact:
-            CompactStyleRichText(
-                content: editableContent,
-                showLinkPreviews: true
-            )
+            CompactStyleRichText(content: editableContent)
             .ndk(ndk)
             .onMentionTap { pubkey in lastTappedItem = "Mention: @\(pubkey.prefix(8))..." }
             .onHashtagTap { tag in lastTappedItem = "Hashtag: #\(tag)" }
@@ -185,10 +214,7 @@ public struct EntityRendererDemoView: View {
             .onEventTap { event in lastTappedItem = "Event: \(event.id.prefix(8))..." }
 
         case .pill:
-            PillStyleRichText(
-                content: editableContent,
-                showLinkPreviews: true
-            )
+            PillStyleRichText(content: editableContent)
             .ndk(ndk)
             .onMentionTap { pubkey in lastTappedItem = "Mention: @\(pubkey.prefix(8))..." }
             .onHashtagTap { tag in lastTappedItem = "Hashtag: #\(tag)" }
@@ -245,7 +271,7 @@ public struct EntityRendererDemoView: View {
         #nostr #bitcoin #decentralized
 
         Here's a cool image:
-        https://r2a.primal.net/uploads2/d/f3/bd/df3bdd118f7db2cdf57821f958033db07dfd9de72248e6869734cbb9e2e8c130.png
+        https://blossom.primal.net/f7a062caeb2cb27401b452b2d97b46ed3e7cac97aef86becb60004c4f3c4fca5.jpg
 
         And here's a note worth checking out:
         nostr:nevent1qgsxu35yyt0mwjjh8pcz4zprhxegz69t4wr9t74vk6zne58wzh0waycppemhxue69uhkummn9ekx7mp0qqsq3zms08nzx3a72cgc0jtsd0g0g9fdx0f9jvp69kp05peuvmrpj5g0w639m

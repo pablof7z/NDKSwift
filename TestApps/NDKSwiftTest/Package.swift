@@ -20,13 +20,16 @@ let package = Package(
         .executableTarget(
             name: "NDKSwiftTest",
             dependencies: [
-                .product(name: "NDKSwift", package: "NDKSwift"),
+                .product(name: "NDKSwiftCore", package: "pluggable-renderers"),
+                .product(name: "NDKSwiftUI", package: "pluggable-renderers"),
+                .product(name: "NDKSwiftNostrDB", package: "pluggable-renderers"),
             ],
             path: ".",
             sources: [
                 "NDKSwiftTestApp.swift",
                 "ContentView.swift",
                 "UserProfileView.swift",
+                "SearchTestView.swift",
             ]
         ),
     ]

@@ -72,6 +72,9 @@ public struct NDKParsedContent {
 
         /// Nprofile mention (nprofile1... format)
         case nprofileMention(String)
+
+        /// Naddr mention (naddr1... format) for addressable events
+        case naddrMention(String)
     }
 
     /// Component type enum for pattern matching
@@ -87,5 +90,6 @@ public struct NDKParsedContent {
         case noteMention(String)
         case neventMention(String)
         case nprofileMention(String)
+        case naddrMention(String)
     }
 }

@@ -200,8 +200,7 @@ public enum ContentParser {
                     components.append(.neventMention(bech32))
                 } else if bech32.hasPrefix(NostrConstants.naddrPrefix) {
                     entities.append(.naddr(bech32))
-                    // NDKParsedContent doesn't have naddr component type, just store as text
-                    components.append(.text(fullMatch))
+                    components.append(.naddrMention(bech32))
                 } else {
                     entities.append(.text(fullMatch))
                     components.append(.text(fullMatch))

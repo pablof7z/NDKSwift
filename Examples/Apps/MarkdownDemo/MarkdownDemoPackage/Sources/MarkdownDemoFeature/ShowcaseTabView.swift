@@ -2,6 +2,64 @@ import SwiftUI
 import NDKSwiftCore
 import NDKSwiftUI
 
+// MARK: - Article Card Type Aliases
+
+/// Article RichText with Hero card (maps to Default style)
+typealias ArticleHeroRichText = NDKUIRichTextView<
+    DefaultMentionView,
+    DefaultHashtagView,
+    DefaultLinkView,
+    DefaultImageView,
+    ArticleCardHero
+>
+
+/// Article RichText with Compact card
+typealias ArticleCompactRichText = NDKUIRichTextView<
+    CompactMentionView,
+    CompactHashtagView,
+    DefaultLinkView,
+    DefaultImageView,
+    ArticleCardCompact
+>
+
+/// Article RichText with Portrait card (maps to Pill style)
+typealias ArticlePortraitRichText = NDKUIRichTextView<
+    PillMentionView,
+    PillHashtagView,
+    DefaultLinkView,
+    DefaultImageView,
+    ArticleCardPortrait
+>
+
+/// Article Markdown with Hero card (maps to Default style)
+typealias ArticleHeroMarkdown = NDKUIMarkdownView<
+    DefaultMentionView,
+    DefaultHashtagView,
+    DefaultLinkView,
+    DefaultImageView,
+    ArticleCardHero
+>
+
+/// Article Markdown with Compact card
+typealias ArticleCompactMarkdown = NDKUIMarkdownView<
+    CompactMentionView,
+    CompactHashtagView,
+    DefaultLinkView,
+    DefaultImageView,
+    ArticleCardCompact
+>
+
+/// Article Markdown with Portrait card (maps to Pill style)
+typealias ArticlePortraitMarkdown = NDKUIMarkdownView<
+    PillMentionView,
+    PillHashtagView,
+    DefaultLinkView,
+    DefaultImageView,
+    ArticleCardPortrait
+>
+
+// MARK: - ShowcaseTabView
+
 /// Showcase tab displaying all renderer variations for each entity type
 public struct ShowcaseTabView: View {
     @State private var renderMode: RenderMode = .richText
@@ -12,7 +70,6 @@ public struct ShowcaseTabView: View {
     // Event data sources
     @State private var followListDataSource: NDKUIFollowListDataSource?
     @State private var kind1DataSource: NDKEventDataSource?
-    @State private var kind30023DataSource: NDKEventDataSource?
 
     let ndk: NDK
 
@@ -73,12 +130,6 @@ public struct ShowcaseTabView: View {
             kind1DataSource = NDKEventDataSource(
                 ndk: ndk,
                 filter: NDKFilter(authors: Array(followList), kinds: [EventKind.textNote]),
-                sortDescending: true
-            )
-
-            kind30023DataSource = NDKEventDataSource(
-                ndk: ndk,
-                filter: NDKFilter(authors: Array(followList), kinds: [EventKind.longFormContent]),
                 sortDescending: true
             )
         }
@@ -167,8 +218,8 @@ public struct ShowcaseTabView: View {
     @ViewBuilder
     private func rendererCard(section: ShowcaseSection, style: RendererStyle) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Style label
-            Text(style.rawValue)
+            // Style label - show article-specific names for kind:30023
+            Text(styleLabel(for: style, section: section))
                 .font(.caption)
                 .fontWeight(.medium)
                 .foregroundColor(.secondary)
@@ -179,6 +230,18 @@ public struct ShowcaseTabView: View {
                 .padding(12)
                 .background(Color(.secondarySystemBackground))
                 .cornerRadius(8)
+        }
+    }
+
+    private func styleLabel(for style: RendererStyle, section: ShowcaseSection) -> String {
+        if section == .kind30023Articles {
+            switch style {
+            case .default: return "Hero"
+            case .compact: return "Compact"
+            case .pill: return "Portrait"
+            }
+        } else {
+            return style.rawValue
         }
     }
 
@@ -202,7 +265,7 @@ public struct ShowcaseTabView: View {
                 // Content preview
                 switch renderMode {
                 case .richText:
-                    DefaultStyleRichText(content: event.content, showLinkPreviews: false)
+                    DefaultStyleRichText(content: event.content)
                         .ndk(ndk)
                         .lineLimit(6)
                         .applyTapHandlers(section: section, lastTappedItem: $lastTappedItem)
@@ -236,37 +299,73 @@ public struct ShowcaseTabView: View {
 
     @ViewBuilder
     private func richTextRenderer(content: String, style: RendererStyle, section: ShowcaseSection) -> some View {
-        switch style {
-        case .default:
-            DefaultStyleRichText(content: content, showLinkPreviews: true)
-                .ndk(ndk)
-                .applyTapHandlers(section: section, lastTappedItem: $lastTappedItem)
-        case .compact:
-            CompactStyleRichText(content: content, showLinkPreviews: true)
-                .ndk(ndk)
-                .applyTapHandlers(section: section, lastTappedItem: $lastTappedItem)
-        case .pill:
-            PillStyleRichText(content: content, showLinkPreviews: true)
-                .ndk(ndk)
-                .applyTapHandlers(section: section, lastTappedItem: $lastTappedItem)
+        // Use article-specific renderers for kind:30023
+        if section == .kind30023Articles {
+            switch style {
+            case .default:
+                ArticleHeroRichText(content: content)
+                    .ndk(ndk)
+                    .applyTapHandlers(section: section, lastTappedItem: $lastTappedItem)
+            case .compact:
+                ArticleCompactRichText(content: content)
+                    .ndk(ndk)
+                    .applyTapHandlers(section: section, lastTappedItem: $lastTappedItem)
+            case .pill:
+                ArticlePortraitRichText(content: content)
+                    .ndk(ndk)
+                    .applyTapHandlers(section: section, lastTappedItem: $lastTappedItem)
+            }
+        } else {
+            switch style {
+            case .default:
+                DefaultStyleRichText(content: content)
+                    .ndk(ndk)
+                    .applyTapHandlers(section: section, lastTappedItem: $lastTappedItem)
+            case .compact:
+                CompactStyleRichText(content: content)
+                    .ndk(ndk)
+                    .applyTapHandlers(section: section, lastTappedItem: $lastTappedItem)
+            case .pill:
+                PillStyleRichText(content: content)
+                    .ndk(ndk)
+                    .applyTapHandlers(section: section, lastTappedItem: $lastTappedItem)
+            }
         }
     }
 
     @ViewBuilder
     private func markdownRenderer(content: String, style: RendererStyle, section: ShowcaseSection) -> some View {
-        switch style {
-        case .default:
-            DefaultStyleMarkdown(content: content, blockConfig: .default)
-                .ndk(ndk)
-                .applyTapHandlers(section: section, lastTappedItem: $lastTappedItem)
-        case .compact:
-            CompactStyleMarkdown(content: content, blockConfig: .default)
-                .ndk(ndk)
-                .applyTapHandlers(section: section, lastTappedItem: $lastTappedItem)
-        case .pill:
-            PillStyleMarkdown(content: content, blockConfig: .default)
-                .ndk(ndk)
-                .applyTapHandlers(section: section, lastTappedItem: $lastTappedItem)
+        // Use article-specific renderers for kind:30023
+        if section == .kind30023Articles {
+            switch style {
+            case .default:
+                ArticleHeroMarkdown(content: content, blockConfig: .default)
+                    .ndk(ndk)
+                    .applyTapHandlers(section: section, lastTappedItem: $lastTappedItem)
+            case .compact:
+                ArticleCompactMarkdown(content: content, blockConfig: .default)
+                    .ndk(ndk)
+                    .applyTapHandlers(section: section, lastTappedItem: $lastTappedItem)
+            case .pill:
+                ArticlePortraitMarkdown(content: content, blockConfig: .default)
+                    .ndk(ndk)
+                    .applyTapHandlers(section: section, lastTappedItem: $lastTappedItem)
+            }
+        } else {
+            switch style {
+            case .default:
+                DefaultStyleMarkdown(content: content, blockConfig: .default)
+                    .ndk(ndk)
+                    .applyTapHandlers(section: section, lastTappedItem: $lastTappedItem)
+            case .compact:
+                CompactStyleMarkdown(content: content, blockConfig: .default)
+                    .ndk(ndk)
+                    .applyTapHandlers(section: section, lastTappedItem: $lastTappedItem)
+            case .pill:
+                PillStyleMarkdown(content: content, blockConfig: .default)
+                    .ndk(ndk)
+                    .applyTapHandlers(section: section, lastTappedItem: $lastTappedItem)
+            }
         }
     }
 
@@ -283,12 +382,12 @@ public struct ShowcaseTabView: View {
         case .images:
             return """
             Here's a cool image:
-            https://r2a.primal.net/uploads2/d/f3/bd/df3bdd118f7db2cdf57821f958033db07dfd9de72248e6869734cbb9e2e8c130.png
+            https://blossom.primal.net/f7a062caeb2cb27401b452b2d97b46ed3e7cac97aef86becb60004c4f3c4fca5.jpg
             """
         case .kind1Events:
             return "Here's a note worth checking out:\nnostr:nevent1qgsxu35yyt0mwjjh8pcz4zprhxegz69t4wr9t74vk6zne58wzh0waycppemhxue69uhkummn9ekx7mp0qqsq3zms08nzx3a72cgc0jtsd0g0g9fdx0f9jvp69kp05peuvmrpj5g0w639m"
         case .kind30023Articles:
-            return "Check out this article:\nnostr:naddr1qqxnzd3exuerqwp5xymrwd3j8y6twvuhxgmn89uqzp75cf0tahv5z7plpdeaws7ex3uka7uvtk2z"
+            return "Check out this article:\nnostr:naddr1qvzqqqr4gupzqmjxss3dld622uu8q25gywum9qtg4w4cv4064jmg20xsac2aam5nqythwumn8ghj7un9d3shjtnswf5k6ctv9ehx2ap0qqxnzd3cx5urjd35xg6rwwpee39928"
         }
     }
 
@@ -311,15 +410,13 @@ public struct ShowcaseTabView: View {
         switch section {
         case .kind1Events:
             return kind1DataSource?.events
-        case .kind30023Articles:
-            return kind30023DataSource?.events
         default:
             return nil
         }
     }
 
     private func shouldShowEventData(_ section: ShowcaseSection) -> Bool {
-        section == .kind1Events || section == .kind30023Articles
+        section == .kind1Events
     }
 }
 
