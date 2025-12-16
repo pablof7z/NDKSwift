@@ -99,6 +99,13 @@ public struct EntityRendererDemoView: View {
                 Label("Edit", systemImage: "pencil")
             }
             .tag(4)
+
+            // Settings Tab
+            SettingsView(ndk: ndk)
+                .tabItem {
+                    Label("Settings", systemImage: "gear")
+                }
+                .tag(5)
         }
         .safeAreaInset(edge: .bottom) {
             if !lastTappedItem.isEmpty {

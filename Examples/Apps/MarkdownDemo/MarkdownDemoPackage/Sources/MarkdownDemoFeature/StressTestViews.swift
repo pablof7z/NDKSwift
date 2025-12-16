@@ -61,18 +61,21 @@ struct FeedTabView: View {
     @ViewBuilder
     private func feedList(events: [NDKEvent]) -> some View {
         ScrollView {
-            LazyVStack(spacing: 16) {
+            LazyVStack(spacing: 0) {
                 ForEach(events, id: \.id) { event in
                     eventCard(for: event)
+
+                    if event.id != events.last?.id {
+                        Divider()
+                    }
                 }
             }
-            .padding()
         }
     }
 
     @ViewBuilder
     private func eventCard(for event: NDKEvent) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: NDKEventViewStyles.verticalSpacing(for: .feed)) {
             // Author header
             NDKUIEventAuthorHeader(
                 ndk: ndk,
@@ -84,10 +87,7 @@ struct FeedTabView: View {
             // Content using selected renderer style
             richTextContent(for: event)
         }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
+        .padding(NDKEventViewStyles.containerPadding(for: .feed))
     }
 
     @ViewBuilder
@@ -219,21 +219,24 @@ struct ArticlesTabView: View {
     @ViewBuilder
     private func articlesList(events: [NDKEvent]) -> some View {
         ScrollView {
-            LazyVStack(spacing: 16) {
+            LazyVStack(spacing: 0) {
                 ForEach(events, id: \.id) { event in
                     articlePreviewCard(for: event)
                         .onTapGesture {
                             selectedArticle = event
                         }
+
+                    if event.id != events.last?.id {
+                        Divider()
+                    }
                 }
             }
-            .padding()
         }
     }
 
     @ViewBuilder
     private func articlePreviewCard(for event: NDKEvent) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: NDKEventViewStyles.verticalSpacing(for: .feed)) {
             // Author header
             NDKUIEventAuthorHeader(
                 ndk: ndk,
@@ -243,7 +246,7 @@ struct ArticlesTabView: View {
             )
 
             // Article preview
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: NDKEventViewStyles.verticalSpacing(for: .feed)) {
                 // Cover image
                 if let imageURL = extractImageURL(from: event) {
                     CachedAsyncImage(url: imageURL) { image in
@@ -254,48 +257,45 @@ struct ArticlesTabView: View {
                         Rectangle()
                             .fill(Color.gray.opacity(0.2))
                     }
-                    .frame(height: 180)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .frame(height: NDKEventViewStyles.imageHeight(for: .feed))
+                    .clipped()
                 }
 
                 // Title
                 if let title = extractTitle(from: event) {
                     Text(title)
-                        .font(.headline)
+                        .font(NDKEventViewStyles.titleFont(for: .feed))
                         .fontWeight(.semibold)
-                        .lineLimit(2)
+                        .lineLimit(NDKEventViewStyles.titleLineLimit(for: .feed))
                 }
 
                 // Summary
                 if let summary = extractSummary(from: event) {
                     Text(summary)
-                        .font(.subheadline)
+                        .font(NDKEventViewStyles.contentFont(for: .feed))
                         .foregroundStyle(.secondary)
-                        .lineLimit(3)
+                        .lineLimit(NDKEventViewStyles.contentLineLimit(for: .feed))
                 }
 
                 // Metadata
                 HStack {
                     Image(systemName: "doc.text")
-                        .font(.caption)
+                        .font(NDKEventViewStyles.captionFont(for: .feed))
                         .foregroundStyle(.secondary)
 
                     Text("Article")
-                        .font(.caption)
+                        .font(NDKEventViewStyles.captionFont(for: .feed))
                         .foregroundStyle(.secondary)
 
                     Spacer()
 
                     Image(systemName: "chevron.right")
-                        .font(.caption)
+                        .font(NDKEventViewStyles.captionFont(for: .feed))
                         .foregroundStyle(.tertiary)
                 }
             }
         }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
+        .padding(NDKEventViewStyles.containerPadding(for: .feed))
     }
 
     private func updateEventSubscription(for followList: Set<String>?) {

@@ -134,7 +134,7 @@ public struct NDKUIDisplayName: View {
     private func loadProfile() {
         profileTask?.cancel()
 
-        profileTask = Task {
+        profileTask = Task { @MainActor in
             os_log(.debug, "NDKUIDisplayName: Starting profile observation for %{public}@", pubkey)
             var receivedProfile = false
 
@@ -142,9 +142,7 @@ public struct NDKUIDisplayName: View {
                 receivedProfile = true
                 os_log(.debug, "NDKUIDisplayName: Received metadata for %{public}@: %{public}@", pubkey, metadata?.displayName ?? metadata?.name ?? "<nil>")
 
-                await MainActor.run {
-                    self.metadata = metadata
-                }
+                self.metadata = metadata
                 // Continue listening for updates
             }
 
