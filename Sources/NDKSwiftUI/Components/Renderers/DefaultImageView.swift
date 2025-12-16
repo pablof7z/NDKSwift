@@ -13,29 +13,18 @@ public struct DefaultImageView: ImageRenderer {
     }
 
     public var body: some View {
-        AsyncImage(url: url) { phase in
-            switch phase {
-            case .empty:
-                ProgressView()
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 200)
-            case .success(let image):
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(maxWidth: .infinity)
-                    .onTapGesture {
-                        (onTap ?? envOnTap)?(url)
-                    }
-            case .failure:
-                Image(systemName: "photo")
-                    .font(.largeTitle)
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 100)
-            @unknown default:
-                EmptyView()
-            }
+        CachedAsyncImage(url: url) { image in
+            image
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(maxWidth: .infinity)
+                .onTapGesture {
+                    (onTap ?? envOnTap)?(url)
+                }
+        } placeholder: {
+            ProgressView()
+                .frame(maxWidth: .infinity)
+                .frame(height: 200)
         }
         .cornerRadius(8)
     }
