@@ -5,8 +5,6 @@ import NDKSwiftUI
 /// Interactive demo showcasing NDKSwiftUI's markdown rendering capabilities
 public struct MarkdownDemoView: View {
     @State private var selectedDemo = 0
-    @State private var selectedStyle = 0
-    @State private var selectedRenderer = 0
     @State private var enableTapHandlers = true
     @State private var lastTappedItem = ""
 
@@ -27,21 +25,6 @@ public struct MarkdownDemoView: View {
         "Mixed Content"
     ]
 
-    private let styles = [
-        ("Default", MarkdownConfiguration()),
-        ("Minimal", .minimal),
-        ("Dark", .dark),
-        ("Nostr", .nostr),
-        ("Compact", .compact)
-    ]
-
-    private let renderers = [
-        "Standard Renderer",
-        "Image Renderer",
-        "Text Only (NDKRichText)",
-        "Entity Only (NDKNostrEntityText)"
-    ]
-
     public var body: some View {
         NavigationView {
             VStack(spacing: 0) {
@@ -54,38 +37,10 @@ public struct MarkdownDemoView: View {
                 .pickerStyle(.segmented)
                 .padding()
 
-                // Renderer selector
                 HStack {
-                    Text("Renderer:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    Picker("Renderer", selection: $selectedRenderer) {
-                        ForEach(0..<renderers.count, id: \.self) { index in
-                            Text(renderers[index]).tag(index)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                }
-                .padding(.horizontal)
-
-                // Style selector
-                HStack {
-                    Text("Style:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    Picker("Style", selection: $selectedStyle) {
-                        ForEach(0..<styles.count, id: \.self) { index in
-                            Text(styles[index].0).tag(index)
-                        }
-                    }
-                    .pickerStyle(.menu)
-
-                    Spacer()
-
                     Toggle("Tap Handlers", isOn: $enableTapHandlers)
                         .font(.caption)
+                    Spacer()
                 }
                 .padding(.horizontal)
 
@@ -122,8 +77,9 @@ public struct MarkdownDemoView: View {
                             .padding(.horizontal)
                         }
 
-                        // Rendered markdown - switch based on selected renderer
+                        // Rendered markdown using NDKMarkdown
                         renderContent()
+                            .padding(.horizontal)
 
                         // Source markdown
                         DisclosureGroup("View Markdown Source") {
@@ -146,67 +102,24 @@ public struct MarkdownDemoView: View {
 
     @ViewBuilder
     private func renderContent() -> some View {
-        let baseRenderer = NDKUIMarkdownRenderer(currentContent, ndk: ndk)
-            .markdownStyle(styles[selectedStyle].1)
-
-        switch selectedRenderer {
-        case 0: // Standard Renderer
-            if enableTapHandlers {
-                baseRenderer
-                    .onMentionTap { pubkey in
-                        lastTappedItem = "Mention: \(pubkey.prefix(8))..."
-                    }
-                    .onHashtagTap { tag in
-                        lastTappedItem = "Hashtag: #\(tag)"
-                    }
-                    .onLinkTap { url in
-                        lastTappedItem = "Link: \(url.absoluteString)"
-                    }
-                    .onNostrEntityTap { entity in
-                        lastTappedItem = "Entity: \(String(describing: entity))"
-                    }
-            } else {
-                baseRenderer
-            }
-
-        case 1: // Image Renderer
-            if enableTapHandlers {
-                baseRenderer
-                    .onMentionTap { pubkey in
-                        lastTappedItem = "Mention: \(pubkey.prefix(8))..."
-                    }
-                    .onHashtagTap { tag in
-                        lastTappedItem = "Hashtag: #\(tag)"
-                    }
-                    .onLinkTap { url in
-                        lastTappedItem = "Link/Image: \(url.absoluteString)"
-                    }
-                    .onNostrEntityTap { entity in
-                        lastTappedItem = "Entity: \(String(describing: entity))"
-                    }
-                    .renderImages()
-            } else {
-                baseRenderer.renderImages()
-            }
-
-        case 2: // Text Only (NDKRichText)
-            NDKRichText(content: currentContent)
-                .onLinkTapped { url in
-                    if enableTapHandlers {
-                        lastTappedItem = "Link: \(url.absoluteString)"
-                    }
+        if enableTapHandlers {
+            NDKMarkdown(content: currentContent)
+                .ndk(ndk)
+                .onMentionTap { pubkey in
+                    lastTappedItem = "Mention: \(pubkey.prefix(8))..."
                 }
-                .onHashtagTapped { tag in
-                    if enableTapHandlers {
-                        lastTappedItem = "Hashtag: #\(tag)"
-                    }
+                .onHashtagTap { tag in
+                    lastTappedItem = "Hashtag: #\(tag)"
                 }
-
-        case 3: // Entity Only
-            NDKNostrEntityText(currentContent, ndk: ndk)
-
-        default:
-            baseRenderer
+                .onLinkTap { url in
+                    lastTappedItem = "Link: \(url.absoluteString)"
+                }
+                .onImageTap { url in
+                    lastTappedItem = "Image: \(url.lastPathComponent)"
+                }
+        } else {
+            NDKMarkdown(content: currentContent)
+                .ndk(ndk)
         }
     }
 
@@ -215,20 +128,17 @@ public struct MarkdownDemoView: View {
     }
 
     private func getDemoDescription() -> String {
-        let rendererDesc = "Using: \(renderers[selectedRenderer])"
-        let baseDesc: String
         switch selectedDemo {
-        case 0: baseDesc = "Basic inline formatting: bold, italic, inline code, and links"
-        case 1: baseDesc = "All six heading levels from H1 to H6"
-        case 2: baseDesc = "Ordered and unordered lists with multiple items"
-        case 3: baseDesc = "Code blocks with and without language specification"
-        case 4: baseDesc = "Blockquotes for highlighting quoted text"
-        case 5: baseDesc = "Nostr-specific entities: npubs, notes, and hashtags"
-        case 6: baseDesc = "Inline images with async loading (best with Image Renderer)"
-        case 7: baseDesc = "Complex content mixing markdown with Nostr entities"
-        default: baseDesc = ""
+        case 0: return "Basic inline formatting: bold, italic, inline code, and links"
+        case 1: return "All six heading levels from H1 to H6"
+        case 2: return "Ordered and unordered lists with multiple items"
+        case 3: return "Code blocks with and without language specification"
+        case 4: return "Blockquotes for highlighting quoted text"
+        case 5: return "Nostr-specific entities: npubs, notes, and hashtags"
+        case 6: return "Inline images with async loading"
+        case 7: return "Complex content mixing markdown with Nostr entities"
+        default: return ""
         }
-        return "\(rendererDesc)\n\(baseDesc)"
     }
 
     private func getDemoContent() -> String {
@@ -272,8 +182,6 @@ public struct MarkdownDemoView: View {
             - First item
             - Second item
             - Third item
-            * Alternative marker
-            + Another marker
 
             ## Ordered List
 
@@ -281,14 +189,6 @@ public struct MarkdownDemoView: View {
             2. Second step
             3. Third step
             4. Fourth step
-
-            ## Mixed Lists
-
-            1. First ordered item
-            2. Second ordered item
-            - Unordered sub-item
-            - Another sub-item
-            3. Third ordered item
             """
 
         case 3: // Code Blocks
@@ -330,52 +230,33 @@ public struct MarkdownDemoView: View {
             Another paragraph after the quote.
 
             > You can **format** text inside blockquotes too!
-            > *Italic* and `code` also work.
             """
 
         case 5: // Nostr Entities
             return """
             ## User Mentions
 
-            Check out @npub1sn0wdenkukak0d9dfczzeacvhkrgz92ak56egt7vdgzn8pv2wfqqhrjdv9
-
-            ## Event References
-
-            See this note: note1gmtnz6q2m55epmlpe3semjkwtj4av3jvx4emmjsa8g3s9x7tgjsq4tnvj
+            Check out nostr:npub1l2vyh47mk2p0qlsku7hg0vn29faehy9hy34ygaclpn66ukqp3afqutajft
 
             ## Hashtags
 
             Popular topics: #nostr #bitcoin #lightning #freedom
-
-            ## Simple Mentions
-
-            Hello @alice and @bob! Join us at #meetup
             """
 
         case 6: // Images
             return """
             # Image Rendering Demo
 
-            Here's an inline image:
-
-            ![Nostr Logo](https://nostr.build/i/nostr.build_6a36f5eb16b2c9f7a5d3d7e7b9dce58f7ce1ff0c7e3c8b4e2f7d1b5c6e9a0d3f.png)
-
-            And some more content with images:
+            Here's an image:
 
             ![Sample Image](https://picsum.photos/400/300)
 
-            > **Note**: Switch to "Image Renderer" to see actual images instead of placeholders.
-
             You can mix images with other content too!
-
-            ```
-            Regular markdown still works
-            ```
             """
 
         case 7: // Mixed Content
             return """
-            # Welcome to Nostr! ⚡
+            # Welcome to Nostr!
 
             **Nostr** is a simple, open protocol that enables global, decentralized, and censorship-resistant social media.
 
@@ -387,21 +268,13 @@ public struct MarkdownDemoView: View {
 
             ## Getting Started
 
-            To join Nostr, you'll need:
-
-            ```
-            1. Generate a keypair (npub/nsec)
-            2. Choose a client
-            3. Connect to relays
+            ```swift
+            let ndk = NDK(relayURLs: ["wss://relay.damus.io"])
             ```
 
             > "Nostr is the future of social media"
-            > - @npub1sn0wdenkukak0d9dfczzeacvhkrgz92ak56egt7vdgzn8pv2wfqqhrjdv9
 
-            Check out these popular tags:
-            - #introductions
-            - #plebchain
-            - #grownostr
+            Check out these popular tags: #introductions #plebchain #grownostr
 
             Learn more at [nostr.com](https://nostr.com)
             """
