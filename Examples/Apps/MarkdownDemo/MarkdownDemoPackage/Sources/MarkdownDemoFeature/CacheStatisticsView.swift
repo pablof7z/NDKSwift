@@ -62,6 +62,12 @@ struct CacheStatisticsView: View {
                 }
             }
 
+            if let unconfirmedEvents = stats.unconfirmedEvents {
+                Section("Optimistic Publishing") {
+                    LabeledContent("Unconfirmed Events", value: "\(unconfirmedEvents)")
+                }
+            }
+
             if let cachePath = stats.cachePath {
                 Section("Database") {
                     LabeledContent("Path", value: cachePath)
@@ -113,6 +119,25 @@ struct CacheStatisticsView: View {
 
     private func fetchStatistics() async throws -> CacheStatisticsData {
         switch cacheType {
+        case .memory:
+            guard let memCache = cache as? MemoryCache else {
+                throw CacheError.platformNotSupported
+            }
+
+            let totalEvents = await memCache.eventCount()
+            let unconfirmedEvents = await memCache.unconfirmedEventCount()
+
+            return CacheStatisticsData(
+                totalEvents: totalEvents,
+                eventsByKind: [:],
+                profileCount: nil,
+                kvEntries: nil,
+                unconfirmedEvents: unconfirmedEvents,
+                storageSize: nil,
+                cachePath: nil,
+                nostrDBStats: nil
+            )
+
         case .sqlite:
             guard let sqlCache = cache as? NDKSQLiteCache else {
                 throw CacheError.platformNotSupported
@@ -132,6 +157,7 @@ struct CacheStatisticsView: View {
                 eventsByKind: eventsByKind,
                 profileCount: cacheStats.profiles,
                 kvEntries: cacheStats.kvEntries,
+                unconfirmedEvents: nil,
                 storageSize: nil,
                 cachePath: nil,
                 nostrDBStats: nil
@@ -158,6 +184,7 @@ struct CacheStatisticsView: View {
                 eventsByKind: eventsByKind,
                 profileCount: nil,
                 kvEntries: nil,
+                unconfirmedEvents: nil,
                 storageSize: dbSize,
                 cachePath: cachePath,
                 nostrDBStats: ndbStats
@@ -178,6 +205,7 @@ struct CacheStatisticsData {
     let eventsByKind: [Int: Int]
     let profileCount: Int?
     let kvEntries: Int?
+    let unconfirmedEvents: Int?
     let storageSize: Int64?
     let cachePath: String?
     let nostrDBStats: NdbStat?
