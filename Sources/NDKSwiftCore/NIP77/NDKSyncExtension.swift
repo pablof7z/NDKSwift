@@ -170,21 +170,19 @@ public extension NDK {
 
 // Extension for relay pool to manage sync handlers
 extension NDKPool {
-    private static var syncHandlers = [String: NIP77SyncHandler]()
-
     func setSyncHandler(_ handler: NIP77SyncHandler, for relayURL: String) {
         let normalizedURL = URLNormalizer.tryNormalizeRelayUrl(relayURL) ?? relayURL
-        Self.syncHandlers[normalizedURL] = handler
+        syncHandlers[normalizedURL] = handler
     }
 
     func getSyncHandler(for relayURL: String) -> NIP77SyncHandler? {
         let normalizedURL = URLNormalizer.tryNormalizeRelayUrl(relayURL) ?? relayURL
-        return Self.syncHandlers[normalizedURL]
+        return syncHandlers[normalizedURL]
     }
 
     func removeSyncHandler(for relayURL: String) {
         let normalizedURL = URLNormalizer.tryNormalizeRelayUrl(relayURL) ?? relayURL
-        Self.syncHandlers.removeValue(forKey: normalizedURL)
+        syncHandlers.removeValue(forKey: normalizedURL)
     }
 }
 
