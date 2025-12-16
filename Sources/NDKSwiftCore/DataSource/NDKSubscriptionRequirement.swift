@@ -144,9 +144,11 @@ actor NDKSubscriptionRequirement {
 
         case let .outbox(strategy):
             // Complex case: split filters by relay
-            let allRelays = Set(strategy.filtersByRelay.keys)
-            await eoseTracker.setExpectedRelays(allRelays)
+            // First apply the strategy (which may add fallback relays for unknown authors)
             await applyOutboxStrategy(strategy)
+            // Then set expected relays to ALL relays where subscriptions were created
+            // This includes both outbox-specific relays AND fallback relays
+            await eoseTracker.setExpectedRelays(Set(relaySubscriptions.keys))
 
         case let .default(relays):
             // Use default relays
@@ -396,6 +398,18 @@ actor NDKSubscriptionRequirement {
             continuation.finish()
         }
         relayUpdateObservers.removeAll()
+    }
+
+    // MARK: - Test Introspection
+
+    /// Get the expected relays from the EOSE tracker (for testing)
+    func getExpectedRelaysForTesting() async -> Set<RelayURL> {
+        await eoseTracker.getExpectedRelays()
+    }
+
+    /// Get the relays that have sent EOSE (for testing)
+    func getEOSEsSeenForTesting() async -> Set<RelayURL> {
+        await eoseTracker.getEOSEsSeen()
     }
 }
 
