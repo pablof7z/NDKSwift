@@ -230,9 +230,7 @@ struct FlowLayout: Layout {
     }
 
     private func arrangeSubviews(proposal: ProposedViewSize, subviews: Subviews) -> (size: CGSize, positions: [CGPoint], sizes: [CGSize]) {
-        // Use proposed width, or fallback to 10000 points when width is unconstrained (nil).
-        // 10000 chosen as a practical upper bound - larger than any real device but finite
-        // to prevent all items being placed on a single infinite line.
+        // Use proposed width, or fallback to screen-like width when unconstrained.
         let maxWidth = proposal.width ?? 10000
         var positions: [CGPoint] = []
         var sizes: [CGSize] = []
@@ -243,23 +241,30 @@ struct FlowLayout: Layout {
         var totalWidth: CGFloat = 0
 
         for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            sizes.append(size)
+            // Measure with full maxWidth to get natural size
+            let size = subview.sizeThatFits(ProposedViewSize(width: maxWidth, height: nil))
 
+            // If item doesn't fit on current line and we're not at start, wrap first
             if currentX + size.width > maxWidth && currentX > 0 {
                 currentX = 0
                 currentY += lineHeight + spacing
                 lineHeight = 0
             }
 
+            // Clamp width to maxWidth for oversized items
+            let finalWidth = min(size.width, maxWidth)
+            let finalSize = CGSize(width: finalWidth, height: size.height)
+            sizes.append(finalSize)
+
             positions.append(CGPoint(x: currentX, y: currentY))
-            currentX += size.width + spacing
+            currentX += finalWidth + spacing
             lineHeight = max(lineHeight, size.height)
-            totalWidth = max(totalWidth, currentX)
+            totalWidth = max(totalWidth, currentX - spacing)
             totalHeight = currentY + lineHeight
         }
 
-        return (CGSize(width: totalWidth, height: totalHeight), positions, sizes)
+        // Constrain total width to maxWidth
+        return (CGSize(width: min(totalWidth, maxWidth), height: totalHeight), positions, sizes)
     }
 }
 
