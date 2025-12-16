@@ -34,7 +34,6 @@ public struct NDKUIDisplayName: View {
     private var tapAction: (() -> Void)?
 
     @State private var metadata: NDKUserMetadata?
-    @State private var profileTask: Task<Void, Never>?
 
     // MARK: - Supporting Types
 
@@ -82,14 +81,20 @@ public struct NDKUIDisplayName: View {
                 tapAction?()
             }
             .accessibilityLabel("User name: \(displayText)")
-            .onAppear {
-                loadProfile()
-            }
-            .onDisappear {
-                profileTask?.cancel()
-            }
-            .onChange(of: pubkey) { _, _ in
-                loadProfile()
+            .task(id: pubkey) {
+                os_log(.debug, "NDKUIDisplayName: Starting profile observation for %{public}@", pubkey)
+                var receivedProfile = false
+
+                for await metadata in await ndk.profileManager.subscribe(for: pubkey) {
+                    receivedProfile = true
+                    os_log(.debug, "NDKUIDisplayName: Received metadata for %{public}@: %{public}@", pubkey, metadata?.displayName ?? metadata?.name ?? "<nil>")
+
+                    self.metadata = metadata
+                }
+
+                if !receivedProfile {
+                    os_log(.debug, "NDKUIDisplayName: No profiles received for %{public}@", pubkey)
+                }
             }
     }
 
@@ -126,29 +131,6 @@ public struct NDKUIDisplayName: View {
             return "Unknown User"
         case .pubkey:
             return String(pubkey.prefix(16)) + "..."
-        }
-    }
-
-    // MARK: - Private Methods
-
-    private func loadProfile() {
-        profileTask?.cancel()
-
-        profileTask = Task { @MainActor in
-            os_log(.debug, "NDKUIDisplayName: Starting profile observation for %{public}@", pubkey)
-            var receivedProfile = false
-
-            for await metadata in await ndk.profileManager.subscribe(for: pubkey) {
-                receivedProfile = true
-                os_log(.debug, "NDKUIDisplayName: Received metadata for %{public}@: %{public}@", pubkey, metadata?.displayName ?? metadata?.name ?? "<nil>")
-
-                self.metadata = metadata
-                // Continue listening for updates
-            }
-
-            if !receivedProfile {
-                os_log(.debug, "NDKUIDisplayName: No profiles received for %{public}@", pubkey)
-            }
         }
     }
 
