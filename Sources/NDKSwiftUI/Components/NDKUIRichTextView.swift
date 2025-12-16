@@ -183,7 +183,9 @@ struct FlowLayout: Layout {
     }
 
     private func arrangeSubviews(proposal: ProposedViewSize, subviews: Subviews) -> (size: CGSize, positions: [CGPoint], sizes: [CGSize]) {
-        // Use proposed width, or fallback to screen-like width when unconstrained.
+        // Use proposed width, or fallback to a large finite value (10000) when unconstrained.
+        // Using .infinity would cause SwiftUI layout issues, so we use a practical maximum
+        // that's larger than any reasonable screen width but still finite for calculations.
         let maxWidth = proposal.width ?? 10000
         var positions: [CGPoint] = []
         var sizes: [CGSize] = []
