@@ -230,8 +230,9 @@ struct FlowLayout: Layout {
     }
 
     private func arrangeSubviews(proposal: ProposedViewSize, subviews: Subviews) -> (size: CGSize, positions: [CGPoint], sizes: [CGSize]) {
-        // Use proposed width, or fallback to a reasonable default for infinite proposals
-        // This prevents all items being placed on a single line when width is unconstrained
+        // Use proposed width, or fallback to 10000 points when width is unconstrained (nil).
+        // 10000 chosen as a practical upper bound - larger than any real device but finite
+        // to prevent all items being placed on a single infinite line.
         let maxWidth = proposal.width ?? 10000
         var positions: [CGPoint] = []
         var sizes: [CGSize] = []
@@ -262,10 +263,10 @@ struct FlowLayout: Layout {
     }
 }
 
-// MARK: - NDKUIEventPreview (Legacy - kept for backwards compatibility during transition)
+// MARK: - NDKUIEventPreview
 
-/// A view for previewing event references
-/// Note: Consider using EventPreviewLoader<DefaultEventView> for new code
+/// A view for previewing event references using NDK directly
+/// Alternative to EventPreviewLoader<DefaultEventView> when you have an NDK instance
 public struct NDKUIEventPreview: View {
     let ndk: NDK
     let eventReference: EventReference
