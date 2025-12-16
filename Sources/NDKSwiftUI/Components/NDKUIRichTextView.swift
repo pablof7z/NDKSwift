@@ -1,4 +1,5 @@
 import NDKSwiftCore
+import os.log
 import SwiftUI
 
 // MARK: - Generic Rich Text View
@@ -52,7 +53,10 @@ public struct NDKUIRichTextView<
     }
 
     private func parseContent() async {
-        guard let ndk = ndk else { return }
+        guard let ndk = ndk else {
+            os_log(.debug, "NDKUIRichTextView: NDK not found in environment. Use .ndk(myNDK) modifier to enable content parsing.")
+            return
+        }
         let parsed = await ndk.parseContent(content, tags: tags, currentUserPubkey: currentUserPubkey)
         await MainActor.run {
             self.parsedContent = parsed
@@ -116,6 +120,7 @@ public struct NDKUIRichTextView<
             return nil
         }
 
+        // Limit to 3 images to prevent UI overflow - intentional UX decision
         ForEach(Array(imageURLs.prefix(3).enumerated()), id: \.offset) { _, url in
             Image(url: url, onTap: nil)
                 .padding(.top, 4)
@@ -126,6 +131,7 @@ public struct NDKUIRichTextView<
     private func renderEventPreviews(from components: [NDKParsedContent.Component]) -> some View {
         let references = extractEventReferences(from: components)
 
+        // Limit to 2 event embeds to prevent UI overflow - intentional UX decision
         ForEach(Array(references.prefix(2).enumerated()), id: \.offset) { _, reference in
             EventPreviewLoader<Event>(reference: reference, onTap: nil)
                 .padding(.top, 4)
@@ -224,7 +230,9 @@ struct FlowLayout: Layout {
     }
 
     private func arrangeSubviews(proposal: ProposedViewSize, subviews: Subviews) -> (size: CGSize, positions: [CGPoint], sizes: [CGSize]) {
-        let maxWidth = proposal.width ?? .infinity
+        // Use proposed width, or fallback to a reasonable default for infinite proposals
+        // This prevents all items being placed on a single line when width is unconstrained
+        let maxWidth = proposal.width ?? 10000
         var positions: [CGPoint] = []
         var sizes: [CGSize] = []
         var currentX: CGFloat = 0
