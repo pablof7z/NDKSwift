@@ -368,7 +368,7 @@ enum MarkdownParser {
 
             // Check for Nostr entities
             if text[index] == "@" || text[index] == "#" ||
-                (index < text.index(text.endIndex, offsetBy: -4) &&
+                (index < text.index(text.endIndex, offsetBy: -5) &&
                     String(text[index ..< text.index(index, offsetBy: 5)]).starts(with: "nostr"))
             {
                 if !currentText.isEmpty {
@@ -594,6 +594,10 @@ enum MarkdownParser {
         let result = ContentParser.parseContent(remaining)
         let entities = result.entities
 
+        // Check if input has nostr: URI prefix (adds 6 chars)
+        let hasNostrPrefix = remaining.hasPrefix("nostr:")
+        let nostrPrefixLength = hasNostrPrefix ? 6 : 0
+
         if let entity = entities.first {
             let entityLength: Int
             switch entity {
@@ -601,16 +605,18 @@ enum MarkdownParser {
                 entityLength = str.count
             case let .npub(id), let .nprofile(id), let .note(id),
                  let .nevent(id), let .naddr(id):
-                // Bech32 strings already include their full prefix (npub1..., note1..., etc.)
-                entityLength = id.count
+                // Bech32 strings include their prefix (npub1..., note1..., etc.)
+                // but we also need to account for the nostr: URI prefix if present
+                entityLength = id.count + nostrPrefixLength
             case let .hashtag(tag):
                 entityLength = tag.count + 1 // include #
             case let .url(url):
                 entityLength = url.absoluteString.count
             case let .userMention(_, npub):
-                entityLength = npub.count
+                // userMention from nostr:npub also needs the prefix
+                entityLength = npub.count + nostrPrefixLength
             case let .eventMention(id):
-                entityLength = id.count
+                entityLength = id.count + nostrPrefixLength
             }
             let endIndex = text.index(startIndex, offsetBy: min(entityLength, text.distance(from: startIndex, to: text.endIndex)))
             return (.nostrEntity(entity), endIndex)

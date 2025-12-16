@@ -271,6 +271,7 @@ public final class NDKSubscription<T> {
 
     // MARK: - Event Handling
 
+    @MainActor
     private func handleEvent(_ event: NDKEvent) async {
         // Check if we've already processed this event (thread-safe via actor)
         let alreadyProcessed = await processedEventIds.contains(event.id)
@@ -306,6 +307,7 @@ public final class NDKSubscription<T> {
 
     /// Flush pending batch to MainActor
     /// Updates the observable data array in a single operation
+    @MainActor
     private func flushBatch() async {
         guard !pendingBatch.isEmpty else { return }
 
@@ -313,12 +315,8 @@ public final class NDKSubscription<T> {
         pendingBatch.removeAll()
         flushTask = nil
 
-        // Single MainActor update for entire batch
-        // Use weak self to prevent crash if subscription is deallocated
-        // during the await (race between deinit and MainActor scheduling)
-        await MainActor.run { [weak self] in
-            self?.data.append(contentsOf: batch)
-        }
+        // Single operation for entire batch
+        data.append(contentsOf: batch)
     }
 
     /// Handle relay-level updates (EOSE, subscription status, etc)
