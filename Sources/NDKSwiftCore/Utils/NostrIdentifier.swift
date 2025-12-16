@@ -7,30 +7,38 @@ public enum NostrIdentifier {
     public static func createFilter(from identifier: String) throws -> NDKFilter {
         // Check if it's a bech32 string
         if Bech32.isBech32(identifier) {
-            let decoded = try ContentTagger.decodeNostrEntity(identifier)
+            do {
+                let decoded = try ContentTagger.decodeNostrEntity(identifier)
 
-            switch decoded.type {
-            case "note", "nevent":
-                guard let eventId = decoded.eventId else {
-                    throw NDKError.invalidDataFormat(decoded.type, details: "Missing event ID")
+                switch decoded.type {
+                case "note", "nevent":
+                    guard let eventId = decoded.eventId else {
+                        throw NDKError.invalidDataFormat(decoded.type, details: "Missing event ID")
+                    }
+                    return NDKFilter(ids: [eventId])
+
+                case "naddr":
+                    guard let pubkey = decoded.pubkey,
+                          let kind = decoded.kind,
+                          let dTag = decoded.identifier
+                    else {
+                        throw NDKError.invalidDataFormat("naddr", details: "Missing required fields")
+                    }
+                    return NDKFilter(
+                        authors: [pubkey],
+                        kinds: [kind],
+                        tags: ["d": Set([dTag])]
+                    )
+
+                default:
+                    throw NDKError.invalidDataFormat("bech32", details: "Unsupported type: \(decoded.type)")
                 }
-                return NDKFilter(ids: [eventId])
-
-            case "naddr":
-                guard let pubkey = decoded.pubkey,
-                      let kind = decoded.kind,
-                      let dTag = decoded.identifier
-                else {
-                    throw NDKError.invalidDataFormat("naddr", details: "Missing required fields")
+            } catch {
+                // Bech32 decode failed, fall back to hex parsing
+                guard HexValidator.isValid32ByteHex(identifier) else {
+                    throw NDKError.invalidEventID("Invalid event ID: must be 64-character hex or valid bech32")
                 }
-                return NDKFilter(
-                    authors: [pubkey],
-                    kinds: [kind],
-                    tags: ["d": Set([dTag])]
-                )
-
-            default:
-                throw NDKError.invalidDataFormat("bech32", details: "Unsupported type: \(decoded.type)")
+                return NDKFilter(ids: [identifier])
             }
         } else {
             // Assume it's a hex event ID
