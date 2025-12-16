@@ -19,8 +19,8 @@ let package = Package(
         .target(
             name: "MarkdownDemoFeature",
             dependencies: [
-                .product(name: "NDKSwiftCore", package: "master"),
-                .product(name: "NDKSwiftUI", package: "master")
+                .product(name: "NDKSwiftCore", package: "pluggable-renderers"),
+                .product(name: "NDKSwiftUI", package: "pluggable-renderers")
             ]
         ),
         .testTarget(
