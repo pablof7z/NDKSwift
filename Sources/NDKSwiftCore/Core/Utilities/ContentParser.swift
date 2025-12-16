@@ -174,7 +174,6 @@ public enum ContentParser {
                 // Identify entity type by prefix and add to both entities and components
                 if bech32.hasPrefix(NostrConstants.npubPrefix) {
                     entities.append(.npub(bech32))
-                    components.append(.npubMention(bech32))
                     do {
                         guard let pubkey = try String.fromNpub(bech32) else {
                             NDKLogger.log(.warning, category: .event, "Failed to decode npub: nil result")

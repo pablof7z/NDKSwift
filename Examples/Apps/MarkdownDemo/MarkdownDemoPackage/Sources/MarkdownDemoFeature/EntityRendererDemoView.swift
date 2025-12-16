@@ -194,70 +194,22 @@ public struct EntityRendererDemoView: View {
 
     private var comprehensiveContent: String {
         """
-        # Welcome to Nostr on NDK! ⚡
+        Just discovered this amazing Nostr library! 🚀
 
-        **Nostr** is a *simple*, open protocol that enables truly **decentralized** and *censorship-resistant* social media.
+        Check out the docs at https://ndk.fyi for more info.
 
-        ## Connect with People
+        Special thanks to nostr:npub1l2vyh47mk2p0qlsku7hg0vn29faehy9hy34ygaclpn66ukqp3afqutajft for building this!
 
-        Check out these amazing Nostr contributors:
-        - nostr:npub1l2vyh47mk2p0qlsku7hg0vn29faehy9hy34ygaclpn66ukqp3afqutajft
-        - @alice and @bob are joining too!
+        #nostr #bitcoin #decentralized
 
-        ## Discover Content
+        Here's a cool image to go with it:
+        https://r2a.primal.net/uploads2/d/f3/bd/df3bdd118f7db2cdf57821f958033db07dfd9de72248e6869734cbb9e2e8c130.png
 
-        See this interesting note:
-        > note1gmtnz6q2m55epmlpe3semjkwtj4av3jvx4emmjsa8g3s9x7tgjsq4tnvj
+        This is an article:
+        nostr:naddr1qvzqqqr4gupzqmjxss3dld622uu8q25gywum9qtg4w4cv4064jmg20xsac2aam5nqythwumn8ghj7un9d3shjtnswf5k6ctv9ehx2ap0qqxnzd3cx5urjd35xg6rwwpee39928
 
-        Or browse events:
-        nevent1qqsyx7v0hx5xvvjwxj5xvvjwxj5xvvjwxj5xvvjwxj5xvvjwxj5xvvjwxj5xv
-
-        ## Popular Topics
-
-        Trending on Nostr: #nostr #bitcoin #lightning #freedom #decentralization
-
-        Join conversations: #introductions #plebchain #grownostr
-
-        ## Learn More
-
-        Visit [nostr.com](https://nostr.com) for guides and tutorials.
-
-        Check out the protocol documentation at [github.com/nostr-protocol](https://github.com/nostr-protocol/nostr).
-
-        ## Share Images
-
-        ![Nostr Logo](https://nostr.build/i/nostr.build_6a36f5eb16b2c9f7a5d3d7e7b9dce58f7ce1ff0c7e3c8b4e2f7d1b5c6e9a0d3f.png)
-
-        Beautiful landscapes:
-        ![Mountain View](https://picsum.photos/400/300)
-
-        ## Code Examples
-
-        Connect to a relay:
-
-        ```swift
-        let ndk = NDK()
-        await ndk.pool.connect(to: "wss://relay.nostr.com")
-        ```
-
-        Publish an event:
-
-        ```javascript
-        const event = {
-          kind: 1,
-          content: "Hello Nostr!",
-          created_at: Math.floor(Date.now() / 1000)
-        }
-        await relay.publish(event)
-        ```
-
-        ## Get Involved
-
-        Start building on Nostr today! Follow #asknostr for help.
-
-        ---
-
-        Made with ❤️ by the Nostr community
+        And here's a note worth checking out:
+        nostr:nevent1qgsxu35yyt0mwjjh8pcz4zprhxegz69t4wr9t74vk6zne58wzh0waycppemhxue69uhkummn9ekx7mp0qqsq3zms08nzx3a72cgc0jtsd0g0g9fdx0f9jvp69kp05peuvmrpj5g0w639m
         """
     }
 }
@@ -277,30 +229,38 @@ struct CustomEntityRenderer: View {
     let onTap: (String) -> Void
 
     var body: some View {
-        // For now, use the standard renderer
-        // In a full implementation, this would parse and render each entity type
-        // according to the selected renderer
-        NDKUIMarkdownRenderer(content, ndk: ndk)
-            .markdownStyle(style)
-            .onMentionTap { pubkey in
-                onTap("Mention: @\(pubkey.prefix(8))... (using \(mentionRenderer.rawValue))")
-            }
-            .onHashtagTap { tag in
-                onTap("Hashtag: #\(tag) (using \(hashtagRenderer.rawValue))")
-            }
-            .onLinkTap { url in
-                onTap("Link: \(url.absoluteString) (using \(linkRenderer.rawValue))")
-            }
-            .onNostrEntityTap { entity in
-                switch entity {
-                case .npub, .nprofile:
-                    onTap("Nostr User (using \(mentionRenderer.rawValue))")
-                case .note, .nevent:
-                    onTap("Nostr Event (using \(eventRenderer.rawValue))")
-                default:
-                    onTap("Nostr Entity: \(String(describing: entity))")
-                }
-            }
+        // Use NDKUIRichTextView which properly loads and displays user profiles for mentions
+        NDKUIRichTextView(
+            ndk: ndk,
+            content: content,
+            showLinkPreviews: linkRenderer == .preview,
+            style: richTextStyle
+        )
+        .onMentionTapped { pubkey in
+            onTap("Mention: @\(pubkey.prefix(8))... (using \(mentionRenderer.rawValue))")
+        }
+        .onHashtagTapped { tag in
+            onTap("Hashtag: #\(tag) (using \(hashtagRenderer.rawValue))")
+        }
+        .onLinkTapped { url in
+            onTap("Link: \(url.absoluteString) (using \(linkRenderer.rawValue))")
+        }
+        .onEventTapped { eventId in
+            onTap("Event: \(eventId.prefix(8))... (using \(eventRenderer.rawValue))")
+        }
+    }
+
+    private var richTextStyle: NDKUIRichTextView.Style {
+        switch mentionRenderer {
+        case .inline:
+            return .compact
+        case .profileCard:
+            return .full
+        case .highlighted:
+            return .full
+        case .hidden:
+            return .minimal
+        }
     }
 }
 

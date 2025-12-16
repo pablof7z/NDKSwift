@@ -64,9 +64,6 @@ public struct NDKParsedContent {
         /// URL found in the content
         case url(URL)
 
-        /// Direct npub mention (bech32-encoded public key)
-        case npubMention(String)
-
         /// Note ID mention (note1... format)
         case noteMention(String)
 
@@ -87,7 +84,6 @@ public struct NDKParsedContent {
         case eventMention(String)
         case hashtag(String)
         case url(URL)
-        case npubMention(String)
         case noteMention(String)
         case neventMention(String)
         case nprofileMention(String)
