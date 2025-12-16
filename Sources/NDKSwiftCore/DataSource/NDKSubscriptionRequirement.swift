@@ -144,9 +144,11 @@ actor NDKSubscriptionRequirement {
 
         case let .outbox(strategy):
             // Complex case: split filters by relay
-            let allRelays = Set(strategy.filtersByRelay.keys)
-            await eoseTracker.setExpectedRelays(allRelays)
+            // First apply the strategy (which may add fallback relays for unknown authors)
             await applyOutboxStrategy(strategy)
+            // Then set expected relays to ALL relays where subscriptions were created
+            // This includes both outbox-specific relays AND fallback relays
+            await eoseTracker.setExpectedRelays(Set(relaySubscriptions.keys))
 
         case let .default(relays):
             // Use default relays
