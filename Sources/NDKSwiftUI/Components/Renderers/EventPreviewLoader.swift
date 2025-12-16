@@ -61,12 +61,32 @@ public struct EventPreviewLoader<Event: EventRenderer>: View {
             return
         }
 
-        guard let eventId = extractEventId() else {
-            await MainActor.run { isLoading = false }
-            return
+        let filter: NDKFilter
+
+        // Handle naddr differently - they use kind/author/d-tag, not event IDs
+        if case .naddr(let naddr) = reference {
+            guard let decoded = try? ContentTagger.decodeNostrEntity(naddr),
+                  let kind = decoded.kind,
+                  let pubkey = decoded.pubkey,
+                  let identifier = decoded.identifier else {
+                await MainActor.run { isLoading = false }
+                return
+            }
+
+            filter = NDKFilter(
+                authors: [pubkey],
+                kinds: [kind],
+                tags: ["d": Set([identifier])]
+            )
+        } else {
+            // For eventId/note/nevent, extract the event ID
+            guard let eventId = extractEventId() else {
+                await MainActor.run { isLoading = false }
+                return
+            }
+            filter = NDKFilter(ids: [eventId])
         }
 
-        let filter = NDKFilter(ids: [eventId])
         let dataSource = ndk.subscribe(filter: filter)
 
         for await fetchedEvent in dataSource.events {
@@ -95,10 +115,8 @@ public struct EventPreviewLoader<Event: EventRenderer>: View {
                 return decoded.eventId
             }
             return nil
-        case .naddr(let naddr):
-            if let decoded = try? ContentTagger.decodeNostrEntity(naddr) {
-                return decoded.eventId
-            }
+        case .naddr:
+            // naddr is handled separately in loadEvent()
             return nil
         }
     }
