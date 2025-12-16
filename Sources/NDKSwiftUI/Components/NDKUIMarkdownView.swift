@@ -207,8 +207,7 @@ public struct NDKUIMarkdownView<
             EventPreviewLoader<Event>(reference: .nevent(nevent), onTap: nil)
 
         case .naddr(let naddr):
-            Text("naddr:\(String(naddr.prefix(16)))...")
-                .foregroundColor(.accentColor)
+            EventPreviewLoader<Event>(reference: .naddr(naddr), onTap: nil)
 
         case .text(let text):
             Text(text)

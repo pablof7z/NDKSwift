@@ -15,7 +15,6 @@ public struct NDKUIRichTextView<
     let content: String
     let tags: [Tag]
     let currentUserPubkey: PublicKey?
-    let showLinkPreviews: Bool
 
     @Environment(\.ndk) private var ndk
     @State private var parsedContent: NDKParsedContent?
@@ -23,26 +22,17 @@ public struct NDKUIRichTextView<
     public init(
         content: String,
         tags: [Tag] = [],
-        currentUserPubkey: PublicKey? = nil,
-        showLinkPreviews: Bool = true
+        currentUserPubkey: PublicKey? = nil
     ) {
         self.content = content
         self.tags = tags
         self.currentUserPubkey = currentUserPubkey
-        self.showLinkPreviews = showLinkPreviews
     }
 
     public var body: some View {
         Group {
             if let parsed = parsedContent {
-                VStack(alignment: .leading, spacing: 8) {
-                    renderComponents(parsed.components)
-
-                    if showLinkPreviews {
-                        renderImagePreviews(from: parsed.components)
-                        renderEventPreviews(from: parsed.components)
-                    }
-                }
+                renderComponents(parsed.components)
             } else {
                 Text(content)
             }
@@ -97,59 +87,22 @@ public struct NDKUIRichTextView<
 
         case .url(let url):
             if isImageURL(url) {
-                if !showLinkPreviews {
-                    Link(url: url, onTap: nil)
-                }
-                // Images rendered separately in preview section when showLinkPreviews is true
+                Image(url: url, onTap: nil)
             } else {
                 Link(url: url, onTap: nil)
             }
 
-        case .eventMention, .noteMention, .neventMention:
-            // Event mentions rendered separately in preview section
-            EmptyView()
-        }
-    }
+        case .eventMention(let eventId):
+            EventPreviewLoader<Event>(reference: .eventId(eventId), onTap: nil)
 
-    @ViewBuilder
-    private func renderImagePreviews(from components: [NDKParsedContent.Component]) -> some View {
-        let imageURLs = components.compactMap { component -> URL? in
-            if case .url(let url) = component, isImageURL(url) {
-                return url
-            }
-            return nil
-        }
+        case .noteMention(let note):
+            EventPreviewLoader<Event>(reference: .note(note), onTap: nil)
 
-        // Limit to 3 images to prevent UI overflow - intentional UX decision
-        ForEach(Array(imageURLs.prefix(3).enumerated()), id: \.offset) { _, url in
-            Image(url: url, onTap: nil)
-                .padding(.top, 4)
-        }
-    }
+        case .neventMention(let nevent):
+            EventPreviewLoader<Event>(reference: .nevent(nevent), onTap: nil)
 
-    @ViewBuilder
-    private func renderEventPreviews(from components: [NDKParsedContent.Component]) -> some View {
-        let references = extractEventReferences(from: components)
-
-        // Limit to 2 event embeds to prevent UI overflow - intentional UX decision
-        ForEach(Array(references.prefix(2).enumerated()), id: \.offset) { _, reference in
-            EventPreviewLoader<Event>(reference: reference, onTap: nil)
-                .padding(.top, 4)
-        }
-    }
-
-    private func extractEventReferences(from components: [NDKParsedContent.Component]) -> [EventPreviewLoader<Event>.Reference] {
-        components.compactMap { component -> EventPreviewLoader<Event>.Reference? in
-            switch component {
-            case .eventMention(let eventId):
-                return .eventId(eventId)
-            case .noteMention(let note):
-                return .note(note)
-            case .neventMention(let nevent):
-                return .nevent(nevent)
-            default:
-                return nil
-            }
+        case .naddrMention(let naddr):
+            EventPreviewLoader<Event>(reference: .naddr(naddr), onTap: nil)
         }
     }
 

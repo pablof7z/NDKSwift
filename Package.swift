@@ -116,6 +116,7 @@ let package = Package(
             dependencies: [
                 "NDKSwiftCore",
                 "NDKSwiftCashu",
+                "NDKSwiftNostrDB",
             ]
         ),
         .target(

@@ -613,39 +613,31 @@ public actor NDKNostrDBCache: NDKCache {
     ///   - limit: Maximum number of results (default: 50)
     /// - Returns: Array of matching NDKEvents
     public func textSearch(_ query: String, limit: Int = 50) async -> [NDKEvent] {
+        let startTime = CFAbsoluteTimeGetCurrent()
         guard let ndb = ndb else { return [] }
 
-        var seenIds = Set<String>()
         var results: [NDKEvent] = []
 
-        // Try nostrdb's native text_search first (for indexed events)
+        // Use nostrdb's native text_search (fast, indexed)
+        let searchStart = CFAbsoluteTimeGetCurrent()
         let noteKeys = ndb.text_search(query: query, limit: limit, order: .newest_first)
+        let searchTime = CFAbsoluteTimeGetCurrent() - searchStart
+        print("🔍 NostrDB search took: \(String(format: "%.2f", searchTime * 1000))ms, found \(noteKeys.count) keys")
+
+        let conversionStart = CFAbsoluteTimeGetCurrent()
         for noteKey in noteKeys {
             if let txn = ndb.lookup_note_by_key(noteKey),
                let note = txn.unsafeUnownedValue,
                let event = convertToNDKEvent(note)
             {
-                seenIds.insert(event.id)
                 results.append(event)
             }
         }
+        let conversionTime = CFAbsoluteTimeGetCurrent() - conversionStart
+        print("🔍 Conversion took: \(String(format: "%.2f", conversionTime * 1000))ms, converted \(results.count) events")
 
-        // Also search in-memory cache for events not yet indexed by nostrdb's async ingester
-        let lowercaseQuery = query.lowercased()
-        for event in events.values {
-            if !seenIds.contains(event.id) && event.content.lowercased().contains(lowercaseQuery) {
-                seenIds.insert(event.id)
-                results.append(event)
-            }
-        }
-
-        // Sort by created_at descending (most recent first)
-        results.sort { $0.createdAt > $1.createdAt }
-
-        // Apply limit
-        if results.count > limit {
-            return Array(results.prefix(limit))
-        }
+        let totalTime = CFAbsoluteTimeGetCurrent() - startTime
+        print("🔍 Total textSearch took: \(String(format: "%.2f", totalTime * 1000))ms for query '\(query)'")
 
         return results
     }
