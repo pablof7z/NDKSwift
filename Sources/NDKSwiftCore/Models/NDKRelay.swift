@@ -127,6 +127,9 @@ actor RelayStateActor {
     // Relay origin tracking
     var origin: NDKRelayOrigin = .explicit
 
+    // Persistence flag - persistent relays are never evicted
+    var isPersistent: Bool = false
+
     // NDK reference
     weak var ndk: NDK?
 
@@ -243,6 +246,16 @@ actor RelayStateActor {
 
     func getOrigin() -> NDKRelayOrigin {
         return origin
+    }
+
+    // MARK: - Persistence
+
+    func setPersistent(_ persistent: Bool) {
+        isPersistent = persistent
+    }
+
+    func getPersistent() -> Bool {
+        return isPersistent
     }
 
     // MARK: - NDK Reference
@@ -446,6 +459,24 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
     /// Set the origin of this relay
     func setOrigin(_ origin: NDKRelayOrigin) async {
         await stateActor.setOrigin(origin)
+    }
+
+    /// Whether this relay is persistent (never evicted from the pool)
+    ///
+    /// Persistent relays include:
+    /// - Relays explicitly added by the developer
+    /// - Outbox config relays
+    ///
+    /// Non-persistent relays may be evicted when idle to conserve resources.
+    public var isPersistent: Bool {
+        get async {
+            await stateActor.getPersistent()
+        }
+    }
+
+    /// Set the persistence flag for this relay
+    public func setPersistent(_ persistent: Bool) async {
+        await stateActor.setPersistent(persistent)
     }
 
     /// Relay information fetched via NIP-11
