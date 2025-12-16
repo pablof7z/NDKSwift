@@ -613,18 +613,12 @@ public actor NDKNostrDBCache: NDKCache {
     ///   - limit: Maximum number of results (default: 50)
     /// - Returns: Array of matching NDKEvents
     public func textSearch(_ query: String, limit: Int = 50) async -> [NDKEvent] {
-        let startTime = CFAbsoluteTimeGetCurrent()
         guard let ndb = ndb else { return [] }
 
         var results: [NDKEvent] = []
 
         // Use nostrdb's native text_search (fast, indexed)
-        let searchStart = CFAbsoluteTimeGetCurrent()
         let noteKeys = ndb.text_search(query: query, limit: limit, order: .newest_first)
-        let searchTime = CFAbsoluteTimeGetCurrent() - searchStart
-        print("🔍 NostrDB search took: \(String(format: "%.2f", searchTime * 1000))ms, found \(noteKeys.count) keys")
-
-        let conversionStart = CFAbsoluteTimeGetCurrent()
         for noteKey in noteKeys {
             if let txn = ndb.lookup_note_by_key(noteKey),
                let note = txn.unsafeUnownedValue,
@@ -633,11 +627,6 @@ public actor NDKNostrDBCache: NDKCache {
                 results.append(event)
             }
         }
-        let conversionTime = CFAbsoluteTimeGetCurrent() - conversionStart
-        print("🔍 Conversion took: \(String(format: "%.2f", conversionTime * 1000))ms, converted \(results.count) events")
-
-        let totalTime = CFAbsoluteTimeGetCurrent() - startTime
-        print("🔍 Total textSearch took: \(String(format: "%.2f", totalTime * 1000))ms for query '\(query)'")
 
         return results
     }
