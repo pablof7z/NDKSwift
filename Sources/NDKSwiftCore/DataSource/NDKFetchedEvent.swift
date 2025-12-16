@@ -121,7 +121,7 @@ public final class NDKFetchedEvent {
         // "a" tag: ["a", "kind:pubkey:d-tag", "relay-hint", "marker"]
         let (identifier, relayHint, pubkeyHint, tagType) = extractHintsFromTag(tag)
 
-        guard let identifier else {
+        guard let identifier, !identifier.isEmpty else {
             error = NDKError.invalidEventID("Tag missing identifier")
             isLoading = false
             return
