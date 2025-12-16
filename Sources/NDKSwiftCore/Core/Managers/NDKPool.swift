@@ -228,6 +228,17 @@ public actor NDKPool {
             await relay.setNDK(ndk)
         }
         await relay.setOrigin(origin)
+
+        // Set persistence based on origin
+        // Explicit and outboxConfig relays are persistent (never evicted)
+        // Outbox-discovered relays are not persistent (can be evicted when idle)
+        switch origin {
+        case .explicit, .outboxConfig:
+            await relay.setPersistent(true)
+        case .outbox:
+            await relay.setPersistent(false)
+        }
+
         relayMap[normalizedUrl] = relay
 
         span?.set(SpanAttributes.decisionOutcome, "added")
