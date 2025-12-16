@@ -1687,7 +1687,27 @@ public actor NDKSQLiteCache: NDKCache {
                     }
                 }
 
-                // Start the observation
+                // If includeExisting, query and emit current events BEFORE starting observation
+                // This prevents race conditions with GRDB's async onChange callback
+                if includeExisting {
+                    do {
+                        let existingEvents = try await self.queryEvents(filter)
+                        if self.debugMode {
+                            NDKLogger.log(.info, category: .cache, "🔍 Initial query for filter \(filter): found \(existingEvents.count) existing events")
+                        }
+                        if !existingEvents.isEmpty {
+                            // Track these IDs so observation doesn't emit them again
+                            existingEventIds = Set(existingEvents.map { $0.id })
+                            continuation.yield(existingEvents)
+                        }
+                    } catch {
+                        if debugMode {
+                            NDKLogger.log(.error, category: .cache, "Failed to fetch existing events: \(error)")
+                        }
+                    }
+                }
+
+                // Start the observation for future changes
                 let cancellable = observation.start(
                     in: dbQueue,
                     onError: { error in
@@ -1698,43 +1718,23 @@ public actor NDKSQLiteCache: NDKCache {
                             NDKLogger.log(.info, category: .cache, "🔔 GRDB observation triggered: \(events.count) events for filter \(filter)")
                         }
 
-                        // Filter events based on includeExisting flag
-                        let eventsToEmit: [NDKEvent]
-                        if includeExisting {
-                            eventsToEmit = events
-                        } else {
-                            // Only emit events that weren't in the initial set
-                            eventsToEmit = events.filter { !existingEventIds.contains($0.id) }
-                            if self.debugMode, eventsToEmit.count != events.count {
-                                NDKLogger.log(.info, category: .cache, "🔍 Filtered out \(events.count - eventsToEmit.count) existing events, emitting \(eventsToEmit.count) new events")
-                            }
+                        // Filter out events we've already emitted
+                        let eventsToEmit = events.filter { !existingEventIds.contains($0.id) }
+
+                        if self.debugMode && eventsToEmit.count != events.count {
+                            NDKLogger.log(.info, category: .cache, "🔍 Filtered out \(events.count - eventsToEmit.count) duplicate events, emitting \(eventsToEmit.count) new events")
                         }
 
                         if !eventsToEmit.isEmpty {
                             continuation.yield(eventsToEmit)
+                            // Update tracked IDs
+                            existingEventIds.formUnion(eventsToEmit.map { $0.id })
                         }
                     }
                 )
 
                 // Store the cancellable
                 await self.storeObservation(id: observationId, cancellable: cancellable)
-
-                // If includeExisting, immediately query and emit current events
-                if includeExisting {
-                    do {
-                        let existingEvents = try await self.queryEvents(filter)
-                        if self.debugMode {
-                            NDKLogger.log(.info, category: .cache, "🔍 Initial query for filter \(filter): found \(existingEvents.count) existing events")
-                        }
-                        if !existingEvents.isEmpty {
-                            continuation.yield(existingEvents)
-                        }
-                    } catch {
-                        if debugMode {
-                            NDKLogger.log(.error, category: .cache, "Failed to fetch existing events: \(error)")
-                        }
-                    }
-                }
 
                 // Set up cleanup when the stream is terminated
                 continuation.onTermination = { @Sendable _ in

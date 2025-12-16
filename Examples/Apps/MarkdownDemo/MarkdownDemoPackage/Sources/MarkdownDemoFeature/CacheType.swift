@@ -4,6 +4,7 @@ import NDKSwiftSQLite
 import NDKSwiftNostrDB
 
 public enum CacheType: String, CaseIterable, Identifiable {
+    case memory = "Memory"
     case sqlite = "SQLite"
     case nostrdb = "NostrDB"
 
@@ -13,6 +14,8 @@ public enum CacheType: String, CaseIterable, Identifiable {
 
     public var description: String {
         switch self {
+        case .memory:
+            return "In-memory cache. No persistence. Fast and simple for testing."
         case .sqlite:
             return "Full-featured SQL cache with GRDB. 13 migrations, reactive observations."
         case .nostrdb:
@@ -35,6 +38,8 @@ public enum CacheType: String, CaseIterable, Identifiable {
 
     public func createCache() async throws -> NDKCache {
         switch self {
+        case .memory:
+            return MemoryCache()
         case .sqlite:
             return try await NDKSQLiteCache(path: nil, debugMode: true)
         case .nostrdb:
