@@ -35,6 +35,8 @@ struct GettingStarted {
             try await Example08_PublishWithNIP46.run()
         case "9", "09", "nutzaps":
             try await Example09_NutzapsAndHistory.run()
+        case "10", "fetch":
+            try await Example10_FetchEvent.run()
         default:
             print("❌ Unknown example: \(example)")
             printUsage()
@@ -60,6 +62,7 @@ struct GettingStarted {
           7 or multiple   - Test multiple observers on same filter
           8 or nip46      - Publish with NIP-46 remote signer (bunker/nostrconnect)
           9 or nutzaps    - Test nutzaps and transaction history
+          10 or fetch     - Fetch single events with cache-first API
 
         Example: swift run GettingStarted 1
         """)

@@ -6,14 +6,15 @@ This guide provides practical examples and best practices for common tasks in ND
 
 1. [Connection Management](#connection-management)
 2. [Event Publishing Patterns](#event-publishing-patterns)
-3. [Subscription Patterns](#subscription-patterns)
-4. [Encrypted Messaging](#encrypted-messaging)
-5. [Zap Integration](#zap-integration)
-6. [File Storage with Blossom](#file-storage-with-blossom)
-7. [Relay Management](#relay-management)
-8. [Error Handling](#error-handling)
-9. [Performance Optimization](#performance-optimization)
-10. [SwiftUI Integration](#swiftui-integration)
+3. [Fetching Single Events](#fetching-single-events)
+4. [Subscription Patterns](#subscription-patterns)
+5. [Encrypted Messaging](#encrypted-messaging)
+6. [Zap Integration](#zap-integration)
+7. [File Storage with Blossom](#file-storage-with-blossom)
+8. [Relay Management](#relay-management)
+9. [Error Handling](#error-handling)
+10. [Performance Optimization](#performance-optimization)
+11. [SwiftUI Integration](#swiftui-integration)
 
 ## Connection Management
 
@@ -130,6 +131,207 @@ func replyToEvent(_ originalEvent: NDKEvent, content: String) async throws -> ND
     return reply
 }
 ```
+
+## Fetching Single Events
+
+The `fetchEvent` API provides a modern, cache-first approach for loading individual events with automatic updates and intelligent relay selection.
+
+### Basic Event Fetching
+
+```swift
+// Fetch by hex event ID
+let fetched = ndk.fetchEvent("a1b2c3d4e5f6789012345678901234567890123456789012345678901234abcd")
+
+// Fetch by note1 (bech32 encoded event ID)
+let fetched = ndk.fetchEvent("note19yx9aknwfwxyu3f3x6nr24pygnj0jtzw6x7gttq8k4a5kyp58k9qd78x46")
+
+// Fetch by nevent (with relay hints)
+let fetched = ndk.fetchEvent("nevent1qqs...")
+
+// Fetch by naddr (addressable/replaceable event)
+let fetched = ndk.fetchEvent("naddr1qqs...")
+
+// Access the result
+if let event = fetched.event {
+    print("Content: \(event.content)")
+}
+
+if let error = fetched.error {
+    print("Error: \(error)")
+}
+
+print("Loading: \(fetched.isLoading)")
+```
+
+### Fetching from NIP-10 Tags
+
+The API intelligently uses relay hints and author pubkeys from tags for optimal relay selection:
+
+```swift
+// Fetch from "e" tag (event reference)
+// Format: ["e", "event-id", "relay-hint", "marker", "pubkey-hint"]
+let eTag: Tag = ["e", "abc123...", "wss://relay.com", "reply", "author-pubkey"]
+let fetched = ndk.fetchEvent(tag: eTag)
+
+// Fetch from "a" tag (addressable event)
+// Format: ["a", "kind:pubkey:d-tag", "relay-hint"]
+let aTag: Tag = ["a", "30023:pubkey123:article-slug", "wss://relay.com"]
+let fetched = ndk.fetchEvent(tag: aTag)
+
+// Relay selection priority:
+// 1. Relay hint from tag (element [2])
+// 2. Pubkey hint with outbox model (element [4] for "e" tags)
+// 3. All connected relays as fallback
+```
+
+### SwiftUI Integration
+
+```swift
+struct EventDetailView: View {
+    let eventId: String
+    let ndk: NDK
+
+    @State private var fetched: NDKFetchedEvent?
+
+    var body: some View {
+        Group {
+            if let event = fetched?.event {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(event.content)
+                    Text("By: \(event.pubkey)")
+                        .font(.caption)
+                }
+            } else if fetched?.isLoading == true {
+                ProgressView("Loading...")
+            } else if let error = fetched?.error {
+                Text("Error: \(error.localizedDescription)")
+                    .foregroundColor(.red)
+            }
+        }
+        .task {
+            fetched = ndk.fetchEvent(eventId)
+        }
+    }
+}
+```
+
+### Handling Quoted Events (NIP-18)
+
+```swift
+struct QuotePostView: View {
+    let event: NDKEvent
+    let ndk: NDK
+
+    @State private var quotedEvent: NDKFetchedEvent?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Main post content
+            Text(event.content)
+
+            // Quoted event preview
+            if let quoted = quotedEvent?.event {
+                QuotedEventCard(event: quoted)
+                    .padding(.leading)
+            } else if quotedEvent?.isLoading == true {
+                ProgressView("Loading quote...")
+            }
+        }
+        .task {
+            // Find "q" tag (NIP-18 quote reference)
+            if let qTag = event.tags.first(where: { $0[0] == "q" }) {
+                quotedEvent = ndk.fetchEvent(tag: qTag)
+            }
+        }
+    }
+}
+```
+
+### Thread View with Reply Chain
+
+```swift
+struct ThreadView: View {
+    let eventId: String
+    let ndk: NDK
+
+    @State private var currentEvent: NDKFetchedEvent?
+    @State private var rootEvent: NDKFetchedEvent?
+    @State private var replyToEvent: NDKFetchedEvent?
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                // Root of thread (if exists)
+                if let root = rootEvent?.event {
+                    EventCard(event: root)
+                        .opacity(0.6)
+                }
+
+                // Reply context (if exists)
+                if let reply = replyToEvent?.event {
+                    EventCard(event: reply)
+                        .opacity(0.8)
+                }
+
+                // Current event
+                if let current = currentEvent?.event {
+                    EventCard(event: current)
+                }
+            }
+            .padding()
+        }
+        .task {
+            currentEvent = ndk.fetchEvent(eventId)
+
+            // Fetch reply chain from NIP-10 "e" tags
+            if let tags = currentEvent?.event?.tags {
+                // Root event (marked with "root" or first tag)
+                if let rootTag = tags.first(where: { $0[safe: 3] == "root" }) {
+                    rootEvent = ndk.fetchEvent(tag: rootTag)
+                }
+
+                // Direct reply (marked with "reply")
+                if let replyTag = tags.first(where: { $0[safe: 3] == "reply" }) {
+                    replyToEvent = ndk.fetchEvent(tag: replyTag)
+                }
+            }
+        }
+    }
+}
+```
+
+### Cache Behavior
+
+The `fetchEvent` API implements intelligent cache-first loading:
+
+```swift
+// Non-replaceable events (kinds 1, 4, etc.)
+// - If cached: returns immediately without network fetch
+// - If not cached: fetches from network
+
+// Replaceable events (kinds 0, 3, 10000-19999)
+// - If cached: returns cached version immediately
+// - Always fetches from network for potential updates
+// - Updates automatically if newer version found
+
+// Addressable/Parameterized events (kinds 30000-39999)
+// - Always fetches latest version from network
+// - Uses kind + author + d-tag to identify
+
+// Example: Profile metadata (kind 0, replaceable)
+let fetched = ndk.fetchEvent(profileEventId)
+// Returns cached profile immediately if available,
+// then updates UI automatically when newer version arrives
+```
+
+### Key Benefits
+
+- **Cache-First**: Non-replaceable events skip network when cached
+- **Automatic Updates**: Replaceable events update when newer versions arrive
+- **Observable**: Perfect for SwiftUI's reactive model with `@State`
+- **Relay Hints**: Automatically extracts and uses hints from bech32 and tags
+- **Outbox Model**: Falls back to author's write relays when hints unavailable
+- **Proper Cleanup**: Subscriptions cancel automatically when view disappears
 
 ## Subscription Patterns
 

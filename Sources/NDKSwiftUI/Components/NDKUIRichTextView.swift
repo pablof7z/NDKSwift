@@ -314,12 +314,13 @@ public struct NDKUIRichTextView: View {
 // MARK: - NDKUIEventPreview
 
 /// A view for previewing event references
+///
+/// Uses the modern `fetchEvent` API for efficient, cache-first event loading with automatic updates.
 public struct NDKUIEventPreview: View {
     let ndk: NDK
     let eventReference: EventReference
 
-    @State private var event: NDKEvent?
-    @State private var isLoading = true
+    @State private var fetchedEvent: NDKFetchedEvent?
 
     public enum EventReference: Hashable {
         case eventId(String)
@@ -334,9 +335,9 @@ public struct NDKUIEventPreview: View {
 
     public var body: some View {
         Group {
-            if let event = event {
+            if let event = fetchedEvent?.event {
                 NDKUIEventView(ndk: ndk, event: event, style: .embedded, showInteractions: false)
-            } else if isLoading {
+            } else if fetchedEvent?.isLoading == true {
                 HStack {
                     ProgressView()
                         .controlSize(.small)
@@ -347,7 +348,7 @@ public struct NDKUIEventPreview: View {
                 .padding()
                 .background(Color.ndkSecondaryBackground)
                 .cornerRadius(8)
-            } else {
+            } else if fetchedEvent?.error != nil {
                 HStack {
                     Image(systemName: "exclamationmark.triangle")
                         .foregroundColor(.orange)
@@ -361,49 +362,18 @@ public struct NDKUIEventPreview: View {
             }
         }
         .task {
-            await loadEvent()
+            fetchedEvent = ndk.fetchEvent(extractIdentifier())
         }
     }
 
-    private func loadEvent() async {
-        guard let eventId = extractEventId() else {
-            await MainActor.run {
-                isLoading = false
-            }
-            return
-        }
-
-        let filter = NDKFilter(ids: [eventId])
-        let dataSource = ndk.subscribe(filter: filter)
-
-        for await event in dataSource.events {
-            await MainActor.run {
-                self.event = event
-                self.isLoading = false
-            }
-            break // Only need first match
-        }
-
-        // If no event found after subscription completes
-        await MainActor.run {
-            if self.event == nil {
-                self.isLoading = false
-            }
-        }
-    }
-
-    private func extractEventId() -> String? {
+    private func extractIdentifier() -> String {
         switch eventReference {
         case .eventId(let id):
             return id
         case .note(let note):
-            return try? Bech32.eventId(from: note)
+            return note
         case .nevent(let nevent):
-            // For nevent, decode the TLV to extract the event ID
-            if let decoded = try? ContentTagger.decodeNostrEntity(nevent) {
-                return decoded.eventId
-            }
-            return nil
+            return nevent
         }
     }
 }
