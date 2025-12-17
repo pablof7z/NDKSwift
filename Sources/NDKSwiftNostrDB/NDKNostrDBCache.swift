@@ -56,7 +56,7 @@ import NDKSwiftCore
 /// let results = await cache.textSearch("bitcoin")
 /// ```
 public actor NDKNostrDBCache: NDKCache {
-    private var ndb: Ndb?
+    private var nostrDB: Ndb?
     private var events: [String: NDKEvent] = [:]
     private let cachePath: String?
     private var relayCache: LRUCache<String, Bool>
@@ -66,8 +66,8 @@ public actor NDKNostrDBCache: NDKCache {
     /// These events still exist in LMDB but should be filtered from queries.
     private var deletedEventIds: Set<String> = []
 
-    /// Unpublished events store for optimistic publishing (JSON file persistence)
-    private var unpublished: UnpublishedStore?
+    /// Manages optimistic publishing state for unpublished events
+    private var publishingManager: OptimisticPublishingManager
 
     /// Maximum number of relay URLs to track in the LRU cache
     private static let maxRelayCount = 100
@@ -78,17 +78,11 @@ public actor NDKNostrDBCache: NDKCache {
     public init(path: String? = nil) async throws {
         cachePath = path
         relayCache = LRUCache<String, Bool>(capacity: Self.maxRelayCount, defaultTTL: TimeInterval.infinity)
-        ndb = Ndb(path: path)
-        if ndb == nil {
-            throw NDKNostrDBCacheError.failedToOpen
-        }
+        nostrDB = Ndb(path: path)
+        publishingManager = OptimisticPublishingManager(cachePath: path)
 
-        // Initialize unpublished events store (loads from JSON file)
-        do {
-            unpublished = try UnpublishedStore(cachePath: path)
-        } catch {
-            NDKLogger.log(.warning, category: .cache, "Failed to initialize unpublished store: \(error)")
-            // Continue without optimistic publishing support
+        if nostrDB == nil {
+            throw NDKNostrDBCacheError.failedToOpen
         }
     }
 
@@ -97,7 +91,7 @@ public actor NDKNostrDBCache: NDKCache {
     /// Get comprehensive statistics about the cache
     /// - Returns: NdbStat containing per-database and per-kind statistics
     public func getStats() -> NdbStat? {
-        return ndb?.stat()
+        return nostrDB?.stat()
     }
 
     /// Get the path where the cache database is stored
@@ -139,7 +133,9 @@ public actor NDKNostrDBCache: NDKCache {
     // MARK: - Event Operations
 
     public func saveEvent(_ event: NDKEvent) async throws {
-        guard let ndb = ndb else {
+        guard shouldCache(event: event) else { return }
+
+        guard let nostrDB = nostrDB else {
             throw NDKNostrDBCacheError.notInitialized
         }
 
@@ -151,7 +147,7 @@ public actor NDKNostrDBCache: NDKCache {
         }
 
         // Process the event through nostrdb
-        _ = ndb.process_event(json)
+        _ = nostrDB.process_event(json)
         // Note: process_event returns false for duplicates or invalid events
         // This is not necessarily an error, so we don't throw
 
@@ -165,14 +161,14 @@ public actor NDKNostrDBCache: NDKCache {
             return nil
         }
 
-        guard let ndb = ndb else { return nil }
+        guard let nostrDB = nostrDB else { return nil }
 
         // Convert hex ID to NdbNoteId
         guard let idData = hexToData(id) else { return nil }
         let noteId = NdbNoteId(idData)
 
         // Lookup the note from nostrdb
-        guard let txn = ndb.lookup_note(noteId) else {
+        guard let txn = nostrDB.lookup_note(noteId) else {
             // Fall back to in-memory cache if not in nostrdb yet
             return events[id]
         }
@@ -187,7 +183,7 @@ public actor NDKNostrDBCache: NDKCache {
     }
 
     public func queryEvents(_ filter: NDKFilter) async throws -> [NDKEvent] {
-        guard let ndb = ndb else {
+        guard let nostrDB = nostrDB else {
             throw NDKNostrDBCacheError.notInitialized
         }
 
@@ -202,11 +198,11 @@ public actor NDKNostrDBCache: NDKCache {
         // Try native nostrdb query first
         do {
             let ndbFilter = try NdbFilter(from: nostrFilter)
-            let noteKeys = try ndb.query(filters: [ndbFilter], maxResults: filter.limit ?? 500)
+            let noteKeys = try nostrDB.query(filters: [ndbFilter], maxResults: filter.limit ?? 500)
 
             // Convert note keys to NDKEvents, filtering out deleted events
             for noteKey in noteKeys {
-                if let txn = ndb.lookup_note_by_key(noteKey),
+                if let txn = nostrDB.lookup_note_by_key(noteKey),
                    let note = txn.unsafeUnownedValue,
                    let event = convertToNDKEvent(note)
                 {
@@ -218,6 +214,7 @@ public actor NDKNostrDBCache: NDKCache {
             }
         } catch {
             // Nostrdb query failed, will rely on in-memory only
+            NDKLogger.log(.error, category: .cache, "NostrDB native query failed: \(error). Falling back to in-memory query.")
         }
 
         // Also query in-memory cache for events not yet indexed
@@ -342,7 +339,7 @@ public actor NDKNostrDBCache: NDKCache {
         eventRelaySources.removeAll()
         await relayCache.clear()
         deletedEventIds.removeAll()
-        try await unpublished?.clear()
+        try await publishingManager.clear()
     }
 
     /// Completely clears the database by deleting the LMDB files and reinitializing.
@@ -355,11 +352,11 @@ public actor NDKNostrDBCache: NDKCache {
         eventRelaySources.removeAll()
         await relayCache.clear()
         deletedEventIds.removeAll()
-        try await unpublished?.clear()
+        try await publishingManager.clear()
 
         // Close the nostrdb connection
-        ndb?.close()
-        ndb = nil
+        nostrDB?.close()
+        nostrDB = nil
 
         // Get the database path
         guard let dbPath = cachePath ?? Ndb.db_path() else {
@@ -380,8 +377,8 @@ public actor NDKNostrDBCache: NDKCache {
         }
 
         // Reinitialize nostrdb with a fresh database
-        ndb = Ndb(path: cachePath)
-        if ndb == nil {
+        nostrDB = Ndb(path: cachePath)
+        if nostrDB == nil {
             throw NDKNostrDBCacheError.failedToOpen
         }
     }
@@ -393,7 +390,7 @@ public actor NDKNostrDBCache: NDKCache {
         matching filter: NDKFilter,
         includeExisting: Bool
     ) async -> AsyncThrowingStream<[NDKEvent], Error> {
-        guard let ndb = ndb else {
+        guard let nostrDB = nostrDB else {
             return AsyncThrowingStream { continuation in
                 continuation.finish(throwing: NDKNostrDBCacheError.notInitialized)
             }
@@ -420,7 +417,7 @@ public actor NDKNostrDBCache: NDKCache {
                     let ndbFilter = try NdbFilter(from: nostrFilter)
 
                     // Subscribe to new events matching the filter
-                    let subscriptionStream = try ndb.subscribe(filters: [ndbFilter])
+                    let subscriptionStream = try nostrDB.subscribe(filters: [ndbFilter])
 
                     // Process incoming events from the subscription
                     for try await item in subscriptionStream {
@@ -430,7 +427,7 @@ public actor NDKNostrDBCache: NDKCache {
                             continue
                         case .event(let noteKey):
                             // Convert NoteKey to NDKEvent
-                            if let txn = ndb.lookup_note_by_key(noteKey),
+                            if let txn = nostrDB.lookup_note_by_key(noteKey),
                                let note = txn.unsafeUnownedValue,
                                let event = self.convertToNDKEvent(note)
                             {
@@ -451,7 +448,7 @@ public actor NDKNostrDBCache: NDKCache {
         pubkey: String,
         includeExisting: Bool
     ) async -> AsyncThrowingStream<NDKUserMetadata?, Error> {
-        guard let ndb = ndb else {
+        guard let nostrDB = nostrDB else {
             return AsyncThrowingStream { continuation in
                 continuation.finish(throwing: NDKNostrDBCacheError.notInitialized)
             }
@@ -498,7 +495,7 @@ public actor NDKNostrDBCache: NDKCache {
                     let ndbFilter = try NdbFilter(from: nostrFilter)
 
                     // Subscribe to new profile events
-                    let subscriptionStream = try ndb.subscribe(filters: [ndbFilter])
+                    let subscriptionStream = try nostrDB.subscribe(filters: [ndbFilter])
 
                     // Process incoming profile events from the subscription
                     for try await item in subscriptionStream {
@@ -508,7 +505,7 @@ public actor NDKNostrDBCache: NDKCache {
                             continue
                         case .event(let noteKey):
                             // Convert NoteKey to profile metadata
-                            if let txn = ndb.lookup_note_by_key(noteKey),
+                            if let txn = nostrDB.lookup_note_by_key(noteKey),
                                let note = txn.unsafeUnownedValue
                             {
                                 // Parse profile metadata from the event content
@@ -538,14 +535,14 @@ public actor NDKNostrDBCache: NDKCache {
     // MARK: - Profile Metadata Operations
 
     public func getProfileMetadata(pubkey: String) async -> (metadata: [String: Any], updatedAt: Timestamp, eventId: String)? {
-        guard let ndb = ndb else { return nil }
+        guard let nostrDB = nostrDB else { return nil }
 
         // Convert hex pubkey to NdbPubkey
         guard let pkData = hexToData(pubkey) else { return nil }
         let ndbPubkey = NdbPubkey(pkData)
 
         // Lookup profile from NostrDB
-        guard let txn = ndb.lookup_profile(ndbPubkey) else {
+        guard let txn = nostrDB.lookup_profile(ndbPubkey) else {
             // Fall back to in-memory cache
             return getProfileMetadataFromMemory(pubkey: pubkey)
         }
@@ -613,14 +610,14 @@ public actor NDKNostrDBCache: NDKCache {
     ///   - limit: Maximum number of results (default: 50)
     /// - Returns: Array of matching NDKEvents
     public func textSearch(_ query: String, limit: Int = 50) async -> [NDKEvent] {
-        guard let ndb = ndb else { return [] }
+        guard let nostrDB = nostrDB else { return [] }
 
         var results: [NDKEvent] = []
 
         // Use nostrdb's native text_search (fast, indexed)
-        let noteKeys = ndb.text_search(query: query, limit: limit, order: .newest_first)
+        let noteKeys = nostrDB.text_search(query: query, limit: limit, order: .newest_first)
         for noteKey in noteKeys {
-            if let txn = ndb.lookup_note_by_key(noteKey),
+            if let txn = nostrDB.lookup_note_by_key(noteKey),
                let note = txn.unsafeUnownedValue,
                let event = convertToNDKEvent(note)
             {
@@ -639,7 +636,9 @@ public actor NDKNostrDBCache: NDKCache {
     ///   - relay: The relay this event came from
     ///   - subscriptionId: The subscription that received this event
     public func processEvent(_ event: NDKEvent, from relay: String, subscriptionId _: String) async throws {
-        guard let ndb = ndb else {
+        guard shouldCache(event: event) else { return }
+
+        guard let nostrDB = nostrDB else {
             throw NDKNostrDBCacheError.notInitialized
         }
 
@@ -655,7 +654,7 @@ public actor NDKNostrDBCache: NDKCache {
         let json = try event.toJSON()
 
         // Process with relay URL for source tracking (nostrdb also tracks this, but async)
-        _ = ndb.process_event(json, originRelayURL: relay)
+        _ = nostrDB.process_event(json, originRelayURL: relay)
 
         // Also save to in-memory cache
         events[event.id] = event
@@ -683,7 +682,7 @@ public actor NDKNostrDBCache: NDKCache {
         try await saveEvent(event)
 
         // Store in unpublished file (NDK-core already decided this needs tracking)
-        try await unpublished?.add(event, publishedRelays: publishedRelays, pendingRelays: pendingRelays)
+        try await publishingManager.addUnpublishedEvent(event, publishedRelays: publishedRelays, pendingRelays: pendingRelays)
     }
 
     /// Mark event as confirmed on a specific relay
@@ -691,7 +690,7 @@ public actor NDKNostrDBCache: NDKCache {
     ///   - eventId: The event ID
     ///   - relay: The relay URL that confirmed
     public func confirmEvent(eventId: String, onRelay relay: String) async throws {
-        try await unpublished?.markRelayPublished(eventId: eventId, relay: relay)
+        try await publishingManager.confirmEvent(eventId: eventId, onRelay: relay)
     }
 
     /// Record a publish failure for a relay
@@ -700,20 +699,20 @@ public actor NDKNostrDBCache: NDKCache {
     ///   - relay: The relay URL that failed
     ///   - reason: The failure reason
     public func recordPublishFailure(eventId: String, relay: String, reason: String) async throws {
-        try await unpublished?.markRelayFailed(eventId: eventId, relay: relay, reason: reason)
+        try await publishingManager.recordPublishFailure(eventId: eventId, relay: relay, reason: reason)
     }
 
     /// Remove an event from unpublished tracking (called by NDK-core when threshold is met)
     /// - Parameter eventId: The event ID to remove
     public func removeUnpublishedEvent(eventId: String) async throws {
-        try await unpublished?.remove(eventId: eventId)
+        try await publishingManager.removeUnpublishedEvent(eventId: eventId)
     }
 
     /// Get event confirmation state
     /// - Parameter eventId: The event ID
     /// - Returns: Confirmation state with published and pending relays
     public func getEventConfirmationState(eventId: String) async -> EventConfirmationState? {
-        return await unpublished?.getEventConfirmationState(eventId: eventId)
+        return await publishingManager.getEventConfirmationState(eventId: eventId)
     }
 
     /// Get unpublished events that need retry
@@ -725,8 +724,7 @@ public actor NDKNostrDBCache: NDKCache {
         maxAge: TimeInterval = TimeConstants.unpublishedEventRetryWindow,
         limit: Int? = nil
     ) async -> [(event: NDKEvent, targetRelays: Set<String>)] {
-        guard let unpublished = unpublished else { return [] }
-        return await unpublished.getUnpublishedEvents(maxAge: maxAge, limit: limit)
+        return await publishingManager.getUnpublishedEvents(maxAge: maxAge, limit: limit)
     }
 
     // MARK: - Helper Methods
@@ -779,6 +777,30 @@ public actor NDKNostrDBCache: NDKCache {
             result.append(high < 10 ? Character(UnicodeScalar(0x30 + high)) : Character(UnicodeScalar(0x61 + high - 10)))
             result.append(low < 10 ? Character(UnicodeScalar(0x30 + low)) : Character(UnicodeScalar(0x61 + low - 10)))
         }
+    }
+
+    /// Check if an event should be cached
+    /// - Parameter event: The event to check
+    /// - Returns: true if the event should be cached, false otherwise
+    private func shouldCache(event: NDKEvent) -> Bool {
+        // Skip ephemeral events (20000-29999) - they should never be persisted
+        if EventKind.isEphemeral(event.kind) {
+            NDKLogger.log(.trace, category: .cache, "NDKNostrDBCache: Skipping ephemeral event (kind: \(event.kind)): \(event.id)")
+            return false
+        }
+        return true
+    }
+
+    /// Lookup and convert a note by its key
+    /// - Parameter noteKey: The note key to lookup
+    /// - Returns: The converted NDKEvent, or nil if not found
+    private func lookupAndConvert(noteKey: NoteKey) -> NDKEvent? {
+        guard let nostrDB = nostrDB,
+              let txn = nostrDB.lookup_note_by_key(noteKey),
+              let note = txn.unsafeUnownedValue else {
+            return nil
+        }
+        return convertToNDKEvent(note)
     }
 }
 
