@@ -25,6 +25,11 @@ public actor NDKNetworkMonitor {
 
     public init() {}
 
+    /// Set the delegate for receiving network change notifications
+    public func setDelegate(_ delegate: NDKNetworkMonitorDelegate?) {
+        self.delegate = delegate
+    }
+
     /// Start monitoring network changes
     public func startMonitoring() {
         guard !isMonitoring else {
