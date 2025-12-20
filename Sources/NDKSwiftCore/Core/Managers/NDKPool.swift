@@ -659,25 +659,24 @@ public actor NDKPool {
 // MARK: - NDKConnectionMonitorDelegate
 
 extension NDKPool: NDKConnectionMonitorDelegate {
-    public func connectionMonitorDidEnterBackground() {
+    nonisolated public func connectionMonitorDidEnterBackground() {
         NDKLogger.log(.info, category: .connection, "📱 App entered background - pausing connection monitoring")
         // Don't disconnect, but monitoring tasks will naturally pause
     }
 
-    public func connectionMonitorDidEnterForeground() {
-        guard config.autoReconnectOnForeground else { return }
-
+    nonisolated public func connectionMonitorDidEnterForeground() {
         NDKLogger.log(.info, category: .connection, "📱 App entering foreground - checking connections")
         Task {
-            await reconnectAll()
+            guard await self.config.autoReconnectOnForeground else { return }
+            await self.reconnectAll()
         }
     }
 
-    public func connectionMonitorDidBecomeActive() {
+    nonisolated public func connectionMonitorDidBecomeActive() {
         NDKLogger.log(.debug, category: .connection, "📱 App became active")
     }
 
-    public func connectionMonitorWillResignActive() {
+    nonisolated public func connectionMonitorWillResignActive() {
         NDKLogger.log(.debug, category: .connection, "📱 App will resign active")
     }
 }
@@ -685,28 +684,26 @@ extension NDKPool: NDKConnectionMonitorDelegate {
 // MARK: - NDKNetworkMonitorDelegate
 
 extension NDKPool: NDKNetworkMonitorDelegate {
-    public func networkMonitorDidGainConnectivity() {
-        guard config.autoReconnectOnNetworkChange else { return }
-
+    nonisolated public func networkMonitorDidGainConnectivity() {
         NDKLogger.log(.info, category: .connection, "🌐 Network connectivity gained - reconnecting")
         Task {
-            await reconnectAll()
+            guard await self.config.autoReconnectOnNetworkChange else { return }
+            await self.reconnectAll()
         }
     }
 
-    public func networkMonitorDidLoseConnectivity() {
+    nonisolated public func networkMonitorDidLoseConnectivity() {
         NDKLogger.log(.warning, category: .connection, "🌐 Network connectivity lost")
         // Don't disconnect - let health checks and reconnection handle it
     }
 
-    public func networkMonitorDidChangeNetworkType() {
-        guard config.autoReconnectOnNetworkChange else { return }
-
+    nonisolated public func networkMonitorDidChangeNetworkType() {
         NDKLogger.log(.info, category: .connection, "🌐 Network type changed - reconnecting")
         Task {
+            guard await self.config.autoReconnectOnNetworkChange else { return }
             // Small delay to let network stabilize
             try? await Task.sleep(nanoseconds: UInt64(1.0 * Double(TimeConstants.nanosecondsPerSecond)))
-            await reconnectAll()
+            await self.reconnectAll()
         }
     }
 }

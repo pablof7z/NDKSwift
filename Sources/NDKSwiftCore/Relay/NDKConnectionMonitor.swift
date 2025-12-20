@@ -33,6 +33,11 @@ public actor NDKConnectionMonitor {
 
     public init() {}
 
+    /// Set the delegate for receiving lifecycle notifications
+    public func setDelegate(_ delegate: NDKConnectionMonitorDelegate?) {
+        self.delegate = delegate
+    }
+
     /// Start monitoring app lifecycle events
     public func startMonitoring() {
         guard !isMonitoring else {

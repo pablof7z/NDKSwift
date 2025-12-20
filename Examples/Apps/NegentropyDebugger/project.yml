@@ -1,0 +1,60 @@
+name: NegentropyDebugger
+options:
+  bundleIdPrefix: com.ndkswift
+  deploymentTarget:
+    iOS: "26.0"
+  xcodeVersion: "26.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: ${DEVELOPMENT_TEAM}
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "5.9"
+
+packages:
+  NDKSwift:
+    path: ../../..
+
+targets:
+  NegentropyDebugger:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+        type: group
+    resources:
+      - path: Resources
+        type: group
+    settings:
+      base:
+        INFOPLIST_FILE: Resources/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.ndkswift.negentropydebugger
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_ENTITLEMENTS: Resources/NegentropyDebugger.entitlements
+        TARGETED_DEVICE_FAMILY: "2"
+    dependencies:
+      - package: NDKSwift
+        product: NDKSwiftCore
+      - package: NDKSwift
+        product: NDKSwiftNostrDB
+    entitlements:
+      path: Resources/NegentropyDebugger.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.network.client: true
+
+schemes:
+  NegentropyDebugger:
+    build:
+      targets:
+        NegentropyDebugger: all
+    run:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
