@@ -94,6 +94,24 @@ public actor NDKNWCWallet: NDKPaymentProvider {
         // Store the connection task
         let task = Task {
             do {
+                // First, ensure NWC relays are connected
+                let nwcRelayURLs = connectionURI.normalizedRelayURLs()
+                NDKLogger.log(.debug, category: .wallet, "\(logPrefix) Connecting to NWC relays: \(nwcRelayURLs)")
+
+                for relayURL in nwcRelayURLs {
+                    let relay = await ndk.addRelay(relayURL)
+
+                    // Wait for relay to connect (up to 5 seconds)
+                    let startTime = Date()
+                    while !(await relay.isConnected) {
+                        if Date().timeIntervalSince(startTime) > 5.0 {
+                            throw NDKError.timeout(operation: "NWC relay connection to \(relayURL)", seconds: 5)
+                        }
+                        try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+                    }
+                    NDKLogger.log(.debug, category: .wallet, "\(logPrefix) Relay \(relayURL) connected")
+                }
+
                 // Fetch wallet info to verify connection
                 NDKLogger.log(.debug, category: .wallet, "\(logPrefix) Fetching wallet info...")
                 let info = try await getInfo()
