@@ -25,6 +25,7 @@ public protocol NDKRelayConnectionDelegate: AnyObject, Sendable {
 /// ```
 public actor NDKRelayConnection {
     private let url: URL
+    private let config: NDKConnectionConfig
 
     #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
         private var webSocketTask: URLSessionWebSocketTask?
@@ -65,8 +66,18 @@ public actor NDKRelayConnection {
     /// Track pending EVENT messages waiting for OK responses
     private var pendingEvents: [EventID: CheckedContinuation<Bool, Error>] = [:]
 
-    public init(url: URL) {
+    /// Health check timer task
+    private var healthCheckTask: Task<Void, Never>?
+
+    /// Last successful health check timestamp
+    private var lastHealthCheckAt: Date?
+
+    /// WebSocket state monitoring task
+    private var stateMonitorTask: Task<Void, Never>?
+
+    public init(url: URL, config: NDKConnectionConfig = .default) {
         self.url = url
+        self.config = config
         NDKLogger.log(.debug, category: .connection, "🆕 NDKRelayConnection initialized for \(url)")
     }
 
@@ -206,6 +217,10 @@ public actor NDKRelayConnection {
         NDKLogger.log(.info, category: .connection, "🔌 Disconnecting from \(url)")
         retryPolicy.cancel()
         retryPolicy.reset()
+
+        // Stop monitoring tasks
+        stopHealthChecks()
+        stopStateMonitoring()
 
         #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
             if let task = webSocketTask {
@@ -499,6 +514,10 @@ public actor NDKRelayConnection {
             connectedAt = Date()
             retryPolicy.reset()
 
+            // Start monitoring tasks
+            startHealthChecks()
+            startStateMonitoring()
+
             resumeAllContinuations(with: .success(()))
 
             // Notify delegate
@@ -625,6 +644,159 @@ public actor NDKRelayConnection {
 
         // Default to network error
         return NDKError.networkError(for: url.absoluteString, operation: operation, error: error)
+    }
+
+    // MARK: - Health Check & State Monitoring
+
+    /// Start periodic health checks
+    private func startHealthChecks() {
+        guard config.enableHealthChecks else { return }
+
+        // Cancel any existing health check task
+        healthCheckTask?.cancel()
+
+        healthCheckTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self = self else { return }
+
+                // Wait for the configured interval
+                try? await Task.sleep(nanoseconds: UInt64(await self.config.healthCheckInterval * Double(TimeConstants.nanosecondsPerSecond)))
+
+                guard !Task.isCancelled else { return }
+
+                // Perform health check
+                await self.performHealthCheck()
+            }
+        }
+    }
+
+    /// Stop periodic health checks
+    private func stopHealthChecks() {
+        healthCheckTask?.cancel()
+        healthCheckTask = nil
+    }
+
+    /// Perform a health check
+    private func performHealthCheck() async {
+        guard isConnected else { return }
+
+        #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
+            guard let task = webSocketTask else {
+                NDKLogger.log(.warning, category: .connection, "⚠️ Health check failed - no WebSocket task for \(url)")
+                await handleHealthCheckFailure()
+                return
+            }
+
+            let checkCompleted = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+                var checkHandled = false
+
+                // Set up timeout
+                let timeoutTask = Task { [weak self] in
+                    try? await Task.sleep(nanoseconds: UInt64(await self?.config.healthCheckTimeout ?? 10.0 * Double(TimeConstants.nanosecondsPerSecond)))
+                    if !checkHandled {
+                        checkHandled = true
+                        NDKLogger.log(.warning, category: .connection, "⏰ Health check timeout for \(url)")
+                        continuation.resume(returning: false)
+                    }
+                }
+
+                task.sendPing { [weak self] error in
+                    guard !checkHandled else { return }
+                    checkHandled = true
+                    timeoutTask.cancel()
+
+                    if let error = error {
+                        Task { [weak self] in
+                            guard let self = self else { return }
+                            NDKLogger.log(.warning, category: .connection, "❌ Health check ping failed for \(self.url): \(error)")
+                            continuation.resume(returning: false)
+                        }
+                    } else {
+                        Task { [weak self] in
+                            guard let self = self else { return }
+                            await self.updateLastHealthCheck()
+                            NDKLogger.log(.trace, category: .connection, "✅ Health check passed for \(self.url)")
+                            continuation.resume(returning: true)
+                        }
+                    }
+                }
+            }
+
+            if !checkCompleted {
+                await handleHealthCheckFailure()
+            }
+        #endif
+    }
+
+    /// Update last health check timestamp
+    private func updateLastHealthCheck() {
+        lastHealthCheckAt = Date()
+    }
+
+    /// Handle health check failure
+    private func handleHealthCheckFailure() async {
+        NDKLogger.log(.error, category: .connection, "🔴 Health check failed for \(url) - reconnecting...")
+        let error = NDKError.connectionLost(relay: url.absoluteString, message: "Health check failed")
+        await handleConnectionError(error)
+    }
+
+    /// Start WebSocket state monitoring
+    private func startStateMonitoring() {
+        guard config.enableStateMonitoring else { return }
+
+        // Cancel any existing state monitor task
+        stateMonitorTask?.cancel()
+
+        #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
+            stateMonitorTask = Task { [weak self] in
+                while !Task.isCancelled {
+                    guard let self = self else { return }
+
+                    // Check WebSocket state every 5 seconds
+                    try? await Task.sleep(nanoseconds: UInt64(5 * Double(TimeConstants.nanosecondsPerSecond)))
+
+                    guard !Task.isCancelled else { return }
+
+                    await self.checkWebSocketState()
+                }
+            }
+        #endif
+    }
+
+    /// Stop WebSocket state monitoring
+    private func stopStateMonitoring() {
+        stateMonitorTask?.cancel()
+        stateMonitorTask = nil
+    }
+
+    /// Check WebSocket task state
+    private func checkWebSocketState() async {
+        #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
+            guard isConnected else { return }
+
+            guard let task = webSocketTask else {
+                NDKLogger.log(.warning, category: .connection, "⚠️ Connected but no WebSocket task for \(url)")
+                let error = NDKError.connectionLost(relay: url.absoluteString, message: "WebSocket task missing")
+                await handleConnectionError(error)
+                return
+            }
+
+            // Check if the task is in a running state
+            switch task.state {
+            case .running:
+                // All good
+                break
+            case .suspended:
+                NDKLogger.log(.warning, category: .connection, "⚠️ WebSocket task suspended for \(url)")
+                task.resume() // Try to resume
+            case .canceling, .completed:
+                NDKLogger.log(.error, category: .connection, "🔴 WebSocket task no longer running for \(url)")
+                let error = NDKError.connectionLost(relay: url.absoluteString, message: "WebSocket task ended")
+                await handleConnectionError(error)
+            @unknown default:
+                NDKLogger.log(.warning, category: .connection, "❓ Unknown WebSocket state for \(url)")
+            }
+        #endif
     }
 
     // MARK: - Delegate Notification Helper
