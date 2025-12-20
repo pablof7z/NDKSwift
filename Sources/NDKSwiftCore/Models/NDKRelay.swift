@@ -407,8 +407,11 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
 
     // MARK: - Initialization
 
-    public init(url: RelayURL) {
+    private let config: NDKConnectionConfig
+
+    public init(url: RelayURL, config: NDKConnectionConfig = .default) {
         self.url = url
+        self.config = config
     }
 
     // MARK: - Public Properties (Async)
@@ -546,7 +549,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
 
         let url = try URLUtils.validateURL(normalizedURL)
 
-        let newConnection = NDKRelayConnection(url: url)
+        let newConnection = NDKRelayConnection(url: url, config: config)
         await stateActor.setConnection(newConnection)
         await newConnection.setDelegate(self)
 

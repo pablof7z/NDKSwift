@@ -58,6 +58,9 @@ public final class NDK {
     /// Configuration for automatic client tagging (NIP-89)
     public let clientTagConfig: NDKClientTagConfig?
 
+    /// Connection reliability configuration
+    public let connectionConfig: NDKConnectionConfig
+
     /// Track pending auth events by event ID to relay (thread-safe via actor)
     private let pendingAuthEvents = PendingAuthEvents()
 
@@ -87,7 +90,7 @@ public final class NDK {
 
     /// Relay pool management
     public lazy var pool: NDKPool = {
-        NDKPool(ndk: self)
+        NDKPool(ndk: self, config: self.connectionConfig)
     }()
 
     /// User and profile management
@@ -166,6 +169,7 @@ public final class NDK {
     ///   - outboxEnabled: Whether outbox model is enabled
     ///   - outboxConfig: Outbox configuration
     ///   - clientTagConfig: Configuration for automatic client tagging
+    ///   - connectionConfig: Connection reliability configuration
     public init(
         relayURLs: [RelayURL] = [],
         signer: NDKSigner? = nil,
@@ -175,7 +179,8 @@ public final class NDK {
         debugMode: Bool = false,
         outboxEnabled: Bool = true,
         outboxConfig: NDKOutboxConfig = .default,
-        clientTagConfig: NDKClientTagConfig? = nil
+        clientTagConfig: NDKClientTagConfig? = nil,
+        connectionConfig: NDKConnectionConfig = .default
     ) {
         self.signer = signer
         self.sessionData = sessionData
@@ -185,6 +190,7 @@ public final class NDK {
         self.outboxEnabled = outboxEnabled
         self.outboxConfig = outboxConfig
         self.clientTagConfig = clientTagConfig
+        self.connectionConfig = connectionConfig
 
         // All managers are now lazy-initialized on first access
         // This avoids initialization order issues with 'self'
