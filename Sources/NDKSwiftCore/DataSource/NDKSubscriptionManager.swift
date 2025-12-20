@@ -113,10 +113,8 @@ actor NDKSubscriptionManager {
             activeRequirements[requirementId] = requirement
         }
 
-        // Start processing
-        Task {
-            await requirement.startProcessing()
-        }
+        // Start processing synchronously to ensure subscription is active before returning
+        await requirement.startProcessing()
 
         return (
             handle: NDKSubscriptionRequirementHandle(
