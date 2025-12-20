@@ -17,6 +17,7 @@ public enum NDKPoolChangeEvent: Sendable {
 public actor NDKPool {
     private weak var ndk: NDK?
     private var relayMap: [String: NDKRelay] = [:]
+    private let config: NDKConnectionConfig
 
     /// Set of relay URLs that were explicitly added by the developer
     private var explicitRelayUrls: Set<String> = []
@@ -36,8 +37,17 @@ public actor NDKPool {
     /// Subscription task for blocked relay list updates
     private var blockedRelaySubscriptionTask: Task<Void, Never>?
 
-    init(ndk: NDK) {
+    /// Connection lifecycle monitor
+    private let connectionMonitor: NDKConnectionMonitor
+
+    /// Network connectivity monitor
+    private let networkMonitor: NDKNetworkMonitor
+
+    init(ndk: NDK, config: NDKConnectionConfig = .default) {
         self.ndk = ndk
+        self.config = config
+        self.connectionMonitor = NDKConnectionMonitor()
+        self.networkMonitor = NDKNetworkMonitor()
 
         // Initialize the relay change stream
         (poolChangeStream, poolChangeContinuation) = AsyncStream<NDKPoolChangeEvent>.makeStream()
@@ -45,6 +55,7 @@ public actor NDKPool {
         // Start monitoring blocked relay list if we have a signer
         Task {
             await startBlockedRelaySubscription()
+            await setupMonitors()
         }
     }
 
@@ -196,12 +207,12 @@ public actor NDKPool {
         if blockedRelays.contains(normalizedUrl) {
             NDKLogger.log(.warning, category: .general, "Attempted to add blocked relay: \(normalizedUrl)")
             // Create a disconnected relay instance to return (won't be added to pool)
-            let blockedRelay = NDKRelay(url: normalizedUrl)
+            let blockedRelay = NDKRelay(url: normalizedUrl, config: config)
             return blockedRelay
         }
 
-        // Create new relay
-        let relay = NDKRelay(url: normalizedUrl)
+        // Create new relay with connection config
+        let relay = NDKRelay(url: normalizedUrl, config: config)
         if let ndk = ndk {
             await relay.setNDK(ndk)
         }
@@ -567,10 +578,69 @@ public actor NDKPool {
         await ndk.eventManager.publishQueuedEvents(for: relay)
     }
 
+    // MARK: - Connection Monitoring
+
+    /// Setup lifecycle and network monitors
+    private func setupMonitors() async {
+        // Setup connection monitor delegate
+        await connectionMonitor.setDelegate(self)
+
+        // Setup network monitor delegate
+        await networkMonitor.setDelegate(self)
+
+        // Start monitors if enabled
+        if config.enableLifecycleMonitoring {
+            await connectionMonitor.startMonitoring()
+        }
+
+        if config.enableNetworkMonitoring {
+            await networkMonitor.startMonitoring()
+        }
+    }
+
+    /// Reconnect all relays
+    private func reconnectAll() async {
+        NDKLogger.log(.info, category: .connection, "🔄 Reconnecting all relays...")
+
+        await withTaskGroup(of: Void.self) { group in
+            for relay in relays {
+                group.addTask {
+                    do {
+                        // First disconnect if connected
+                        let state = await relay.connectionState
+                        if state == .connected || state == .authenticated {
+                            await relay.disconnect()
+                        }
+
+                        // Small delay to ensure clean disconnect
+                        try? await Task.sleep(nanoseconds: UInt64(0.1 * Double(TimeConstants.nanosecondsPerSecond)))
+
+                        // Then reconnect
+                        try await relay.connect()
+                    } catch {
+                        Task {
+                            let shouldLog = await connectionErrorRateLimiter.shouldLogError(for: relay.url, errorType: "reconnectFailed")
+                            if shouldLog {
+                                NDKLogger.log(.error, category: .relay, "❌ Failed to reconnect to \(relay.url): \(error)")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let connectedCount = await connectedRelays().count
+        NDKLogger.log(.info, category: .relay, "✅ Reconnection complete - connected: \(connectedCount)/\(relays.count)")
+    }
+
     // MARK: - Cleanup
 
     /// Stop all subscriptions and clean up resources
     public func stop() async {
+        // Stop monitors
+        await connectionMonitor.stopMonitoring()
+        await networkMonitor.stopMonitoring()
+
         // Cancel blocked relay subscription
         blockedRelaySubscriptionTask?.cancel()
         blockedRelaySubscriptionTask = nil
@@ -583,5 +653,60 @@ public actor NDKPool {
     deinit {
         // Cancel subscription if not already done
         blockedRelaySubscriptionTask?.cancel()
+    }
+}
+
+// MARK: - NDKConnectionMonitorDelegate
+
+extension NDKPool: NDKConnectionMonitorDelegate {
+    public func connectionMonitorDidEnterBackground() {
+        NDKLogger.log(.info, category: .connection, "📱 App entered background - pausing connection monitoring")
+        // Don't disconnect, but monitoring tasks will naturally pause
+    }
+
+    public func connectionMonitorDidEnterForeground() {
+        guard config.autoReconnectOnForeground else { return }
+
+        NDKLogger.log(.info, category: .connection, "📱 App entering foreground - checking connections")
+        Task {
+            await reconnectAll()
+        }
+    }
+
+    public func connectionMonitorDidBecomeActive() {
+        NDKLogger.log(.debug, category: .connection, "📱 App became active")
+    }
+
+    public func connectionMonitorWillResignActive() {
+        NDKLogger.log(.debug, category: .connection, "📱 App will resign active")
+    }
+}
+
+// MARK: - NDKNetworkMonitorDelegate
+
+extension NDKPool: NDKNetworkMonitorDelegate {
+    public func networkMonitorDidGainConnectivity() {
+        guard config.autoReconnectOnNetworkChange else { return }
+
+        NDKLogger.log(.info, category: .connection, "🌐 Network connectivity gained - reconnecting")
+        Task {
+            await reconnectAll()
+        }
+    }
+
+    public func networkMonitorDidLoseConnectivity() {
+        NDKLogger.log(.warning, category: .connection, "🌐 Network connectivity lost")
+        // Don't disconnect - let health checks and reconnection handle it
+    }
+
+    public func networkMonitorDidChangeNetworkType() {
+        guard config.autoReconnectOnNetworkChange else { return }
+
+        NDKLogger.log(.info, category: .connection, "🌐 Network type changed - reconnecting")
+        Task {
+            // Small delay to let network stabilize
+            try? await Task.sleep(nanoseconds: UInt64(1.0 * Double(TimeConstants.nanosecondsPerSecond)))
+            await reconnectAll()
+        }
     }
 }
