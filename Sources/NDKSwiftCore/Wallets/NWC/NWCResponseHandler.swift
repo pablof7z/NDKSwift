@@ -36,19 +36,26 @@ public struct NWCResponseHandler {
                     relay.url == url
             }
         }
-        NDKLogger.log(.debug, category: .wallet, "[NWC Response] Using \(connectedRelays.count) connected relays")
+        NDKLogger.log(.debug, category: .wallet, "[NWC Response] Using \(connectedRelays.count) connected relays out of \(allRelays.count) total")
 
         // 2. Create subscription for the response BEFORE publishing
         let relayUrls = Set(connectedRelays.map { $0.url })
 
+        guard !relayUrls.isEmpty else {
+            NDKLogger.log(.error, category: .wallet, "[NWC Response] No matching NWC relays found! Expected: \(relayURLs)")
+            throw NDKError.notConfigured("No NWC relays connected. Expected: \(relayURLs)")
+        }
+
         // Use NDKSubscription for NWC response monitoring
-        let dataSource = NDKSubscription(
-            ndk: ndk,
-            filter: filter,
+        // IMPORTANT: groupable: false ensures the subscription REQ is sent immediately
+        // before we publish the request event (prevents race condition)
+        let options = NDKSubscriptionOptions(
             maxAge: 0, // Always fresh for real-time response monitoring
             cachePolicy: .networkOnly, // Skip cache for NWC responses
-            relays: relayUrls
+            relays: relayUrls,
+            groupable: false // Execute immediately, don't wait for grouping
         )
+        let dataSource = NDKSubscription<NDKEvent>(ndk: ndk, filter: filter, options: options)
 
         // Collect response in a task
         let responseTask = Task { () -> T in
@@ -84,53 +91,37 @@ public struct NWCResponseHandler {
             throw NDKError.timeout(operation: "NWC response", seconds: Int(timeout))
         }
 
-        // 3. AsyncStream starts immediately, no need to wait for EOSE
+        // 3. Wait for subscription to be fully ready (REQ sent to relay)
+        // This ensures we receive the response before the wallet service sends it
+        await dataSource.ensureReady()
 
-        // 4. Now publish the request
-        NDKLogger.log(.debug, category: .wallet, "[NWC Response] Publishing request event \(requestId)")
-        let publishedRelays = try await ndk.publish(event)
+        // 4. Now publish the request to NWC relays specifically
+        NDKLogger.log(.debug, category: .wallet, "[NWC Response] Publishing request event \(requestId) to NWC relays: \(relayUrls)")
+        let publishedRelays = try await ndk.publish(event, to: relayUrls)
         NDKLogger.log(.debug, category: .wallet, "[NWC Response] Published to \(publishedRelays.count) relays")
 
-        // 5. Set up timeout
-        let timeoutTask = Task {
-            try await Task.sleep(nanoseconds: UInt64(timeout * Double(TimeConstants.nanosecondsPerSecond)))
-            // AsyncStream will clean up automatically when task is cancelled
-            throw NDKError.timeout(operation: "NWC response", seconds: Int(timeout))
-        }
-
-        // 6. Race between response and timeout
-        let result: T = try await withThrowingTaskGroup(of: Result<T, Error>.self) { group in
+        // 5. Race between response and timeout
+        let result: T = try await withThrowingTaskGroup(of: T.self) { group in
+            // Response task
             group.addTask {
-                do {
-                    return try .success(await responseTask.value)
-                } catch {
-                    return .failure(error)
-                }
+                try await responseTask.value
             }
 
+            // Timeout task
             group.addTask {
-                do {
-                    try await timeoutTask.value
-                    return .failure(NDKError.timeout(operation: "NWC response", seconds: Int(timeout)))
-                } catch {
-                    return .failure(error)
-                }
+                try await Task.sleep(nanoseconds: UInt64(timeout * Double(TimeConstants.nanosecondsPerSecond)))
+                throw NDKError.timeout(operation: "NWC response", seconds: Int(timeout))
             }
 
-            // Wait for first result
+            // Wait for first result (either response or timeout)
             guard let firstResult = try await group.next() else {
                 throw NDKError.timeout(operation: "NWC response", seconds: Int(timeout))
             }
 
-            // Cancel the other task
+            // Cancel the remaining task
             group.cancelAll()
 
-            switch firstResult {
-            case let .success(value):
-                return value
-            case let .failure(error):
-                throw error
-            }
+            return firstResult
         }
 
         return result

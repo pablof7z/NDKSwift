@@ -322,6 +322,12 @@ public final class NDKSubscription<T> {
         await startObserving()
     }
 
+    /// Wait for the subscription to be fully ready (REQ sent to relay)
+    /// Use this before publishing events that expect responses
+    public func ensureReady() async {
+        await task?.value
+    }
+
     // MARK: - Event-Driven Methods
 
     /// Wait for the first event to arrive
