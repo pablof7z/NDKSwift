@@ -103,8 +103,8 @@ final class OTLPSpanExporter: SpanExporter, @unchecked Sendable {
 
     private func buildOTLPSpan(_ span: RecordedSpan) -> [String: Any] {
         var otlpSpan: [String: Any] = [
-            "traceId": hexToBase64(span.context.traceId),
-            "spanId": hexToBase64(span.context.spanId),
+            "traceId": padTraceId(span.context.traceId),
+            "spanId": padSpanId(span.context.spanId),
             "name": span.name,
             "kind": 1, // SPAN_KIND_INTERNAL
             "startTimeUnixNano": nanosFromDate(span.startTime),
@@ -115,7 +115,7 @@ final class OTLPSpanExporter: SpanExporter, @unchecked Sendable {
         ]
 
         if let parentId = span.context.parentSpanId {
-            otlpSpan["parentSpanId"] = hexToBase64(parentId)
+            otlpSpan["parentSpanId"] = padSpanId(parentId)
         }
 
         return otlpSpan
@@ -190,31 +190,17 @@ final class OTLPSpanExporter: SpanExporter, @unchecked Sendable {
         return String(nanos)
     }
 
-    private func hexToBase64(_ hex: String) -> String {
-        // Pad to even length
-        var paddedHex = hex
-        if paddedHex.count % 2 != 0 {
-            paddedHex = "0" + paddedHex
-        }
-
-        // Convert hex to bytes
-        var bytes: [UInt8] = []
-        var index = paddedHex.startIndex
-        while index < paddedHex.endIndex {
-            let nextIndex = paddedHex.index(index, offsetBy: 2)
-            if let byte = UInt8(paddedHex[index..<nextIndex], radix: 16) {
-                bytes.append(byte)
-            }
-            index = nextIndex
-        }
-
-        // For OTLP JSON, trace IDs and span IDs should be hex strings, not base64
-        // Return the original hex string padded to correct length
+    /// Pad trace ID to 32 hex chars (16 bytes)
+    private func padTraceId(_ hex: String) -> String {
         if hex.count < 32 {
-            // Trace ID should be 32 hex chars (16 bytes)
             return String(repeating: "0", count: 32 - hex.count) + hex
-        } else if hex.count < 16 {
-            // Span ID should be 16 hex chars (8 bytes)
+        }
+        return hex
+    }
+
+    /// Pad span ID to 16 hex chars (8 bytes)
+    private func padSpanId(_ hex: String) -> String {
+        if hex.count < 16 {
             return String(repeating: "0", count: 16 - hex.count) + hex
         }
         return hex
