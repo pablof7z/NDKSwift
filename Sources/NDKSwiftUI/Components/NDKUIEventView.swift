@@ -94,7 +94,8 @@ public struct NDKUIEventView: View {
                     showAuthor: showAuthor,
                     showTimestamp: showTimestamp,
                     showInteractions: showInteractions,
-                    authorTapAction: authorTapAction
+                    authorTapAction: authorTapAction,
+                    eventTapAction: eventTapAction
                 )
             case 20:
                 NDKPictureEventView(
@@ -103,7 +104,8 @@ public struct NDKUIEventView: View {
                     style: style,
                     showAuthor: showAuthor,
                     showTimestamp: showTimestamp,
-                    authorTapAction: authorTapAction
+                    authorTapAction: authorTapAction,
+                    eventTapAction: eventTapAction
                 )
             case EventKind.longFormContent:
                 NDKLongFormArticleView(
@@ -112,7 +114,8 @@ public struct NDKUIEventView: View {
                     style: style,
                     showAuthor: showAuthor,
                     showTimestamp: showTimestamp,
-                    authorTapAction: authorTapAction
+                    authorTapAction: authorTapAction,
+                    eventTapAction: eventTapAction
                 )
             case 9321:
                 NDKCashuTokenView(
@@ -121,7 +124,8 @@ public struct NDKUIEventView: View {
                     style: style,
                     showAuthor: showAuthor,
                     showTimestamp: showTimestamp,
-                    authorTapAction: authorTapAction
+                    authorTapAction: authorTapAction,
+                    eventTapAction: eventTapAction
                 )
             default:
                 NDKGenericEventView(
@@ -130,13 +134,10 @@ public struct NDKUIEventView: View {
                     style: style,
                     showAuthor: showAuthor,
                     showTimestamp: showTimestamp,
-                    authorTapAction: authorTapAction
+                    authorTapAction: authorTapAction,
+                    eventTapAction: eventTapAction
                 )
             }
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            eventTapAction?(event)
         }
     }
 
@@ -168,6 +169,7 @@ public struct NDKTextNoteView: View {
     let showTimestamp: Bool
     let showInteractions: Bool
     let authorTapAction: ((String) -> Void)?
+    let eventTapAction: ((NDKEvent) -> Void)?
 
     public var body: some View {
         VStack(alignment: .leading, spacing: NDKEventViewStyles.verticalSpacing(for: style)) {
@@ -188,9 +190,15 @@ public struct NDKTextNoteView: View {
             }
 
             // Content
-            NDKRichText(content: event.content)
-                .font(NDKEventViewStyles.contentFont(for: style))
-                .lineLimit(NDKEventViewStyles.contentLineLimit(for: style))
+            Group {
+                NDKRichText(content: event.content)
+                    .font(NDKEventViewStyles.contentFont(for: style))
+                    .lineLimit(NDKEventViewStyles.contentLineLimit(for: style))
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                eventTapAction?(event)
+            }
 
             // Media/URL previews would go here in full implementation
 
@@ -213,6 +221,7 @@ public struct NDKLongFormArticleView: View {
     let showAuthor: Bool
     let showTimestamp: Bool
     let authorTapAction: ((String) -> Void)?
+    let eventTapAction: ((NDKEvent) -> Void)?
 
     public var body: some View {
         VStack(alignment: .leading, spacing: NDKEventViewStyles.verticalSpacing(for: style)) {
@@ -283,6 +292,10 @@ public struct NDKLongFormArticleView: View {
                 }
             }
             .ndkEventCardStyle(style)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                eventTapAction?(event)
+            }
         }
         .ndkEventViewStyle(style)
     }
@@ -324,6 +337,7 @@ public struct NDKCashuTokenView: View {
     let showAuthor: Bool
     let showTimestamp: Bool
     let authorTapAction: ((String) -> Void)?
+    let eventTapAction: ((NDKEvent) -> Void)?
 
     public var body: some View {
         VStack(alignment: .leading, spacing: NDKEventViewStyles.verticalSpacing(for: style)) {
@@ -387,6 +401,10 @@ public struct NDKCashuTokenView: View {
                 RoundedRectangle(cornerRadius: NDKEventViewStyles.cardCornerRadius(for: style))
                     .stroke(Color.orange.opacity(OpacityConstants.border), lineWidth: 1)
             )
+            .contentShape(Rectangle())
+            .onTapGesture {
+                eventTapAction?(event)
+            }
         }
         .ndkEventViewStyle(style)
     }
@@ -416,6 +434,7 @@ public struct NDKPictureEventView: View {
     let showAuthor: Bool
     let showTimestamp: Bool
     let authorTapAction: ((String) -> Void)?
+    let eventTapAction: ((NDKEvent) -> Void)?
 
     public var body: some View {
         VStack(alignment: .leading, spacing: NDKEventViewStyles.verticalSpacing(for: style)) {
@@ -435,38 +454,44 @@ public struct NDKPictureEventView: View {
                 }
             }
 
-            // Title if available
-            if let title = extractTitle() {
-                Text(title)
-                    .font(NDKEventViewStyles.titleFont(for: style))
-                    .fontWeight(.semibold)
-                    .lineLimit(NDKEventViewStyles.titleLineLimit(for: style))
-            }
-
-            // Images from imeta tags
-            let imageURLs = extractImageURLs()
-            if !imageURLs.isEmpty {
-                PictureGrid(imageURLs: imageURLs, style: style)
-            }
-
-            // Description content
-            if !event.content.isEmpty {
-                NDKRichText(content: event.content)
-                    .font(NDKEventViewStyles.contentFont(for: style))
-                    .lineLimit(NDKEventViewStyles.contentLineLimit(for: style))
-            }
-
-            // Location if available
-            if let location = extractLocation() {
-                HStack(spacing: 4) {
-                    Image(systemName: "location")
-                        .font(NDKEventViewStyles.captionFont(for: style))
-                        .foregroundStyle(.secondary)
-
-                    Text(location)
-                        .font(NDKEventViewStyles.captionFont(for: style))
-                        .foregroundStyle(.secondary)
+            Group {
+                // Title if available
+                if let title = extractTitle() {
+                    Text(title)
+                        .font(NDKEventViewStyles.titleFont(for: style))
+                        .fontWeight(.semibold)
+                        .lineLimit(NDKEventViewStyles.titleLineLimit(for: style))
                 }
+
+                // Images from imeta tags
+                let imageURLs = extractImageURLs()
+                if !imageURLs.isEmpty {
+                    PictureGrid(imageURLs: imageURLs, style: style)
+                }
+
+                // Description content
+                if !event.content.isEmpty {
+                    NDKRichText(content: event.content)
+                        .font(NDKEventViewStyles.contentFont(for: style))
+                        .lineLimit(NDKEventViewStyles.contentLineLimit(for: style))
+                }
+
+                // Location if available
+                if let location = extractLocation() {
+                    HStack(spacing: 4) {
+                        Image(systemName: "location")
+                            .font(NDKEventViewStyles.captionFont(for: style))
+                            .foregroundStyle(.secondary)
+
+                        Text(location)
+                            .font(NDKEventViewStyles.captionFont(for: style))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                eventTapAction?(event)
             }
         }
         .ndkEventViewStyle(style)
@@ -634,6 +659,7 @@ public struct NDKGenericEventView: View {
     let showAuthor: Bool
     let showTimestamp: Bool
     let authorTapAction: ((String) -> Void)?
+    let eventTapAction: ((NDKEvent) -> Void)?
 
     public var body: some View {
         VStack(alignment: .leading, spacing: NDKEventViewStyles.verticalSpacing(for: style)) {
@@ -653,31 +679,37 @@ public struct NDKGenericEventView: View {
                 }
             }
 
-            // Generic event card
-            HStack(spacing: NDKEventViewStyles.horizontalSpacing(for: style)) {
-                Image(systemName: "doc.text")
-                    .font(NDKEventViewStyles.titleFont(for: style))
-                    .foregroundStyle(.secondary)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Event")
-                        .font(NDKEventViewStyles.contentFont(for: style))
-                        .fontWeight(.medium)
-
-                    Text("Kind \(event.kind)")
-                        .font(NDKEventViewStyles.captionFont(for: style))
+            Group {
+                // Generic event card
+                HStack(spacing: NDKEventViewStyles.horizontalSpacing(for: style)) {
+                    Image(systemName: "doc.text")
+                        .font(NDKEventViewStyles.titleFont(for: style))
                         .foregroundStyle(.secondary)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Event")
+                            .font(NDKEventViewStyles.contentFont(for: style))
+                            .fontWeight(.medium)
+
+                        Text("Kind \(event.kind)")
+                            .font(NDKEventViewStyles.captionFont(for: style))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
                 }
+                .ndkEventCardStyle(style, backgroundColor: Color.ndkTertiaryBackground)
 
-                Spacer()
+                // Show alt tag content if available
+                if let altContent = event.tagValue("alt") {
+                    Text(altContent)
+                        .font(NDKEventViewStyles.contentFont(for: style))
+                        .lineLimit(NDKEventViewStyles.contentLineLimit(for: style))
+                }
             }
-            .ndkEventCardStyle(style, backgroundColor: Color.ndkTertiaryBackground)
-
-            // Show alt tag content if available
-            if let altContent = event.tagValue("alt") {
-                Text(altContent)
-                    .font(NDKEventViewStyles.contentFont(for: style))
-                    .lineLimit(NDKEventViewStyles.contentLineLimit(for: style))
+            .contentShape(Rectangle())
+            .onTapGesture {
+                eventTapAction?(event)
             }
         }
         .ndkEventViewStyle(style)
