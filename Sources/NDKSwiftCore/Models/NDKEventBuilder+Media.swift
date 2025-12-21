@@ -51,6 +51,7 @@ public extension NDKEventBuilder {
         if let sha256 = sha256 { imeta.x = sha256 }
         if let size = size { imeta.size = "\(size)" }
         if let dimensions = dimensions { imeta.dim = dimensions }
+        if let alt = alt { imeta.alt = alt }
 
         self.imetaTag(imeta)
 
