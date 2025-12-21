@@ -3,9 +3,48 @@ import NDKSwiftCore
 import SwiftUI
 
 #if canImport(UIKit)
-    import UIKit
+import SwiftSVG
+import UIKit
 #elseif canImport(AppKit)
-    import AppKit
+import AppKit
+#endif
+
+// MARK: - SVG Rendering Helpers
+
+#if canImport(UIKit)
+private func renderSVGToUIImage(data: Data, targetSize: CGSize = CGSize(width: 200, height: 200)) async -> UIImage? {
+    await withCheckedContinuation { continuation in
+        DispatchQueue.main.async {
+            let containerView = UIView(frame: CGRect(origin: .zero, size: targetSize))
+            containerView.backgroundColor = .clear
+
+            _ = UIView(SVGData: data) { svgLayer in
+                // Scale SVG to fit target size
+                let svgBounds = svgLayer.bounds
+                if svgBounds.width > 0 && svgBounds.height > 0 {
+                    let scale = min(targetSize.width / svgBounds.width, targetSize.height / svgBounds.height)
+                    svgLayer.transform = CATransform3DMakeScale(scale, scale, 1)
+                    svgLayer.frame = CGRect(
+                        x: (targetSize.width - svgBounds.width * scale) / 2,
+                        y: (targetSize.height - svgBounds.height * scale) / 2,
+                        width: svgBounds.width * scale,
+                        height: svgBounds.height * scale
+                    )
+                }
+
+                containerView.layer.addSublayer(svgLayer)
+
+                // Render to image
+                let renderer = UIGraphicsImageRenderer(size: targetSize)
+                let image = renderer.image { context in
+                    containerView.layer.render(in: context.cgContext)
+                }
+
+                continuation.resume(returning: image)
+            }
+        }
+    }
+}
 #endif
 
 /// A drop-in replacement for AsyncImage with persistent disk and memory caching.
@@ -141,27 +180,41 @@ private class ImageLoader: ObservableObject {
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
 
-            #if canImport(UIKit)
-                guard let uiImage = UIImage(data: data) else { return }
+#if canImport(UIKit)
+            let uiImage: UIImage?
 
-                // Cache the image
-                await Self.imageCache.store(image: uiImage, for: url)
-                NDKLogger.log(.debug, category: .cache, "[CachedAsyncImage] Downloaded and cached: \(url.lastPathComponent)")
+            if url.pathExtension.lowercased() == "svg" {
+                uiImage = await renderSVGToUIImage(data: data)
+            } else {
+                uiImage = UIImage(data: data)
+            }
 
-                await MainActor.run {
-                    self.image = Image(uiImage: uiImage)
-                }
-            #elseif canImport(AppKit)
-                guard let nsImage = NSImage(data: data) else { return }
+            guard let finalImage = uiImage else { return }
 
-                // Cache the image
-                await Self.imageCache.store(image: nsImage, for: url)
-                NDKLogger.log(.debug, category: .cache, "[CachedAsyncImage] Downloaded and cached: \(url.lastPathComponent)")
+            // Cache the image
+            await Self.imageCache.store(image: finalImage, for: url)
+            NDKLogger.log(.debug, category: .cache, "[CachedAsyncImage] Downloaded and cached: \(url.lastPathComponent)")
 
-                await MainActor.run {
-                    self.image = Image(nsImage: nsImage)
-                }
-            #endif
+            await MainActor.run {
+                self.image = Image(uiImage: finalImage)
+            }
+#elseif canImport(AppKit)
+            // SVG not supported on macOS - SwiftSVG has compatibility issues
+            if url.pathExtension.lowercased() == "svg" {
+                NDKLogger.log(.warning, category: .cache, "[CachedAsyncImage] SVG not supported on macOS: \(url.lastPathComponent)")
+                return
+            }
+
+            guard let nsImage = NSImage(data: data) else { return }
+
+            // Cache the image
+            await Self.imageCache.store(image: nsImage, for: url)
+            NDKLogger.log(.debug, category: .cache, "[CachedAsyncImage] Downloaded and cached: \(url.lastPathComponent)")
+
+            await MainActor.run {
+                self.image = Image(nsImage: nsImage)
+            }
+#endif
         } catch {
             NDKLogger.log(.error, category: .cache, "[CachedAsyncImage] Failed to download \(url.lastPathComponent): \(error)")
         }
@@ -233,12 +286,12 @@ private class ImageCache {
 
         func store(image: UIImage, for url: URL) async {
             // Store in memory
-            let cost = image.jpegData(compressionQuality: 1.0)?.count ?? 0
+            let cost = image.pngData()?.count ?? 0
             memoryCache.setObject(image, forKey: url.absoluteString as NSString, cost: cost)
 
             // Store on disk
             let filePath = cacheFilePath(for: url)
-            if let data = image.jpegData(compressionQuality: 0.8) {
+            if let data = image.pngData() {
                 try? data.write(to: filePath)
             }
         }
@@ -281,7 +334,7 @@ private class ImageCache {
             let filePath = cacheFilePath(for: url)
             if let tiffData = tiffRep,
                let bitmapRep = NSBitmapImageRep(data: tiffData),
-               let data = bitmapRep.representation(using: .jpeg, properties: [.compressionFactor: 0.8])
+               let data = bitmapRep.representation(using: .tiff, properties: [:])
             {
                 try? data.write(to: filePath)
             }

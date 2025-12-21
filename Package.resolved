@@ -125,6 +125,15 @@
         "revision" : "04ccff117f6549121d5721ec84fdf0162122b90e",
         "version" : "0.5.0"
       }
+    },
+    {
+      "identity" : "swiftsvg",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/mchoe/SwiftSVG.git",
+      "state" : {
+        "revision" : "c3a8866a25ace169ee8e5c037670ba14aa59606f",
+        "version" : "2.3.2"
+      }
     }
   ],
   "version" : 2
