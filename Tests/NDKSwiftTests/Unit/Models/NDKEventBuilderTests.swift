@@ -236,9 +236,7 @@ final class NDKEventBuilderTests: XCTestCase {
         }
     }
 
-    // NOTE: addMedia method not yet implemented in NDKEventBuilder
-    /*
-     func testAddMediaFromBlossomBlob() async throws {
+    func testAddMediaFromBlossomBlob() async throws {
          let blob = BlossomBlob(
              sha256: "abc123def456",
              url: "https://blossom.example.com/abc123",
@@ -259,49 +257,42 @@ final class NDKEventBuilderTests: XCTestCase {
          XCTAssertEqual(imetaTags.count, 1)
 
          let imetaTag = imetaTags[0]
-         XCTAssertTrue(imetaTag.contains("url=https://blossom.example.com/abc123"))
-         XCTAssertTrue(imetaTag.contains("x=abc123def456"))
-         XCTAssertTrue(imetaTag.contains("size=1024"))
-         XCTAssertTrue(imetaTag.contains("m=image/jpeg"))
-         XCTAssertTrue(imetaTag.contains("blurhash=L6PZfSi_.AyE"))
-         XCTAssertTrue(imetaTag.contains("dim=800x600"))
-         XCTAssertTrue(imetaTag.contains("alt=Test image"))
-     }
-     */
-
-    // NOTE: addMedia method not yet implemented in NDKEventBuilder
-    /*
-     func testAddMediaWithCustomParameters() async throws {
-         let event = try await builder
-             .addMedia(
-                 url: "https://example.com/video.mp4",
-                 mimeType: "video/mp4",
-                 blurhash: "L6PZfSi_.AyE",
-                 dimensions: (width: 1920, height: 1080),
-                 alt: "Test video",
-                 sha256: "videohash123",
-                 size: "5242880",
-                 fallback: ["https://backup.com/video.mp4"]
-             )
-             .content("test")
-             .kind(1)
-             .build(signer: signer)
-
-         let imetaTags = event.tags.filter { $0.first == "imeta" }
-         XCTAssertEqual(imetaTags.count, 1)
-
-         let imetaTag = imetaTags[0]
-         XCTAssertTrue(imetaTag.contains("url=https://example.com/video.mp4"))
-         XCTAssertTrue(imetaTag.contains("m=video/mp4"))
-         XCTAssertTrue(imetaTag.contains("blurhash=L6PZfSi_.AyE"))
-         XCTAssertTrue(imetaTag.contains("dim=1920x1080"))
-         XCTAssertTrue(imetaTag.contains("alt=Test video"))
-         XCTAssertTrue(imetaTag.contains("x=videohash123"))
-         XCTAssertTrue(imetaTag.contains("size=5242880"))
-         XCTAssertTrue(imetaTag.contains("fallback=https://backup.com/video.mp4"))
+         XCTAssertTrue(imetaTag.contains("url https://blossom.example.com/abc123"))
+         XCTAssertTrue(imetaTag.contains("x abc123def456"))
+         XCTAssertTrue(imetaTag.contains("size 1024"))
+         XCTAssertTrue(imetaTag.contains("m image/jpeg"))
+         XCTAssertTrue(imetaTag.contains("blurhash L6PZfSi_.AyE"))
+         XCTAssertTrue(imetaTag.contains("dim 800x600"))
+         XCTAssertTrue(imetaTag.contains("alt Test image"))
      }
 
-     func testBuildEventIDCalculation() async throws {
+    func testAddMediaWithCustomParameters() async throws {
+        let event = try await builder
+            .addMedia(
+                url: "https://example.com/video.mp4",
+                type: "video/mp4",
+                sha256: "videohash123",
+                size: 5242880,
+                dimensions: "1920x1080",
+                alt: "Test video"
+            )
+            .content("test")
+            .kind(1)
+            .build(signer: signer)
+
+        let imetaTags = event.tags.filter { $0.first == "imeta" }
+        XCTAssertEqual(imetaTags.count, 1)
+
+        let imetaTag = imetaTags[0]
+        XCTAssertTrue(imetaTag.contains("url https://example.com/video.mp4"))
+        XCTAssertTrue(imetaTag.contains("m video/mp4"))
+        XCTAssertTrue(imetaTag.contains("dim 1920x1080"))
+        XCTAssertTrue(imetaTag.contains("alt Test video"))
+        XCTAssertTrue(imetaTag.contains("x videohash123"))
+        XCTAssertTrue(imetaTag.contains("size 5242880"))
+    }
+
+    func testBuildEventIDCalculation() async throws {
          let event = try await builder
              .content("test")
              .kind(1)
@@ -345,5 +336,4 @@ final class NDKEventBuilderTests: XCTestCase {
          XCTAssertEqual(event.kind, 30000)
          XCTAssertTrue(event.tags.contains(["d", "identifier"]))
      }
-     */
 }
