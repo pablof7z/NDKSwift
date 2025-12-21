@@ -274,7 +274,7 @@ public struct Transaction: Codable {
     public let description: String?
     public let descriptionHash: String?
     public let preimage: String?
-    public let paymentHash: String
+    public let paymentHash: String?
     public let amount: Int64
     public let feesPaid: Int64?
     public let createdAt: Int64
