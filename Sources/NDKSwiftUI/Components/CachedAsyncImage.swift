@@ -1,12 +1,50 @@
 import Combine
 import NDKSwiftCore
-import SwiftSVG
 import SwiftUI
 
 #if canImport(UIKit)
-    import UIKit
+import SwiftSVG
+import UIKit
 #elseif canImport(AppKit)
-    import AppKit
+import AppKit
+#endif
+
+// MARK: - SVG Rendering Helpers
+
+#if canImport(UIKit)
+private func renderSVGToUIImage(data: Data, targetSize: CGSize = CGSize(width: 200, height: 200)) async -> UIImage? {
+    await withCheckedContinuation { continuation in
+        DispatchQueue.main.async {
+            let containerView = UIView(frame: CGRect(origin: .zero, size: targetSize))
+            containerView.backgroundColor = .clear
+
+            _ = UIView(SVGData: data) { svgLayer in
+                // Scale SVG to fit target size
+                let svgBounds = svgLayer.bounds
+                if svgBounds.width > 0 && svgBounds.height > 0 {
+                    let scale = min(targetSize.width / svgBounds.width, targetSize.height / svgBounds.height)
+                    svgLayer.transform = CATransform3DMakeScale(scale, scale, 1)
+                    svgLayer.frame = CGRect(
+                        x: (targetSize.width - svgBounds.width * scale) / 2,
+                        y: (targetSize.height - svgBounds.height * scale) / 2,
+                        width: svgBounds.width * scale,
+                        height: svgBounds.height * scale
+                    )
+                }
+
+                containerView.layer.addSublayer(svgLayer)
+
+                // Render to image
+                let renderer = UIGraphicsImageRenderer(size: targetSize)
+                let image = renderer.image { context in
+                    containerView.layer.render(in: context.cgContext)
+                }
+
+                continuation.resume(returning: image)
+            }
+        }
+    }
+}
 #endif
 
 /// A drop-in replacement for AsyncImage with persistent disk and memory caching.
@@ -146,7 +184,7 @@ private class ImageLoader: ObservableObject {
             let uiImage: UIImage?
 
             if url.pathExtension.lowercased() == "svg" {
-                uiImage = UIImage(svgData: data)
+                uiImage = await renderSVGToUIImage(data: data)
             } else {
                 uiImage = UIImage(data: data)
             }
@@ -161,22 +199,20 @@ private class ImageLoader: ObservableObject {
                 self.image = Image(uiImage: finalImage)
             }
 #elseif canImport(AppKit)
-            let nsImage: NSImage?
-
+            // SVG not supported on macOS - SwiftSVG has compatibility issues
             if url.pathExtension.lowercased() == "svg" {
-                nsImage = NSImage(svgData: data)
-            } else {
-                nsImage = NSImage(data: data)
+                NDKLogger.log(.warning, category: .cache, "[CachedAsyncImage] SVG not supported on macOS: \(url.lastPathComponent)")
+                return
             }
 
-            guard let finalImage = nsImage else { return }
+            guard let nsImage = NSImage(data: data) else { return }
 
             // Cache the image
-            await Self.imageCache.store(image: finalImage, for: url)
+            await Self.imageCache.store(image: nsImage, for: url)
             NDKLogger.log(.debug, category: .cache, "[CachedAsyncImage] Downloaded and cached: \(url.lastPathComponent)")
 
             await MainActor.run {
-                self.image = Image(nsImage: finalImage)
+                self.image = Image(nsImage: nsImage)
             }
 #endif
         } catch {
