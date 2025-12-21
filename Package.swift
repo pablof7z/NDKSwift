@@ -25,6 +25,7 @@ let package = Package(
         .package(url: "https://github.com/pablof7z/CashuSwift.git", branch: "main"),
         .package(url: "https://github.com/21-DOT-DEV/swift-secp256k1", from: "0.19.0"),
         .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.0.0"),
+        .package(url: "https://github.com/SVGKit/SVGKit.git", branch: "3.x"),
     ],
     targets: [
         .target(
@@ -117,6 +118,7 @@ let package = Package(
                 "NDKSwiftCore",
                 "NDKSwiftCashu",
                 "NDKSwiftNostrDB",
+                .product(name: "SVGKit", package: "SVGKit"),
             ]
         ),
         .target(
