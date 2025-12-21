@@ -74,20 +74,36 @@ public actor NDKEventManager {
             throw NDKError.notConfigured(ErrorMessageConstants.Messages.ndkReferenceLost)
         }
 
+        // Start telemetry span for the entire publish operation
+        let span = ndk.startSpan("event.publish", category: .publishing)
+        span.set(SpanAttributes.eventId, event.id)
+        span.set(SpanAttributes.eventKind, event.kind)
+        span.set(SpanAttributes.eventPubkey, event.pubkey)
+        span.set(SpanAttributes.relayCount, relayURLs.count)
+        span.set(SpanAttributes.relayUrls, Array(relayURLs))
+        span.set("optimistic", useOptimistic)
+        defer { span.end() }
+
         // Events should already be signed before publishing
         if event.sig.isEmpty {
+            span.setStatus(.error("Event not signed"))
             throw NDKError.invalidContent("Event must be signed before publishing")
         }
 
         // Save to cache first
+        let cacheSpan = span.startChild(name: "event.cache.write", category: .cache)
         do {
             try await cache.saveEvent(event)
+            cacheSpan.success()
         } catch {
+            cacheSpan.recordError(error)
             NDKLogger.log(.warning, category: .cache, "Failed to cache event: \(error)")
         }
+        cacheSpan.end()
 
         // Always handle optimistic publishing (except for relay lists)
         if useOptimistic && event.kind != 10002 {
+            span.addEvent("optimistic_publish_tracked", attributes: nil)
             do {
                 try await cache.addUnpublishedEvent(event, relays: relayURLs)
             } catch {
@@ -113,35 +129,56 @@ public actor NDKEventManager {
         // Publish to relays
         var publishedRelays = Set<NDKRelay>()
         var failedRelays = Set<NDKRelay>()
-        await withTaskGroup(of: (NDKRelay, Bool).self) { group in
+        var authRequiredRelays: [String] = []
+
+        await withTaskGroup(of: (NDKRelay, Bool, Bool).self) { group in
             for relay in targetRelays {
-                group.addTask {
+                group.addTask { [weak self] in
+                    // Create child span for per-relay publish
+                    let relaySpan = ndk.startSpan("event.publish.relay", category: .publishing, parent: span.context)
+                    relaySpan.set(SpanAttributes.relayUrl, relay.url)
+                    defer { relaySpan.end() }
+
                     do {
                         let result = try await relay.publish(event)
-                        return (relay, result.success)
+                        if result.success {
+                            relaySpan.success()
+                        } else {
+                            relaySpan.set(SpanAttributes.errorMessage, result.message ?? "Unknown error")
+                            relaySpan.setStatus(.error(result.message ?? "Rejected"))
+                        }
+                        return (relay, result.success, false)
                     } catch let error as NDKError {
                         // Check if error is auth-required
                         if case let .publishFailed(_, message) = error {
                             let errorMsg = message.lowercased()
                             if errorMsg.contains("auth") || errorMsg.contains("restricted") || errorMsg.contains("authentication") {
                                 // Track this event for retry after authentication
-                                await self.trackPendingAuthEvent(event, for: relay.url)
+                                await self?.trackPendingAuthEvent(event, for: relay.url)
+                                relaySpan.set(SpanAttributes.authRequired, true)
+                                relaySpan.addEvent("auth_required", attributes: [
+                                    SpanAttributes.errorMessage: .string(message)
+                                ])
                                 NDKLogger.log(.info, category: .auth, "Event \(event.id) requires authentication on \(relay.url)")
+                                return (relay, false, true) // authRequired = true
                             } else {
+                                relaySpan.recordError(error)
                                 NDKLogger.log(.error, category: .event, "Failed to publish to \(relay.url): \(error)")
                             }
                         } else {
+                            relaySpan.recordError(error)
                             NDKLogger.log(.error, category: .event, "Failed to publish to \(relay.url): \(error)")
                         }
-                        return (relay, false)
+                        return (relay, false, false)
                     } catch {
+                        relaySpan.recordError(error)
                         NDKLogger.log(.error, category: .event, "Failed to publish to \(relay.url): \(error)")
-                        return (relay, false)
+                        return (relay, false, false)
                     }
                 }
             }
 
-            for await(relay, success) in group {
+            for await(relay, success, authRequired) in group {
                 if success {
                     publishedRelays.insert(relay)
 
@@ -157,11 +194,30 @@ public actor NDKEventManager {
                     }
                 } else {
                     failedRelays.insert(relay)
+                    if authRequired {
+                        authRequiredRelays.append(relay.url)
+                    }
 
                     // Update event tracker with failed publish
                     await ndk.eventTracker.updatePublishStatus(eventId: event.id, relay: relay.url, status: .failed(.connectionFailed))
                 }
             }
+        }
+
+        // Record final publish summary in span
+        span.set("successful_relays", publishedRelays.count)
+        span.set("failed_relays", failedRelays.count)
+        span.set("auth_required_relays", authRequiredRelays.count)
+        if !authRequiredRelays.isEmpty {
+            span.set("pending_auth_relays", authRequiredRelays)
+        }
+
+        if publishedRelays.isEmpty && !failedRelays.isEmpty {
+            span.setStatus(.error("All relays failed"))
+        } else if !failedRelays.isEmpty {
+            span.setStatus(.ok) // Partial success is still OK
+        } else {
+            span.success()
         }
 
         // Failed relays are already tracked in the unpublished cache from earlier

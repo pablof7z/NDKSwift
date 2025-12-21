@@ -14,6 +14,9 @@ public actor NDKSignatureVerificationSampler {
     /// Delegate for signature verification events
     public weak var delegate: NDKSignatureVerificationDelegate?
 
+    /// Tracer for telemetry (set lazily to avoid initialization order issues)
+    private var tracer: NDKTracer?
+
     /// Statistics tracking
     private var totalVerifications: Int = 0
     private var failedVerifications: Int = 0
@@ -21,6 +24,11 @@ public actor NDKSignatureVerificationSampler {
     public init(config: NDKSignatureVerificationConfig) {
         self.config = config
         cache = NDKSignatureVerificationCache()
+    }
+
+    /// Set tracer for telemetry
+    public func setTracer(_ tracer: NDKTracer) {
+        self.tracer = tracer
     }
 
     /// Verify an event's signature with sampling
@@ -33,35 +41,62 @@ public actor NDKSignatureVerificationSampler {
         let eventId = event.id
         let signature = event.sig
 
+        // Start telemetry span
+        let span = tracer?.startSpan(name: "signature.verification", category: .signatureVerification)
+        span?.set(SpanAttributes.eventId, eventId)
+        span?.set(SpanAttributes.relayUrl, relay.url)
+        span?.set(SpanAttributes.verificationSampleRatio, stats.currentValidationRatio)
+        defer { span?.end() }
+
         guard !eventId.isEmpty, !signature.isEmpty else {
+            span?.set(SpanAttributes.decisionOutcome, "invalid_empty")
+            span?.setStatus(.error("Empty event ID or signature"))
             return .invalid
         }
 
         // Check if relay is blacklisted
         if blacklistedRelays.contains(relay.url) {
+            span?.set(SpanAttributes.decisionOutcome, "relay_blacklisted")
+            span?.setStatus(.error("Relay is blacklisted"))
             return .invalid
         }
 
         // Check cache first
         if await cache.isVerified(eventId: eventId, signature: signature) {
+            span?.set(SpanAttributes.cacheHit, true)
+            span?.set(SpanAttributes.decisionOutcome, "cached")
+            span?.success()
             stats.addValidatedEvent()
             return .cached
         }
+        span?.set(SpanAttributes.cacheHit, false)
 
         // Determine if we should verify based on sampling
         let shouldVerify = shouldVerifyEvent(relay: relay, stats: stats)
+        span?.set(SpanAttributes.verificationSampled, shouldVerify)
 
         if !shouldVerify {
             // Skip verification due to sampling
+            span?.set(SpanAttributes.decisionOutcome, "skipped_sampling")
+            span?.set(SpanAttributes.decisionReason, "Below sample ratio threshold")
+            span?.success()
             stats.addNonValidatedEvent()
             updateValidationRatio(relay: relay, stats: &stats)
             return .skipped
         }
 
         // Perform actual signature verification
+        let verifySpan = tracer?.startSpan(name: "signature.verify", category: .signatureVerification, parent: span?.context)
         let isValid = await verifySignature(event: event)
+        verifySpan?.set(SpanAttributes.verificationValid, isValid)
 
         if isValid {
+            verifySpan?.success()
+            verifySpan?.end()
+            span?.set(SpanAttributes.verificationValid, true)
+            span?.set(SpanAttributes.decisionOutcome, "valid")
+            span?.success()
+
             // Cache the verified signature
             await cache.addVerifiedSignature(eventId: eventId, signature: signature)
             stats.addValidatedEvent()
@@ -69,6 +104,16 @@ public actor NDKSignatureVerificationSampler {
             totalVerifications += 1
             return .valid
         } else {
+            verifySpan?.setStatus(.error("Invalid signature"))
+            verifySpan?.end()
+            span?.set(SpanAttributes.verificationValid, false)
+            span?.set(SpanAttributes.decisionOutcome, "invalid_signature")
+            span?.addEvent("evil_relay_detected", attributes: [
+                SpanAttributes.relayUrl: .string(relay.url),
+                SpanAttributes.eventId: .string(eventId)
+            ])
+            span?.setStatus(.error("Invalid signature - evil relay detected"))
+
             // Invalid signature detected - this relay is evil!
             failedVerifications += 1
             await handleInvalidSignature(event: event, relay: relay)

@@ -61,6 +61,14 @@ public final class NDK {
     /// Connection reliability configuration
     public let connectionConfig: NDKConnectionConfig
 
+    /// Telemetry configuration
+    public let telemetryConfig: NDKTelemetryConfig
+
+    /// Tracer for creating telemetry spans
+    public private(set) lazy var tracer: NDKTracer = {
+        NDKTracer(config: telemetryConfig)
+    }()
+
     /// Track pending auth events by event ID to relay (thread-safe via actor)
     private let pendingAuthEvents = PendingAuthEvents()
 
@@ -114,7 +122,11 @@ public final class NDK {
 
     /// Signature verification sampler
     private lazy var signatureVerificationSampler: NDKSignatureVerificationSampler = {
-        NDKSignatureVerificationSampler(config: self.signatureVerificationConfig)
+        let sampler = NDKSignatureVerificationSampler(config: self.signatureVerificationConfig)
+        // Set tracer for telemetry - tracer is already initialized by this point
+        let tracerRef = self.tracer
+        Task { await sampler.setTracer(tracerRef) }
+        return sampler
     }()
 
     /// Data requirement manager for declarative data access
@@ -180,7 +192,8 @@ public final class NDK {
         outboxEnabled: Bool = true,
         outboxConfig: NDKOutboxConfig = .default,
         clientTagConfig: NDKClientTagConfig? = nil,
-        connectionConfig: NDKConnectionConfig = .default
+        connectionConfig: NDKConnectionConfig = .default,
+        telemetryConfig: NDKTelemetryConfig = .disabled
     ) {
         self.signer = signer
         self.sessionData = sessionData
@@ -191,6 +204,7 @@ public final class NDK {
         self.outboxConfig = outboxConfig
         self.clientTagConfig = clientTagConfig
         self.connectionConfig = connectionConfig
+        self.telemetryConfig = telemetryConfig
 
         // All managers are now lazy-initialized on first access
         // This avoids initialization order issues with 'self'
