@@ -37,13 +37,14 @@ final class OTLPSpanExporter: SpanExporter, @unchecked Sendable {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = jsonData
 
-            let (_, response) = try await session.data(for: request)
+            let (data, response) = try await session.data(for: request)
 
             if let httpResponse = response as? HTTPURLResponse {
                 if httpResponse.statusCode >= 400 {
-                    print("📡 [Telemetry] Export failed with status \(httpResponse.statusCode)")
+                    let responseBody = String(data: data, encoding: .utf8) ?? "no body"
+                    print("📡 [Telemetry] Export failed with status \(httpResponse.statusCode): \(responseBody)")
                     NDKLogger.log(.warning, category: .performance,
-                        "Telemetry export failed with status \(httpResponse.statusCode)")
+                        "Telemetry export failed with status \(httpResponse.statusCode): \(responseBody)")
                 } else {
                     print("📡 [Telemetry] Export succeeded with status \(httpResponse.statusCode)")
                 }
