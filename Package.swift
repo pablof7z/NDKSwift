@@ -118,7 +118,7 @@ let package = Package(
                 "NDKSwiftCore",
                 "NDKSwiftCashu",
                 "NDKSwiftNostrDB",
-                .product(name: "SwiftSVG", package: "SwiftSVG"),
+                .product(name: "SwiftSVG", package: "SwiftSVG", condition: .when(platforms: [.iOS, .tvOS, .watchOS])),
             ]
         ),
         .target(
