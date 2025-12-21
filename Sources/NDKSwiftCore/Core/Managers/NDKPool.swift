@@ -197,8 +197,16 @@ public actor NDKPool {
     public func addRelay(_ url: RelayURL, origin: NDKRelayOrigin = .explicit) async -> NDKRelay {
         let normalizedUrl = url.normalizedRelayURL
 
+        // Start telemetry span
+        let span = ndk?.startSpan("relay.pool.add", category: .relayPool)
+        span?.set(SpanAttributes.relayUrl, normalizedUrl)
+        span?.set(SpanAttributes.relayOrigin, origin.telemetryValue)
+        defer { span?.end() }
+
         // Check if already exists
         if let existing = relayMap[normalizedUrl] {
+            span?.set("already_exists", true)
+            span?.success()
             return existing
         }
 
@@ -206,6 +214,9 @@ public actor NDKPool {
         let blockedRelays = await getBlockedRelays()
         if blockedRelays.contains(normalizedUrl) {
             NDKLogger.log(.warning, category: .general, "Attempted to add blocked relay: \(normalizedUrl)")
+            span?.set(SpanAttributes.decisionReason, "blocked")
+            span?.set(SpanAttributes.decisionOutcome, "rejected")
+            span?.setStatus(.error("Relay is blocked"))
             // Create a disconnected relay instance to return (won't be added to pool)
             let blockedRelay = NDKRelay(url: normalizedUrl, config: config)
             return blockedRelay
@@ -218,6 +229,9 @@ public actor NDKPool {
         }
         await relay.setOrigin(origin)
         relayMap[normalizedUrl] = relay
+
+        span?.set(SpanAttributes.decisionOutcome, "added")
+        span?.set(SpanAttributes.poolSize, relayMap.count)
 
         // Track explicit relays
         if case .explicit = origin {
@@ -274,13 +288,20 @@ public actor NDKPool {
         let normalizedUrl = url.normalizedRelayURL
         NDKLogger.log(.debug, category: .relay, "➖ Removing relay from pool: \(normalizedUrl)")
 
+        let span = ndk?.startSpan("relay.pool.remove", category: .relayPool)
+        span?.set(SpanAttributes.relayUrl, normalizedUrl)
+        defer { span?.end() }
+
         if let relay = relayMap.removeValue(forKey: normalizedUrl) {
             await relay.disconnect()
 
             // Emit relay removed event
             poolChangeContinuation.yield(.relayRemoved(normalizedUrl))
+            span?.set(SpanAttributes.poolSize, relayMap.count)
+            span?.success()
             NDKLogger.log(.info, category: .relay, "✅ Removed relay from pool: \(normalizedUrl), remaining relays: \(relayMap.count)")
         } else {
+            span?.set(SpanAttributes.decisionOutcome, "not_found")
             NDKLogger.log(.warning, category: .relay, "⚠️ Attempted to remove non-existent relay: \(normalizedUrl)")
         }
     }
@@ -466,12 +487,23 @@ public actor NDKPool {
     public func connectAll() async {
         let relayCount = relays.count
 
+        let span = ndk?.startSpan("relay.pool.connect_all", category: .relayPool)
+        span?.set(SpanAttributes.relayCount, relayCount)
+        defer { span?.end() }
+
+        // Capture ndk reference outside task group to avoid actor isolation issues
+        let ndkRef = ndk
+
         await withTaskGroup(of: Void.self) { group in
             for relay in relays {
                 group.addTask {
+                    let connectionSpan = ndkRef?.startSpan("relay.connect", category: .relayConnection, parent: span?.context)
+                    connectionSpan?.set(SpanAttributes.relayUrl, relay.url)
                     do {
                         try await relay.connect()
+                        connectionSpan?.success()
                     } catch {
+                        connectionSpan?.recordError(error)
                         Task {
                             let shouldLog = await connectionErrorRateLimiter.shouldLogError(for: relay.url, errorType: "connectFailed")
                             if shouldLog {
@@ -479,11 +511,14 @@ public actor NDKPool {
                             }
                         }
                     }
+                    connectionSpan?.end()
                 }
             }
         }
 
         let connectedCount = await connectedRelays().count
+        span?.set(SpanAttributes.poolConnectedCount, connectedCount)
+        span?.success()
         NDKLogger.log(.info, category: .relay, "✅ Connection attempt complete - connected: \(connectedCount)/\(relayCount)")
     }
 

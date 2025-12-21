@@ -35,6 +35,9 @@ actor NDKRelaySubscription {
     /// The subscription ID used for this group's REQ
     var subId: String?
 
+    /// Number of subscriptions in this group
+    var itemCount: Int { items.count }
+
     init(relay: NDKRelay, fingerprint: String, isGroupable: Bool) {
         self.relay = relay
         self.fingerprint = fingerprint
