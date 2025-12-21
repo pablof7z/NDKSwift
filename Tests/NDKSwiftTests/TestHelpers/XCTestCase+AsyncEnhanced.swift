@@ -141,8 +141,9 @@ extension XCTestCase {
         var events: [T] = []
         let deadline = Date().addingTimeInterval(timeout)
 
-        for await event in dataSource.events {
-            events.append(event)
+        // events yields [T] batches, not individual T elements
+        for await eventBatch in dataSource.events {
+            events.append(contentsOf: eventBatch)
             if events.count >= count {
                 return events
             }
