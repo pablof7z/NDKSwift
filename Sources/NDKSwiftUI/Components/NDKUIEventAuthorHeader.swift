@@ -67,9 +67,11 @@ public struct NDKUIEventAuthorHeader: View {
         HStack(spacing: horizontalSpacing) {
             // Profile picture
             NDKUIProfilePicture(ndk: ndk, pubkey: pubkey, size: avatarSize)
-                .onTapGesture {
-                    authorTapAction?(pubkey)
-                }
+                .highPriorityGesture(
+                    TapGesture().onEnded {
+                        authorTapAction?(pubkey)
+                    }
+                )
 
             // Author info
             VStack(alignment: .leading, spacing: nameSpacing) {
@@ -77,18 +79,22 @@ public struct NDKUIEventAuthorHeader: View {
                 NDKUIDisplayName(ndk: ndk, pubkey: pubkey)
                     .font(nameFont)
                     .fontWeight(.medium)
-                    .onTapGesture {
-                        authorTapAction?(pubkey)
-                    }
+                    .highPriorityGesture(
+                        TapGesture().onEnded {
+                            authorTapAction?(pubkey)
+                        }
+                    )
 
                 // Username (detailed style only)
                 if style == .detailed {
                     NDKUIUsername(ndk: ndk, pubkey: pubkey)
                         .font(usernameFont)
                         .foregroundStyle(.secondary)
-                        .onTapGesture {
-                            authorTapAction?(pubkey)
-                        }
+                        .highPriorityGesture(
+                            TapGesture().onEnded {
+                                authorTapAction?(pubkey)
+                            }
+                        )
                 }
 
                 // Timestamp (if provided and not minimal)
