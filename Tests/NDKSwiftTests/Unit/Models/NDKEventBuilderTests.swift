@@ -236,9 +236,7 @@ final class NDKEventBuilderTests: XCTestCase {
         }
     }
 
-    // NOTE: addMedia method not yet implemented in NDKEventBuilder
-    /*
-     func testAddMediaFromBlossomBlob() async throws {
+    func testAddMediaFromBlossomBlob() async throws {
          let blob = BlossomBlob(
              sha256: "abc123def456",
              url: "https://blossom.example.com/abc123",
@@ -259,18 +257,15 @@ final class NDKEventBuilderTests: XCTestCase {
          XCTAssertEqual(imetaTags.count, 1)
 
          let imetaTag = imetaTags[0]
-         XCTAssertTrue(imetaTag.contains("url=https://blossom.example.com/abc123"))
-         XCTAssertTrue(imetaTag.contains("x=abc123def456"))
-         XCTAssertTrue(imetaTag.contains("size=1024"))
-         XCTAssertTrue(imetaTag.contains("m=image/jpeg"))
-         XCTAssertTrue(imetaTag.contains("blurhash=L6PZfSi_.AyE"))
-         XCTAssertTrue(imetaTag.contains("dim=800x600"))
-         XCTAssertTrue(imetaTag.contains("alt=Test image"))
+         XCTAssertTrue(imetaTag.contains("url https://blossom.example.com/abc123"))
+         XCTAssertTrue(imetaTag.contains("x abc123def456"))
+         XCTAssertTrue(imetaTag.contains("size 1024"))
+         XCTAssertTrue(imetaTag.contains("m image/jpeg"))
+         XCTAssertTrue(imetaTag.contains("blurhash L6PZfSi_.AyE"))
+         XCTAssertTrue(imetaTag.contains("dim 800x600"))
+         XCTAssertTrue(imetaTag.contains("alt Test image"))
      }
-     */
 
-    // NOTE: addMedia method not yet implemented in NDKEventBuilder
-    /*
      func testAddMediaWithCustomParameters() async throws {
          let event = try await builder
              .addMedia(
@@ -291,14 +286,14 @@ final class NDKEventBuilderTests: XCTestCase {
          XCTAssertEqual(imetaTags.count, 1)
 
          let imetaTag = imetaTags[0]
-         XCTAssertTrue(imetaTag.contains("url=https://example.com/video.mp4"))
-         XCTAssertTrue(imetaTag.contains("m=video/mp4"))
-         XCTAssertTrue(imetaTag.contains("blurhash=L6PZfSi_.AyE"))
-         XCTAssertTrue(imetaTag.contains("dim=1920x1080"))
-         XCTAssertTrue(imetaTag.contains("alt=Test video"))
-         XCTAssertTrue(imetaTag.contains("x=videohash123"))
-         XCTAssertTrue(imetaTag.contains("size=5242880"))
-         XCTAssertTrue(imetaTag.contains("fallback=https://backup.com/video.mp4"))
+         XCTAssertTrue(imetaTag.contains("url https://example.com/video.mp4"))
+         XCTAssertTrue(imetaTag.contains("m video/mp4"))
+         XCTAssertTrue(imetaTag.contains("blurhash L6PZfSi_.AyE"))
+         XCTAssertTrue(imetaTag.contains("dim 1920x1080"))
+         XCTAssertTrue(imetaTag.contains("alt Test video"))
+         XCTAssertTrue(imetaTag.contains("x videohash123"))
+         XCTAssertTrue(imetaTag.contains("size 5242880"))
+         XCTAssertTrue(imetaTag.contains("fallback https://backup.com/video.mp4"))
      }
 
      func testBuildEventIDCalculation() async throws {
