@@ -445,14 +445,17 @@ public final class NDKEventBuilder: @unchecked Sendable {
     }
 
     /// Add an imeta tag from a BlossomBlob
-    /// - Parameter blob: The BlossomBlob to extract metadata from
+    /// - Parameters:
+    ///   - blob: The BlossomBlob to extract metadata from
+    ///   - alt: Optional alt text for accessibility
     /// - Returns: Self for chaining
     @discardableResult
-    public func imetaTag(from blob: BlossomBlob) -> NDKEventBuilder {
+    public func imetaTag(from blob: BlossomBlob, alt: String? = nil) -> NDKEventBuilder {
         let imeta = NDKImetaTag(
             url: blob.url,
-            blurhash: nil,
+            blurhash: blob.blurhash,
             dim: blob.dimensionsString,
+            alt: alt,
             m: blob.type,
             x: blob.sha256,
             size: "\(blob.size)"

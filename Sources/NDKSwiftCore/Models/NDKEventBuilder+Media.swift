@@ -10,7 +10,7 @@ public extension NDKEventBuilder {
     @discardableResult
     func addMedia(from blob: BlossomBlob, alt: String? = nil) -> NDKEventBuilder {
         // Add imeta tag
-        self.imetaTag(from: blob)
+        self.imetaTag(from: blob, alt: alt)
 
         // Add text content if empty
         if self.content.isEmpty {
@@ -51,6 +51,7 @@ public extension NDKEventBuilder {
         if let sha256 = sha256 { imeta.x = sha256 }
         if let size = size { imeta.size = "\(size)" }
         if let dimensions = dimensions { imeta.dim = dimensions }
+        if let alt = alt { imeta.alt = alt }
 
         self.imetaTag(imeta)
 
