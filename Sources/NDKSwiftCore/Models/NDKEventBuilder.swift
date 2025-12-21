@@ -455,10 +455,10 @@ public final class NDKEventBuilder: @unchecked Sendable {
             url: blob.url,
             blurhash: blob.blurhash,
             dim: blob.dimensionsString,
+            alt: alt,
             m: blob.type,
             x: blob.sha256,
-            size: "\(blob.size)",
-            alt: alt
+            size: "\(blob.size)"
         )
 
         let tag = ImetaUtils.imetaTagToTag(imeta)
