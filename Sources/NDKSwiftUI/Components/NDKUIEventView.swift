@@ -93,7 +93,8 @@ public struct NDKUIEventView: View {
                     style: style,
                     showAuthor: showAuthor,
                     showTimestamp: showTimestamp,
-                    showInteractions: showInteractions
+                    showInteractions: showInteractions,
+                    authorTapAction: authorTapAction
                 )
             case 20:
                 NDKPictureEventView(
@@ -101,7 +102,8 @@ public struct NDKUIEventView: View {
                     event: event,
                     style: style,
                     showAuthor: showAuthor,
-                    showTimestamp: showTimestamp
+                    showTimestamp: showTimestamp,
+                    authorTapAction: authorTapAction
                 )
             case EventKind.longFormContent:
                 NDKLongFormArticleView(
@@ -109,7 +111,8 @@ public struct NDKUIEventView: View {
                     event: event,
                     style: style,
                     showAuthor: showAuthor,
-                    showTimestamp: showTimestamp
+                    showTimestamp: showTimestamp,
+                    authorTapAction: authorTapAction
                 )
             case 9321:
                 NDKCashuTokenView(
@@ -117,7 +120,8 @@ public struct NDKUIEventView: View {
                     event: event,
                     style: style,
                     showAuthor: showAuthor,
-                    showTimestamp: showTimestamp
+                    showTimestamp: showTimestamp,
+                    authorTapAction: authorTapAction
                 )
             default:
                 NDKGenericEventView(
@@ -125,7 +129,8 @@ public struct NDKUIEventView: View {
                     event: event,
                     style: style,
                     showAuthor: showAuthor,
-                    showTimestamp: showTimestamp
+                    showTimestamp: showTimestamp,
+                    authorTapAction: authorTapAction
                 )
             }
         }
@@ -162,17 +167,24 @@ public struct NDKTextNoteView: View {
     let showAuthor: Bool
     let showTimestamp: Bool
     let showInteractions: Bool
+    let authorTapAction: ((String) -> Void)?
 
     public var body: some View {
         VStack(alignment: .leading, spacing: NDKEventViewStyles.verticalSpacing(for: style)) {
             // Author header
             if showAuthor {
-                NDKUIEventAuthorHeader(
+                let header = NDKUIEventAuthorHeader(
                     ndk: ndk,
                     pubkey: event.pubkey,
                     timestamp: showTimestamp ? event.createdAt : nil,
                     style: NDKEventViewStyles.authorHeaderStyle(for: style)
                 )
+
+                if let action = authorTapAction {
+                    header.onAuthorTapped(action)
+                } else {
+                    header
+                }
             }
 
             // Content
@@ -200,17 +212,24 @@ public struct NDKLongFormArticleView: View {
     let style: NDKUIEventView.EventStyle
     let showAuthor: Bool
     let showTimestamp: Bool
+    let authorTapAction: ((String) -> Void)?
 
     public var body: some View {
         VStack(alignment: .leading, spacing: NDKEventViewStyles.verticalSpacing(for: style)) {
             // Author header
             if showAuthor {
-                NDKUIEventAuthorHeader(
+                let header = NDKUIEventAuthorHeader(
                     ndk: ndk,
                     pubkey: event.pubkey,
                     timestamp: showTimestamp ? event.createdAt : nil,
                     style: NDKEventViewStyles.authorHeaderStyle(for: style)
                 )
+
+                if let action = authorTapAction {
+                    header.onAuthorTapped(action)
+                } else {
+                    header
+                }
             }
 
             // Article preview card
@@ -304,17 +323,24 @@ public struct NDKCashuTokenView: View {
     let style: NDKUIEventView.EventStyle
     let showAuthor: Bool
     let showTimestamp: Bool
+    let authorTapAction: ((String) -> Void)?
 
     public var body: some View {
         VStack(alignment: .leading, spacing: NDKEventViewStyles.verticalSpacing(for: style)) {
             // Author header
             if showAuthor {
-                NDKUIEventAuthorHeader(
+                let header = NDKUIEventAuthorHeader(
                     ndk: ndk,
                     pubkey: event.pubkey,
                     timestamp: showTimestamp ? event.createdAt : nil,
                     style: NDKEventViewStyles.authorHeaderStyle(for: style)
                 )
+
+                if let action = authorTapAction {
+                    header.onAuthorTapped(action)
+                } else {
+                    header
+                }
             }
 
             // Token preview card
@@ -389,17 +415,24 @@ public struct NDKPictureEventView: View {
     let style: NDKUIEventView.EventStyle
     let showAuthor: Bool
     let showTimestamp: Bool
+    let authorTapAction: ((String) -> Void)?
 
     public var body: some View {
         VStack(alignment: .leading, spacing: NDKEventViewStyles.verticalSpacing(for: style)) {
             // Author header
             if showAuthor {
-                NDKUIEventAuthorHeader(
+                let header = NDKUIEventAuthorHeader(
                     ndk: ndk,
                     pubkey: event.pubkey,
                     timestamp: showTimestamp ? event.createdAt : nil,
                     style: NDKEventViewStyles.authorHeaderStyle(for: style)
                 )
+
+                if let action = authorTapAction {
+                    header.onAuthorTapped(action)
+                } else {
+                    header
+                }
             }
 
             // Title if available
@@ -600,17 +633,24 @@ public struct NDKGenericEventView: View {
     let style: NDKUIEventView.EventStyle
     let showAuthor: Bool
     let showTimestamp: Bool
+    let authorTapAction: ((String) -> Void)?
 
     public var body: some View {
         VStack(alignment: .leading, spacing: NDKEventViewStyles.verticalSpacing(for: style)) {
             // Author header
             if showAuthor {
-                NDKUIEventAuthorHeader(
+                let header = NDKUIEventAuthorHeader(
                     ndk: ndk,
                     pubkey: event.pubkey,
                     timestamp: showTimestamp ? event.createdAt : nil,
                     style: NDKEventViewStyles.authorHeaderStyle(for: style)
                 )
+
+                if let action = authorTapAction {
+                    header.onAuthorTapped(action)
+                } else {
+                    header
+                }
             }
 
             // Generic event card
