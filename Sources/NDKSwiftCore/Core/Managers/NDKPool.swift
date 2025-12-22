@@ -13,6 +13,35 @@ public enum NDKPoolChangeEvent: Sendable {
     case relayDisconnected(NDKRelay)
 }
 
+/// Represents a publish event notification from a relay
+/// Used to notify observers about per-relay publish success/failure
+public struct NDKRelayPublishEvent: Sendable {
+    /// The event ID that was published
+    public let eventId: EventID
+    /// The relay URL that accepted or rejected the event
+    public let relayUrl: RelayURL
+    /// Whether the relay accepted the event
+    public let success: Bool
+    /// Optional error message from the relay (when success is false)
+    public let message: String?
+    /// Timestamp when the publish result was received
+    public let timestamp: Date
+
+    public init(
+        eventId: EventID,
+        relayUrl: RelayURL,
+        success: Bool,
+        message: String? = nil,
+        timestamp: Date = Date()
+    ) {
+        self.eventId = eventId
+        self.relayUrl = relayUrl
+        self.success = success
+        self.message = message
+        self.timestamp = timestamp
+    }
+}
+
 /// Thread-safe actor that manages a pool of relay connections
 public actor NDKPool {
     private weak var ndk: NDK?
@@ -29,6 +58,10 @@ public actor NDKPool {
     /// Stream of relay pool changes for event-driven observation
     private let poolChangeStream: AsyncStream<NDKPoolChangeEvent>
     private let poolChangeContinuation: AsyncStream<NDKPoolChangeEvent>.Continuation
+
+    /// Stream of relay publish events for event-driven observation
+    private let publishEventStream: AsyncStream<NDKRelayPublishEvent>
+    private let publishEventContinuation: AsyncStream<NDKRelayPublishEvent>.Continuation
 
     /// Cache for blocked relays
     private var cachedBlockedRelays: Set<String> = []
@@ -51,6 +84,9 @@ public actor NDKPool {
 
         // Initialize the relay change stream
         (poolChangeStream, poolChangeContinuation) = AsyncStream<NDKPoolChangeEvent>.makeStream()
+
+        // Initialize the publish event stream
+        (publishEventStream, publishEventContinuation) = AsyncStream<NDKRelayPublishEvent>.makeStream()
 
         // Start monitoring blocked relay list if we have a signer
         Task {
@@ -78,6 +114,47 @@ public actor NDKPool {
     /// ```
     public var relayChanges: AsyncStream<NDKPoolChangeEvent> {
         poolChangeStream
+    }
+
+    /// Public accessor for relay publish events stream
+    ///
+    /// Provides real-time notifications when events are published to relays, including
+    /// per-relay success/failure status and error messages.
+    ///
+    /// Example:
+    /// ```swift
+    /// for await publishEvent in await pool.publishEvents {
+    ///     if publishEvent.success {
+    ///         print("Event \(publishEvent.eventId) published to \(publishEvent.relayUrl)")
+    ///     } else {
+    ///         print("Failed to publish \(publishEvent.eventId) to \(publishEvent.relayUrl): \(publishEvent.message ?? "Unknown error")")
+    ///     }
+    /// }
+    /// ```
+    public var publishEvents: AsyncStream<NDKRelayPublishEvent> {
+        publishEventStream
+    }
+
+    // MARK: - Publish Event Management
+
+    /// Emit a publish event notification
+    ///
+    /// Called internally when an event is published to a relay with success or failure.
+    /// This method yields the publish event to the stream for observers.
+    ///
+    /// - Parameters:
+    ///   - eventId: The event ID that was published
+    ///   - relayUrl: The relay URL that accepted or rejected the event
+    ///   - success: Whether the relay accepted the event
+    ///   - message: Optional error message from the relay (when success is false)
+    func emitPublishEvent(eventId: EventID, relayUrl: RelayURL, success: Bool, message: String? = nil) {
+        let publishEvent = NDKRelayPublishEvent(
+            eventId: eventId,
+            relayUrl: relayUrl,
+            success: success,
+            message: message
+        )
+        publishEventContinuation.yield(publishEvent)
     }
 
     // MARK: - Blocked Relay Management
@@ -231,11 +308,11 @@ public actor NDKPool {
 
         // Set persistence based on origin
         // Explicit and outboxConfig relays are persistent (never evicted)
-        // Outbox-discovered relays are not persistent (can be evicted when idle)
+        // Outbox-discovered and fallback relays are not persistent (can be evicted when idle)
         switch origin {
         case .explicit, .outboxConfig:
             await relay.setPersistent(true)
-        case .outbox:
+        case .outbox, .fallback:
             await relay.setPersistent(false)
         }
 
@@ -350,7 +427,7 @@ public actor NDKPool {
         switch origin {
         case let .outbox(authorPubkey):
             return [authorPubkey]
-        case .explicit, .outboxConfig:
+        case .explicit, .outboxConfig, .fallback:
             return []
         }
     }
@@ -364,7 +441,7 @@ public actor NDKPool {
             switch origin {
             case let .outbox(authorPubkey):
                 mapping[url] = [authorPubkey]
-            case .explicit, .outboxConfig:
+            case .explicit, .outboxConfig, .fallback:
                 // These relays weren't added because of specific authors
                 mapping[url] = []
             }
@@ -662,6 +739,11 @@ public actor NDKPool {
             return
         }
         await ndk.eventManager.publishQueuedEvents(for: relay)
+
+        // Retry any pending outbox discoveries that failed when no relays were connected
+        Task {
+            await ndk.outbox.retryPendingDiscoveries()
+        }
     }
 
     // MARK: - Connection Monitoring

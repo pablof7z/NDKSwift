@@ -21,6 +21,8 @@ public enum RelayUpdate: Sendable {
     case aggregatedEose
     /// Subscription closed on a specific relay
     case closed(relay: String)
+    /// Subscription activated on a relay with specific filter
+    case subscriptionActivated(relay: String, kinds: [Int], authorCount: Int)
 }
 
 /// Primary API for declarative data access in NDKSwift

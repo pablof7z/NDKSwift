@@ -395,7 +395,7 @@ actor NDKSubscriptionManager {
                 // Create enhanced requirement for this specific relay
                 // This follows the outbox model: create a new requirement for discovered relays
                 let enhancedRequirementId = UUID()
-                let (enhancedRequirement, _, _) = await createRequirement(
+                let (enhancedRequirement, enhancedEventStream, _) = await createRequirement(
                     filter: enhancedFilter,
                     maxAge: 0, // Enhanced requirements are live subscriptions
                     cachePolicy: .networkOnly, // Fetch fresh data from discovered relays
@@ -431,8 +431,17 @@ actor NDKSubscriptionManager {
                     await enhancedRequirement.startProcessing()
                 }
 
-                // Note: Enhanced requirements work independently
-                // Events will flow through the cache and reactive system naturally
+                // Forward events from enhanced requirement to original requirement's observers
+                // This ensures events from discovered relays flow to the original subscription
+                Task {
+                    for await batch in enhancedEventStream {
+                        if !batch.isEmpty {
+                            NDKLogger.log(.debug, category: .subscription,
+                                          "📬 Forwarding \(batch.count) events from enhanced requirement '\(enhancedSubscriptionId)' to original")
+                            await requirement.forwardEventsFromEnhanced(batch)
+                        }
+                    }
+                }
             }
         }
     }
