@@ -24,14 +24,14 @@ import SwiftUI
 ///     .foregroundStyle(.primary)
 ///     .onTapGesture { /* handle tap */ }
 /// ```
+@MainActor
 public struct NDKUIDisplayName: View {
     // MARK: - Properties
 
+    private let ndk: NDK
     private let pubkey: String
     private let fallbackStyle: FallbackStyle
     private var tapAction: (() -> Void)?
-
-    @State private var profileDataSource: NDKProfileDataSource
 
     // MARK: - Supporting Types
 
@@ -53,13 +53,9 @@ public struct NDKUIDisplayName: View {
         pubkey: String,
         fallbackStyle: FallbackStyle = .npub
     ) {
+        self.ndk = ndk
         self.pubkey = pubkey
         self.fallbackStyle = fallbackStyle
-        self._profileDataSource = State(wrappedValue: NDKProfileDataSource(
-            ndk: ndk,
-            pubkey: pubkey,
-            maxAge: TimeConstants.hour
-        ))
     }
 
     /// Initialize with NDK instance and NDKUser
@@ -89,9 +85,12 @@ public struct NDKUIDisplayName: View {
 
     /// The resolved display text for this user
     public var displayText: String {
-        // If we have metadata, use the data source's display name logic
-        if profileDataSource.metadata != nil {
-            return profileDataSource.displayName
+        // Get profile from new API
+        let profile = ndk.profile(for: pubkey)
+
+        // If we have metadata, use profile's display name
+        if profile.metadata != nil {
+            return profile.displayName
         }
 
         // Otherwise use custom fallback based on style
