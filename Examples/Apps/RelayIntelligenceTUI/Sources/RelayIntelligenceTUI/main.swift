@@ -218,55 +218,6 @@ struct OutboxTest {
             print("   \(status) \(relay.url) (\(type), origin: \(origin))")
         }
 
-        // Build coverage analysis using greedy set cover
-        print("\n📈 Coverage Analysis (Greedy Set Cover):")
-        print("   Computing optimal relay selection...")
-
-        let followSet = Set(followPubkeys)
-        let connectedRelayURLs = Set(relays.map { $0.url })
-
-        let setCoverSelector = GreedySetCoverRelaySelector(tracker: ndk.outbox)
-        let (optimalRelays, coverageDetails) = await setCoverSelector.computeOptimalCoverage(
-            for: followSet,
-            existingRelays: [],
-            connectedRelays: connectedRelayURLs
-        )
-
-        print("\n   Optimal relay selection (minimum relays for full coverage):")
-        print("   " + String(repeating: "-", count: 70))
-
-        var authorsWithRelays = 0
-        for detail in coverageDetails {
-            authorsWithRelays = detail.cumulative
-            let isConnected = connectedRelayURLs.contains(detail.relay)
-            let connectedMarker = isConnected ? "✓" : " "
-            let pct = Int(Double(detail.cumulative) / Double(followPubkeys.count) * 100)
-
-            print("   \(connectedMarker) \(detail.relay)")
-            print("      +\(detail.newAuthors) new authors | Cumulative: \(detail.cumulative)/\(followPubkeys.count) (\(pct)%)")
-        }
-
-        // Count how many of the optimal relays we're connected to
-        let optimalConnected = optimalRelays.filter { connectedRelayURLs.contains($0) }.count
-        let authorsWithoutRelays = followPubkeys.count - authorsWithRelays
-
-        print("\n   " + String(repeating: "-", count: 70))
-        print("   Summary:")
-        print("      Authors with known relays: \(authorsWithRelays)/\(followPubkeys.count)")
-        print("      Authors without relay info: \(authorsWithoutRelays) (use fallback relays)")
-        print("")
-        print("   Comparison:")
-        print("      Optimal (greedy set cover): \(optimalRelays.count) relays for 100% coverage")
-        print("      Actually connected:         \(connected) relays")
-        print("      Optimal relays connected:   \(optimalConnected)/\(optimalRelays.count)")
-
-        // Show efficiency
-        if optimalRelays.count > 0 {
-            let efficiency = Double(optimalRelays.count) / Double(connected) * 100
-            print("")
-            print("   Efficiency: Current approach uses \(String(format: "%.1f", 100.0 / efficiency))x more relays than optimal")
-        }
-
         print("\n✨ Test complete!")
     }
 }
