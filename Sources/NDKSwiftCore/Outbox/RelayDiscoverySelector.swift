@@ -19,6 +19,33 @@ public protocol RelayDiscoverySelectionStrategy {
     ) async -> Set<RelayURL>
 }
 
+/// Build a map of relay URLs to the set of authors each relay serves
+private func buildRelayToAuthorsMap(
+    authors: Set<String>,
+    candidateRelays: Set<RelayURL>?,
+    tracker: any RelayPreferenceProvider
+) async -> [RelayURL: Set<String>] {
+    var relayToAuthors: [RelayURL: Set<String>] = [:]
+    for author in authors {
+        if let relayInfo = await tracker.getRelaysSyncFor(pubkey: author, type: .both) {
+            let allRelays = relayInfo.readRelays.union(relayInfo.writeRelays)
+            for relay in allRelays {
+                let normalizedUrl = relay.url.normalizedRelayURL
+                if let candidates = candidateRelays {
+                    if candidates.contains(normalizedUrl) {
+                        relayToAuthors[normalizedUrl, default: []].insert(author)
+                    } else if candidates.contains(relay.url) {
+                        relayToAuthors[relay.url, default: []].insert(author)
+                    }
+                } else {
+                    relayToAuthors[normalizedUrl, default: []].insert(author)
+                }
+            }
+        }
+    }
+    return relayToAuthors
+}
+
 /// Default implementation that prioritizes already-connected relays and overlapping relays
 struct DefaultRelayDiscoverySelector: RelayDiscoverySelectionStrategy {
     private let tracker: any RelayPreferenceProvider
@@ -65,26 +92,10 @@ struct DefaultRelayDiscoverySelector: RelayDiscoverySelectionStrategy {
             let remainingCandidates = candidateRelays.subtracting(connectedCandidates)
 
             // Score remaining candidates by how many authors they serve
-            var relayScores: [(relay: RelayURL, score: Int)] = []
-
-            for relay in remainingCandidates {
-                var score = 0
-
-                // Count how many of our authors use this relay
-                for author in authors {
-                    if let relayInfo = await tracker.getRelaysSyncFor(pubkey: author, type: .both) {
-                        let allRelays = relayInfo.readRelays.union(relayInfo.writeRelays)
-                        if allRelays.contains(where: { $0.url == relay }) {
-                            score += 1
-                        }
-                    }
-                }
-
-                relayScores.append((relay: relay, score: score))
-            }
-
-            // Sort by score (descending) and take what we need
+            let relayToAuthors = await buildRelayToAuthorsMap(authors: authors, candidateRelays: remainingCandidates, tracker: tracker)
+            var relayScores = relayToAuthors.map { (relay: $0.key, score: $0.value.count) }
             relayScores.sort { $0.score > $1.score }
+
             let additionalRelaysNeeded = relaysNeeded - selectedRelays.count
             let topRelays = relayScores.prefix(additionalRelaysNeeded).map { $0.relay }
             selectedRelays.formUnion(topRelays)
@@ -140,21 +151,7 @@ struct OverlapOptimizedRelaySelector: RelayDiscoverySelectionStrategy {
                       correlationId: String(correlationId))
 
         // Build a map of relay -> Set of authors it serves
-        var relayToAuthors: [RelayURL: Set<String>] = [:]
-
-        for author in authors {
-            if let relayInfo = await tracker.getRelaysSyncFor(pubkey: author, type: .both) {
-                let allRelays = relayInfo.readRelays.union(relayInfo.writeRelays)
-                for relay in allRelays {
-                    let normalizedUrl = relay.url.normalizedRelayURL
-                    if candidateRelays.contains(normalizedUrl) {
-                        relayToAuthors[normalizedUrl, default: []].insert(author)
-                    } else if candidateRelays.contains(relay.url) {
-                        relayToAuthors[relay.url, default: []].insert(author)
-                    }
-                }
-            }
-        }
+        let relayToAuthors = await buildRelayToAuthorsMap(authors: authors, candidateRelays: candidateRelays, tracker: tracker)
 
         NDKLogger.log(.debug, category: .outbox,
                       "📊 [OverlapOptimized] Relay coverage analysis complete - \(relayToAuthors.count) relays serve our authors",
