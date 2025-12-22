@@ -146,7 +146,10 @@ struct OverlapOptimizedRelaySelector: RelayDiscoverySelectionStrategy {
             if let relayInfo = await tracker.getRelaysSyncFor(pubkey: author, type: .both) {
                 let allRelays = relayInfo.readRelays.union(relayInfo.writeRelays)
                 for relay in allRelays {
-                    if candidateRelays.contains(relay.url) {
+                    let normalizedUrl = relay.url.normalizedRelayURL
+                    if candidateRelays.contains(normalizedUrl) {
+                        relayToAuthors[normalizedUrl, default: []].insert(author)
+                    } else if candidateRelays.contains(relay.url) {
                         relayToAuthors[relay.url, default: []].insert(author)
                     }
                 }
