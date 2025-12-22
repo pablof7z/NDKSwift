@@ -527,6 +527,20 @@ public extension Nutzap {
                 return .invalidProofs(reason: ErrorMessageConstants.withContext("P2PK signing error", context: message))
             case let .invalidSplit(message):
                 return .invalidProofs(reason: ErrorMessageConstants.withContext(ErrorMessageConstants.invalid("split"), context: message))
+            case let .invalidKeysetID(message):
+                return .invalidProofs(reason: ErrorMessageConstants.withContext(ErrorMessageConstants.invalid("keyset ID"), context: message))
+            case let .paymentRequestEncoding(message):
+                return .invalidProofs(reason: ErrorMessageConstants.withContext("Payment request encoding error", context: message))
+            case let .paymentRequestDecoding(message):
+                return .invalidProofs(reason: ErrorMessageConstants.withContext("Payment request decoding error", context: message))
+            case let .paymentRequestValidation(message):
+                return .invalidProofs(reason: ErrorMessageConstants.withContext("Payment request validation error", context: message))
+            case let .unsupportedTransport(message):
+                return .invalidProofs(reason: ErrorMessageConstants.withContext("Unsupported transport", context: message))
+            case let .lockingConditionMismatch(message):
+                return .invalidProofs(reason: ErrorMessageConstants.withContext("Locking condition mismatch", context: message))
+            case let .paymentRequestAmount(message):
+                return .invalidProofs(reason: ErrorMessageConstants.withContext("Payment request amount error", context: message))
             @unknown default:
                 return .unknownError("Unknown CashuError")
             }
