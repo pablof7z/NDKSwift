@@ -398,18 +398,10 @@ public actor NDKNostrDBCache: NDKCache {
 
         return AsyncThrowingStream { continuation in
             Task {
-                // Yield existing events first if requested
-                if includeExisting {
-                    do {
-                        let existing = try await self.queryEvents(filter)
-                        if !existing.isEmpty {
-                            continuation.yield(existing)
-                        }
-                    } catch {
-                        continuation.finish(throwing: error)
-                        return
-                    }
-                }
+                // Note: includeExisting is handled by nostrDB.subscribe which yields
+                // initial events as a batch (.events case) before live events (.event case)
+                // This avoids duplicate queries and ensures proper batching.
+                _ = includeExisting // Suppress unused parameter warning (always includes existing)
 
                 // Convert NDKFilter to NostrFilter and then NdbFilter for subscription
                 let nostrFilter = self.convertToNostrFilter(filter)
@@ -426,12 +418,27 @@ public actor NDKNostrDBCache: NDKCache {
                             // EOSE just indicates initial query is done, continue listening
                             continue
                         case .event(let noteKey):
-                            // Convert NoteKey to NDKEvent
+                            // Convert NoteKey to NDKEvent (single event from live subscription)
                             if let txn = nostrDB.lookup_note_by_key(noteKey),
                                let note = txn.unsafeUnownedValue,
                                let event = self.convertToNDKEvent(note)
                             {
                                 continuation.yield([event])
+                            }
+                        case .events(let noteKeys):
+                            // Convert batch of NoteKeys to NDKEvents (initial query results)
+                            var events: [NDKEvent] = []
+                            events.reserveCapacity(noteKeys.count)
+                            for noteKey in noteKeys {
+                                if let txn = nostrDB.lookup_note_by_key(noteKey),
+                                   let note = txn.unsafeUnownedValue,
+                                   let event = self.convertToNDKEvent(note)
+                                {
+                                    events.append(event)
+                                }
+                            }
+                            if !events.isEmpty {
+                                continuation.yield(events)
                             }
                         }
                     }
@@ -521,6 +528,9 @@ public actor NDKNostrDBCache: NDKCache {
                                     continuation.yield(userMetadata)
                                 }
                             }
+                        case .events:
+                            // Batch events - not used in this context
+                            continue
                         }
                     }
 
@@ -737,6 +747,20 @@ public actor NDKNostrDBCache: NDKCache {
         limit: Int? = nil
     ) async -> [(event: NDKEvent, targetRelays: Set<String>)] {
         return await publishingManager.getUnpublishedEvents(maxAge: maxAge, limit: limit)
+    }
+
+    /// Get the stream of unpublished store changes for reactive updates
+    /// Returns nil if unpublished store is not available
+    public var unpublishedChanges: AsyncStream<UnpublishedChange>? {
+        get async {
+            await publishingManager.unpublishedChanges
+        }
+    }
+
+    /// Get all unpublished event records with full per-relay status
+    /// Returns a dictionary of eventId -> record containing publishedRelays and pendingRelays
+    public func getAllUnpublishedRecords() async -> [String: UnpublishedStore.UnpublishedEventRecord] {
+        return await publishingManager.getAllUnpublishedRecords()
     }
 
     // MARK: - Helper Methods
