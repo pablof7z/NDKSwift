@@ -3,13 +3,13 @@ import Foundation
 /// Manages a single data requirement with proper filter splitting for outbox model
 /// Focuses on event deduplication and relay management
 actor NDKSubscriptionRequirement {
-    let filter: NDKFilter
-    let subscriptionId: String
-    let internalSubscription: NDKSubscriptionCoordinator
+    nonisolated let filter: NDKFilter
+    nonisolated let subscriptionId: String
+    nonisolated let internalSubscription: NDKSubscriptionCoordinator
     private let cache: any NDKCache
     private weak var ndk: NDK?
     private let closeOnEose: Bool
-    let relayStrategy: InternalRelaySelectionStrategy
+    nonisolated let relayStrategy: InternalRelaySelectionStrategy
     private let shouldFetchFromNetwork: Bool
     private let cachePolicy: CachePolicy
 

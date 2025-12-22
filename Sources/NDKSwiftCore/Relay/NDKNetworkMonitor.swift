@@ -105,11 +105,11 @@ public actor NDKNetworkMonitor {
         if !wasConnected && isNowConnected {
             wasConnected = true
             NDKLogger.log(.info, category: .connection, "🌐 Network connectivity gained")
-            await delegate?.networkMonitorDidGainConnectivity()
+            delegate?.networkMonitorDidGainConnectivity()
         } else if wasConnected && !isNowConnected {
             wasConnected = false
             NDKLogger.log(.warning, category: .connection, "🌐 Network connectivity lost")
-            await delegate?.networkMonitorDidLoseConnectivity()
+            delegate?.networkMonitorDidLoseConnectivity()
         }
 
         // Check for network type changes (only when connected)
@@ -123,7 +123,7 @@ public actor NDKNetworkMonitor {
                     category: .connection,
                     "🌐 Network type changed from \(previousType) to \(currentType)"
                 )
-                await delegate?.networkMonitorDidChangeNetworkType()
+                delegate?.networkMonitorDidChangeNetworkType()
             }
         }
     }

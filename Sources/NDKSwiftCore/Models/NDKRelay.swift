@@ -416,7 +416,8 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
 
     /// Subscription manager for this relay (handles grouping and merging)
     /// Lazy to avoid initialization order issues with self
-    lazy var subscriptionManager: NDKRelaySubscriptionManager = {
+    /// Thread-safety is guaranteed by NDKRelaySubscriptionManager being an actor
+    nonisolated(unsafe) lazy var subscriptionManager: NDKRelaySubscriptionManager = {
         NDKRelaySubscriptionManager(relay: self)
     }()
 

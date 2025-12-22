@@ -24,8 +24,8 @@ public protocol NDKRelayConnectionDelegate: AnyObject, Sendable {
 /// try await connection.send(message: .event(event))
 /// ```
 public actor NDKRelayConnection {
-    private let url: URL
-    private let config: NDKConnectionConfig
+    private nonisolated let url: URL
+    private nonisolated let config: NDKConnectionConfig
 
     #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
         private var webSocketTask: URLSessionWebSocketTask?
@@ -660,7 +660,7 @@ public actor NDKRelayConnection {
                 guard let self = self else { return }
 
                 // Wait for the configured interval
-                try? await Task.sleep(nanoseconds: UInt64(await self.config.healthCheckInterval * Double(TimeConstants.nanosecondsPerSecond)))
+                try? await Task.sleep(nanoseconds: UInt64(self.config.healthCheckInterval * Double(TimeConstants.nanosecondsPerSecond)))
 
                 guard !Task.isCancelled else { return }
 
