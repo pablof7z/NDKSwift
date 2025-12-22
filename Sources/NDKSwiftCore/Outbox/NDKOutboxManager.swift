@@ -461,12 +461,6 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
 
         NDKLogger.log(.info, category: .outbox, "🔍 Starting background relay discovery for \(authors.count) authors")
 
-        // Mark authors as looked up NOW that discovery is actually being triggered
-        // This prevents duplicate discovery requests
-        Task {
-            await lookupTracker.markLookedUp(authors)
-        }
-
         Task {
             // Create filter for relay lists
             // Do NOT set a limit - this prevents filter aggregation
@@ -499,15 +493,24 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
                     relaysToUse = connectedRelays
                     NDKLogger.log(.warning, category: .outbox, "⚠️ No outbox relays connected, falling back to \(connectedRelays.count) explicit relays for discovery")
                 } else {
-                    // No relays connected at all
-                    NDKLogger.log(.error, category: .outbox, "❌ No relays connected for relay discovery")
+                    // No relays connected at all - don't mark authors as looked up so we can retry when online
+                    NDKLogger.log(.warning, category: .outbox, "⏳ No relays connected for relay discovery - will retry when relays connect")
                     return
                 }
             } else {
                 // No outbox relays configured, use all connected relays
+                if connectedRelays.isEmpty {
+                    // No relays connected - don't mark authors as looked up so we can retry when online
+                    NDKLogger.log(.warning, category: .outbox, "⏳ No relays connected for relay discovery - will retry when relays connect")
+                    return
+                }
                 relaysToUse = connectedRelays
                 NDKLogger.log(.debug, category: .outbox, "📡 No outbox relays configured, using \(connectedRelays.count) connected relays for discovery")
             }
+
+            // Mark authors as looked up only AFTER we've confirmed we have relays to use
+            // This ensures we retry discovery if it fails due to no relays being connected
+            await lookupTracker.markLookedUp(authors)
 
             // Create data source for relay list discovery
             // Generate a short subscription ID by taking prefix of first author and adding count
@@ -910,7 +913,8 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
             filter: filter,
             maxAge: 0,
             cachePolicy: .networkOnly,
-            relays: relaysToUse
+            relays: relaysToUse,
+            includeRelayUpdates: true
         )
 
         // Process both events and relay updates with timeout
@@ -928,7 +932,8 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
 
             // Task 2: Track EOSE
             group.addTask {
-                for await update in dataSource.relayUpdates {
+                guard let relayUpdates = dataSource.relayUpdates else { return }
+                for await update in relayUpdates {
                     if case let .eose(relay) = update {
                         eoseRelays.insert(relay)
                     }

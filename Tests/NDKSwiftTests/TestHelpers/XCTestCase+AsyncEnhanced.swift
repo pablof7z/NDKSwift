@@ -141,9 +141,8 @@ extension XCTestCase {
         var events: [T] = []
         let deadline = Date().addingTimeInterval(timeout)
 
-        // events yields [T] batches, not individual T elements
-        for await eventBatch in dataSource.events {
-            events.append(contentsOf: eventBatch)
+        for await batch in dataSource.events {
+            events.append(contentsOf: batch)
             if events.count >= count {
                 return events
             }
@@ -168,7 +167,12 @@ extension XCTestCase {
 
         let deadline = Date().addingTimeInterval(timeout)
 
-        for await update in dataSource.relayUpdates {
+        guard let relayUpdates = dataSource.relayUpdates else {
+            XCTFail("relayUpdates not available - subscription must be created with includeRelayUpdates: true", file: file, line: line)
+            return
+        }
+
+        for await update in relayUpdates {
             if case .eose = update {
                 eoseReceived = true
                 break
