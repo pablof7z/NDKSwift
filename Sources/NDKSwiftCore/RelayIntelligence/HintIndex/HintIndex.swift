@@ -109,6 +109,11 @@ public actor HintIndex {
         return Set(hints(forEventId: eventId).map { $0.relay })
     }
 
+    /// Get unique relay URLs for an address
+    public func relayURLs(forAddress address: String) -> Set<RelayURL> {
+        return Set(hints(forAddress: address).map { $0.relay })
+    }
+
     // MARK: - Statistics
 
     /// Total number of hint entries
@@ -238,11 +243,6 @@ public actor HintIndex {
         eventIdHints.removeAll()
         addressHints.removeAll()
         totalEntries = 0
-    }
-
-    /// Get unique relay URLs for an address
-    public func relayURLs(forAddress address: String) -> Set<RelayURL> {
-        return Set(hints(forAddress: address).map { $0.relay })
     }
 
     // MARK: - Private
