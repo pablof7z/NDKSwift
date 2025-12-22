@@ -46,7 +46,7 @@ public struct NDKRelayPublishEvent: Sendable {
 public actor NDKPool {
     private weak var ndk: NDK?
     private var relayMap: [String: NDKRelay] = [:]
-    private let config: NDKConnectionConfig
+    private nonisolated let config: NDKConnectionConfig
 
     /// Set of relay URLs that were explicitly added by the developer
     private var explicitRelayUrls: Set<String> = []
@@ -835,7 +835,7 @@ extension NDKPool: NDKConnectionMonitorDelegate {
     nonisolated public func connectionMonitorDidEnterForeground() {
         NDKLogger.log(.info, category: .connection, "📱 App entering foreground - checking connections")
         Task {
-            guard await self.config.autoReconnectOnForeground else { return }
+            guard self.config.autoReconnectOnForeground else { return }
             await self.reconnectAll()
         }
     }
@@ -855,7 +855,7 @@ extension NDKPool: NDKNetworkMonitorDelegate {
     nonisolated public func networkMonitorDidGainConnectivity() {
         NDKLogger.log(.info, category: .connection, "🌐 Network connectivity gained - reconnecting")
         Task {
-            guard await self.config.autoReconnectOnNetworkChange else { return }
+            guard self.config.autoReconnectOnNetworkChange else { return }
             await self.reconnectAll()
         }
     }
@@ -868,7 +868,7 @@ extension NDKPool: NDKNetworkMonitorDelegate {
     nonisolated public func networkMonitorDidChangeNetworkType() {
         NDKLogger.log(.info, category: .connection, "🌐 Network type changed - reconnecting")
         Task {
-            guard await self.config.autoReconnectOnNetworkChange else { return }
+            guard self.config.autoReconnectOnNetworkChange else { return }
             // Small delay to let network stabilize
             try? await Task.sleep(nanoseconds: UInt64(1.0 * Double(TimeConstants.nanosecondsPerSecond)))
             await self.reconnectAll()

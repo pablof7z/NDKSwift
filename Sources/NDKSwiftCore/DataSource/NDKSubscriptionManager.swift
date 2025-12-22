@@ -320,7 +320,7 @@ actor NDKSubscriptionManager {
         for (requirementId, requirement) in activeRequirements {
             // Get the relay strategy to check if this requirement has unknown authors
             let filter = requirement.filter
-            let relayStrategy = await requirement.relayStrategy
+            let relayStrategy = requirement.relayStrategy
             guard case let .outbox(strategy) = relayStrategy else {
                 NDKLogger.log(.trace, category: .subscription, "   Requirement not using outbox strategy, skipping")
                 continue

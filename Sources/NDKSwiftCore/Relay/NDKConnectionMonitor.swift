@@ -166,24 +166,24 @@ public actor NDKConnectionMonitor {
 
     // MARK: - Event Handlers
 
-    private func handleDidEnterBackground() async {
+    private func handleDidEnterBackground() {
         NDKLogger.log(.info, category: .connection, "📱 App entered background")
-        await delegate?.connectionMonitorDidEnterBackground()
+        delegate?.connectionMonitorDidEnterBackground()
     }
 
-    private func handleWillEnterForeground() async {
+    private func handleWillEnterForeground() {
         NDKLogger.log(.info, category: .connection, "📱 App entering foreground")
-        await delegate?.connectionMonitorDidEnterForeground()
+        delegate?.connectionMonitorDidEnterForeground()
     }
 
-    private func handleDidBecomeActive() async {
+    private func handleDidBecomeActive() {
         NDKLogger.log(.info, category: .connection, "📱 App became active")
-        await delegate?.connectionMonitorDidBecomeActive()
+        delegate?.connectionMonitorDidBecomeActive()
     }
 
-    private func handleWillResignActive() async {
+    private func handleWillResignActive() {
         NDKLogger.log(.info, category: .connection, "📱 App will resign active")
-        await delegate?.connectionMonitorWillResignActive()
+        delegate?.connectionMonitorWillResignActive()
     }
 
     deinit {
