@@ -51,7 +51,7 @@ Use `profileUpdates(for:)` to get an `AsyncStream`:
 
 ```swift
 Task {
-    for await metadata in ndk.profileUpdates(for: pubkey) {
+    for await metadata in await ndk.profileUpdates(for: pubkey) {
         print("Profile updated: \(metadata?.name ?? "Unknown")")
     }
 }
@@ -170,7 +170,7 @@ Text(profile.name)
 NDKUIUsername(ndk: ndk, pubkey: pubkey)
 
 // AsyncStream for background tasks
-for await metadata in ndk.profileUpdates(for: pubkey) {
+for await metadata in await ndk.profileUpdates(for: pubkey) {
     // Process updates
 }
 ```
@@ -264,7 +264,7 @@ struct ProfileDetailView: View {
 ```swift
 class ProfileAnalyzer {
     func analyzeProfile(pubkey: String, ndk: NDK) async {
-        for await metadata in ndk.profileUpdates(for: pubkey) {
+        for await metadata in await ndk.profileUpdates(for: pubkey) {
             guard let metadata else { continue }
 
             // Process profile

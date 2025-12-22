@@ -126,10 +126,10 @@ final class NDKProfileAPITests: XCTestCase {
 
     func testUserProfile_ReturnsSameProfileAsNDKProfile() {
         // Given a user
-        let user = ndk.getUser(testPubkey)
+        let user = ndk.getUser(testPubkey)!
 
         // When getting profile via user vs ndk
-        let userProfile = user.profile
+        let userProfile = user.profile!
         let ndkProfile = ndk.profile(for: testPubkey)
 
         // Then returns same instance
@@ -142,7 +142,7 @@ final class NDKProfileAPITests: XCTestCase {
         // Given a pubkey
 
         // When getting profile updates
-        let updates = ndk.profileUpdates(for: testPubkey)
+        let updates = await ndk.profileUpdates(for: testPubkey)
 
         // Then returns AsyncStream
         XCTAssert(updates is AsyncStream<NDKUserMetadata?>)
@@ -153,7 +153,7 @@ final class NDKProfileAPITests: XCTestCase {
 
         // When collecting first update
         var firstUpdate: NDKUserMetadata??
-        for await update in ndk.profileUpdates(for: testPubkey) {
+        for await update in await ndk.profileUpdates(for: testPubkey) {
             firstUpdate = update
             break
         }
