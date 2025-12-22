@@ -31,6 +31,7 @@ public struct OutboxFilterStrategy: Sendable {
 /// Tracks recent relay list lookups to avoid spamming
 actor RelayListLookupTracker {
     private var recentLookups: [String: Date] = [:]
+    private var pendingAuthors: Set<String> = []  // Authors waiting for relay connection
     private let lookupWindow: TimeInterval
 
     init(lookupWindow: TimeInterval = 2 * TimeConstants.hour) { // 2 hours default
@@ -46,6 +47,7 @@ actor RelayListLookupTracker {
 
     func markLookedUp(_ pubkey: String) {
         recentLookups[pubkey] = Date()
+        pendingAuthors.remove(pubkey)
     }
 
     func markLookedUp(_ pubkeys: Set<String>) {
@@ -53,9 +55,20 @@ actor RelayListLookupTracker {
         for pubkey in pubkeys {
             recentLookups[pubkey] = now
         }
+        pendingAuthors.subtract(pubkeys)
 
         // Clean up old entries periodically
         cleanupOldEntries()
+    }
+
+    /// Mark authors as pending (discovery was requested but no relays were connected)
+    func markPending(_ pubkeys: Set<String>) {
+        pendingAuthors.formUnion(pubkeys)
+    }
+
+    /// Get authors that are waiting for relay connection to be discovered
+    func getPendingAuthors() -> Set<String> {
+        pendingAuthors
     }
 
     /// Remove entries older than 2x the lookup window to prevent unbounded growth

@@ -493,15 +493,17 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
                     relaysToUse = connectedRelays
                     NDKLogger.log(.warning, category: .outbox, "⚠️ No outbox relays connected, falling back to \(connectedRelays.count) explicit relays for discovery")
                 } else {
-                    // No relays connected at all - don't mark authors as looked up so we can retry when online
-                    NDKLogger.log(.warning, category: .outbox, "⏳ No relays connected for relay discovery - will retry when relays connect")
+                    // No relays connected at all - mark as pending for retry when relays connect
+                    NDKLogger.log(.warning, category: .outbox, "⏳ No relays connected for relay discovery - marking \(authors.count) authors as pending")
+                    await lookupTracker.markPending(authors)
                     return
                 }
             } else {
                 // No outbox relays configured, use all connected relays
                 if connectedRelays.isEmpty {
-                    // No relays connected - don't mark authors as looked up so we can retry when online
-                    NDKLogger.log(.warning, category: .outbox, "⏳ No relays connected for relay discovery - will retry when relays connect")
+                    // No relays connected - mark as pending for retry when relays connect
+                    NDKLogger.log(.warning, category: .outbox, "⏳ No relays connected for relay discovery - marking \(authors.count) authors as pending")
+                    await lookupTracker.markPending(authors)
                     return
                 }
                 relaysToUse = connectedRelays
@@ -583,6 +585,28 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
     public func untrackUser(_: String) async {
         // Remove from tracker cache
         await clear() // For now, just clear - in future could implement selective removal
+    }
+
+    /// Retry pending discoveries when relays connect
+    /// Called when a relay connects to check if there are authors we couldn't look up earlier
+    public func retryPendingDiscoveries() async {
+        // Get authors that need lookup (weren't marked because no relays were connected)
+        let pendingAuthors = await lookupTracker.getPendingAuthors()
+
+        guard !pendingAuthors.isEmpty else {
+            NDKLogger.log(.trace, category: .outbox, "🔄 No pending authors to discover")
+            return
+        }
+
+        // Check if we have connected relays now
+        let connectedRelays = await ndk.pool.connectedRelayURLs
+        guard !connectedRelays.isEmpty else {
+            NDKLogger.log(.trace, category: .outbox, "🔄 Still no connected relays for discovery")
+            return
+        }
+
+        NDKLogger.log(.info, category: .outbox, "🚀 Retrying discovery for \(pendingAuthors.count) authors now that relays are connected")
+        discoverRelaysInBackground(for: pendingAuthors)
     }
 
     /// Get relay update statistics
@@ -739,6 +763,10 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
                 source: source
             )
             relayDiscoveryInternalContinuation.yield(discoveryEvent)
+
+            // Also emit to the public discovery stream (used by NDKSubscriptionManager for enhanced requirements)
+            let allRelays = filteredReadRelays.union(filteredWriteRelays)
+            discoveryContinuation?.yield(RelayDiscovery(authors: Set([pubkey]), relays: allRelays))
 
             NDKLogger.log(.debug, category: .outbox, "📡 Emitted relay discovery for \(pubkey.prefix(8)): \(filteredReadRelays.count) read, \(filteredWriteRelays.count) write relays")
         }
@@ -1012,5 +1040,13 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         case .both:
             return item
         }
+    }
+
+    // MARK: - Test Helpers
+
+    /// Get pending authors that are waiting for relay connection to be discovered
+    /// This is exposed for testing purposes
+    public func getPendingAuthorsForTesting() async -> Set<String> {
+        await lookupTracker.getPendingAuthors()
     }
 }
