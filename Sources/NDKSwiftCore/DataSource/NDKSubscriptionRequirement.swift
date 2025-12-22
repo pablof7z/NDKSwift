@@ -179,10 +179,26 @@ actor NDKSubscriptionRequirement {
                 let allConnectedRelays = await pool.connectedRelayURLs
                 // Normalize outbox relay URLs to match the format of connected relays
                 let normalizedOutboxRelays = Set((ndk?.outboxConfig.outboxRelays ?? []).map { $0.normalizedRelayURL })
-                let fallbackRelayURLs = allConnectedRelays.subtracting(normalizedOutboxRelays)
+                var fallbackRelayURLs = allConnectedRelays.subtracting(normalizedOutboxRelays)
 
-                NDKLogger.log(.debug, category: .subscription,
-                              "📍 Using \(fallbackRelayURLs.count) fallback relays for \(strategy.unknownAuthors.count) unknown authors")
+                // If no relays are connected (offline mode), use configured relay URLs
+                // This ensures subscriptions are registered for replay when relays connect
+                if fallbackRelayURLs.isEmpty {
+                    // First try explicit relays in the pool
+                    let configuredRelays = await pool.explicitRelays()
+                    fallbackRelayURLs = Set(configuredRelays.map { $0.url }).subtracting(normalizedOutboxRelays)
+
+                    // If pool is empty (connect() not called yet), use the initial relay URLs
+                    if fallbackRelayURLs.isEmpty, let ndk = ndk {
+                        fallbackRelayURLs = Set(ndk.configuredRelayURLs.map { $0.normalizedRelayURL }).subtracting(normalizedOutboxRelays)
+                    }
+
+                    NDKLogger.log(.debug, category: .subscription,
+                                  "📍 No connected relays, using \(fallbackRelayURLs.count) configured relays for \(strategy.unknownAuthors.count) unknown authors")
+                } else {
+                    NDKLogger.log(.debug, category: .subscription,
+                                  "📍 Using \(fallbackRelayURLs.count) fallback relays for \(strategy.unknownAuthors.count) unknown authors")
+                }
 
                 for relay in fallbackRelayURLs {
                     // Mark these as fallback relays - they should NOT count toward author coverage
@@ -215,12 +231,12 @@ actor NDKSubscriptionRequirement {
             // Determine the correct origin based on whether this is a fallback
             let origin: NDKRelayOrigin
             if isFallback {
-                origin = .explicit
+                origin = .fallback
             } else {
                 let originAuthor = filter.authors?.first ?? "unknown"
                 origin = .outbox(authorPubkey: originAuthor)
             }
-            relay = await ndk.pool.addRelay(relayURL, origin: origin)
+            relay = await ndk.addRelay(relayURL, origin: origin)
         }
 
         guard let relay = relay else {
@@ -252,6 +268,12 @@ actor NDKSubscriptionRequirement {
             } else {
                 NDKLogger.log(.debug, category: .subscription,
                               "📍 Relay \(relayURL) is a FALLBACK for \(authors.count) authors (does NOT count toward coverage): \(authors.prefix(3).joined(separator: ", "))\(authors.count > 3 ? "..." : "")")
+            }
+
+            // Notify relay update observers about subscription activation
+            let kinds = filter.kinds ?? []
+            for (_, _, continuation) in relayUpdateObservers {
+                continuation.yield(.subscriptionActivated(relay: relayURL, kinds: kinds, authorCount: authors.count))
             }
         }
     }
@@ -387,6 +409,30 @@ actor NDKSubscriptionRequirement {
     /// Add an enhanced requirement handle
     func addEnhancedRequirement(_ handle: NDKSubscriptionRequirementHandle) {
         enhancedRequirements.append(handle)
+    }
+
+    /// Forward events from enhanced requirements to this requirement's observers
+    /// This ensures events from discovered relays flow to the original subscription
+    func forwardEventsFromEnhanced(_ events: [NDKEvent]) {
+        // Deduplicate events we've already seen
+        let newEvents = events.filter { !seenEventIds.contains($0.id) }
+        guard !newEvents.isEmpty else { return }
+
+        // Mark all as seen
+        for event in newEvents {
+            seenEventIds.insert(event.id)
+        }
+
+        NDKLogger.log(.debug, category: .subscription,
+                      "📬 Forwarding \(newEvents.count) new events (from \(events.count) total) to \(observers.count) observers")
+
+        // Notify observers with filtered batch
+        for (_, _, continuation, individualFilter) in observers {
+            let matching = newEvents.filter { individualFilter.matches(event: $0) }
+            if !matching.isEmpty {
+                continuation.yield(matching)
+            }
+        }
     }
 
     /// Monitor EOSE status and emit when appropriate

@@ -94,7 +94,9 @@ public class NDKRelayList: NDKList {
                 access = [.read, .write]
             }
 
-            return NDKRelayListEntry(url: url, access: access)
+            // Normalize the URL to ensure consistent relay identification
+            let normalizedURL = URLNormalizer.tryNormalizeRelayUrl(url) ?? url
+            return NDKRelayListEntry(url: normalizedURL, access: access)
         }
     }
 

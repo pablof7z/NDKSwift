@@ -8,6 +8,8 @@ public enum NDKRelayOrigin: Codable, Equatable, Sendable {
     case outbox(authorPubkey: String) // pubkey whose relay list led to discovery
     /// Added from NDKOutboxConfig for relay list queries
     case outboxConfig
+    /// System-added fallback relay (temporary, non-persistent)
+    case fallback
 }
 
 /// Relay information for NIP-65 (relay list metadata)
