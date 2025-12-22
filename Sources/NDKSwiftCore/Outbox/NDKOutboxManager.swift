@@ -408,10 +408,9 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
                 NDKLogger.log(.debug, category: .outbox, "❓ No relay info cached for \(author.prefix(8))")
                 unknownAuthors.insert(author)
 
-                // Check if we should look them up
+                // Check if we should look them up (don't mark as looked up here - that happens when discovery is triggered)
                 if await lookupTracker.shouldLookup(author) {
                     authorsToDiscover.insert(author)
-                    await lookupTracker.markLookedUp(author)
                 }
             }
         }
@@ -426,23 +425,12 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
             }
         }
 
-        // Add unknown authors to app's explicit relays (NOT outbox relays)
+        // NOTE: Unknown authors are NOT added to relayToAuthors here!
+        // They are kept separate in `unknownAuthors` and handled by applyOutboxStrategy
+        // which routes them to fallback relays with `isFallback: true`.
+        // This ensures fallback relay coverage doesn't count toward author-specific coverage.
         if !unknownAuthors.isEmpty {
-            // Get only the explicit relays, excluding outbox relays
-            let allConnectedRelays = await ndk.pool.connectedRelayURLs
-            // Normalize outbox relay URLs to match the format of connected relays
-            let normalizedOutboxRelays = Set(ndk.outboxConfig.outboxRelays.map { $0.normalizedRelayURL })
-            let explicitRelays = allConnectedRelays.subtracting(normalizedOutboxRelays)
-
-            NDKLogger.log(.debug, category: .outbox, "🔍 Relay filtering details:")
-            NDKLogger.log(.debug, category: .outbox, "  - Connected relays: \(allConnectedRelays.sorted())")
-            NDKLogger.log(.debug, category: .outbox, "  - Outbox config relays (raw): \(ndk.outboxConfig.outboxRelays.sorted())")
-            NDKLogger.log(.debug, category: .outbox, "  - Outbox config relays (normalized): \(normalizedOutboxRelays.sorted())")
-            NDKLogger.log(.debug, category: .outbox, "  - Explicit (non-outbox) relays: \(explicitRelays.sorted())")
-            NDKLogger.log(.debug, category: .outbox, "🔄 Adding \(unknownAuthors.count) unknown authors to \(explicitRelays.count) explicit relays (excluding outbox relays)")
-            for relay in explicitRelays {
-                relayToAuthors[relay, default: []].formUnion(unknownAuthors)
-            }
+            NDKLogger.log(.debug, category: .outbox, "📋 \(unknownAuthors.count) unknown authors will use fallback relays (not added to filtersByRelay)")
         }
 
         // Create relay-specific filters
@@ -472,6 +460,12 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         guard !authors.isEmpty else { return }
 
         NDKLogger.log(.info, category: .outbox, "🔍 Starting background relay discovery for \(authors.count) authors")
+
+        // Mark authors as looked up NOW that discovery is actually being triggered
+        // This prevents duplicate discovery requests
+        Task {
+            await lookupTracker.markLookedUp(authors)
+        }
 
         Task {
             // Create filter for relay lists
@@ -572,7 +566,12 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
                 relays: allRelays
             )
             NDKLogger.log(.info, category: .outbox, "📡 Emitting relay discovery event for \(event.pubkey.prefix(StringConstants.DisplayFormatting.hexPrefixLength)) with \(allRelays.count) relays")
-            discoveryContinuation?.yield(discovery)
+            if discoveryContinuation == nil {
+                NDKLogger.log(.error, category: .outbox, "❌ Discovery continuation is nil! Cannot emit discovery")
+            } else {
+                discoveryContinuation?.yield(discovery)
+                NDKLogger.log(.trace, category: .outbox, "✅ Yielded to discovery stream")
+            }
         }
     }
 

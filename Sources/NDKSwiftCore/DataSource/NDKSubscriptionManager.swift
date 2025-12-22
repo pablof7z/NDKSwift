@@ -297,15 +297,18 @@ actor NDKSubscriptionManager {
 
     /// Listen for relay discoveries and update active requirements
     private func listenForRelayDiscoveries() async {
-        // Subscribe to outbox relay discoveries
+        NDKLogger.log(.info, category: .subscription, "🎧 Started listening for relay discoveries")
         for await discovery in await ndk.outbox.relayDiscoveries {
+            NDKLogger.log(.info, category: .subscription, "🔔 Received discovery: \(discovery.authors.count) authors, \(discovery.relays.count) relays")
             await handleRelayDiscovery(authors: discovery.authors, relays: discovery.relays)
         }
+        NDKLogger.log(.warning, category: .subscription, "⚠️ Relay discovery stream ended")
     }
 
     /// Handle newly discovered relays for authors
     private func handleRelayDiscovery(authors: Set<String>, relays: Set<RelayURL>) async {
         NDKLogger.log(.info, category: .subscription, "📡 Relay discovery: \(relays.count) relays for \(authors.count) authors")
+        NDKLogger.log(.debug, category: .subscription, "   Active requirements: \(activeRequirements.count)")
 
         // According to Outbox.md: Create NEW NDKSubscriptionRequirements for discovered relays
         // and attach them to the same observers as the original subscription
@@ -318,18 +321,27 @@ actor NDKSubscriptionManager {
             // Get the relay strategy to check if this requirement has unknown authors
             let filter = requirement.filter
             let relayStrategy = await requirement.relayStrategy
-            guard case let .outbox(strategy) = relayStrategy else { continue }
+            guard case let .outbox(strategy) = relayStrategy else {
+                NDKLogger.log(.trace, category: .subscription, "   Requirement not using outbox strategy, skipping")
+                continue
+            }
 
             // Check if any discovered authors are in this requirement's unknown authors
             let relevantAuthors = authors.intersection(strategy.unknownAuthors)
-            guard !relevantAuthors.isEmpty else { continue }
+            guard !relevantAuthors.isEmpty else {
+                NDKLogger.log(.trace, category: .subscription, "   No relevant authors (discovered authors not in unknown set)")
+                continue
+            }
 
             NDKLogger.log(.info, category: .subscription,
                           "🎯 Evaluating enhanced requirements for \(relevantAuthors.count) authors")
 
             // Check if the requirement has observers
             let observerCount = await requirement.getObserverCount()
-            guard observerCount > 0 else { continue }
+            guard observerCount > 0 else {
+                NDKLogger.log(.warning, category: .subscription, "   Req has no observers, skipping enhancement")
+                continue
+            }
 
             // Get relays that are already serving these specific authors
             let existingRelays = await requirement.getRelaysServingAuthors(relevantAuthors)

@@ -26,7 +26,7 @@ public enum RelayUpdate {
 /// Primary API for declarative data access in NDKSwift
 /// Automatically manages subscriptions, caching, and lifecycle
 @Observable
-public final class NDKSubscription<T> {
+public final class NDKSubscription<T>: @unchecked Sendable {
     public private(set) var data: [T] = []
     public private(set) var isLoading: Bool = false
     public private(set) var error: Error?
