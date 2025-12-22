@@ -1,7 +1,7 @@
 import Foundation
 
 /// Result from outbox relay recommendation that includes filter breakdown by relay
-public struct OutboxFilterStrategy {
+public struct OutboxFilterStrategy: Sendable {
     /// Filters broken down by relay - each relay gets only the authors it serves
     public let filtersByRelay: [RelayURL: NDKFilter]
 
