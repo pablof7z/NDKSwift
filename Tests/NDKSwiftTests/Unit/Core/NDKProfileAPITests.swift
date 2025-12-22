@@ -129,7 +129,7 @@ final class NDKProfileAPITests: XCTestCase {
         let user = ndk.getUser(testPubkey)!
 
         // When getting profile via user vs ndk
-        let userProfile = user.profile!
+        let userProfile = user.profile
         let ndkProfile = ndk.profile(for: testPubkey)
 
         // Then returns same instance

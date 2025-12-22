@@ -53,10 +53,10 @@ public final class NDKUser: Equatable, Hashable {
     // MARK: - Profile
 
     /// Observable profile that streams kind 0 metadata updates
-    /// Returns nil only if NDK has been deallocated (should not happen in normal usage)
+    /// Convenience property that delegates to ndk.profile(for:)
     @MainActor
-    public var profile: NDKProfile? {
-        ndk.profileCache.get(pubkey)
+    public var profile: NDKProfile {
+        ndk.profile(for: pubkey)
     }
 
     // MARK: - Relay List
