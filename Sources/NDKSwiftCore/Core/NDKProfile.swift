@@ -22,9 +22,14 @@ public final class NDKProfile {
         metadata?.banner.flatMap(URL.init(string:))
     }
 
+    /// User's name
+    public var name: String {
+        metadata?.name ?? ""
+    }
+
     /// Bio/about text
-    public var about: String? {
-        metadata?.about
+    public var about: String {
+        metadata?.about ?? ""
     }
 
     /// NIP-05 identifier
@@ -62,31 +67,13 @@ public final class NDKProfile {
         let pubkey = self.pubkey
 
         Task { [weak self] in
-            let filter = NDKFilter(
-                authors: [pubkey],
-                kinds: [EventKind.metadata]
-            )
+            // Delegate to ProfileManager for caching and subscription management
+            for await metadata in await ndk.profileManager.subscribe(for: pubkey, maxAge: 0) {
+                guard !cancellation.isCancelled else { break }
+                guard let self else { break }
 
-            let subscription = ndk.subscribe(
-                filter: filter,
-                cachePolicy: .cacheWithNetwork
-            )
-
-            for await batch in subscription.events {
-                for event in batch {
-                    guard !cancellation.isCancelled else { break }
-                    guard let self else { break }
-
-                    let newMetadata = NDKUserMetadata(event: event, ndk: ndk)
-
-                    // Only update if newer
-                    if let existingMetadata = self.metadata {
-                        if newMetadata.updatedAt > existingMetadata.updatedAt {
-                            self.metadata = newMetadata
-                        }
-                    } else {
-                        self.metadata = newMetadata
-                    }
+                await MainActor.run {
+                    self.metadata = metadata
                 }
             }
         }
