@@ -25,8 +25,12 @@ actor NDKSubscriptionRequirement {
     // Active relay subscriptions (for outbox model)
     private var relaySubscriptions: [RelayURL: RelaySubscription] = [:]
 
-    // Track which authors each relay subscription covers
+    // Track which authors each relay subscription covers (all relays including fallbacks)
     private var relayAuthorCoverage: [RelayURL: Set<String>] = [:]
+
+    // Track only author-specific relay coverage (NOT fallbacks)
+    // Fallback relays should NOT count toward author coverage for relay selection
+    private var authorSpecificRelayCoverage: [RelayURL: Set<String>] = [:]
 
     // Enhanced requirements created by NDKSubscriptionManager
     private var enhancedRequirements: [NDKSubscriptionRequirementHandle] = []
@@ -159,11 +163,13 @@ actor NDKSubscriptionRequirement {
     /// Apply outbox strategy with filter splitting
     private func applyOutboxStrategy(_ strategy: OutboxFilterStrategy) async {
         // Create subscriptions for each relay with its specific filter
+        // These are AUTHOR-SPECIFIC relays (from their kind:10002) - NOT fallbacks
         for (relay, relayFilter) in strategy.filtersByRelay {
-            await createSubscription(for: relayFilter, on: relay)
+            await createSubscription(for: relayFilter, on: relay, isFallback: false)
         }
 
         // If there are unknown authors, use fallback relays
+        // These are FALLBACK relays - they should NOT count toward author coverage
         if !strategy.unknownAuthors.isEmpty {
             var fallbackFilter = filter
             fallbackFilter.authors = Array(strategy.unknownAuthors)
@@ -179,21 +185,24 @@ actor NDKSubscriptionRequirement {
                               "📍 Using \(fallbackRelayURLs.count) fallback relays for \(strategy.unknownAuthors.count) unknown authors")
 
                 for relay in fallbackRelayURLs {
-                    await createSubscription(for: fallbackFilter, on: relay)
+                    // Mark these as fallback relays - they should NOT count toward author coverage
+                    await createSubscription(for: fallbackFilter, on: relay, isFallback: true)
                 }
             }
         }
     }
 
     /// Create subscriptions on specific relays
-    private func createSubscriptions(for filter: NDKFilter, on relays: Set<RelayURL>) async {
+    /// - Parameter isFallback: If true, these are fallback relays that should NOT count toward author coverage
+    private func createSubscriptions(for filter: NDKFilter, on relays: Set<RelayURL>, isFallback: Bool = false) async {
         for relay in relays {
-            await createSubscription(for: filter, on: relay)
+            await createSubscription(for: filter, on: relay, isFallback: isFallback)
         }
     }
 
     /// Create a subscription on a specific relay
-    private func createSubscription(for filter: NDKFilter, on relayURL: RelayURL) async {
+    /// - Parameter isFallback: If true, this is a fallback relay that should NOT count toward author coverage
+    private func createSubscription(for filter: NDKFilter, on relayURL: RelayURL, isFallback: Bool = false) async {
         guard let ndk = ndk else { return }
 
         // Get or create relay
@@ -203,9 +212,15 @@ actor NDKSubscriptionRequirement {
         if relay == nil {
             NDKLogger.log(.info, category: .subscription,
                           "🔌 Relay not in pool, adding and connecting: \(relayURL)")
-            // Try to determine origin from filter authors
-            let originAuthor = filter.authors?.first ?? "unknown"
-            relay = await ndk.pool.addRelay(relayURL, origin: .outbox(authorPubkey: originAuthor))
+            // Determine the correct origin based on whether this is a fallback
+            let origin: NDKRelayOrigin
+            if isFallback {
+                origin = .explicit
+            } else {
+                let originAuthor = filter.authors?.first ?? "unknown"
+                origin = .outbox(authorPubkey: originAuthor)
+            }
+            relay = await ndk.pool.addRelay(relayURL, origin: origin)
         }
 
         guard let relay = relay else {
@@ -225,9 +240,19 @@ actor NDKSubscriptionRequirement {
 
         // Track which authors this relay subscription covers
         if let authors = filter.authors {
+            // Always track in the general coverage (for all relay purposes)
             relayAuthorCoverage[relayURL] = Set(authors)
-            NDKLogger.log(.debug, category: .subscription,
-                          "📊 Relay \(relayURL) now covers \(authors.count) authors: \(authors.prefix(3).joined(separator: ", "))\(authors.count > 3 ? "..." : "")")
+
+            // Only track in author-specific coverage if NOT a fallback relay
+            // Fallback relays should NOT count toward author coverage for relay selection
+            if !isFallback {
+                authorSpecificRelayCoverage[relayURL] = Set(authors)
+                NDKLogger.log(.debug, category: .subscription,
+                              "📊 Relay \(relayURL) now covers \(authors.count) authors (author-specific): \(authors.prefix(3).joined(separator: ", "))\(authors.count > 3 ? "..." : "")")
+            } else {
+                NDKLogger.log(.debug, category: .subscription,
+                              "📍 Relay \(relayURL) is a FALLBACK for \(authors.count) authors (does NOT count toward coverage): \(authors.prefix(3).joined(separator: ", "))\(authors.count > 3 ? "..." : "")")
+            }
         }
     }
 
@@ -322,18 +347,22 @@ actor NDKSubscriptionRequirement {
     }
 
     /// Get relays that are serving specific authors
+    /// IMPORTANT: Only returns author-specific relays, NOT fallback relays
+    /// Fallback relays should NOT count toward author coverage for relay selection
     func getRelaysServingAuthors(_ authors: Set<String>) -> Set<RelayURL> {
         var servingRelays = Set<RelayURL>()
 
-        for (relay, coveredAuthors) in relayAuthorCoverage {
-            // Check if this relay covers any of the requested authors
-            if !authors.isDisjoint(with: coveredAuthors) {
+        // Use authorSpecificRelayCoverage, NOT relayAuthorCoverage
+        // This ensures fallback relays are NOT counted as serving authors
+        for (relay, coveredAuthors) in authorSpecificRelayCoverage {
+            let intersection = authors.intersection(coveredAuthors)
+            if !intersection.isEmpty {
                 servingRelays.insert(relay)
             }
         }
 
         NDKLogger.log(.debug, category: .subscription,
-                      "🎯 Found \(servingRelays.count) relays serving authors \(authors.prefix(3).joined(separator: ", ")): \(servingRelays)")
+                      "🎯 Found \(servingRelays.count) author-specific relays serving authors \(authors.prefix(3).joined(separator: ", ")): \(servingRelays)")
 
         return servingRelays
     }
