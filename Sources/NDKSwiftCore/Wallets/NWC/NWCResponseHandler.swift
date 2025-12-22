@@ -91,11 +91,7 @@ public struct NWCResponseHandler {
             throw NDKError.timeout(operation: "NWC response", seconds: Int(timeout))
         }
 
-        // 3. Wait for subscription to be fully ready (REQ sent to relay)
-        // This ensures we receive the response before the wallet service sends it
-        await dataSource.ensureReady()
-
-        // 4. Now publish the request to NWC relays specifically
+        // 3. Now publish the request to NWC relays specifically
         NDKLogger.log(.debug, category: .wallet, "[NWC Response] Publishing request event \(requestId) to NWC relays: \(relayUrls)")
         let publishedRelays = try await ndk.publish(event, to: relayUrls)
         NDKLogger.log(.debug, category: .wallet, "[NWC Response] Published to \(publishedRelays.count) relays")
