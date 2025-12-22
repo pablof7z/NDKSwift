@@ -198,7 +198,7 @@ public actor NDKNostrDBCache: NDKCache {
         // Try native nostrdb query first
         do {
             let ndbFilter = try NdbFilter(from: nostrFilter)
-            let noteKeys = try nostrDB.query(filters: [ndbFilter], maxResults: filter.limit ?? 500)
+            let noteKeys = try nostrDB.query(filters: [ndbFilter], maxResults: filter.limit ?? Int.max)
 
             // Convert note keys to NDKEvents, filtering out deleted events
             for noteKey in noteKeys {
@@ -671,13 +671,25 @@ public actor NDKNostrDBCache: NDKCache {
 
     // MARK: - Optimistic Publishing
 
-    /// Add an unpublished event (called by NDK-core which decides what needs tracking)
-    /// The cache layer is dumb - it just stores what it's told.
+    /// Add an unpublished event with target relays (protocol conformance)
+    /// - Parameters:
+    ///   - event: The event to track
+    ///   - relays: Target relays for publishing
+    public func addUnpublishedEvent(_ event: NDKEvent, relays: Set<String>) async throws {
+        // Save event to nostrdb first
+        try await saveEvent(event)
+
+        // Store in unpublished file with all relays as pending
+        let pendingRelays = Dictionary(uniqueKeysWithValues: relays.map { ($0, "pending") })
+        try await publishingManager.addUnpublishedEvent(event, publishedRelays: [], pendingRelays: pendingRelays)
+    }
+
+    /// Add an unpublished event with detailed relay state
     /// - Parameters:
     ///   - event: The event to track
     ///   - publishedRelays: Relays that have successfully published
     ///   - pendingRelays: Relays pending publication with failure reasons
-    public func addUnpublishedEvent(_ event: NDKEvent, publishedRelays: [String], pendingRelays: [String: String]) async throws {
+    public func addUnpublishedEventWithState(_ event: NDKEvent, publishedRelays: [String], pendingRelays: [String: String]) async throws {
         // Save event to nostrdb first
         try await saveEvent(event)
 
