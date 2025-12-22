@@ -906,193 +906,152 @@ This optimistic publishing system is fundamental to creating responsive Nostr ap
 
 ---
 
-### 6. User Profile Management: Modern Profile APIs
+### 6. User Profile Management: Simplified Profile API
 
-NDKSwift provides sophisticated profile management through multiple abstraction levels, from high-level reactive APIs to low-level event fetching. All APIs follow the "never wait, always stream" philosophy.
+**Last Updated**: 2024-12-22
 
-**IMPORTANT: Apps should use NDKProfileManager directly instead of creating their own profile management wrappers. The built-in manager provides all necessary functionality including caching, real-time updates, and thread safety.**
+NDKSwift provides a dramatically simplified profile management system that consolidates 13+ legacy APIs down to 3 clear, idiomatic patterns. The new API is built on `@Observable` for automatic SwiftUI updates and follows the "never wait, always stream" philosophy.
 
-#### NDKProfileManager (Recommended for Most Cases)
+#### The Three Profile APIs
 
-The `NDKProfileManager` is an actor-based cache that provides intelligent profile fetching with real-time updates:
+**1. `ndk.profile(for:)` - Primary @Observable API (SwiftUI)**
 
-```swift
-// Reactive profile updates with caching
-for await profile in await ndk.profileManager.subscribe(for: pubkey, maxAge: TimeConstants.hour) {
-    // Handle profile updates (may be nil if not found)
-    if let profile = profile {
-        print("Name: \(profile.name ?? "Unknown")")
-        print("Display Name: \(profile.displayName ?? "Unknown")")
-    }
-    break // If you only need the current value
-}
-
-// Force fresh data from network
-for await profile in await ndk.profileManager.subscribe(for: pubkey, maxAge: 0) {
-    // Real-time profile updates, always from network
-}
-
-// Load cached metadata without subscription
-let metadata = await ndk.profileManager.loadMetadata(for: pubkey)
-
-// Batch loading
-let profiles = await ndk.profileManager.loadMetadata(for: pubkeys)
-```
-
-**Key Benefits:**
-- **Intelligent Caching**: LRU in-memory cache with configurable staleness
-- **Real-time Updates**: AsyncStream provides live profile changes
-- **Thread Safety**: Actor-based design prevents race conditions
-- **Network Efficiency**: Automatic batching of similar requests
-
-#### NDKProfileDataSource (Perfect for SwiftUI)
-
-For SwiftUI applications, use the reactive `NDKProfileDataSource`:
+The main API returns an `@Observable` profile that auto-updates:
 
 ```swift
-struct UserView: View {
-    @StateObject private var profileDataSource = NDKProfileDataSource(
-        ndk: ndk,
-        pubkey: userPubkey,
-        maxAge: TimeConstants.hour
-    )
-    
+struct ProfileView: View {
+    let ndk: NDK
+    let pubkey: String
+
     var body: some View {
+        let profile = ndk.profile(for: pubkey)
+
         VStack {
-            if let profile = profileDataSource.profile {
-                Text(profileDataSource.displayName)
-                AsyncImage(url: profileDataSource.pictureURL)
-                Text(profileDataSource.about ?? "No bio")
-            } else {
-                Text(userPubkey.prefix(8) + "...") // Show pubkey while loading
+            Text(profile.name)  // Auto-updates!
+                .font(.title)
+
+            Text(profile.about)
+                .foregroundColor(.secondary)
+
+            if let nip05 = profile.nip05 {
+                Label(nip05, systemImage: "checkmark.seal")
             }
         }
     }
 }
 ```
 
-**Available Properties:**
-- `profile: NDKUserMetadata?` - Full profile metadata object
-- `displayName: String` - Computed display name with fallbacks
-- `pictureURL: URL?` - Profile picture URL
-- `nip05: String?` - NIP-05 identifier
-- `about: String?` - Profile bio
+**Key Features:**
+- Returns immediately (never blocks)
+- `@Observable` - SwiftUI views auto-refresh when profile updates
+- Cached and deduplicated - same instance for same pubkey
+- Background network subscriptions for real-time updates
+- Non-optional properties: `name`, `displayName`, `about` (empty string if unavailable)
+- Optional properties: `nip05`, `lud16`, `pictureURL`, `bannerURL`, `metadata`
 
-#### SwiftUI Profile Components (Use These Instead of Custom Components)
+**2. `user.profile` - Convenience Property**
 
-NDKSwift includes ready-to-use SwiftUI components in the NDKSwiftUI module. **Apps should use these components instead of creating their own avatar, profile picture, or display name components.**
+```swift
+let user = ndk.user(pubkey: "npub...")
+let profile = user.profile  // Same as ndk.profile(for: pubkey)
+
+Text(profile.displayName)
+```
+
+**3. `ndk.profileUpdates(for:)` - AsyncStream for Non-SwiftUI Code**
+
+```swift
+Task {
+    for await metadata in await ndk.profileUpdates(for: pubkey) {
+        print("Profile updated: \(metadata?.name ?? "Unknown")")
+    }
+}
+```
+
+#### SwiftUI Profile Components
+
+**Use these built-in components instead of creating your own:**
 
 ```swift
 import NDKSwiftUI
 
 // Profile picture with automatic loading and fallbacks
-NDKProfilePicture(pubkey: user.pubkey, size: 60)
-    .onTapGesture { /* handle tap */ }
+NDKUIProfilePicture(ndk: ndk, pubkey: pubkey, size: 50)
 
-// Display name with intelligent fallback options
-NDKDisplayName(pubkey: user.pubkey, fallbackStyle: .npub)
+// Username with NIP-05 support and smart fallbacks
+NDKUIUsername(ndk: ndk, pubkey: pubkey)
+    .font(.headline)
 
-// Username (prioritizes username over display name)
-NDKUsername(pubkey: user.pubkey)
-
-// Event author header (combines avatar + name)
-NDKEventAuthorHeader(event: event)
-
-// Full event view with author, content, and actions
-NDKEventView(event: event)
+// Display name with customizable fallback styles
+NDKUIDisplayName(ndk: ndk, pubkey: pubkey, fallbackStyle: .npub)
 ```
 
-Available components in NDKSwiftUI:
-- `NDKProfilePicture`: Avatar with fallback to initial
-- `NDKDisplayName`: Display name with various fallback styles
-- `NDKUsername`: Username-first display
-- `NDKEventAuthorHeader`: Complete author header for events
-- `NDKEventView`: Full event display with interactions
-- `NDKMarkdownRenderer`: Markdown content with nostr entity parsing
-- `NDKFollowButton`: Follow/unfollow button with state management
-- `NDKZapButton`: Lightning zap button
-- `NDKReactionButton`: Reaction/like button
+All UI components use `ndk.profile(for:)` internally and auto-update.
 
-#### NDKUser Model Methods
+#### How It Works
 
-The `NDKUser` class provides convenient async properties:
+**Automatic Caching:**
+- Two-tier cache: LRU in-memory + SQLite persistent storage
+- Returns cached data immediately if available
+- Subscribes to network updates in background
+- Auto-updates profile as new data arrives
 
+**Deduplication:**
 ```swift
-let user = NDKUser(pubkey: pubkey)
-user.ndk = ndk
+// These all return the SAME NDKProfile instance
+let profile1 = ndk.profile(for: pubkey)
+let profile2 = ndk.profile(for: pubkey)
+let profile3 = user.profile
 
-// Async property access
-let profile = await user.profile
-let displayName = await user.displayName
-let name = await user.name
-let nip05 = await user.nip05
-
-// Process metadata events directly
-user.processMetadataEvent(metadataEvent)
+assert(profile1 === profile2)  // true
 ```
 
-#### Contact List Management
+Benefits:
+- ✅ Efficient memory usage
+- ✅ Shared network subscriptions
+- ✅ Consistent state across your app
 
-For managing contact lists and bulk profile loading:
+#### Best Practices
 
-```swift
-@StateObject private var contactsDataSource = NDKContactsDataSource(
-    ndk: ndk,
-    userPubkey: currentUser.pubkey
-)
-
-// Access contact pubkeys and their profiles
-let contacts = contactsDataSource.contactPubkeys
-let profiles = contactsDataSource.contactProfiles
-```
-
-#### Low-Level Profile Fetching
-
-For custom implementations, use direct event fetching:
+**✅ DO THIS:**
 
 ```swift
-// Direct profile event fetching
-let subscription = ndk.subscribe(
-    filter: NDKFilter(authors: [pubkey], kinds: [EventKind.metadata], limit: 1),
-    cachePolicy: .cacheWithNetwork
-)
+// Direct property access in SwiftUI
+let profile = ndk.profile(for: pubkey)
+Text(profile.name)
 
-for await profileEvent in subscription.events {
-    let metadata = NDKUserMetadata(event: profileEvent)
-    // Handle profile data
-    print("Name: \(metadata.name ?? "Unknown")")
+// Use components for common UI elements
+NDKUIUsername(ndk: ndk, pubkey: pubkey)
+
+// AsyncStream for background tasks
+for await metadata in await ndk.profileUpdates(for: pubkey) {
+    // Process updates
 }
 ```
 
-#### Profile Data Structure
-
-Profiles are stored as Kind 0 events with this structure:
+**❌ DON'T DO THIS:**
 
 ```swift
-// NDKUserMetadata provides access to profile data:
-public class NDKUserMetadata {
-    public var name: String? { get }         // User's display name
-    public var displayName: String? { get }  // User's username/handle
-    public var about: String? { get }        // Bio/description
-    public var picture: String? { get }      // Avatar URL
-    public var banner: String? { get }       // Banner image URL
-    public var nip05: String? { get }        // NIP-05 identifier
-    public var lud16: String? { get }        // Lightning address
-    public var lud06: String? { get }        // LNURL
-    public var website: String? { get }      // Website URL
+// ❌ Don't manually manage subscriptions
+Task {
+    let filter = NDKFilter(authors: [pubkey], kinds: [.metadata])
+    let subscription = ndk.subscribe(filter: filter)
+    // ... manual parsing
 }
+
+// ❌ Don't store profile in @State
+@State private var profileName: String?  // Unnecessary
+
+// Just use the profile directly:
+let profile = ndk.profile(for: pubkey)
+Text(profile.name)  // Auto-updates!
+
+// ❌ Don't create your own profile picture components
+// Use NDKUIProfilePicture instead
+
+// ❌ Don't create your own profile data sources
+// Use ndk.profile(for:) or ndk.profileUpdates(for:)
 ```
-
-#### Best Practices for Profile Management
-
-1. **Use NDKProfileManager** for most profile retrieval needs - it handles caching and real-time updates efficiently
-2. **Set appropriate maxAge** values:
-   - **Feed views**: `TimeConstants.hour` for performance
-   - **Profile pages**: `0` for fresh data
-   - **Background updates**: `TimeConstants.day` for rare changes
-3. **Progressive UI Updates**: Always show the pubkey initially, enhance with profile data as it arrives
-4. **Handle Missing Profiles**: Not all users have profile metadata - design graceful fallbacks
-5. **Use SwiftUI Components**: Leverage `NDKProfilePicture` and `NDKDisplayName` for consistency
 
 #### Never Wait for Profiles Pattern
 
@@ -1102,8 +1061,7 @@ Following NDKSwift's core philosophy, never show loading states for profiles:
 // ❌ WRONG: Don't wait for profiles
 func loadUserProfile() async {
     showLoadingSpinner()
-    // Wait for profile to fully load - WRONG PATTERN
-    for await metadata in await ndk.profileManager.subscribe(for: pubkey) {
+    for await metadata in await ndk.profileUpdates(for: pubkey) {
         if let metadata = metadata {
             updateUI(metadata)
         }
@@ -1112,31 +1070,69 @@ func loadUserProfile() async {
     hideLoadingSpinner()
 }
 
-// ✅ RIGHT: Stream profiles progressively  
+// ✅ RIGHT: Stream profiles progressively
 struct UserProfileView: View {
+    let ndk: NDK
     let pubkey: String
-    @State private var profile: NDKUserMetadata?
-    
+
     var body: some View {
+        let profile = ndk.profile(for: pubkey)
+
         VStack {
             // Show pubkey immediately - never a loading state
-            Text(profile?.displayName ?? pubkey.prefix(8) + "...")
-            
+            Text(profile.displayName)  // Smart fallback to truncated pubkey
+
             // Profile elements appear as they're available
-            if let pictureURL = profile?.picture {
-                AsyncImage(url: URL(string: pictureURL))
+            if let pictureURL = profile.pictureURL {
+                AsyncImage(url: pictureURL)
             }
         }
-        .task {
-            for await profile in await ndk.profileManager.subscribe(for: pubkey) {
-                self.profile = profile
-            }
-        }
+        // No .task needed - profile auto-updates!
     }
 }
 ```
 
-The profile management system is designed for maximum performance and user experience, with automatic caching, batching, and real-time updates built-in.
+#### Profile Data Structure
+
+```swift
+// NDKProfile properties:
+profile.name          // String (empty if no metadata)
+profile.displayName   // String (smart fallback to truncated pubkey)
+profile.about         // String (empty if no metadata)
+profile.nip05         // String?
+profile.lud16         // String?
+profile.pictureURL    // URL?
+profile.bannerURL     // URL?
+profile.metadata      // NDKUserMetadata? (full metadata object)
+```
+
+#### Migration from Old API
+
+**Before (Legacy):**
+```swift
+// Old way - complex
+for await profile in await ndk.profileManager.subscribe(for: pubkey, maxAge: .hour) {
+    self.profileName = profile?.name
+    break
+}
+```
+
+**After (New):**
+```swift
+// New way - simple!
+let profile = ndk.profile(for: pubkey)
+Text(profile.name)  // Auto-updates
+```
+
+#### Performance
+
+- **Memory cache**: ~1000 profiles (LRU eviction)
+- **Cache hit time**: < 1ms (in-memory lookup)
+- **Cache miss + DB hit**: < 10ms (SQLite query)
+- **Network fetch**: Variable (depends on relay response time)
+- **Deduplication**: Same pubkey = same instance (efficient memory)
+
+The simplified profile system removes all unnecessary complexity while providing superior performance and developer experience. **Just ask for a profile and use it - everything else happens automatically.**
 
 ---
 

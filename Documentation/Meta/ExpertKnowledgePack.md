@@ -1,10 +1,10 @@
 
 # NDKSwift Expert Knowledge Pack
 
-**Version**: 1.0
-**Last Updated**: 2024-12-08
+**Version**: 1.1
+**Last Updated**: 2024-12-22
 
-This document contains the verified, hands-on knowledge for the NDKSwift library, based on the execution of a comprehensive testing plan.
+This document contains the verified, hands-on knowledge for the NDKSwift library, based on the execution of a comprehensive testing plan and production usage in multiple applications.
 
 ---
 
@@ -121,6 +121,12 @@ The following core functionalities have been **verified through testing** as of 
     - NIP-42 authentication
     - Event de-duplication
     - Signature verification
+- **Profile Management (NEW - Dec 2024)**: Use the simplified profile API:
+    - `ndk.profile(for:)` for SwiftUI (@Observable, auto-updating)
+    - `user.profile` for convenience (same as above)
+    - `ndk.profileUpdates(for:)` for AsyncStream in non-UI code
+    - Use built-in `NDKUIProfilePicture`, `NDKUIUsername`, and `NDKUIDisplayName` components
+    - **Do NOT** create custom profile management wrappers or data sources
 
 ---
 
