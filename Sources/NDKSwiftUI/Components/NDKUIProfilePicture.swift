@@ -28,6 +28,7 @@ import SwiftUI
 ///     .frame(width: 80, height: 80)
 ///     .onTapGesture { /* handle tap */ }
 /// ```
+@MainActor
 public struct NDKUIProfilePicture: View {
     // MARK: - Properties
 
@@ -38,9 +39,6 @@ public struct NDKUIProfilePicture: View {
     private let borderColor: Color?
     private let borderWidth: CGFloat
     private var tapAction: (() -> Void)?
-
-    @State private var metadata: NDKUserMetadata?
-    @State private var profileTask: Task<Void, Never>?
 
     // MARK: - Initialization
 
@@ -97,19 +95,21 @@ public struct NDKUIProfilePicture: View {
     // MARK: - Body
 
     public var body: some View {
+        let profile = ndk.profile(for: pubkey)
+
         Group {
-            if let pictureURL = pictureURL {
+            if let pictureURL = profile.pictureURL {
                 CachedAsyncImage(url: pictureURL) { image in
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                 } placeholder: {
-                    placeholderView
+                    placeholderView(for: profile)
                 }
                 .frame(width: size, height: size)
                 .clipShape(RoundedRectangle(cornerRadius: effectiveCornerRadius))
             } else {
-                placeholderView
+                placeholderView(for: profile)
             }
         }
         .overlay(
@@ -118,26 +118,17 @@ public struct NDKUIProfilePicture: View {
                 .stroke(borderColor ?? Color.clear, lineWidth: borderWidth)
         )
         .modifier(TapGestureModifier(tapAction: tapAction))
-        .accessibilityLabel("Profile picture for \(displayName)")
-        .onAppear {
-            loadProfile()
-        }
-        .onDisappear {
-            profileTask?.cancel()
-        }
-        .onChange(of: pubkey) { _, _ in
-            loadProfile()
-        }
+        .accessibilityLabel("Profile picture for \(profile.displayName)")
     }
 
     // MARK: - Private Views
 
-    private var placeholderView: some View {
+    private func placeholderView(for profile: NDKProfile) -> some View {
         RoundedRectangle(cornerRadius: effectiveCornerRadius)
             .fill(Color.ndkGray5)
             .frame(width: size, height: size)
             .overlay(
-                Text(displayName.prefix(1).uppercased())
+                Text(profile.displayName.prefix(1).uppercased())
                     .font(.system(size: size * 0.4, weight: .medium))
                     .foregroundStyle(.secondary)
             )
@@ -145,37 +136,6 @@ public struct NDKUIProfilePicture: View {
 
     private var effectiveCornerRadius: CGFloat {
         cornerRadius ?? (size / 2) // Default to circular
-    }
-
-    private var pictureURL: URL? {
-        guard let picture = metadata?.picture, !picture.isEmpty else { return nil }
-        return URL(string: picture)
-    }
-
-    private var displayName: String {
-        if let displayName = metadata?.displayName, !displayName.isEmpty {
-            return displayName
-        }
-        if let name = metadata?.name, !name.isEmpty {
-            return name
-        }
-        // Fallback to shortened pubkey
-        return String(pubkey.prefix(8)) + "..."
-    }
-
-    // MARK: - Private Methods
-
-    private func loadProfile() {
-        profileTask?.cancel()
-
-        profileTask = Task {
-            for await metadata in await ndk.profileManager.subscribe(for: pubkey) {
-                await MainActor.run {
-                    self.metadata = metadata
-                }
-                // Continue listening for updates
-            }
-        }
     }
 
     // MARK: - Modifiers

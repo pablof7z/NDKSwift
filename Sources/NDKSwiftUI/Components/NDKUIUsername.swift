@@ -12,12 +12,11 @@ import SwiftUI
 ///     .font(.caption)
 ///     .foregroundStyle(.secondary)
 /// ```
+@MainActor
 public struct NDKUIUsername: View {
     private let ndk: NDK
     private let pubkey: String
     private let maxLength: Int
-
-    @StateObject private var profileState: ProfileState
 
     /// Initialize a username display component
     /// - Parameters:
@@ -28,25 +27,24 @@ public struct NDKUIUsername: View {
         self.ndk = ndk
         self.pubkey = pubkey
         self.maxLength = maxLength
-        _profileState = StateObject(wrappedValue: ProfileState(pubkey: pubkey))
     }
 
     public var body: some View {
+        let profile = ndk.profile(for: pubkey)
+
         Group {
-            if let nip05 = profileState.nip05, !nip05.isEmpty {
+            if let nip05 = profile.nip05, !nip05.isEmpty {
                 // Show NIP-05 identifier
                 Text(formatNip05(nip05))
-            } else if let name = profileState.name, !name.isEmpty {
+            } else if !profile.name.isEmpty {
                 // Show display name
-                Text(truncateIfNeeded(name))
+                Text(truncateIfNeeded(profile.name))
+            } else if !profile.displayName.isEmpty && profile.displayName != truncatedNpub {
+                // Show displayName if different from fallback
+                Text(truncateIfNeeded(profile.displayName))
             } else {
                 // Fallback to truncated npub
                 Text(truncatedNpub)
-            }
-        }
-        .onAppear {
-            Task {
-                await profileState.loadProfile(profileManager: ndk.profileManager)
             }
         }
     }
@@ -76,40 +74,6 @@ public struct NDKUIUsername: View {
         let prefix = String(npub.prefix(8))
         let suffix = String(npub.suffix(4))
         return "\(prefix)...\(suffix)"
-    }
-}
-
-// MARK: - ProfileState
-
-@MainActor
-private class ProfileState: ObservableObject {
-    @Published var name: String?
-    @Published var nip05: String?
-
-    private let pubkey: String
-    private var loadTask: Task<Void, Never>?
-
-    init(pubkey: String) {
-        self.pubkey = pubkey
-    }
-
-    deinit {
-        loadTask?.cancel()
-    }
-
-    func loadProfile(profileManager: NDKProfileManager) async {
-        loadTask?.cancel()
-
-        loadTask = Task {
-            // Use profile manager to observe profile updates
-            for await profile in await profileManager.subscribe(for: pubkey) {
-                if !Task.isCancelled {
-                    self.name = profile?.displayName ?? profile?.name
-                    self.nip05 = profile?.nip05
-                    break // Only need the first profile
-                }
-            }
-        }
     }
 }
 
