@@ -73,9 +73,7 @@ struct DefaultRelayDiscoverySelector: RelayDiscoverySelectionStrategy {
         guard relaysNeeded > 0 else { return [] }
 
         // Filter out relays we're already using and relays invalid for outbox
-        let candidateRelays = discoveredRelays
-            .subtracting(existingRelays)
-            .filter { URLNormalizer.isValidForOutbox($0) }
+        let candidateRelays = discoveredRelays.subtracting(existingRelays).validForOutbox
         guard !candidateRelays.isEmpty else { return [] }
 
         // Prioritize relays that are already connected
@@ -140,9 +138,7 @@ struct OverlapOptimizedRelaySelector: RelayDiscoverySelectionStrategy {
         guard relaysNeeded > 0 else { return [] }
 
         // Filter out relays we're already using and relays invalid for outbox
-        let candidateRelays = discoveredRelays
-            .subtracting(existingRelays)
-            .filter { URLNormalizer.isValidForOutbox($0) }
+        let candidateRelays = discoveredRelays.subtracting(existingRelays).validForOutbox
         guard !candidateRelays.isEmpty else {
             NDKLogger.log(.debug, category: .outbox,
                           "📊 [OverlapOptimized] No new candidate relays after filtering existing ones",

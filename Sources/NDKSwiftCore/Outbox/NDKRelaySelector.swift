@@ -612,16 +612,15 @@ actor NDKRelaySelector {
                 }
 
                 // Filter out relays that are invalid for outbox (localhost and non-secure)
-                let validRelays = relays.filter { URLNormalizer.isValidForOutbox($0) }
+                let validRelays = relays.validForOutbox
 
                 if !validRelays.isEmpty {
                     pubkeysToRelays[pubkey] = validRelays
                 } else {
                     // Tracker has no valid relays, try HintIndex as fallback
                     let hintRelays = await getRelaysFromHintIndex(for: pubkey)
-                    let validHintRelays = hintRelays.filter { URLNormalizer.isValidForOutbox($0) }
-                    if !validHintRelays.isEmpty {
-                        pubkeysToRelays[pubkey] = validHintRelays
+                    if !hintRelays.validForOutbox.isEmpty {
+                        pubkeysToRelays[pubkey] = hintRelays.validForOutbox
                     } else {
                         authorsMissingRelays.insert(pubkey)
                     }
@@ -629,9 +628,8 @@ actor NDKRelaySelector {
             } else {
                 // No tracker info, try HintIndex as fallback
                 let hintRelays = await getRelaysFromHintIndex(for: pubkey)
-                let validHintRelays = hintRelays.filter { URLNormalizer.isValidForOutbox($0) }
-                if !validHintRelays.isEmpty {
-                    pubkeysToRelays[pubkey] = validHintRelays
+                if !hintRelays.validForOutbox.isEmpty {
+                    pubkeysToRelays[pubkey] = hintRelays.validForOutbox
                 } else {
                     authorsMissingRelays.insert(pubkey)
                 }

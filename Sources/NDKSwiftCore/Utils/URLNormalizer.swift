@@ -179,12 +179,57 @@ public enum URLNormalizer {
     /// - Parameter url: The relay URL to check
     /// - Returns: true if the relay should be used, false if it should be excluded
     public static func isValidForOutbox(_ url: String) -> Bool {
-        // Exclude non-secure WebSocket relays (ws://)
-        if url.hasPrefix("ws://") {
+        // Must have wss:// scheme (secure WebSocket)
+        guard url.hasPrefix("wss://") else {
+            return false
+        }
+
+        // Extract host from URL
+        guard let urlComponents = URLComponents(string: url),
+              let host = urlComponents.host,
+              !host.isEmpty else {
+            return false
+        }
+
+        // Exclude localhost
+        if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+            return false
+        }
+
+        // Exclude .onion (Tor hidden services)
+        if host.hasSuffix(".onion") {
+            return false
+        }
+
+        // Exclude .local (mDNS/Bonjour)
+        if host.hasSuffix(".local") {
             return false
         }
 
         return true
+    }
+}
+
+// MARK: - Collection Extensions for Outbox Filtering
+
+public extension Array where Element == String {
+    /// Filter to only valid outbox relay URLs (wss://, no localhost, no .onion)
+    var validForOutbox: [String] {
+        filter { URLNormalizer.isValidForOutbox($0) }
+    }
+}
+
+public extension Set where Element == String {
+    /// Filter to only valid outbox relay URLs (wss://, no localhost, no .onion)
+    var validForOutbox: Set<String> {
+        filter { URLNormalizer.isValidForOutbox($0) }
+    }
+}
+
+public extension Array where Element == NDKRelay {
+    /// Filter to only valid outbox relays (wss://, no localhost, no .onion)
+    var validForOutbox: [NDKRelay] {
+        filter { URLNormalizer.isValidForOutbox($0.url) }
     }
 }
 
