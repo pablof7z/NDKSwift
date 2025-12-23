@@ -174,6 +174,23 @@ public enum URLNormalizer {
 
         return components.url
     }
+
+    /// Checks if a relay URL is valid for use in outbox calculations
+    /// - Parameter url: The relay URL to check
+    /// - Returns: true if the relay should be used, false if it should be excluded
+    public static func isValidForOutbox(_ url: String) -> Bool {
+        // Exclude non-secure WebSocket relays (ws://)
+        if url.hasPrefix("ws://") {
+            return false
+        }
+
+        // Exclude localhost relays (127.x.x.x)
+        if url.contains("127.") {
+            return false
+        }
+
+        return true
+    }
 }
 
 /// Errors that can occur during URL normalization

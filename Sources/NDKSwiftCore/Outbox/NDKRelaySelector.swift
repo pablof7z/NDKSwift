@@ -288,10 +288,17 @@ actor NDKRelaySelector {
         // Get blocked relays
         let blockedRelays = await getBlockedRelays()
 
-        // First pass: Prioritize connected relays (excluding blocked ones)
+        // First pass: Prioritize connected relays (excluding blocked and invalid ones)
         for relay in connectedRelays {
             let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(relay.url) ?? relay.url
+
+            // Skip blocked relays
             if blockedRelays.contains(normalizedUrl) {
+                continue
+            }
+
+            // Skip relays that are invalid for outbox (localhost and non-secure)
+            if !URLNormalizer.isValidForOutbox(relay.url) {
                 continue
             }
 
@@ -325,6 +332,9 @@ actor NDKRelaySelector {
                 let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(relayURL) ?? relayURL
                 if blockedRelays.contains(normalizedUrl) { continue }
 
+                // Skip relays that are invalid for outbox (localhost and non-secure)
+                if !URLNormalizer.isValidForOutbox(relayURL) { continue }
+
                 var pubkeysInRelay = relayToPubkeys[relayURL, default: []]
                 if !pubkeysInRelay.contains(pubkey) {
                     pubkeysInRelay.append(pubkey)
@@ -351,6 +361,9 @@ actor NDKRelaySelector {
                 let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(relayURL) ?? relayURL
                 if blockedRelays.contains(normalizedUrl) { continue }
 
+                // Skip relays that are invalid for outbox (localhost and non-secure)
+                if !URLNormalizer.isValidForOutbox(relayURL) { continue }
+
                 // Skip if already in the result
                 if relayToPubkeys[relayURL]?.contains(pubkey) == true { continue }
 
@@ -371,6 +384,9 @@ actor NDKRelaySelector {
                 // Skip blocked relays
                 let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(relayURL) ?? relayURL
                 if blockedRelays.contains(normalizedUrl) { continue }
+
+                // Skip relays that are invalid for outbox (localhost and non-secure)
+                if !URLNormalizer.isValidForOutbox(relayURL) { continue }
 
                 var pubkeysInRelay = relayToPubkeys[relayURL, default: []]
                 if !pubkeysInRelay.contains(pubkey) {
@@ -595,13 +611,17 @@ actor NDKRelaySelector {
                     relays = item.allRelayURLs
                 }
 
-                if !relays.isEmpty {
-                    pubkeysToRelays[pubkey] = relays
+                // Filter out relays that are invalid for outbox (localhost and non-secure)
+                let validRelays = relays.filter { URLNormalizer.isValidForOutbox($0) }
+
+                if !validRelays.isEmpty {
+                    pubkeysToRelays[pubkey] = validRelays
                 } else {
-                    // Tracker has no relays, try HintIndex as fallback
+                    // Tracker has no valid relays, try HintIndex as fallback
                     let hintRelays = await getRelaysFromHintIndex(for: pubkey)
-                    if !hintRelays.isEmpty {
-                        pubkeysToRelays[pubkey] = hintRelays
+                    let validHintRelays = hintRelays.filter { URLNormalizer.isValidForOutbox($0) }
+                    if !validHintRelays.isEmpty {
+                        pubkeysToRelays[pubkey] = validHintRelays
                     } else {
                         authorsMissingRelays.insert(pubkey)
                     }
@@ -609,8 +629,9 @@ actor NDKRelaySelector {
             } else {
                 // No tracker info, try HintIndex as fallback
                 let hintRelays = await getRelaysFromHintIndex(for: pubkey)
-                if !hintRelays.isEmpty {
-                    pubkeysToRelays[pubkey] = hintRelays
+                let validHintRelays = hintRelays.filter { URLNormalizer.isValidForOutbox($0) }
+                if !validHintRelays.isEmpty {
+                    pubkeysToRelays[pubkey] = validHintRelays
                 } else {
                     authorsMissingRelays.insert(pubkey)
                 }
