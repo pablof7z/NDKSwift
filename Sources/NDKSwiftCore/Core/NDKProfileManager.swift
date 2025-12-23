@@ -25,9 +25,10 @@ private struct ProfileCacheEntry {
 /// synchronized with the database. When profile updates arrive from relays, both the
 /// memory cache and database are updated together.
 ///
-/// Use the maxAge parameter to control network behavior (consistent with ndk.observe):
-/// - maxAge: 0 - Always check relays for real-time updates
-/// - maxAge: >0 - Return cached data immediately if available
+/// Cached data is always returned immediately if available (UX first!).
+/// The maxAge parameter controls subscription behavior:
+/// - maxAge: 0 - Keep subscription open for real-time updates
+/// - maxAge: >0 - Close subscription after EOSE if cache is fresh enough
 ///
 /// Example usage:
 /// ```swift
@@ -70,12 +71,12 @@ public actor NDKProfileManager {
     }
 
     /// Observe profile updates for a given pubkey
-    /// Returns an AsyncSequence that yields the profile immediately if cached,
+    /// Returns an AsyncSequence that yields cached profile immediately (if available),
     /// then yields updates as they arrive from relays
     ///
     /// - Parameters:
     ///   - pubkey: The public key to observe
-    ///   - maxAge: Maximum age of cached data in seconds (0 = always get real-time updates)
+    ///   - maxAge: Controls subscription behavior (0 = keep open for real-time, >0 = close after EOSE if fresh)
     public func subscribe(for pubkey: PublicKey, maxAge: TimeInterval = TimeConstants.hour) -> AsyncStream<NDKUserMetadata?> {
         AsyncStream { continuation in
             Task {
@@ -86,8 +87,9 @@ public actor NDKProfileManager {
                 }
                 activeObservations[pubkey]?.append(wrapper)
 
-                // Yield cached metadata immediately if available and maxAge allows it
-                if maxAge > 0, let cached = await getCachedMetadata(for: pubkey) {
+                // Always yield cached metadata immediately if available (UX first!)
+                // maxAge controls subscription behavior, not cache access
+                if let cached = await getCachedMetadata(for: pubkey) {
                     continuation.yield(cached)
                 }
 
