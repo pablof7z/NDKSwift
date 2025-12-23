@@ -337,26 +337,6 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         return await selector.selectRelays(for: pubkey, count: count)
     }
 
-    /// Retrieves all tracked relay list items from the cache.
-    ///
-    /// This method returns cached relay preferences for all tracked users,
-    /// useful for debugging or displaying relay usage statistics.
-    ///
-    /// - Returns: Array of `NDKOutboxItem` containing relay preferences for each tracked user.
-    ///
-    /// ## Example
-    /// ```swift
-    /// let items = await outbox.getAllTrackedItems()
-    /// for item in items {
-    ///     print("User \(item.pubkey) uses \(item.readRelays.count) read relays")
-    /// }
-    /// ```
-    ///
-    /// - Note: This only returns cached items. Users not yet tracked won't appear.
-    public func getAllTrackedItems() async -> [NDKOutboxItem] {
-        return await getAllCachedItems()
-    }
-
     /// Analyzes a filter and creates an optimized outbox strategy for querying.
     ///
     /// This method breaks down a multi-author filter into relay-specific filters,
@@ -489,44 +469,10 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
             )
 
             // Determine which relays to use for discovery
-            let relaysToUse: Set<RelayURL>
-            let connectedRelays = await ndk.pool.connectedRelayURLs
-
-            if !ndk.outboxConfig.outboxRelays.isEmpty {
-                // Check if any outbox relays are connected (normalize for comparison)
-                let normalizedOutboxRelays = Set(ndk.outboxConfig.outboxRelays.map { $0.normalizedRelayURL })
-                let connectedOutboxRelays = normalizedOutboxRelays.intersection(connectedRelays)
-
-                NDKLogger.log(.debug, category: .outbox, "🔍 Checking outbox relay connectivity:")
-                NDKLogger.log(.debug, category: .outbox, "  - Configured outbox relays (raw): \(ndk.outboxConfig.outboxRelays.sorted())")
-                NDKLogger.log(.debug, category: .outbox, "  - Configured outbox relays (normalized): \(normalizedOutboxRelays.sorted())")
-                NDKLogger.log(.debug, category: .outbox, "  - Connected relays: \(connectedRelays.sorted())")
-                NDKLogger.log(.debug, category: .outbox, "  - Intersection: \(connectedOutboxRelays.sorted())")
-
-                if !connectedOutboxRelays.isEmpty {
-                    // Use connected outbox relays
-                    relaysToUse = connectedOutboxRelays
-                    NDKLogger.log(.debug, category: .outbox, "📡 Using \(connectedOutboxRelays.count) connected outbox relays for relay discovery")
-                } else if !connectedRelays.isEmpty {
-                    // Fall back to any connected relays
-                    relaysToUse = connectedRelays
-                    NDKLogger.log(.warning, category: .outbox, "⚠️ No outbox relays connected, falling back to \(connectedRelays.count) explicit relays for discovery")
-                } else {
-                    // No relays connected at all - mark as pending for retry when relays connect
-                    NDKLogger.log(.warning, category: .outbox, "⏳ No relays connected for relay discovery - marking \(authors.count) authors as pending")
-                    await lookupTracker.markPending(authors)
-                    return
-                }
-            } else {
-                // No outbox relays configured, use all connected relays
-                if connectedRelays.isEmpty {
-                    // No relays connected - mark as pending for retry when relays connect
-                    NDKLogger.log(.warning, category: .outbox, "⏳ No relays connected for relay discovery - marking \(authors.count) authors as pending")
-                    await lookupTracker.markPending(authors)
-                    return
-                }
-                relaysToUse = connectedRelays
-                NDKLogger.log(.debug, category: .outbox, "📡 No outbox relays configured, using \(connectedRelays.count) connected relays for discovery")
+            guard let relaysToUse = await getRelaysForDiscovery() else {
+                NDKLogger.log(.warning, category: .outbox, "⏳ No relays connected for relay discovery - marking \(authors.count) authors as pending")
+                await lookupTracker.markPending(authors)
+                return
             }
 
             // Mark authors as looked up only AFTER we've confirmed we have relays to use
@@ -644,13 +590,6 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         }
     }
 
-    /// Stop tracking a user for outbox operations
-    /// - Parameter pubkey: The public key of the user to stop tracking
-    public func untrackUser(_: String) async {
-        // Remove from tracker cache
-        await clear() // For now, just clear - in future could implement selective removal
-    }
-
     /// Retry pending discoveries when relays connect
     /// Called when a relay connects to check if there are authors we couldn't look up earlier
     public func retryPendingDiscoveries() async {
@@ -671,17 +610,6 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
 
         NDKLogger.log(.info, category: .outbox, "🚀 Retrying discovery for \(pendingAuthors.count) authors now that relays are connected")
         discoverRelaysInBackground(for: pendingAuthors)
-    }
-
-    /// Get relay update statistics
-    /// - Returns: Current statistics about relay updates and subscriptions
-    public func getRelayUpdateStats() async -> RelayUpdateStats {
-        // For now, return placeholder stats - this would be implemented with actual tracking
-        return RelayUpdateStats(
-            activeSubscriptions: 0,
-            totalUnknownAuthors: 0,
-            totalUpdateSubscriptions: 0
-        )
     }
 
     /// Stream of relay updates
@@ -984,22 +912,7 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         )
 
         // Determine which relays to use for fetching relay lists
-        let relaysToUse: Set<String>
-
-        // Check if outbox relays are connected
-        let connectedRelays = await ndk.pool.connectedRelayURLs
-        let connectedOutboxRelays = ndk.outboxConfig.outboxRelays.intersection(connectedRelays)
-
-        if !connectedOutboxRelays.isEmpty {
-            // Use connected outbox relays
-            relaysToUse = connectedOutboxRelays
-            NDKLogger.log(.debug, category: .outbox, "📡 Using \(connectedOutboxRelays.count) connected outbox relays for relay list fetch: \(connectedOutboxRelays.sorted())")
-        } else if !connectedRelays.isEmpty {
-            // Fall back to any connected relays
-            relaysToUse = connectedRelays
-            NDKLogger.log(.warning, category: .outbox, "⚠️ No outbox relays connected, falling back to \(connectedRelays.count) explicit relays: \(connectedRelays.sorted())")
-        } else {
-            // No relays connected at all
+        guard let relaysToUse = await getRelaysForDiscovery() else {
             NDKLogger.log(.error, category: .outbox, "❌ No relays connected for relay list fetch")
             return (nil, Set())
         }
