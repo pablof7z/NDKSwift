@@ -250,7 +250,7 @@ actor NDKSubscriptionRequirement {
                 let originAuthor = filter.authors?.first ?? "unknown"
                 origin = .outbox(authorPubkey: originAuthor)
             }
-            relay = await ndk.addRelay(relayURL, origin: origin)
+            relay = await ndk.pool.addRelay(relayURL, origin: origin)
         }
 
         guard let relay = relay else {

@@ -422,6 +422,12 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
 
         NDKLogger.log(.info, category: .outbox, "🔍 Starting background relay discovery for \(authors.count) authors")
 
+        // Mark authors as looked up NOW that discovery is actually being triggered
+        // This prevents duplicate discovery requests
+        Task {
+            await lookupTracker.markLookedUp(authors)
+        }
+
         Task {
             // Create filter for relay lists
             // Do NOT set a limit - this prevents filter aggregation
