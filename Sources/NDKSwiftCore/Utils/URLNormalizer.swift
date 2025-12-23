@@ -191,8 +191,8 @@ public enum URLNormalizer {
             return false
         }
 
-        // Exclude localhost
-        if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+        // Exclude localhost (127.x.x.x range, ::1, and "localhost")
+        if host == "localhost" || host == "::1" || host.hasPrefix("127.") {
             return false
         }
 
@@ -203,6 +203,11 @@ public enum URLNormalizer {
 
         // Exclude .local (mDNS/Bonjour)
         if host.hasSuffix(".local") {
+            return false
+        }
+
+        // Exclude URLs with /npub paths (these are filter services, not proper relays)
+        if let path = urlComponents.path.nilIfEmpty, path.contains("/npub") {
             return false
         }
 

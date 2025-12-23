@@ -837,6 +837,11 @@ extension NDKPool: NDKConnectionMonitorDelegate {
         Task {
             guard self.config.autoReconnectOnForeground else { return }
             await self.reconnectAll()
+
+            // Retry unpublished events - this will connect to their target relays via prepareRelays
+            if let ndk = await self.ndk {
+                _ = try? await ndk.eventManager.retryUnpublishedEvents()
+            }
         }
     }
 
@@ -857,6 +862,11 @@ extension NDKPool: NDKNetworkMonitorDelegate {
         Task {
             guard self.config.autoReconnectOnNetworkChange else { return }
             await self.reconnectAll()
+
+            // Retry unpublished events - this will connect to their target relays via prepareRelays
+            if let ndk = await self.ndk {
+                _ = try? await ndk.eventManager.retryUnpublishedEvents()
+            }
         }
     }
 

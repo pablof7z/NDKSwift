@@ -321,7 +321,10 @@ actor NDKSubscriptionRequirement {
         // Update EOSE tracker
         await eoseTracker.trackEventReceived()
 
-        guard !seenEventIds.contains(event.id) else { return }
+        guard !seenEventIds.contains(event.id) else {
+            NDKLogger.log(.trace, category: .subscription, "⏭️ Skipping duplicate event \(event.id.prefix(8)) kind:\(event.kind)")
+            return
+        }
         seenEventIds.insert(event.id)
 
         // Store in cache
