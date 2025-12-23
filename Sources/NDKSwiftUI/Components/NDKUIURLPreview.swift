@@ -351,7 +351,7 @@ private struct LinkPreviewImage: View {
     }
 
     private func loadImage() {
-        imageProvider.loadDataRepresentation(for: .image) { data, _ in
+        _ = imageProvider.loadDataRepresentation(for: .image) { data, _ in
             if let data = data {
                 #if canImport(UIKit)
                     if let image = UIImage(data: data) {
@@ -406,7 +406,7 @@ private struct LinkPreviewIcon: View {
     }
 
     private func loadIcon() {
-        iconProvider.loadDataRepresentation(for: .image) { data, _ in
+        _ = iconProvider.loadDataRepresentation(for: .image) { data, _ in
             if let data = data {
                 #if canImport(UIKit)
                     if let image = UIImage(data: data) {

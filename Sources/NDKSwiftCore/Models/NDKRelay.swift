@@ -415,11 +415,8 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
     private let stateActor = RelayStateActor()
 
     /// Subscription manager for this relay (handles grouping and merging)
-    /// Lazy to avoid initialization order issues with self
-    /// Thread-safety is guaranteed by NDKRelaySubscriptionManager being an actor
-    nonisolated(unsafe) lazy var subscriptionManager: NDKRelaySubscriptionManager = {
-        NDKRelaySubscriptionManager(relay: self)
-    }()
+    /// Initialized eagerly; thread-safety guaranteed by NDKRelaySubscriptionManager being an actor
+    let subscriptionManager: NDKRelaySubscriptionManager
 
     /// Get the current connection (internal use only)
     var connection: NDKRelayConnection? {
@@ -435,6 +432,11 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
     public init(url: RelayURL, config: NDKConnectionConfig = .default) {
         self.url = url
         self.config = config
+        self.subscriptionManager = NDKRelaySubscriptionManager(relay: nil)
+        // Set the relay reference after initialization (breaking init cycle)
+        Task { [subscriptionManager] in
+            await subscriptionManager.setRelay(self)
+        }
     }
 
     // MARK: - Public Properties (Async)

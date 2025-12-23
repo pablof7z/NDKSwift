@@ -107,7 +107,7 @@ Per-relay publish notifications:
 4. [x] Add UNPUBLISHED EVENTS section to TUI renderer
 5. [x] Hook activity log into `ndk.pool.publishEvents`
 6. [x] Replace polling with reactive stream consumption
-7. [ ] Test the TUI with unpublished events display
+7. [x] Fix offline publish bug: use outbox config relays as fallback when no relays available
 
 ## NDK Changes (Complete)
 

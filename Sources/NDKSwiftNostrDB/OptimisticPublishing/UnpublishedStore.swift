@@ -174,14 +174,19 @@ public actor UnpublishedStore {
             record.publishedRelays.append(relay)
         }
 
-        // Update in memory
-        records[eventId] = record
-
-        // Rewrite file (infrequent operation)
-        try writeToFile()
-
-        // Emit change notification
+        // Emit relay published notification
         changeContinuation.yield(.relayPublished(eventId: eventId, relay: relay))
+
+        // If no more pending relays, remove the event from tracking
+        if record.pendingRelays.isEmpty {
+            records.removeValue(forKey: eventId)
+            try writeToFile()
+            changeContinuation.yield(.eventRemoved(eventId: eventId))
+        } else {
+            // Update in memory and rewrite file
+            records[eventId] = record
+            try writeToFile()
+        }
     }
 
     /// Update failure reason for a relay

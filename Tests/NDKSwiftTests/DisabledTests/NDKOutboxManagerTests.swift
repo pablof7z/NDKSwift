@@ -589,4 +589,71 @@ final class NDKOutboxManagerTests: NDKUnitTestCase {
             XCTAssertEqual(results.count, 5)
         }
     }
+
+    // MARK: - Batched Discovery Tests
+
+    func testDiscoveryDebounceEmitsAfter100ms() async throws {
+        try await performAsyncTest(timeout: 5) {
+            var discoveryEvents: [RelayDiscovery] = []
+            let expectation = XCTestExpectation(description: "Batched discovery emitted after debounce")
+
+            // Listen for discovery events
+            let listenerTask = Task {
+                for await discovery in await self.outboxManager.relayDiscoveries {
+                    discoveryEvents.append(discovery)
+                    expectation.fulfill()
+                }
+            }
+
+            // Simulate multiple relay list events arriving quickly
+            let event1 = NDKEvent(
+                id: "event1",
+                pubkey: "author1",
+                createdAt: Timestamp.now,
+                kind: EventKind.relayList,
+                tags: [["r", "wss://relay1.test", "read"]],
+                content: "",
+                sig: "sig1"
+            )
+
+            let event2 = NDKEvent(
+                id: "event2",
+                pubkey: "author2",
+                createdAt: Timestamp.now,
+                kind: EventKind.relayList,
+                tags: [["r", "wss://relay2.test", "read"]],
+                content: "",
+                sig: "sig2"
+            )
+
+            let event3 = NDKEvent(
+                id: "event3",
+                pubkey: "author3",
+                createdAt: Timestamp.now,
+                kind: EventKind.relayList,
+                tags: [["r", "wss://relay3.test", "read"]],
+                content: "",
+                sig: "sig3"
+            )
+
+            // Process events with small delays (< 100ms apart)
+            await self.outboxManager.processRelayListEvent(event1)
+            try await Task.sleep(nanoseconds: 30_000_000) // 30ms
+            await self.outboxManager.processRelayListEvent(event2)
+            try await Task.sleep(nanoseconds: 30_000_000) // 30ms
+            await self.outboxManager.processRelayListEvent(event3)
+
+            // Wait for debounce (100ms + buffer)
+            await self.fulfillment(of: [expectation], timeout: 0.5)
+
+            // Should emit single batched discovery with all 3 authors
+            XCTAssertEqual(discoveryEvents.count, 1)
+            XCTAssertEqual(discoveryEvents[0].authors.count, 3)
+            XCTAssertTrue(discoveryEvents[0].authors.contains("author1"))
+            XCTAssertTrue(discoveryEvents[0].authors.contains("author2"))
+            XCTAssertTrue(discoveryEvents[0].authors.contains("author3"))
+
+            listenerTask.cancel()
+        }
+    }
 }

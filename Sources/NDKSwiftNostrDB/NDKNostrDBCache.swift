@@ -45,7 +45,6 @@ import NDKSwiftCore
 /// - Negentropy: `getEventsByTimeRange`, `getEventIdsWithTimestamps`, `hasEvents`
 /// - Cache freshness: `getLastFetchTime`, `recordFetchTime`
 /// - NIP-05: All NIP-05 verification methods
-/// - Relay preferences: `saveRelayPreferences`, `getRelayPreferences`
 /// - Profile batch: `getMultipleProfileMetadata`, `saveProfileMetadata`
 ///
 /// ## Usage
@@ -198,7 +197,7 @@ public actor NDKNostrDBCache: NDKCache {
         // Try native nostrdb query first
         do {
             let ndbFilter = try NdbFilter(from: nostrFilter)
-            let noteKeys = try nostrDB.query(filters: [ndbFilter], maxResults: filter.limit ?? Int.max)
+            let noteKeys = try nostrDB.query(filters: [ndbFilter], maxResults: filter.limit ?? 10000)
 
             // Convert note keys to NDKEvents, filtering out deleted events
             for noteKey in noteKeys {
@@ -409,7 +408,9 @@ public actor NDKNostrDBCache: NDKCache {
                     let ndbFilter = try NdbFilter(from: nostrFilter)
 
                     // Subscribe to new events matching the filter
-                    let subscriptionStream = try nostrDB.subscribe(filters: [ndbFilter])
+                    // Use filter's limit if set, otherwise use 100000 to load all existing events
+                    let maxResults = filter.limit ?? 100000
+                    let subscriptionStream = try nostrDB.subscribe(filters: [ndbFilter], maxSimultaneousResults: maxResults)
 
                     // Process incoming events from the subscription
                     for try await item in subscriptionStream {

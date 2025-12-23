@@ -62,12 +62,16 @@ struct UnpublishedEventDisplay: Sendable {
 actor TUIState {
     var isOnline = false
     var relayStates: [String: NDKRelayConnectionState] = [:]
+    // Track active subscriptions: subId -> (kinds, authorCount)
+    var subscriptions: [String: (kinds: [Int], authorCount: Int)] = [:]
     // Track subscriptions per relay: (relay, subId) -> (kinds, authorCount)
     var relaySubscriptions: [(relay: String, subId: String, kinds: [Int], authorCount: Int)] = []
     var recentEvents: [(timestamp: Date, kind: Int, author: String, preview: String)] = []
     var unpublishedEvents: [String: UnpublishedEventDisplay] = [:]  // eventId -> display record
     var logs: [(timestamp: Date, message: String)] = []
     var eventCount = 0
+    var totalEvents = 0
+    var total10002Events = 0  // Debug: total kind-10002 events in NostrDB
     var authorRelays: [String: Set<String>] = [:] // pubkey -> Set of relay URLs from outbox
 
     let maxEvents = 10
@@ -79,6 +83,10 @@ actor TUIState {
 
     func setRelayState(_ url: String, _ state: NDKRelayConnectionState) {
         relayStates[url] = state
+    }
+
+    func addSubscription(subId: String, kinds: [Int], authorCount: Int) {
+        subscriptions[subId] = (kinds: kinds, authorCount: authorCount)
     }
 
     func addRelaySubscription(relay: String, subId: String, kinds: [Int], authorCount: Int) {
@@ -125,6 +133,14 @@ actor TUIState {
         authorRelays[pubkey] = relays
     }
 
+    func setTotalEvents(_ count: Int) {
+        totalEvents = count
+    }
+
+    func setTotal10002Events(_ count: Int) {
+        total10002Events = count
+    }
+
     func log(_ message: String) {
         logs.insert((Date(), message), at: 0)
         if logs.count > maxLogs {
@@ -136,11 +152,14 @@ actor TUIState {
         TUISnapshot(
             isOnline: isOnline,
             relayStates: relayStates,
+            subscriptions: subscriptions,
             relaySubscriptions: relaySubscriptions,
             recentEvents: recentEvents,
             unpublishedEvents: Array(unpublishedEvents.values),
             logs: logs,
             eventCount: eventCount,
+            totalEvents: totalEvents,
+            total10002Events: total10002Events,
             authorRelays: authorRelays
         )
     }
@@ -149,11 +168,14 @@ actor TUIState {
 struct TUISnapshot {
     let isOnline: Bool
     let relayStates: [String: NDKRelayConnectionState]
+    let subscriptions: [String: (kinds: [Int], authorCount: Int)]
     let relaySubscriptions: [(relay: String, subId: String, kinds: [Int], authorCount: Int)]
     let recentEvents: [(timestamp: Date, kind: Int, author: String, preview: String)]
     let unpublishedEvents: [UnpublishedEventDisplay]
     let logs: [(timestamp: Date, message: String)]
     let eventCount: Int
+    let totalEvents: Int
+    let total10002Events: Int  // Debug: total kind-10002 events in NostrDB
     let authorRelays: [String: Set<String>]
 }
 
@@ -178,13 +200,20 @@ class TUIRenderer {
         }.count
         let relayCountColor: Color = connectedCount > 0 ? .brightGreen : .yellow
         let relayText = "Relays: \(c("\(connectedCount)", relayCountColor))/\(state.relayStates.count)"
-        let eventsText = "Events: \(c("\(state.eventCount)", .brightGreen))"
+        let allEventsText = "All: \(c("\(state.totalEvents)", .brightGreen))"
+        let eventsText = "Session: \(c("\(state.eventCount)", .green))"
         let unpubCount = state.unpublishedEvents.count
         let unpubColor: Color = unpubCount > 0 ? .brightYellow : .green
         let unpubText = "Unpub: \(c("\(unpubCount)", unpubColor))"
 
-        let statusLine = "  \(modeText)  │  \(relayText)  │  \(eventsText)  │  \(unpubText)"
+        let statusLine = "  \(modeText)  │  \(relayText)  │  \(allEventsText)  │  \(eventsText)  │  \(unpubText)"
         lines.append(c("║", .cyan) + padRight(statusLine, width - 2) + c("║", .cyan))
+
+        // Debug: Show total kind-10002 events in NostrDB
+        let k10002Text = "10002 in DB: \(c("\(state.total10002Events)", .brightMagenta))"
+        let debugLine = "  \(k10002Text)"
+        lines.append(c("║", .cyan) + padRight(debugLine, width - 2) + c("║", .cyan))
+
         lines.append(c("╠" + String(repeating: "═", count: width - 2) + "╣", .cyan))
 
         // Relays section
@@ -197,13 +226,25 @@ class TUIRenderer {
         for (url, connState) in sortedRelays.prefix(relayLimit) {
             let (icon, color) = relayIcon(connState)
             let shortUrl = url.replacingOccurrences(of: "wss://", with: "").replacingOccurrences(of: "/", with: "")
+
+            // Count unique pubkeys covered by this relay
+            let pubkeysCovered = state.authorRelays.filter { _, relays in
+                relays.contains(url)
+            }.count
+
             let subsOnRelay = state.relaySubscriptions.filter { $0.relay == url }
-            let totalAuthors = subsOnRelay.reduce(0) { $0 + $1.authorCount }
             let subCount = subsOnRelay.count
 
             var info = ""
-            if subCount > 0 {
-                info = c(" [\(subCount) sub\(subCount == 1 ? "" : "s"), \(totalAuthors) author\(totalAuthors == 1 ? "" : "s")]", .dim)
+            if subCount > 0 || pubkeysCovered > 0 {
+                var parts: [String] = []
+                if subCount > 0 {
+                    parts.append("\(subCount) sub\(subCount == 1 ? "" : "s")")
+                }
+                if pubkeysCovered > 0 {
+                    parts.append("\(pubkeysCovered) pubkey\(pubkeysCovered == 1 ? "" : "s")")
+                }
+                info = c(" [\(parts.joined(separator: ", "))]", .dim)
             }
             lines.append(c("║", .cyan) + padRight("  \(c(icon, color)) \(shortUrl)\(info)", width - 2) + c("║", .cyan))
         }
@@ -262,21 +303,45 @@ class TUIRenderer {
 
         // Subscriptions section
         let subLimit = 10
-        let totalSubs = state.relaySubscriptions.count
+        let totalSubs = state.subscriptions.count
         lines.append(c("║", .cyan) + c(" SUBSCRIPTIONS (\(totalSubs))", .brightBlue, bold: true) + padRight("", width - 20 - String(totalSubs).count) + c("║", .cyan))
         lines.append(c("║", .cyan) + padRight(String(repeating: "─", count: width - 4), width - 2) + c("║", .cyan))
 
-        if state.relaySubscriptions.isEmpty {
+        if state.subscriptions.isEmpty {
             lines.append(c("║", .cyan) + padRight(c("  (none)", .dim), width - 2) + c("║", .cyan))
         } else {
-            // Display one line per subscription per relay (limited)
-            for sub in state.relaySubscriptions.prefix(subLimit) {
-                let shortSubId = String(sub.subId.prefix(8))
-                let kindsStr = "k:\(sub.kinds.map { String($0) }.joined(separator: ","))"
-                let authorsStr = "authors:\(sub.authorCount)"
-                let shortRelay = sub.relay.replacingOccurrences(of: "wss://", with: "").replacingOccurrences(of: "/", with: "")
+            // Display subscriptions with per-relay breakdown
+            let relayLimit = 4  // Max relays to show per subscription
+            for (subId, sub) in state.subscriptions.sorted(by: { $0.key < $1.key }).prefix(subLimit) {
+                let shortSubId = String(subId.prefix(8))
+                let kindsStr = "kinds: [\(sub.kinds.map { String($0) }.joined(separator: ","))]"
 
-                lines.append(c("║", .cyan) + padRight("  \(c(shortSubId, .brightBlue)) \(c(kindsStr, .dim)) \(c(authorsStr, .dim)) \(c("→", .green)) \(shortRelay)", width - 2) + c("║", .cyan))
+                // Header line: subscription ID and kinds
+                lines.append(c("║", .cyan) + padRight("  \(c(shortSubId, .brightBlue)) \(c(kindsStr, .dim))", width - 2) + c("║", .cyan))
+
+                // Get relay subscriptions for this subscription, sorted by author count descending
+                let relaysForSub = state.relaySubscriptions
+                    .filter { $0.subId == subId }
+                    .sorted { $0.authorCount > $1.authorCount }
+
+                if relaysForSub.isEmpty {
+                    lines.append(c("║", .cyan) + padRight(c("     (pending)", .yellow), width - 2) + c("║", .cyan))
+                } else {
+                    // Show per-relay author counts
+                    for relaySub in relaysForSub.prefix(relayLimit) {
+                        let shortRelay = relaySub.relay
+                            .replacingOccurrences(of: "wss://", with: "")
+                            .replacingOccurrences(of: "/", with: "")
+                        let authorText = c("#\(relaySub.authorCount)", .green)
+                        lines.append(c("║", .cyan) + padRight("     \(authorText) \(shortRelay)", width - 2) + c("║", .cyan))
+                    }
+
+                    // Show overflow indicator if more relays
+                    if relaysForSub.count > relayLimit {
+                        let remaining = relaysForSub.count - relayLimit
+                        lines.append(c("║", .cyan) + padRight(c("     ... +\(remaining) more relay\(remaining == 1 ? "" : "s")", .dim), width - 2) + c("║", .cyan))
+                    }
+                }
             }
 
             if totalSubs > subLimit {
@@ -424,8 +489,6 @@ func restoreTerminalMode(_ original: termios) {
 
 @main
 struct OfflineDemo {
-    // Configuration
-    static let seedNpub = "npub1l2vyh47mk2p0qlsku7hg0vn29faehy9hy34ygaclpn66ukqp3afqutajft"
     // No app relays - only outbox relay (relay.damus.io) for discovery
     static let defaultRelays: [String] = []
 
@@ -513,7 +576,7 @@ struct OfflineDemo {
             relayURLs: defaultRelays,
             signer: signer,
             cache: cache,
-            debugMode: false,
+            debugMode: debugMode,
             outboxEnabled: true,
             outboxConfig: NDKOutboxConfig(
                 blacklistedRelays: [],
@@ -724,6 +787,17 @@ struct OfflineDemo {
         // Update outbox data for all followed pubkeys
         await refreshOutboxData()
 
+        // Update total events count from cache stats
+        if let stats = await cache.getStats() {
+            await tuiState.setTotalEvents(stats.totalEvents)
+        }
+
+        // Debug: Count total kind-10002 events in NostrDB
+        let filter10002 = NDKFilter(kinds: [10002])
+        if let events = try? await cache.queryEvents(filter10002) {
+            await tuiState.setTotal10002Events(events.count)
+        }
+
         let state = await tuiState.getSnapshot()
         renderer.render(state, userNpub: userNpub, followCount: followedPubkeys.count)
     }
@@ -814,7 +888,10 @@ struct OfflineDemo {
         )
         debug("NDKSubscription created")
 
+        // Add subscription to UI immediately
+        await tuiState.addSubscription(subId: subId, kinds: kinds, authorCount: followedPubkeys.count)
         await tuiState.log("Sub \(subId) created for kinds \(kinds)")
+        await refreshUI()
 
         // Monitor incoming events
         Task {
@@ -833,17 +910,26 @@ struct OfflineDemo {
 
         // Monitor relay updates (including subscription activations)
         Task {
-            guard let relayUpdates = subscription.relayUpdates else { return }
+            guard let relayUpdates = subscription.relayUpdates else {
+                debug("WARNING: relayUpdates is nil for subscription \(subId)")
+                await tuiState.log("ERROR: relayUpdates is nil for sub \(subId)")
+                return
+            }
+            debug("Starting relay updates monitoring for subscription \(subId)")
             for await update in relayUpdates {
+                debug("Received relay update: \(update)")
                 switch update {
                 case let .subscriptionActivated(relay, kinds, authorCount):
+                    debug("Subscription activated on relay \(relay) with \(authorCount) authors")
                     await tuiState.addRelaySubscription(relay: relay, subId: subId, kinds: kinds, authorCount: authorCount)
                     await tuiState.log("Sub \(String(subId.prefix(8))) → \(relay.replacingOccurrences(of: "wss://", with: "")) (\(authorCount) authors)")
                     await refreshUI()
                 default:
+                    debug("Ignoring relay update type: \(update)")
                     break
                 }
             }
+            debug("Relay updates stream ended for subscription \(subId)")
         }
 
         // Track relay connection states

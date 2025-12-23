@@ -399,6 +399,9 @@ public final class NDK {
 
         // Mark that connect has been called
         hasConnected = true
+
+        // Activate any subscriptions that were created while offline
+        await dataRequirementManager.activateDeferredSubscriptions()
     }
 
     /// Disconnect from all relays

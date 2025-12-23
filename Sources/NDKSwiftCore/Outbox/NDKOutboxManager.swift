@@ -892,57 +892,47 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
     }
 
     private func checkDatabaseCache(pubkey: String, maxAge: TimeInterval) async -> CachedRelayPreference? {
-        guard let dbResult = await ndk.cache.getRelayPreferences(pubkey: pubkey) else {
+        // Query kind 10002 events directly from the cache
+        let filter = NDKFilter(authors: [pubkey], kinds: [EventKind.relayList], limit: 1)
+        guard let events = try? await ndk.cache.queryEvents(filter),
+              let event = events.first else {
             return nil
         }
 
+        let fetchedAt = Date(timeIntervalSince1970: TimeInterval(event.createdAt))
+
         // Check maxAge
-        let age = Date().timeIntervalSince(dbResult.fetchedAt)
+        let age = Date().timeIntervalSince(fetchedAt)
         if age > maxAge {
             return nil
         }
 
-        // Check expiration
-        if Date() > dbResult.expiresAt {
-            return nil
-        }
+        // Parse relay list from event
+        let relayList = NDKRelayList.fromEvent(event)
 
-        // For negative cache, check if we'd query the same relays
-        let hasRelayList = dbResult.writeRelays != nil || dbResult.readRelays != nil
-        if !hasRelayList, let checkedRelays = dbResult.checkedRelays {
-            let currentOutboxRelays = ndk.outboxConfig.outboxRelays
-            if !currentOutboxRelays.isSubset(of: checkedRelays) {
-                // Some new outbox relays to check
-                return nil
-            }
-        }
+        let writeRelayInfos = relayList.writeRelays
+            .filter { !blacklistedRelays.contains($0.url) }
+            .map { RelayInfo(url: $0.url) }
+        let readRelayInfos = relayList.readRelays
+            .filter { !blacklistedRelays.contains($0.url) }
+            .map { RelayInfo(url: $0.url) }
 
-        // Convert to NDKOutboxItem
-        let item: NDKOutboxItem?
-        if let writeRelays = dbResult.writeRelays, let readRelays = dbResult.readRelays {
-            let writeRelayInfos = writeRelays
-                .filter { !blacklistedRelays.contains($0) }
-                .map { RelayInfo(url: $0) }
-            let readRelayInfos = readRelays
-                .filter { !blacklistedRelays.contains($0) }
-                .map { RelayInfo(url: $0) }
+        let item = NDKOutboxItem(
+            pubkey: pubkey,
+            readRelays: Set(readRelayInfos),
+            writeRelays: Set(writeRelayInfos),
+            fetchedAt: fetchedAt,
+            source: .nip65
+        )
 
-            item = NDKOutboxItem(
-                pubkey: pubkey,
-                readRelays: Set(readRelayInfos),
-                writeRelays: Set(writeRelayInfos),
-                fetchedAt: dbResult.fetchedAt,
-                source: .nip65
-            )
-        } else {
-            item = nil
-        }
+        // Set expiration to 7 days from event creation
+        let expiresAt = fetchedAt.addingTimeInterval(TimeConstants.day * 7)
 
         let cached = CachedRelayPreference(
             item: item,
-            fetchedAt: dbResult.fetchedAt,
-            expiresAt: dbResult.expiresAt,
-            checkedRelays: dbResult.checkedRelays
+            fetchedAt: fetchedAt,
+            expiresAt: expiresAt,
+            checkedRelays: nil
         )
 
         // Update memory cache
@@ -963,25 +953,8 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
             checkedRelays: item == nil ? eoseRelays : nil
         )
 
-        // Update memory cache
+        // Update memory cache (kind 10002 events are already saved via normal event flow)
         await memoryCache.set(pubkey, value: cached)
-
-        // Save to database
-        let writeRelays = item?.writeRelays.map { $0.url }
-        let readRelays = item?.readRelays.map { $0.url }
-
-        do {
-            try await ndk.cache.saveRelayPreferences(
-                pubkey: pubkey,
-                writeRelays: writeRelays,
-                readRelays: readRelays,
-                fetchedAt: now,
-                expiresAt: expiresAt,
-                checkedRelays: item == nil ? eoseRelays : nil
-            )
-        } catch {
-            NDKLogger.log(.warning, category: .cache, "Failed to save relay preferences for \(pubkey): \(error.localizedDescription)")
-        }
     }
 
     private func fetchRelayListFromNetwork(for pubkey: String) async throws -> (item: NDKOutboxItem?, eoseRelays: Set<String>) {
