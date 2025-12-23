@@ -597,11 +597,10 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
 
         NDKLogger.log(.debug, category: .outbox, "📋 Processing relay list for \(event.pubkey.prefix(StringConstants.DisplayFormatting.hexPrefixLength))")
 
-        // Use NDKRelayList to parse the event - single source of truth
         let relayList = NDKRelayList.fromEvent(event)
 
-        let readRelayUrls = Set(relayList.readRelays.map { $0.url })
-        let writeRelayUrls = Set(relayList.writeRelays.map { $0.url })
+        let readRelayUrls = Set(relayList.readRelays.validForOutbox.map { $0.url })
+        let writeRelayUrls = Set(relayList.writeRelays.validForOutbox.map { $0.url })
 
         // Update tracker (don't emit individual discoveries - we batch them)
         await track(
@@ -807,12 +806,8 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         emitDiscoveryEvent: Bool = true
     ) async {
         // Filter out blacklisted and invalid relays (ws://, localhost) at the source
-        let filteredReadRelays = readRelays
-            .subtracting(blacklistedRelays)
-            .filter { URLNormalizer.isValidForOutbox($0) }
-        let filteredWriteRelays = writeRelays
-            .subtracting(blacklistedRelays)
-            .filter { URLNormalizer.isValidForOutbox($0) }
+        let filteredReadRelays = readRelays.subtracting(blacklistedRelays).validForOutbox
+        let filteredWriteRelays = writeRelays.subtracting(blacklistedRelays).validForOutbox
 
         let readRelayInfos = filteredReadRelays
             .map { RelayInfo(url: $0) }
@@ -863,6 +858,26 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         await memoryCache.cleanupExpired()
     }
 
+    // MARK: - Private Relay Selection
+
+    /// Determines which relays to use for relay list discovery/fetching
+    /// Prefers outbox relays if connected, falls back to any connected relays
+    /// - Returns: Set of relay URLs to use, or nil if no relays are connected
+    private func getRelaysForDiscovery() async -> Set<RelayURL>? {
+        let connectedRelays = await ndk.pool.connectedRelayURLs
+
+        if !ndk.outboxConfig.outboxRelays.isEmpty {
+            let normalizedOutboxRelays = Set(ndk.outboxConfig.outboxRelays.map { $0.normalizedRelayURL })
+            let connectedOutboxRelays = normalizedOutboxRelays.intersection(connectedRelays)
+
+            if !connectedOutboxRelays.isEmpty {
+                return connectedOutboxRelays
+            }
+        }
+
+        return connectedRelays.isEmpty ? nil : connectedRelays
+    }
+
     // MARK: - Private Cache Methods
 
     private func checkMemoryCache(pubkey: String, maxAge: TimeInterval) async -> CachedRelayPreference? {
@@ -908,13 +923,12 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         // created the event, not when we cached it. A kind 10002 could be years old
         // but still be the user's current valid relay list.
 
-        // Parse relay list from event
         let relayList = NDKRelayList.fromEvent(event)
 
-        let writeRelayInfos = relayList.writeRelays
+        let writeRelayInfos = relayList.writeRelays.validForOutbox
             .filter { !blacklistedRelays.contains($0.url) }
             .map { RelayInfo(url: $0.url) }
-        let readRelayInfos = relayList.readRelays
+        let readRelayInfos = relayList.readRelays.validForOutbox
             .filter { !blacklistedRelays.contains($0.url) }
             .map { RelayInfo(url: $0.url) }
 
@@ -1049,16 +1063,16 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
 
         NDKLogger.log(.debug, category: .outbox, "📝 Raw relay list data - Read: \(relayList.readRelays.map { $0.url }), Write: \(relayList.writeRelays.map { $0.url })")
 
-        let readRelayUrls = Set(relayList.readRelays.map { $0.url })
-            .subtracting(blacklistedRelays)
-        let writeRelayUrls = Set(relayList.writeRelays.map { $0.url })
-            .subtracting(blacklistedRelays)
+        let readRelayUrls = Set(relayList.readRelays.validForOutbox.map { $0.url }).subtracting(blacklistedRelays)
+        let writeRelayUrls = Set(relayList.writeRelays.validForOutbox.map { $0.url }).subtracting(blacklistedRelays)
 
         let readRelayInfos = readRelayUrls.map { RelayInfo(url: $0) }
         let writeRelayInfos = writeRelayUrls.map { RelayInfo(url: $0) }
 
-        if !blacklistedRelays.isEmpty && (relayList.readRelays.count != readRelayUrls.count || relayList.writeRelays.count != writeRelayUrls.count) {
-            NDKLogger.log(.debug, category: .outbox, "🚫 Filtered blacklisted relays - Final Read: \(readRelayUrls), Write: \(writeRelayUrls)")
+        let rawReadCount = relayList.readRelays.count
+        let rawWriteCount = relayList.writeRelays.count
+        if rawReadCount != readRelayUrls.count || rawWriteCount != writeRelayUrls.count {
+            NDKLogger.log(.debug, category: .outbox, "🚫 Filtered invalid/blacklisted relays - Raw: \(rawReadCount)r/\(rawWriteCount)w → Valid: \(readRelayUrls.count)r/\(writeRelayUrls.count)w")
         }
 
         let item = NDKOutboxItem(
