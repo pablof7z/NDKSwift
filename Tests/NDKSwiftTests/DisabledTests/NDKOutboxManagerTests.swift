@@ -194,7 +194,7 @@ final class NDKOutboxManagerTests: NDKUnitTestCase {
             let expectation = XCTestExpectation(description: "Relay discovery event emitted")
 
             let task = Task {
-                for await discovery in await self.outboxManager.relayDiscoveriesInternal {
+                for await discovery in await self.outboxManager.relayDiscoveries {
                     if discovery.pubkey == "test_pubkey" {
                         expectation.fulfill()
                         break
@@ -587,6 +587,76 @@ final class NDKOutboxManagerTests: NDKUnitTestCase {
 
             // All should get the same result (deduplication working)
             XCTAssertEqual(results.count, 5)
+        }
+    }
+
+    // MARK: - Discovery Emission Tests
+
+    func testProcessRelayListEventEmitsImmediately() async throws {
+        try await performAsyncTest(timeout: 5) {
+            var discoveryEvents: [RelayDiscoveryEvent] = []
+            let expectation = XCTestExpectation(description: "Discovery events emitted immediately")
+            expectation.expectedFulfillmentCount = 3 // Expect 3 individual events
+
+            // Listen for discovery events
+            let listenerTask = Task {
+                for await discovery in await self.outboxManager.relayDiscoveries {
+                    discoveryEvents.append(discovery)
+                    expectation.fulfill()
+                }
+            }
+
+            // Small delay to ensure listener is ready
+            try await Task.sleep(nanoseconds: 10_000_000)
+
+            // Simulate multiple relay list events
+            let event1 = NDKEvent(
+                id: "event1",
+                pubkey: "author1",
+                createdAt: Timestamp.now,
+                kind: EventKind.relayList,
+                tags: [["r", "wss://relay1.test", "read"]],
+                content: "",
+                sig: "sig1"
+            )
+
+            let event2 = NDKEvent(
+                id: "event2",
+                pubkey: "author2",
+                createdAt: Timestamp.now,
+                kind: EventKind.relayList,
+                tags: [["r", "wss://relay2.test", "read"]],
+                content: "",
+                sig: "sig2"
+            )
+
+            let event3 = NDKEvent(
+                id: "event3",
+                pubkey: "author3",
+                createdAt: Timestamp.now,
+                kind: EventKind.relayList,
+                tags: [["r", "wss://relay3.test", "read"]],
+                content: "",
+                sig: "sig3"
+            )
+
+            // Process events - each should emit immediately (no debouncing in NDKOutboxManager)
+            await self.outboxManager.processRelayListEvent(event1)
+            await self.outboxManager.processRelayListEvent(event2)
+            await self.outboxManager.processRelayListEvent(event3)
+
+            // Wait for events (should be immediate, but allow small buffer)
+            await self.fulfillment(of: [expectation], timeout: 0.5)
+
+            // Should emit 3 individual discovery events (one per pubkey)
+            XCTAssertEqual(discoveryEvents.count, 3)
+            let authors = Set(discoveryEvents.map { $0.pubkey })
+            XCTAssertEqual(authors.count, 3)
+            XCTAssertTrue(authors.contains("author1"))
+            XCTAssertTrue(authors.contains("author2"))
+            XCTAssertTrue(authors.contains("author3"))
+
+            listenerTask.cancel()
         }
     }
 }

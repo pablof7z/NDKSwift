@@ -88,6 +88,18 @@ public final class NDKFetchedEvent {
                     if decoded.type == "naddr" {
                         isAddressable = true
                     }
+
+                    // Record hints in the HintIndex for future relay selection
+                    if let pubkey = decoded.pubkey, let hints = decoded.relays {
+                        for relay in hints {
+                            await ndk.hintIndex.recordHint(pubkey: pubkey, relay: relay, source: .nip19)
+                        }
+                    }
+                    if let eventId = decoded.eventId, let hints = decoded.relays {
+                        for relay in hints {
+                            await ndk.hintIndex.recordHint(eventId: eventId, relay: relay, source: .nip19)
+                        }
+                    }
                 } catch {
                     NDKLogger.log(.warning, category: .general, "Failed to decode bech32 identifier: \(error.localizedDescription)")
                 }
@@ -125,6 +137,16 @@ public final class NDKFetchedEvent {
             error = NDKError.invalidEventID("Tag missing identifier")
             isLoading = false
             return
+        }
+
+        // Record hints from tag for future relay selection
+        if let relay = relayHint {
+            if let pubkey = pubkeyHint {
+                await ndk.hintIndex.recordHint(pubkey: pubkey, relay: relay, source: .nip19)
+            }
+            if tagType == "e" {
+                await ndk.hintIndex.recordHint(eventId: identifier, relay: relay, source: .nip19)
+            }
         }
 
         // Handle "a" tags (addressable events)

@@ -219,7 +219,8 @@ public actor NIP60Wallet: NDKPaymentProvider {
                         maxAge: 0,
                         cachePolicy: .cacheWithNetwork,
                         relays: relayURLs,
-                        subscriptionId: subscriptionId
+                        subscriptionId: subscriptionId,
+                        includeRelayUpdates: true
                     )
                     dataSources.append(dataSource)
 
@@ -231,7 +232,8 @@ public actor NIP60Wallet: NDKPaymentProvider {
                 // Monitor EOSE for nutzap and spending history
                 if let nutzapDS = nutzapDataSource {
                     Task {
-                        for await update in nutzapDS.relayUpdates {
+                        guard let relayUpdates = nutzapDS.relayUpdates else { return }
+                        for await update in relayUpdates {
                             if case .eose = update {
                                 await self.startupRedemption?.markNutzapEoseReceived()
                                 break
@@ -242,7 +244,8 @@ public actor NIP60Wallet: NDKPaymentProvider {
 
                 if let spendingHistoryDS = spendingHistoryDataSource {
                     Task {
-                        for await update in spendingHistoryDS.relayUpdates {
+                        guard let relayUpdates = spendingHistoryDS.relayUpdates else { return }
+                        for await update in relayUpdates {
                             if case .eose = update {
                                 await self.startupRedemption?.markSpendingHistoryEoseReceived()
                                 break
@@ -906,7 +909,8 @@ public actor NIP60Wallet: NDKPaymentProvider {
                 filter: configFilter,
                 maxAge: 0,
                 cachePolicy: .cacheWithNetwork,
-                subscriptionId: "nip60-wallet-config"
+                subscriptionId: "nip60-wallet-config",
+                includeRelayUpdates: true
             )
 
             // Track EOSE status
@@ -915,7 +919,8 @@ public actor NIP60Wallet: NDKPaymentProvider {
 
             // Monitor relay updates for EOSE
             eoseTask = Task {
-                for await update in dataSource.relayUpdates {
+                guard let relayUpdates = dataSource.relayUpdates else { return }
+                for await update in relayUpdates {
                     if case .eose = update, !receivedEOSE {
                         receivedEOSE = true
                         NDKLogger.log(.info, category: .wallet, "📡 Configuration EOSE received. Starting wallet event subscriptions...")

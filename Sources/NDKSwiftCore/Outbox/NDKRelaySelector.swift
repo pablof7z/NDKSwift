@@ -215,6 +215,14 @@ actor NDKRelaySelector {
         // Extract relay URLs
         var selectedRelays = Set(relayToPubkeys.keys)
 
+        // Add event ID hints from HintIndex
+        if let eventIds = filter.ids {
+            for eventId in eventIds {
+                let eventIdHintRelays = await getRelaysFromHintIndex(forEventId: eventId)
+                selectedRelays.formUnion(eventIdHintRelays)
+            }
+        }
+
         // Ensure minimum relays
         if selectedRelays.count < OutboxConstants.minFetchRelays {
             let fallbackRelays = await selectFallbackRelays(
@@ -280,10 +288,17 @@ actor NDKRelaySelector {
         // Get blocked relays
         let blockedRelays = await getBlockedRelays()
 
-        // First pass: Prioritize connected relays (excluding blocked ones)
+        // First pass: Prioritize connected relays (excluding blocked and invalid ones)
         for relay in connectedRelays {
             let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(relay.url) ?? relay.url
+
+            // Skip blocked relays
             if blockedRelays.contains(normalizedUrl) {
+                continue
+            }
+
+            // Skip relays that are invalid for outbox (localhost and non-secure)
+            if !URLNormalizer.isValidForOutbox(relay.url) {
                 continue
             }
 
@@ -317,6 +332,9 @@ actor NDKRelaySelector {
                 let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(relayURL) ?? relayURL
                 if blockedRelays.contains(normalizedUrl) { continue }
 
+                // Skip relays that are invalid for outbox (localhost and non-secure)
+                if !URLNormalizer.isValidForOutbox(relayURL) { continue }
+
                 var pubkeysInRelay = relayToPubkeys[relayURL, default: []]
                 if !pubkeysInRelay.contains(pubkey) {
                     pubkeysInRelay.append(pubkey)
@@ -327,7 +345,36 @@ actor NDKRelaySelector {
             }
         }
 
-        // Third pass: Add fallback relays for pubkeys with no relays
+        // Third pass: Add hint relays directly from HintIndex for each pubkey
+        for pubkey in pubkeys {
+            let currentCount = pubkeyRelayCount[pubkey, default: 0]
+            if currentCount >= relaysPerAuthor { continue }
+
+            // Get hint relays from HintIndex
+            guard let hintRelays = pubkeyRelayInfo.pubkeysToRelays[pubkey] else { continue }
+
+            // Add hint relays that aren't already in the map
+            for relayURL in hintRelays {
+                if pubkeyRelayCount[pubkey, default: 0] >= relaysPerAuthor { break }
+
+                // Skip blocked relays
+                let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(relayURL) ?? relayURL
+                if blockedRelays.contains(normalizedUrl) { continue }
+
+                // Skip relays that are invalid for outbox (localhost and non-secure)
+                if !URLNormalizer.isValidForOutbox(relayURL) { continue }
+
+                // Skip if already in the result
+                if relayToPubkeys[relayURL]?.contains(pubkey) == true { continue }
+
+                var pubkeysInRelay = relayToPubkeys[relayURL, default: []]
+                pubkeysInRelay.append(pubkey)
+                relayToPubkeys[relayURL] = pubkeysInRelay
+                pubkeyRelayCount[pubkey, default: 0] += 1
+            }
+        }
+
+        // Fourth pass: Add fallback relays for pubkeys with no relays
         let fallbackRelays = await selectFallbackRelays(currentCount: 0, targetCount: relaysPerAuthor)
         for pubkey in pubkeyRelayInfo.authorsMissingRelays {
             var assignedCount = 0
@@ -337,6 +384,9 @@ actor NDKRelaySelector {
                 // Skip blocked relays
                 let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(relayURL) ?? relayURL
                 if blockedRelays.contains(normalizedUrl) { continue }
+
+                // Skip relays that are invalid for outbox (localhost and non-secure)
+                if !URLNormalizer.isValidForOutbox(relayURL) { continue }
 
                 var pubkeysInRelay = relayToPubkeys[relayURL, default: []]
                 if !pubkeysInRelay.contains(pubkey) {
@@ -561,17 +611,44 @@ actor NDKRelaySelector {
                     relays = item.allRelayURLs
                 }
 
-                if !relays.isEmpty {
-                    pubkeysToRelays[pubkey] = relays
+                // Filter out relays that are invalid for outbox (localhost and non-secure)
+                let validRelays = relays.validForOutbox
+
+                if !validRelays.isEmpty {
+                    pubkeysToRelays[pubkey] = validRelays
+                } else {
+                    // Tracker has no valid relays, try HintIndex as fallback
+                    let hintRelays = await getRelaysFromHintIndex(for: pubkey)
+                    if !hintRelays.validForOutbox.isEmpty {
+                        pubkeysToRelays[pubkey] = hintRelays.validForOutbox
+                    } else {
+                        authorsMissingRelays.insert(pubkey)
+                    }
+                }
+            } else {
+                // No tracker info, try HintIndex as fallback
+                let hintRelays = await getRelaysFromHintIndex(for: pubkey)
+                if !hintRelays.validForOutbox.isEmpty {
+                    pubkeysToRelays[pubkey] = hintRelays.validForOutbox
                 } else {
                     authorsMissingRelays.insert(pubkey)
                 }
-            } else {
-                authorsMissingRelays.insert(pubkey)
             }
         }
 
         return (pubkeysToRelays, authorsMissingRelays)
+    }
+
+    /// Get relays from HintIndex for a pubkey (used as fallback when tracker has no info)
+    private func getRelaysFromHintIndex(for pubkey: String) async -> Set<String> {
+        let hints = await ndk.hintIndex.hints(for: pubkey)
+        return Set(hints.map { $0.relay })
+    }
+
+    /// Get relays from HintIndex for an event ID
+    private func getRelaysFromHintIndex(forEventId eventId: String) async -> Set<String> {
+        let hints = await ndk.hintIndex.hints(forEventId: eventId)
+        return Set(hints.map { $0.relay })
     }
 
     private func extractPubkeysFromFilter(_ filter: NDKFilter) -> [String] {

@@ -48,13 +48,10 @@ struct MarkdownDemoApp: App {
 
             let cache = try await cacheType.createCache()
 
+            // No explicit app relays - purplepag.es is configured via NDKOutboxConfig.default
+            // Content relays will be discovered dynamically via NIP-65
             ndk = NDK(
-                relayURLs: [
-                    "wss://relay.damus.io",
-                    "wss://relay.primal.net",
-                    "wss://nos.lol",
-                    "wss://relay.nostr.band"
-                ],
+                relayURLs: [],
                 cache: cache,
                 debugMode: true
             )

@@ -40,6 +40,19 @@ actor OptimisticPublishingManager {
         return await store.getUnpublishedEvents(maxAge: maxAge, limit: limit)
     }
 
+    /// Get the stream of unpublished store changes
+    var unpublishedChanges: AsyncStream<UnpublishedChange>? {
+        get async {
+            await store?.changes
+        }
+    }
+
+    /// Get all unpublished event records with full relay status
+    func getAllUnpublishedRecords() async -> [String: UnpublishedStore.UnpublishedEventRecord] {
+        guard let store = store else { return [:] }
+        return await store.getAllRecords()
+    }
+
     func clear() async throws {
         try await store?.clear()
     }

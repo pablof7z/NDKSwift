@@ -216,14 +216,16 @@ public final class NDKMetaSubscription {
             relays: options.relays,
             exclusiveRelays: options.exclusiveRelays,
             subscriptionId: options.subscriptionId,
-            closeOnEose: options.closeOnEose
+            closeOnEose: options.closeOnEose,
+            includeRelayUpdates: true
         )
 
         await stateManager.setPointerSubscription(subscription)
 
         let processingTask = Task { [weak self] in
             Task { [weak self] in
-                for await update in subscription.relayUpdates {
+                guard let relayUpdates = subscription.relayUpdates else { return }
+                for await update in relayUpdates {
                     guard let self = self else { return }
                     if case .aggregatedEose = update {
                         await MainActor.run {

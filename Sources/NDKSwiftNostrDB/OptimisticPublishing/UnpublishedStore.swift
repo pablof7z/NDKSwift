@@ -1,17 +1,29 @@
 import Foundation
 import NDKSwiftCore
 
+/// Represents a change in the unpublished events store
+public enum UnpublishedChange: Sendable {
+    /// A new event was added to unpublished tracking
+    case eventAdded(eventId: String, kind: Int, targetRelays: [String])
+    /// A relay successfully published an event
+    case relayPublished(eventId: String, relay: String)
+    /// A relay failed to publish an event
+    case relayFailed(eventId: String, relay: String, reason: String)
+    /// An event was removed from tracking (fully published or expired)
+    case eventRemoved(eventId: String)
+}
+
 /// Storage for unpublished events using JSONL format
 /// This is a "dumb" storage layer - it just stores/retrieves what it's told.
 /// Threshold logic and decisions about what needs retry live in NDK-core.
-actor UnpublishedStore {
+public actor UnpublishedStore {
     /// Record of an unpublished event with per-relay state
-    struct UnpublishedEventRecord: Codable {
-        let event: String  // Raw signed JSON event (as published)
-        var publishedRelays: [String]  // Successfully published to these
-        var pendingRelays: [String: String]  // Relay URL -> failure reason
+    public struct UnpublishedEventRecord: Codable, Sendable {
+        public let event: String  // Raw signed JSON event (as published)
+        public var publishedRelays: [String]  // Successfully published to these
+        public var pendingRelays: [String: String]  // Relay URL -> failure reason (empty string = pending)
 
-        var eventId: String? {
+        public var eventId: String? {
             // Extract event ID from raw JSON
             guard let data = event.data(using: .utf8),
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -20,12 +32,34 @@ actor UnpublishedStore {
             }
             return id
         }
+
+        public var kind: Int? {
+            // Extract kind from raw JSON
+            guard let data = event.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let kind = json["kind"] as? Int else {
+                return nil
+            }
+            return kind
+        }
     }
 
     private let fileURL: URL
     private var records: [String: UnpublishedEventRecord]  // eventId -> record
 
+    /// Stream of unpublished store changes for event-driven observation
+    private let changeStream: AsyncStream<UnpublishedChange>
+    private let changeContinuation: AsyncStream<UnpublishedChange>.Continuation
+
+    /// Public accessor for unpublished changes stream
+    public var changes: AsyncStream<UnpublishedChange> {
+        changeStream
+    }
+
     init(cachePath: String?) throws {
+        // Initialize the change stream
+        (changeStream, changeContinuation) = AsyncStream<UnpublishedChange>.makeStream()
+
         // Determine file location
         let url: URL
         if let cachePath = cachePath {
@@ -121,6 +155,13 @@ actor UnpublishedStore {
 
         // Append to file
         try appendToFile(record)
+
+        // Emit change notification
+        changeContinuation.yield(.eventAdded(
+            eventId: event.id,
+            kind: event.kind,
+            targetRelays: Array(pendingRelays.keys)
+        ))
     }
 
     /// Mark a relay as successfully published
@@ -133,11 +174,19 @@ actor UnpublishedStore {
             record.publishedRelays.append(relay)
         }
 
-        // Update in memory
-        records[eventId] = record
+        // Emit relay published notification
+        changeContinuation.yield(.relayPublished(eventId: eventId, relay: relay))
 
-        // Rewrite file (infrequent operation)
-        try writeToFile()
+        // If no more pending relays, remove the event from tracking
+        if record.pendingRelays.isEmpty {
+            records.removeValue(forKey: eventId)
+            try writeToFile()
+            changeContinuation.yield(.eventRemoved(eventId: eventId))
+        } else {
+            // Update in memory and rewrite file
+            records[eventId] = record
+            try writeToFile()
+        }
     }
 
     /// Update failure reason for a relay
@@ -152,12 +201,18 @@ actor UnpublishedStore {
 
         // Rewrite file
         try writeToFile()
+
+        // Emit change notification
+        changeContinuation.yield(.relayFailed(eventId: eventId, relay: relay, reason: reason))
     }
 
     /// Remove an event from tracking (called by NDK-core when threshold is met)
     func remove(eventId: String) throws {
         records.removeValue(forKey: eventId)
         try writeToFile()
+
+        // Emit change notification
+        changeContinuation.yield(.eventRemoved(eventId: eventId))
     }
 
     /// Get event confirmation state
@@ -173,7 +228,7 @@ actor UnpublishedStore {
         return .optimistic
     }
 
-    /// Get unpublished events
+    /// Get unpublished events (events that still have pending relays to publish to)
     func getUnpublishedEvents(maxAge: TimeInterval, limit: Int?) -> [(event: NDKEvent, targetRelays: Set<String>)] {
         let now = Date().timeIntervalSince1970
         let cutoff = now - maxAge
@@ -181,6 +236,11 @@ actor UnpublishedStore {
         var results: [(event: NDKEvent, targetRelays: Set<String>)] = []
 
         for record in records.values {
+            // Skip events with no pending relays - they're fully published
+            if record.pendingRelays.isEmpty {
+                continue
+            }
+
             // Parse event from raw JSON
             guard let data = record.event.data(using: .utf8),
                   let event = try? JSONCoding.decode(NDKEvent.self, from: data) else {
@@ -192,8 +252,8 @@ actor UnpublishedStore {
                 continue
             }
 
-            // Combine published and pending relays as target relays
-            let targetRelays = Set(record.publishedRelays + Array(record.pendingRelays.keys))
+            // Return only pending relays as target relays
+            let targetRelays = Set(record.pendingRelays.keys)
 
             results.append((event: event, targetRelays: targetRelays))
 
@@ -212,5 +272,11 @@ actor UnpublishedStore {
         if FileManager.default.fileExists(atPath: fileURL.path) {
             try FileManager.default.removeItem(at: fileURL)
         }
+    }
+
+    /// Get all unpublished event records with full relay status
+    /// Used by TUI to display detailed per-relay publish status
+    func getAllRecords() -> [String: UnpublishedEventRecord] {
+        records
     }
 }

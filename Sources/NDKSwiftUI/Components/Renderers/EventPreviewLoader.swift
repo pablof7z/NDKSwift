@@ -89,8 +89,8 @@ public struct EventPreviewLoader<Event: EventRenderer>: View {
 
         let dataSource = ndk.subscribe(filter: filter)
 
-        for await fetchedEvents in dataSource.events {
-            if let firstEvent = fetchedEvents.first {
+        for await batch in dataSource.events {
+            if let firstEvent = batch.first {
                 await MainActor.run {
                     self.event = firstEvent
                     self.isLoading = false

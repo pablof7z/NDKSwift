@@ -9,6 +9,18 @@ actor NDKSubscriptionManager {
     // Active requirements tracked by ID
     private var activeRequirements: [RequirementID: NDKSubscriptionRequirement] = [:]
 
+    // MARK: - Relay Discovery Batching
+    // Batch relay discoveries to enable smart relay selection (overlap optimization)
+
+    /// Pending discoveries waiting for debounce
+    private var pendingDiscoveries: [String: (readRelays: Set<RelayURL>, writeRelays: Set<RelayURL>)] = [:]
+
+    /// Debounce task for batched processing
+    private var discoveryDebounceTask: Task<Void, Never>?
+
+    /// Debounce window for relay discoveries (100ms)
+    private let discoveryDebounceInterval: UInt64 = 100_000_000
+
     init(ndk: NDK) {
         self.ndk = ndk
         NDKLogger.log(.trace, category: .subscription, "🏗️ NDKSubscriptionManager initialized")
@@ -113,8 +125,11 @@ actor NDKSubscriptionManager {
             activeRequirements[requirementId] = requirement
         }
 
-        // Start processing synchronously to ensure subscription is active before returning
-        await requirement.startProcessing()
+        // Start processing asynchronously - don't block the return
+        // This allows relay update forwarding to start immediately while subscriptions are being created
+        Task {
+            await requirement.startProcessing()
+        }
 
         return (
             handle: NDKSubscriptionRequirementHandle(
@@ -296,16 +311,52 @@ actor NDKSubscriptionManager {
     }
 
     /// Listen for relay discoveries and update active requirements
+    /// Batches discoveries with 100ms debounce to enable smart relay selection
     private func listenForRelayDiscoveries() async {
-        // Subscribe to outbox relay discoveries
-        for await discovery in await ndk.outbox.relayDiscoveries {
-            await handleRelayDiscovery(authors: discovery.authors, relays: discovery.relays)
+        NDKLogger.log(.info, category: .subscription, "🎧 Started listening for relay discoveries")
+        for await discovery in ndk.outbox.relayDiscoveries {
+            // Accumulate discovery
+            pendingDiscoveries[discovery.pubkey] = (
+                readRelays: discovery.readRelays,
+                writeRelays: discovery.writeRelays
+            )
+
+            NDKLogger.log(.debug, category: .subscription,
+                          "📋 Accumulated discovery for \(discovery.pubkey.prefix(8))... (\(pendingDiscoveries.count) pending)")
+
+            // Cancel existing debounce and start new one
+            discoveryDebounceTask?.cancel()
+            discoveryDebounceTask = Task { [weak self] in
+                try? await Task.sleep(nanoseconds: self?.discoveryDebounceInterval ?? 100_000_000)
+                guard !Task.isCancelled else { return }
+                await self?.processBatchedDiscoveries()
+            }
         }
+        NDKLogger.log(.warning, category: .subscription, "⚠️ Relay discovery stream ended")
+    }
+
+    /// Process all accumulated relay discoveries as a batch
+    private func processBatchedDiscoveries() async {
+        guard !pendingDiscoveries.isEmpty else { return }
+
+        // Collect all authors and relays from pending discoveries
+        let authors = Set(pendingDiscoveries.keys)
+        let allRelays = Set(pendingDiscoveries.values.flatMap { $0.readRelays.union($0.writeRelays) })
+
+        NDKLogger.log(.info, category: .subscription,
+                      "📡 Processing batched relay discoveries: \(authors.count) authors, \(allRelays.count) relays")
+
+        // Clear pending before processing (so new discoveries during processing start a new batch)
+        pendingDiscoveries.removeAll()
+
+        // Process the batch
+        await handleRelayDiscovery(authors: authors, relays: allRelays)
     }
 
     /// Handle newly discovered relays for authors
     private func handleRelayDiscovery(authors: Set<String>, relays: Set<RelayURL>) async {
         NDKLogger.log(.info, category: .subscription, "📡 Relay discovery: \(relays.count) relays for \(authors.count) authors")
+        NDKLogger.log(.debug, category: .subscription, "   Active requirements: \(activeRequirements.count)")
 
         // According to Outbox.md: Create NEW NDKSubscriptionRequirements for discovered relays
         // and attach them to the same observers as the original subscription
@@ -317,19 +368,28 @@ actor NDKSubscriptionManager {
         for (requirementId, requirement) in activeRequirements {
             // Get the relay strategy to check if this requirement has unknown authors
             let filter = requirement.filter
-            let relayStrategy = await requirement.relayStrategy
-            guard case let .outbox(strategy) = relayStrategy else { continue }
+            let relayStrategy = requirement.relayStrategy
+            guard case let .outbox(strategy) = relayStrategy else {
+                NDKLogger.log(.trace, category: .subscription, "   Requirement not using outbox strategy, skipping")
+                continue
+            }
 
             // Check if any discovered authors are in this requirement's unknown authors
             let relevantAuthors = authors.intersection(strategy.unknownAuthors)
-            guard !relevantAuthors.isEmpty else { continue }
+            guard !relevantAuthors.isEmpty else {
+                NDKLogger.log(.trace, category: .subscription, "   No relevant authors (discovered authors not in unknown set)")
+                continue
+            }
 
             NDKLogger.log(.info, category: .subscription,
                           "🎯 Evaluating enhanced requirements for \(relevantAuthors.count) authors")
 
             // Check if the requirement has observers
             let observerCount = await requirement.getObserverCount()
-            guard observerCount > 0 else { continue }
+            guard observerCount > 0 else {
+                NDKLogger.log(.warning, category: .subscription, "   Req has no observers, skipping enhancement")
+                continue
+            }
 
             // Get relays that are already serving these specific authors
             let existingRelays = await requirement.getRelaysServingAuthors(relevantAuthors)
@@ -383,7 +443,7 @@ actor NDKSubscriptionManager {
                 // Create enhanced requirement for this specific relay
                 // This follows the outbox model: create a new requirement for discovered relays
                 let enhancedRequirementId = UUID()
-                let (enhancedRequirement, _, _) = await createRequirement(
+                let (enhancedRequirement, enhancedEventStream, _) = await createRequirement(
                     filter: enhancedFilter,
                     maxAge: 0, // Enhanced requirements are live subscriptions
                     cachePolicy: .networkOnly, // Fetch fresh data from discovered relays
@@ -419,9 +479,29 @@ actor NDKSubscriptionManager {
                     await enhancedRequirement.startProcessing()
                 }
 
-                // Note: Enhanced requirements work independently
-                // Events will flow through the cache and reactive system naturally
+                // Forward events from enhanced requirement to original requirement's observers
+                // This ensures events from discovered relays flow to the original subscription
+                Task {
+                    for await batch in enhancedEventStream {
+                        if !batch.isEmpty {
+                            NDKLogger.log(.debug, category: .subscription,
+                                          "📬 Forwarding \(batch.count) events from enhanced requirement '\(enhancedSubscriptionId)' to original")
+                            await requirement.forwardEventsFromEnhanced(batch)
+                        }
+                    }
+                }
             }
+        }
+    }
+
+    /// Activate all deferred subscriptions after connect() is called
+    /// This is called when NDK transitions from offline to online mode
+    func activateDeferredSubscriptions() async {
+        NDKLogger.log(.info, category: .subscription,
+                      "🔄 Activating deferred subscriptions for \(activeRequirements.count) active requirements")
+
+        for (_, requirement) in activeRequirements {
+            await requirement.activateRelayStrategy()
         }
     }
 }

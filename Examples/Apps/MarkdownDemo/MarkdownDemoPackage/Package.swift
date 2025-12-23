@@ -19,10 +19,10 @@ let package = Package(
         .target(
             name: "MarkdownDemoFeature",
             dependencies: [
-                .product(name: "NDKSwiftCore", package: "master"),
-                .product(name: "NDKSwiftUI", package: "master"),
-                .product(name: "NDKSwiftSQLite", package: "master"),
-                .product(name: "NDKSwiftNostrDB", package: "master")
+                .product(name: "NDKSwiftCore", package: "relay-intelligence"),
+                .product(name: "NDKSwiftUI", package: "relay-intelligence"),
+                .product(name: "NDKSwiftSQLite", package: "relay-intelligence"),
+                .product(name: "NDKSwiftNostrDB", package: "relay-intelligence")
             ]
         ),
         .testTarget(

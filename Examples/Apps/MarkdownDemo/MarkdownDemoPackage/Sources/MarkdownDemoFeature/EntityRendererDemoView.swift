@@ -100,6 +100,16 @@ public struct EntityRendererDemoView: View {
             }
             .tag(4)
 
+            // Feed Tab - Live Nostr notes (exercises outbox model)
+            NavigationView {
+                FeedView(ndk: ndk)
+                    .navigationTitle("Feed")
+                    .navigationBarTitleDisplayMode(.inline)
+            }
+            .tabItem {
+                Label("Feed", systemImage: "list.bullet")
+            }
+
             // Settings Tab
             SettingsView(ndk: ndk)
                 .tabItem {
@@ -148,6 +158,17 @@ public struct EntityRendererDemoView: View {
                     Label("Articles", systemImage: "doc.text")
                 }
                 .tag(11)
+
+            // Intelligence Tab - Relay Intelligence Diagnostics
+            NavigationView {
+                RelayIntelligenceDiagnosticsView(ndk: ndk)
+                    .navigationTitle("Intelligence")
+                    .navigationBarTitleDisplayMode(.inline)
+            }
+            .tabItem {
+                Label("Intelligence", systemImage: "brain.head.profile")
+            }
+            .tag(12)
         }
         .safeAreaInset(edge: .bottom) {
             if !lastTappedItem.isEmpty {

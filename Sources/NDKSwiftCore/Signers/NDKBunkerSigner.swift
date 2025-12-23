@@ -242,8 +242,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
         if case let .nip05(nip05) = connectionType {
             let user = try await NDKUser.fromNip05(nip05, ndk: ndk)
             userPubkey = user.pubkey
-            let nip46Urls = await user.nip46Urls
-            if let nip46Urls = nip46Urls {
+            if let nip46Urls = user.nip46Urls {
                 relayURLs = nip46Urls
             }
             if bunkerPubkey == nil {

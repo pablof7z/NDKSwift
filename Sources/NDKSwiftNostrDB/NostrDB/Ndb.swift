@@ -980,10 +980,9 @@ class Ndb: @unchecked Sendable {
 
         // Create a cascading stream that combines initial results with new events
         return AsyncStream<StreamItem> { continuation in
-            // Stream all results already present in the database
-            for noteId in noteIds {
-                if Task.isCancelled { return }
-                continuation.yield(.event(noteId))
+            // Yield all existing results as a single batch for efficient processing
+            if !noteIds.isEmpty {
+                continuation.yield(.events(noteIds))
             }
 
             // Indicate this is the end of the results currently present in the database
@@ -1123,6 +1122,8 @@ extension Ndb {
         case eose
         /// An event in NostrDB available at the given note key
         case event(NoteKey)
+        /// A batch of events (used for initial query results)
+        case events([NoteKey])
     }
 
     /// An error that may happen during nostrdb streaming
