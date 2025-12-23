@@ -41,12 +41,6 @@ public enum RelayListType {
     case both
 }
 
-/// Represents a relay discovery event
-public struct RelayDiscovery: Sendable {
-    public let authors: Set<String>
-    public let relays: Set<RelayURL>
-}
-
 /// Public-facing outbox manager that provides a simplified API for outbox operations.
 ///
 /// `NDKOutboxManager` implements the NIP-65 outbox model for intelligent relay selection,
@@ -107,27 +101,9 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
     /// Track pending fetches to avoid duplicate requests
     private var pendingFetches: [String: Task<NDKOutboxItem?, Error>] = [:]
 
-    // Stream for relay discoveries
-    private var discoveryStream: AsyncStream<RelayDiscovery>?
-    private var discoveryContinuation: AsyncStream<RelayDiscovery>.Continuation?
-
-    /// Stream of relay discoveries (internal format from tracker)
-    public let relayDiscoveriesInternal: AsyncStream<RelayDiscoveryEvent>
-    private let relayDiscoveryInternalContinuation: AsyncStream<RelayDiscoveryEvent>.Continuation
-
-    // MARK: - Batched Discovery State
-
-    /// Pending discoveries waiting for debounce or EOSE
-    private var pendingDiscoveries: [String: (readRelays: Set<String>, writeRelays: Set<String>)] = [:]
-
-    /// Debounce task for batched emission
-    private var debounceTask: Task<Void, Never>?
-
-    /// Generation counter to track active debounce task
-    private var debounceGeneration = 0
-
-    /// Flag to ensure only one emission happens
-    private var hasEmittedBatch = false
+    /// Stream of relay discoveries as they happen
+    public let relayDiscoveries: AsyncStream<RelayDiscoveryEvent>
+    private let relayDiscoveryContinuation: AsyncStream<RelayDiscoveryEvent>.Continuation
 
     /// Cached relay preference with metadata
     private struct CachedRelayPreference {
@@ -147,29 +123,15 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         memoryCache = LRUCache(capacity: capacity, defaultTTL: Self.positiveEntryTTL)
         self.blacklistedRelays = blacklistedRelays
 
-        // Set up discovery stream (public format)
-        let (stream, continuation) = AsyncStream<RelayDiscovery>.makeStream()
-        discoveryStream = stream
-        discoveryContinuation = continuation
-
-        // Set up internal discovery stream (from tracker)
-        var internalContinuation: AsyncStream<RelayDiscoveryEvent>.Continuation!
-        relayDiscoveriesInternal = AsyncStream { cont in
-            internalContinuation = cont
+        // Set up discovery stream
+        var continuation: AsyncStream<RelayDiscoveryEvent>.Continuation!
+        relayDiscoveries = AsyncStream { cont in
+            continuation = cont
         }
-        relayDiscoveryInternalContinuation = internalContinuation
-    }
-
-    deinit {
-        debounceTask?.cancel()
+        relayDiscoveryContinuation = continuation
     }
 
     // MARK: - Public API
-
-    /// Stream of relay discoveries as they happen
-    public var relayDiscoveries: AsyncStream<RelayDiscovery> {
-        discoveryStream ?? AsyncStream { _ in }
-    }
 
     /// Publishes an event using the outbox model for intelligent relay selection.
     ///
@@ -502,41 +464,6 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         }
     }
 
-    /// Emit batched relay discoveries if the generation matches
-    private func emitBatchedDiscoveryIfGeneration(_ generation: Int) async {
-        // Check generation first - if it doesn't match, we've been replaced
-        guard debounceGeneration == generation else {
-            return
-        }
-        await emitBatchedDiscovery()
-    }
-
-    /// Emit batched relay discoveries
-    private func emitBatchedDiscovery() async {
-        guard !hasEmittedBatch, !pendingDiscoveries.isEmpty else { return }
-        hasEmittedBatch = true
-
-        let allAuthors = Set(pendingDiscoveries.keys)
-        let allRelays = Set(pendingDiscoveries.values.flatMap { $0.readRelays.union($0.writeRelays) })
-
-        NDKLogger.log(.info, category: .outbox, "📡 Emitting batched relay discovery for \(allAuthors.count) authors with \(allRelays.count) relays")
-
-        discoveryContinuation?.yield(RelayDiscovery(authors: allAuthors, relays: allRelays))
-
-        // Clear pending discoveries (flag will be reset when next batch starts)
-        pendingDiscoveries.removeAll()
-    }
-
-    /// Handle EOSE (End of Stored Events) - emit batched discovery immediately
-    func handleEOSE() async {
-        // Cancel debounce task since we're emitting now
-        debounceTask?.cancel()
-        debounceTask = nil
-
-        // Emit immediately - emitBatchedDiscovery handles the guards
-        await emitBatchedDiscovery()
-    }
-
     /// Process a relay list event and update tracking
     func processRelayListEvent(_ event: NDKEvent) async {
         guard event.kind == EventKind.relayList else { return }
@@ -548,46 +475,17 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         let readRelayUrls = Set(relayList.readRelays.validForOutbox.map { $0.url })
         let writeRelayUrls = Set(relayList.writeRelays.validForOutbox.map { $0.url })
 
-        // Update tracker (don't emit individual discoveries - we batch them)
+        // Update tracker and emit discovery event immediately
+        // Batching/debouncing is handled by consumers who need it (e.g., NDKSubscriptionManager)
         await track(
             pubkey: event.pubkey,
             readRelays: readRelayUrls,
             writeRelays: writeRelayUrls,
             source: .nip65,
-            emitDiscoveryEvent: false
+            emitDiscoveryEvent: true
         )
 
         NDKLogger.log(.info, category: .outbox, "✅ Updated relay info for \(event.pubkey.prefix(StringConstants.DisplayFormatting.hexPrefixLength)): \(readRelayUrls.count) read, \(writeRelayUrls.count) write")
-
-        // Log specific relays discovered
-        NDKLogger.log(.debug, category: .outbox, "📋 Read relays: \(readRelayUrls.sorted())")
-        NDKLogger.log(.debug, category: .outbox, "📋 Write relays: \(writeRelayUrls.sorted())")
-
-        // Accumulate discovery instead of emitting immediately
-        let allRelays = readRelayUrls.union(writeRelayUrls)
-        if !allRelays.isEmpty {
-            // Reset emission flag when starting a new batch (when pending was empty)
-            if pendingDiscoveries.isEmpty {
-                hasEmittedBatch = false
-            }
-
-            pendingDiscoveries[event.pubkey] = (readRelays: readRelayUrls, writeRelays: writeRelayUrls)
-            NDKLogger.log(.debug, category: .outbox, "📋 Accumulated relay discovery for \(event.pubkey.prefix(StringConstants.DisplayFormatting.hexPrefixLength)) (\(pendingDiscoveries.count) total pending)")
-
-            // Cancel existing debounce task and start new one
-            debounceTask?.cancel()
-            debounceGeneration += 1
-            let generation = debounceGeneration
-            debounceTask = Task { [weak self] in
-                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
-                // Check if task was cancelled during sleep
-                guard !Task.isCancelled, let self else {
-                    return
-                }
-                // Emit on the actor - the generation check happens inside emitBatchedDiscovery
-                await self.emitBatchedDiscoveryIfGeneration(generation)
-            }
-        }
     }
 
     /// Retry pending discoveries when relays connect
@@ -610,25 +508,6 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
 
         NDKLogger.log(.info, category: .outbox, "🚀 Retrying discovery for \(pendingAuthors.count) authors now that relays are connected")
         discoverRelaysInBackground(for: pendingAuthors)
-    }
-
-    /// Stream of relay updates
-    public var relayUpdates: AsyncStream<RelayUpdateEvent> {
-        // Convert RelayDiscoveryEvent to RelayUpdateEvent
-        AsyncStream { continuation in
-            Task {
-                for await discovery in relayDiscoveriesInternal {
-                    let update = RelayUpdateEvent(
-                        pubkey: discovery.pubkey,
-                        relays: (readRelays: discovery.readRelays, writeRelays: discovery.writeRelays),
-                        affectedSubscriptionIds: Set<String>(), // Would need actual subscription tracking
-                        timestamp: discovery.timestamp
-                    )
-                    continuation.yield(update)
-                }
-                continuation.finish()
-            }
-        }
     }
 
     // MARK: - Cache Methods
@@ -765,11 +644,7 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
                 writeRelays: filteredWriteRelays,
                 source: source
             )
-            relayDiscoveryInternalContinuation.yield(discoveryEvent)
-
-            // Also emit to the public discovery stream (used by NDKSubscriptionManager for enhanced requirements)
-            let allRelays = filteredReadRelays.union(filteredWriteRelays)
-            discoveryContinuation?.yield(RelayDiscovery(authors: Set([pubkey]), relays: allRelays))
+            relayDiscoveryContinuation.yield(discoveryEvent)
 
             NDKLogger.log(.debug, category: .outbox, "📡 Emitted relay discovery for \(pubkey.prefix(8)): \(filteredReadRelays.count) read, \(filteredWriteRelays.count) write relays")
         }

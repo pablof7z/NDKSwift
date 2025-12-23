@@ -9,6 +9,18 @@ actor NDKSubscriptionManager {
     // Active requirements tracked by ID
     private var activeRequirements: [RequirementID: NDKSubscriptionRequirement] = [:]
 
+    // MARK: - Relay Discovery Batching
+    // Batch relay discoveries to enable smart relay selection (overlap optimization)
+
+    /// Pending discoveries waiting for debounce
+    private var pendingDiscoveries: [String: (readRelays: Set<RelayURL>, writeRelays: Set<RelayURL>)] = [:]
+
+    /// Debounce task for batched processing
+    private var discoveryDebounceTask: Task<Void, Never>?
+
+    /// Debounce window for relay discoveries (100ms)
+    private let discoveryDebounceInterval: UInt64 = 100_000_000
+
     init(ndk: NDK) {
         self.ndk = ndk
         NDKLogger.log(.trace, category: .subscription, "🏗️ NDKSubscriptionManager initialized")
@@ -299,13 +311,46 @@ actor NDKSubscriptionManager {
     }
 
     /// Listen for relay discoveries and update active requirements
+    /// Batches discoveries with 100ms debounce to enable smart relay selection
     private func listenForRelayDiscoveries() async {
         NDKLogger.log(.info, category: .subscription, "🎧 Started listening for relay discoveries")
-        for await discovery in await ndk.outbox.relayDiscoveries {
-            NDKLogger.log(.info, category: .subscription, "🔔 Received discovery: \(discovery.authors.count) authors, \(discovery.relays.count) relays")
-            await handleRelayDiscovery(authors: discovery.authors, relays: discovery.relays)
+        for await discovery in ndk.outbox.relayDiscoveries {
+            // Accumulate discovery
+            pendingDiscoveries[discovery.pubkey] = (
+                readRelays: discovery.readRelays,
+                writeRelays: discovery.writeRelays
+            )
+
+            NDKLogger.log(.debug, category: .subscription,
+                          "📋 Accumulated discovery for \(discovery.pubkey.prefix(8))... (\(pendingDiscoveries.count) pending)")
+
+            // Cancel existing debounce and start new one
+            discoveryDebounceTask?.cancel()
+            discoveryDebounceTask = Task { [weak self] in
+                try? await Task.sleep(nanoseconds: self?.discoveryDebounceInterval ?? 100_000_000)
+                guard !Task.isCancelled else { return }
+                await self?.processBatchedDiscoveries()
+            }
         }
         NDKLogger.log(.warning, category: .subscription, "⚠️ Relay discovery stream ended")
+    }
+
+    /// Process all accumulated relay discoveries as a batch
+    private func processBatchedDiscoveries() async {
+        guard !pendingDiscoveries.isEmpty else { return }
+
+        // Collect all authors and relays from pending discoveries
+        let authors = Set(pendingDiscoveries.keys)
+        let allRelays = Set(pendingDiscoveries.values.flatMap { $0.readRelays.union($0.writeRelays) })
+
+        NDKLogger.log(.info, category: .subscription,
+                      "📡 Processing batched relay discoveries: \(authors.count) authors, \(allRelays.count) relays")
+
+        // Clear pending before processing (so new discoveries during processing start a new batch)
+        pendingDiscoveries.removeAll()
+
+        // Process the batch
+        await handleRelayDiscovery(authors: authors, relays: allRelays)
     }
 
     /// Handle newly discovered relays for authors

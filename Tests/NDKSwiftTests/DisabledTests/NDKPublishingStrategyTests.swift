@@ -217,7 +217,7 @@ final class NDKPublishingStrategyTests: XCTestCase {
 
         // Subscribe to discovery events
         Task {
-            for await discoveryEvent in await ndk.outbox.relayDiscoveriesInternal {
+            for await discoveryEvent in await ndk.outbox.relayDiscoveries {
                 if discoveryEvent.pubkey == OutboxTestFixtures.bobPubkey ||
                     discoveryEvent.pubkey == OutboxTestFixtures.charliePubkey
                 {

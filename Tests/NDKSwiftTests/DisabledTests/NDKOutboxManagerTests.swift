@@ -194,7 +194,7 @@ final class NDKOutboxManagerTests: NDKUnitTestCase {
             let expectation = XCTestExpectation(description: "Relay discovery event emitted")
 
             let task = Task {
-                for await discovery in await self.outboxManager.relayDiscoveriesInternal {
+                for await discovery in await self.outboxManager.relayDiscoveries {
                     if discovery.pubkey == "test_pubkey" {
                         expectation.fulfill()
                         break
@@ -590,12 +590,13 @@ final class NDKOutboxManagerTests: NDKUnitTestCase {
         }
     }
 
-    // MARK: - Batched Discovery Tests
+    // MARK: - Discovery Emission Tests
 
-    func testDiscoveryDebounceEmitsAfter100ms() async throws {
+    func testProcessRelayListEventEmitsImmediately() async throws {
         try await performAsyncTest(timeout: 5) {
-            var discoveryEvents: [RelayDiscovery] = []
-            let expectation = XCTestExpectation(description: "Batched discovery emitted after debounce")
+            var discoveryEvents: [RelayDiscoveryEvent] = []
+            let expectation = XCTestExpectation(description: "Discovery events emitted immediately")
+            expectation.expectedFulfillmentCount = 3 // Expect 3 individual events
 
             // Listen for discovery events
             let listenerTask = Task {
@@ -605,7 +606,10 @@ final class NDKOutboxManagerTests: NDKUnitTestCase {
                 }
             }
 
-            // Simulate multiple relay list events arriving quickly
+            // Small delay to ensure listener is ready
+            try await Task.sleep(nanoseconds: 10_000_000)
+
+            // Simulate multiple relay list events
             let event1 = NDKEvent(
                 id: "event1",
                 pubkey: "author1",
@@ -636,22 +640,21 @@ final class NDKOutboxManagerTests: NDKUnitTestCase {
                 sig: "sig3"
             )
 
-            // Process events with small delays (< 100ms apart)
+            // Process events - each should emit immediately (no debouncing in NDKOutboxManager)
             await self.outboxManager.processRelayListEvent(event1)
-            try await Task.sleep(nanoseconds: 30_000_000) // 30ms
             await self.outboxManager.processRelayListEvent(event2)
-            try await Task.sleep(nanoseconds: 30_000_000) // 30ms
             await self.outboxManager.processRelayListEvent(event3)
 
-            // Wait for debounce (100ms + buffer)
+            // Wait for events (should be immediate, but allow small buffer)
             await self.fulfillment(of: [expectation], timeout: 0.5)
 
-            // Should emit single batched discovery with all 3 authors
-            XCTAssertEqual(discoveryEvents.count, 1)
-            XCTAssertEqual(discoveryEvents[0].authors.count, 3)
-            XCTAssertTrue(discoveryEvents[0].authors.contains("author1"))
-            XCTAssertTrue(discoveryEvents[0].authors.contains("author2"))
-            XCTAssertTrue(discoveryEvents[0].authors.contains("author3"))
+            // Should emit 3 individual discovery events (one per pubkey)
+            XCTAssertEqual(discoveryEvents.count, 3)
+            let authors = Set(discoveryEvents.map { $0.pubkey })
+            XCTAssertEqual(authors.count, 3)
+            XCTAssertTrue(authors.contains("author1"))
+            XCTAssertTrue(authors.contains("author2"))
+            XCTAssertTrue(authors.contains("author3"))
 
             listenerTask.cancel()
         }

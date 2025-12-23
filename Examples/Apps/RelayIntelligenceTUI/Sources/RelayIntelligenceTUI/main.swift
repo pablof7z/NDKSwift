@@ -78,7 +78,7 @@ struct OutboxTest {
         
         // Monitor relay discoveries
         Task {
-            for await discovery in await ndk.outbox.relayDiscoveriesInternal {
+            for await discovery in await ndk.outbox.relayDiscoveries {
                 print("📡 Discovery: \(discovery.pubkey.prefix(8))... found \(discovery.readRelays.count) read, \(discovery.writeRelays.count) write relays")
                 if !discovery.readRelays.isEmpty {
                     let relayList = discovery.readRelays.sorted().prefix(3).joined(separator: ", ")
