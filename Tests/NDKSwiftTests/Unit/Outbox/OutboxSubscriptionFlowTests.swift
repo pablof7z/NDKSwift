@@ -240,54 +240,21 @@ final class OutboxSubscriptionFlowTests: XCTestCase {
         }
     }
 
-    // MARK: - Test 7: Localhost relays filtered out
+    // MARK: - Test 7: Strategy is pure query (no side effects)
 
-    func testLocalhostRelaysFilteredOut() async throws {
-        // Given: A relay list with localhost relays
-        await ndk.outbox.track(
-            pubkey: pubkey1,
-            readRelays: [
-                "wss://relay.example.com/",
-                "wss://localhost:8080/",
-                "wss://127.0.0.1:8080/",
-            ],
-            writeRelays: [],
-            source: .nip65
-        )
-
-        // When: We get the outbox strategy
-        let filter = NDKFilter(authors: [pubkey1], kinds: [1])
-        let strategy = await ndk.outbox.getOutboxStrategy(for: filter)
-
-        // Then: Localhost relays should be filtered out
-        for (relay, _) in strategy.filtersByRelay {
-            XCTAssertFalse(relay.contains("localhost"),
-                           "Localhost relays should be filtered out: \(relay)")
-            XCTAssertFalse(relay.contains("127.0.0.1"),
-                           "127.0.0.1 relays should be filtered out: \(relay)")
-        }
-    }
-
-    // MARK: - Test 8: Repeated lookups are throttled
-
-    func testRepeatedLookupsAreThrottled() async throws {
+    func testStrategyIsPureQuery() async throws {
         // Given: A filter with unknown authors
         let filter = NDKFilter(authors: [pubkey1, pubkey2], kinds: [1])
 
-        // When: We get the strategy twice
+        // When: We call getOutboxStrategy multiple times
         let strategy1 = await ndk.outbox.getOutboxStrategy(for: filter)
         let strategy2 = await ndk.outbox.getOutboxStrategy(for: filter)
 
-        // Then: First call should mark authors for discovery
-        XCTAssertEqual(strategy1.authorsToDiscover, Set([pubkey1, pubkey2]),
-                       "First call should mark authors for discovery")
-
-        // Second call should NOT mark them again (throttled)
-        XCTAssertTrue(strategy2.authorsToDiscover.isEmpty,
-                      "Second call should be throttled - no authors to discover")
-
-        // But they should still be in unknownAuthors
-        XCTAssertEqual(strategy2.unknownAuthors, Set([pubkey1, pubkey2]),
-                       "Authors should still be marked as unknown")
+        // Then: Both calls should return the same authors for discovery
+        // (getOutboxStrategy is a pure query with no side effects)
+        XCTAssertEqual(strategy1.authorsToDiscover, strategy2.authorsToDiscover,
+                       "Strategy should be idempotent - same result on repeated calls")
+        XCTAssertEqual(strategy1.unknownAuthors, strategy2.unknownAuthors,
+                       "Unknown authors should be the same on repeated calls")
     }
 }

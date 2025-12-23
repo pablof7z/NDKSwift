@@ -184,11 +184,6 @@ public enum URLNormalizer {
             return false
         }
 
-        // Exclude localhost relays (127.x.x.x and localhost)
-        if url.contains("127.") || url.contains("localhost") {
-            return false
-        }
-
         return true
     }
 }

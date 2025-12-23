@@ -288,7 +288,8 @@ actor NDKSubscriptionRequirement {
 
             // Notify relay update observers about subscription activation
             let kinds = filter.kinds ?? []
-            FileHandle.standardError.write("[NDKSubscriptionRequirement] 🔔 Yielding subscriptionActivated to \(relayUpdateObservers.count) observers for relay \(relayURL) with \(authors.count) authors\n".data(using: .utf8)!)
+            NDKLogger.log(.debug, category: .subscription,
+                          "🔔 Yielding subscriptionActivated to \(relayUpdateObservers.count) observers for relay \(relayURL) with \(authors.count) authors")
             for (_, _, continuation) in relayUpdateObservers {
                 continuation.yield(.subscriptionActivated(relay: relayURL, kinds: kinds, authorCount: authors.count))
             }
