@@ -184,25 +184,8 @@ public enum URLNormalizer {
             return false
         }
 
-        // Extract host from URL
-        guard let urlComponents = URLComponents(string: url),
-              let host = urlComponents.host,
-              !host.isEmpty else {
-            return false
-        }
-
-        // Exclude localhost (127.x.x.x range, ::1, and "localhost")
-        if host == "localhost" || host == "::1" || host.hasPrefix("127.") {
-            return false
-        }
-
-        // Exclude .onion (Tor hidden services)
-        if host.hasSuffix(".onion") {
-            return false
-        }
-
-        // Exclude .local (mDNS/Bonjour)
-        if host.hasSuffix(".local") {
+        // Extract path from URL
+        guard let urlComponents = URLComponents(string: url) else {
             return false
         }
 
