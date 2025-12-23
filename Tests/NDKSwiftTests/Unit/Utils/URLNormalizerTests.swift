@@ -219,4 +219,48 @@ final class URLNormalizerTests: XCTestCase {
         let convertedWithFragment = URLNormalizer.convertWebSocketToHTTP(urlWithFragment)
         XCTAssertEqual(convertedWithFragment?.absoluteString, "http://relay.example.com/path#section")
     }
+
+    // MARK: - Outbox Validation Tests
+
+    func testIsValidForOutbox_secureRelays() {
+        // Test that secure relays are valid
+        XCTAssertTrue(URLNormalizer.isValidForOutbox("wss://relay.nostr.band"))
+        XCTAssertTrue(URLNormalizer.isValidForOutbox("wss://relay.example.com:8080"))
+        XCTAssertTrue(URLNormalizer.isValidForOutbox("wss://subdomain.relay.example.com"))
+    }
+
+    func testIsValidForOutbox_nonsecureRelays() {
+        // Test that non-secure (ws://) relays are invalid
+        XCTAssertFalse(URLNormalizer.isValidForOutbox("ws://relay.nostr.band"))
+        XCTAssertFalse(URLNormalizer.isValidForOutbox("ws://relay.example.com:8080"))
+        XCTAssertFalse(URLNormalizer.isValidForOutbox("ws://subdomain.relay.example.com"))
+    }
+
+    func testIsValidForOutbox_localhostRelays() {
+        // Test that localhost relays (127.x.x.x) are invalid
+        XCTAssertFalse(URLNormalizer.isValidForOutbox("wss://127.0.0.1"))
+        XCTAssertFalse(URLNormalizer.isValidForOutbox("wss://127.0.0.1:8080"))
+        XCTAssertFalse(URLNormalizer.isValidForOutbox("ws://127.0.0.1"))
+        XCTAssertFalse(URLNormalizer.isValidForOutbox("wss://127.1.2.3"))
+        XCTAssertFalse(URLNormalizer.isValidForOutbox("wss://127.255.255.255"))
+    }
+
+    func testIsValidForOutbox_localhostWithPath() {
+        // Test that localhost relays with paths are invalid
+        XCTAssertFalse(URLNormalizer.isValidForOutbox("wss://127.0.0.1/path"))
+        XCTAssertFalse(URLNormalizer.isValidForOutbox("ws://127.0.0.1:8080/websocket"))
+    }
+
+    func testIsValidForOutbox_nonLocalhostIPAddresses() {
+        // Test that non-localhost IP addresses are valid (if using wss://)
+        XCTAssertTrue(URLNormalizer.isValidForOutbox("wss://192.168.1.1"))
+        XCTAssertTrue(URLNormalizer.isValidForOutbox("wss://10.0.0.1"))
+        XCTAssertTrue(URLNormalizer.isValidForOutbox("wss://8.8.8.8"))
+    }
+
+    func testIsValidForOutbox_combinedInvalidCases() {
+        // Test combinations of invalid conditions
+        XCTAssertFalse(URLNormalizer.isValidForOutbox("ws://127.0.0.1"), "Both non-secure and localhost")
+        XCTAssertFalse(URLNormalizer.isValidForOutbox("ws://127.0.0.1:8080/path"), "Both non-secure and localhost with path and port")
+    }
 }
