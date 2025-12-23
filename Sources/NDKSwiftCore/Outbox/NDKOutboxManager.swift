@@ -115,6 +115,20 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
     public let relayDiscoveriesInternal: AsyncStream<RelayDiscoveryEvent>
     private let relayDiscoveryInternalContinuation: AsyncStream<RelayDiscoveryEvent>.Continuation
 
+    // MARK: - Batched Discovery State
+
+    /// Pending discoveries waiting for debounce or EOSE
+    private var pendingDiscoveries: [String: (readRelays: Set<String>, writeRelays: Set<String>)] = [:]
+
+    /// Debounce task for batched emission
+    private var debounceTask: Task<Void, Never>?
+
+    /// Generation counter to track active debounce task
+    private var debounceGeneration = 0
+
+    /// Flag to ensure only one emission happens
+    private var hasEmittedBatch = false
+
     /// Cached relay preference with metadata
     private struct CachedRelayPreference {
         let item: NDKOutboxItem? // nil = negative cache
@@ -144,6 +158,10 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
             internalContinuation = cont
         }
         relayDiscoveryInternalContinuation = internalContinuation
+    }
+
+    deinit {
+        debounceTask?.cancel()
     }
 
     // MARK: - Public API
@@ -385,6 +403,7 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
 
         for author in authors {
             // Get cached relay info synchronously (non-blocking)
+            // Note: Invalid relays (ws://, localhost) are already filtered at track() time
             if let item = await getRelaysSyncFor(pubkey: author, type: .both) {
                 let readRelays = item.readRelays
                 if !readRelays.isEmpty {
@@ -399,7 +418,7 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
                         relayToAuthors[relayInfo.url, default: []].insert(author)
                     }
                 } else {
-                    // Has relay info but no relays - still unknown
+                    // Has relay info but no relays - treat as unknown
                     NDKLogger.log(.debug, category: .outbox, "⚠️ Author \(author.prefix(8)) has relay info but no relays")
                     unknownAuthors.insert(author)
                 }
@@ -537,6 +556,41 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         }
     }
 
+    /// Emit batched relay discoveries if the generation matches
+    private func emitBatchedDiscoveryIfGeneration(_ generation: Int) async {
+        // Check generation first - if it doesn't match, we've been replaced
+        guard debounceGeneration == generation else {
+            return
+        }
+        await emitBatchedDiscovery()
+    }
+
+    /// Emit batched relay discoveries
+    private func emitBatchedDiscovery() async {
+        guard !hasEmittedBatch, !pendingDiscoveries.isEmpty else { return }
+        hasEmittedBatch = true
+
+        let allAuthors = Set(pendingDiscoveries.keys)
+        let allRelays = Set(pendingDiscoveries.values.flatMap { $0.readRelays.union($0.writeRelays) })
+
+        NDKLogger.log(.info, category: .outbox, "📡 Emitting batched relay discovery for \(allAuthors.count) authors with \(allRelays.count) relays")
+
+        discoveryContinuation?.yield(RelayDiscovery(authors: allAuthors, relays: allRelays))
+
+        // Clear pending discoveries (flag will be reset when next batch starts)
+        pendingDiscoveries.removeAll()
+    }
+
+    /// Handle EOSE (End of Stored Events) - emit batched discovery immediately
+    func handleEOSE() async {
+        // Cancel debounce task since we're emitting now
+        debounceTask?.cancel()
+        debounceTask = nil
+
+        // Emit immediately - emitBatchedDiscovery handles the guards
+        await emitBatchedDiscovery()
+    }
+
     /// Process a relay list event and update tracking
     func processRelayListEvent(_ event: NDKEvent) async {
         guard event.kind == EventKind.relayList else { return }
@@ -549,12 +603,13 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         let readRelayUrls = Set(relayList.readRelays.map { $0.url })
         let writeRelayUrls = Set(relayList.writeRelays.map { $0.url })
 
-        // Update tracker
+        // Update tracker (don't emit individual discoveries - we batch them)
         await track(
             pubkey: event.pubkey,
             readRelays: readRelayUrls,
             writeRelays: writeRelayUrls,
-            source: .nip65
+            source: .nip65,
+            emitDiscoveryEvent: false
         )
 
         NDKLogger.log(.info, category: .outbox, "✅ Updated relay info for \(event.pubkey.prefix(StringConstants.DisplayFormatting.hexPrefixLength)): \(readRelayUrls.count) read, \(writeRelayUrls.count) write")
@@ -563,19 +618,29 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         NDKLogger.log(.debug, category: .outbox, "📋 Read relays: \(readRelayUrls.sorted())")
         NDKLogger.log(.debug, category: .outbox, "📋 Write relays: \(writeRelayUrls.sorted())")
 
-        // Emit relay discovery event
+        // Accumulate discovery instead of emitting immediately
         let allRelays = readRelayUrls.union(writeRelayUrls)
         if !allRelays.isEmpty {
-            let discovery = RelayDiscovery(
-                authors: Set([event.pubkey]),
-                relays: allRelays
-            )
-            NDKLogger.log(.info, category: .outbox, "📡 Emitting relay discovery event for \(event.pubkey.prefix(StringConstants.DisplayFormatting.hexPrefixLength)) with \(allRelays.count) relays")
-            if discoveryContinuation == nil {
-                NDKLogger.log(.error, category: .outbox, "❌ Discovery continuation is nil! Cannot emit discovery")
-            } else {
-                discoveryContinuation?.yield(discovery)
-                NDKLogger.log(.trace, category: .outbox, "✅ Yielded to discovery stream")
+            // Reset emission flag when starting a new batch (when pending was empty)
+            if pendingDiscoveries.isEmpty {
+                hasEmittedBatch = false
+            }
+
+            pendingDiscoveries[event.pubkey] = (readRelays: readRelayUrls, writeRelays: writeRelayUrls)
+            NDKLogger.log(.debug, category: .outbox, "📋 Accumulated relay discovery for \(event.pubkey.prefix(StringConstants.DisplayFormatting.hexPrefixLength)) (\(pendingDiscoveries.count) total pending)")
+
+            // Cancel existing debounce task and start new one
+            debounceTask?.cancel()
+            debounceGeneration += 1
+            let generation = debounceGeneration
+            debounceTask = Task { [weak self] in
+                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                // Check if task was cancelled during sleep
+                guard !Task.isCancelled, let self else {
+                    return
+                }
+                // Emit on the actor - the generation check happens inside emitBatchedDiscovery
+                await self.emitBatchedDiscoveryIfGeneration(generation)
             }
         }
     }
@@ -694,14 +759,25 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         return result.flatMap { filterByType($0, type: type) }
     }
 
-    /// Get relay information synchronously from cache only
+    /// Get relay information synchronously from cache only (memory + database, no network)
     public func getRelaysSyncFor(
         pubkey: String,
         type: RelayListType = .both
     ) async -> NDKOutboxItem? {
-        guard let cached = await memoryCache.get(pubkey),
-              let item = cached.item else { return nil }
-        return filterByType(item, type: type)
+        // 1. Check memory cache first
+        if let cached = await memoryCache.get(pubkey),
+           let item = cached.item {
+            return filterByType(item, type: type)
+        }
+
+        // 2. Check database cache (local, no network - still "sync")
+        if let cached = await checkDatabaseCache(pubkey: pubkey, maxAge: TimeConstants.day * 7) {
+            if let item = cached.item {
+                return filterByType(item, type: type)
+            }
+        }
+
+        return nil
     }
 
     /// Get all cached outbox items
@@ -730,9 +806,13 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         source: RelayListSource = .manual,
         emitDiscoveryEvent: Bool = true
     ) async {
-        // Filter out blacklisted relays
-        let filteredReadRelays = readRelays.subtracting(blacklistedRelays)
-        let filteredWriteRelays = writeRelays.subtracting(blacklistedRelays)
+        // Filter out blacklisted and invalid relays (ws://, localhost) at the source
+        let filteredReadRelays = readRelays
+            .subtracting(blacklistedRelays)
+            .filter { URLNormalizer.isValidForOutbox($0) }
+        let filteredWriteRelays = writeRelays
+            .subtracting(blacklistedRelays)
+            .filter { URLNormalizer.isValidForOutbox($0) }
 
         let readRelayInfos = filteredReadRelays
             .map { RelayInfo(url: $0) }

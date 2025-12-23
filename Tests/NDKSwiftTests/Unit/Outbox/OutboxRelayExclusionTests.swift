@@ -55,6 +55,46 @@ final class OutboxRelayExclusionTests: XCTestCase {
         }
     }
 
+    /// Test that ws:// (non-secure) relays are completely filtered from outbox strategy
+    func testInsecureRelaysExcludedFromOutboxStrategy() async throws {
+        // Create NDK with minimal config
+        let ndk = NDK()
+        let outbox = ndk.outbox
+
+        // Track an author with both secure and insecure relays
+        await outbox.track(
+            pubkey: "author_with_insecure_relays",
+            readRelays: [
+                "wss://secure.relay.com",
+                "ws://insecure.relay.com",  // Should be filtered
+                "ws://2pbkpndvpeebljfvjew6auq63lndzszqnntct5aqfmazslerzxe75kad.onion",  // Should be filtered
+                "wss://another-secure.relay.com"
+            ],
+            writeRelays: [
+                "wss://write-secure.relay.com",
+                "ws://write-insecure.relay.com"  // Should be filtered
+            ],
+            source: .nip65
+        )
+
+        // Get outbox strategy
+        let filter = NDKFilter(authors: ["author_with_insecure_relays"], kinds: [1])
+        let strategy = await outbox.getOutboxStrategy(for: filter)
+
+        // Verify NO ws:// relays appear in filtersByRelay
+        for (relay, _) in strategy.filtersByRelay {
+            XCTAssertFalse(
+                relay.hasPrefix("ws://"),
+                "Insecure relay \(relay) should not appear in outbox strategy"
+            )
+        }
+
+        // Verify secure relays ARE present
+        let relays = Set(strategy.filtersByRelay.keys)
+        XCTAssertTrue(relays.contains("wss://secure.relay.com/") || relays.contains("wss://secure.relay.com"),
+            "Secure relay should be present in strategy")
+    }
+
     /// Test that outbox relay discovery uses only outbox relays when available
     func testOutboxRelayDiscoveryUsesOutboxRelays() async throws {
         // Create NDK with custom outbox configuration
