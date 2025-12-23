@@ -108,7 +108,7 @@ public final class NDK {
 
     /// Cache for observable profile instances (MainActor-bound)
     @MainActor
-    public lazy var profileCache: NDKProfileCache = {
+    internal lazy var profileCache: NDKProfileCache = {
         NDKProfileCache(ndk: self)
     }()
 
