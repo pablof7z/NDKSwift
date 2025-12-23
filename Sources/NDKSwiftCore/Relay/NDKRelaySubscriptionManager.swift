@@ -139,26 +139,11 @@ actor NDKRelaySubscriptionManager {
 
     /// Route an incoming event to the appropriate group
     func routeEvent(_ event: NDKEvent, subscriptionId: String, from relay: NDKRelay) async {
-        // Start telemetry span for event routing
-        let ndk = await relay.ndk
-        let span = ndk?.startSpan("event.route", category: .eventRouting)
-        span?.set(SpanAttributes.eventId, event.id)
-        span?.set(SpanAttributes.eventKind, event.kind)
-        span?.set(SpanAttributes.subscriptionId, subscriptionId)
-        span?.set(SpanAttributes.relayUrl, relay.url)
-        defer { span?.end() }
-
         guard let group = subscriptionIdToGroup[subscriptionId] else {
-            span?.set(SpanAttributes.decisionOutcome, "no_group_found")
-            span?.setStatus(.error("No group found for subscription"))
             NDKLogger.log(.warning, category: .subscription,
                           "⚠️ No group found for subscription \(subscriptionId)")
             return
         }
-
-        span?.set(SpanAttributes.subscriptionFingerprint, group.fingerprint)
-        span?.set(SpanAttributes.decisionOutcome, "routed")
-        span?.success()
 
         await group.handleEvent(event, from: relay)
     }

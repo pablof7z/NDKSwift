@@ -101,7 +101,6 @@ public enum TelemetryCategory: String, CaseIterable, Sendable {
     case relaySelection = "relay.selection"
     case subscription = "subscription"
     case subscriptionGrouping = "subscription.grouping"
-    case eventRouting = "event.routing"
     case publishing = "publishing"
     case cache = "cache"
     case signatureVerification = "signature"
