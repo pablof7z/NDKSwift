@@ -39,7 +39,7 @@ final class NDKNostrDBCacheOptimisticIntegrationTests: NDKTestCase {
         let event = EventTestFactory.createEvent(kind: EventKind.textNote, content: "Test event")
 
         // Add as unpublished
-        try await cache.addUnpublishedEvent(
+        try await cache.addUnpublishedEventWithState(
             event,
             publishedRelays: ["wss://relay1.com"],
             pendingRelays: ["wss://relay2.com": "timeout"]
@@ -61,7 +61,7 @@ final class NDKNostrDBCacheOptimisticIntegrationTests: NDKTestCase {
         let event = EventTestFactory.createEvent(kind: EventKind.textNote, content: "Test event")
 
         // Add as unpublished (optimistic)
-        try await cache.addUnpublishedEvent(
+        try await cache.addUnpublishedEventWithState(
             event,
             publishedRelays: [],
             pendingRelays: ["wss://relay1.com": "timeout"]
@@ -87,7 +87,7 @@ final class NDKNostrDBCacheOptimisticIntegrationTests: NDKTestCase {
         let event = EventTestFactory.createEvent(kind: EventKind.textNote, content: "Test event")
 
         // Add as unpublished
-        try await cache.addUnpublishedEvent(
+        try await cache.addUnpublishedEventWithState(
             event,
             publishedRelays: [],
             pendingRelays: ["wss://relay1.com": "initial timeout"]
@@ -109,7 +109,7 @@ final class NDKNostrDBCacheOptimisticIntegrationTests: NDKTestCase {
         let event = EventTestFactory.createEvent(kind: EventKind.textNote, content: "Test event")
 
         // Add as unpublished
-        try await cache.addUnpublishedEvent(
+        try await cache.addUnpublishedEventWithState(
             event,
             publishedRelays: ["wss://relay1.com"],
             pendingRelays: ["wss://relay2.com": "timeout"]
@@ -137,7 +137,7 @@ final class NDKNostrDBCacheOptimisticIntegrationTests: NDKTestCase {
         let event = EventTestFactory.createEvent(kind: EventKind.textNote, content: "Persistent event")
 
         // Add as unpublished
-        try await cache.addUnpublishedEvent(
+        try await cache.addUnpublishedEventWithState(
             event,
             publishedRelays: ["wss://relay1.com"],
             pendingRelays: ["wss://relay2.com": "timeout"]
@@ -167,7 +167,7 @@ final class NDKNostrDBCacheOptimisticIntegrationTests: NDKTestCase {
         let event = EventTestFactory.createEvent(kind: EventKind.textNote, content: "Test event")
 
         // Add as unpublished
-        try await cache.addUnpublishedEvent(
+        try await cache.addUnpublishedEventWithState(
             event,
             publishedRelays: [],
             pendingRelays: ["wss://relay1.com": "timeout"]
@@ -189,7 +189,7 @@ final class NDKNostrDBCacheOptimisticIntegrationTests: NDKTestCase {
         let event = EventTestFactory.createEvent(kind: EventKind.textNote, content: "Test event")
 
         // Add as unpublished
-        try await cache.addUnpublishedEvent(
+        try await cache.addUnpublishedEventWithState(
             event,
             publishedRelays: [],
             pendingRelays: ["wss://relay1.com": "timeout"]
@@ -216,7 +216,7 @@ final class NDKNostrDBCacheOptimisticIntegrationTests: NDKTestCase {
     func testMultipleEventsWithMixedStates() async throws {
         // Event 1: Fully published (2 relays)
         let event1 = EventTestFactory.createEvent(content: "Event 1")
-        try await cache.addUnpublishedEvent(
+        try await cache.addUnpublishedEventWithState(
             event1,
             publishedRelays: ["wss://relay1.com", "wss://relay2.com"],
             pendingRelays: [:]
@@ -224,7 +224,7 @@ final class NDKNostrDBCacheOptimisticIntegrationTests: NDKTestCase {
 
         // Event 2: Partially published (1/2 relays)
         let event2 = EventTestFactory.createEvent(content: "Event 2")
-        try await cache.addUnpublishedEvent(
+        try await cache.addUnpublishedEventWithState(
             event2,
             publishedRelays: ["wss://relay1.com"],
             pendingRelays: ["wss://relay2.com": "timeout"]
@@ -232,7 +232,7 @@ final class NDKNostrDBCacheOptimisticIntegrationTests: NDKTestCase {
 
         // Event 3: Completely failed (0/2 relays)
         let event3 = EventTestFactory.createEvent(content: "Event 3")
-        try await cache.addUnpublishedEvent(
+        try await cache.addUnpublishedEventWithState(
             event3,
             publishedRelays: [],
             pendingRelays: [
@@ -268,7 +268,7 @@ final class NDKNostrDBCacheOptimisticIntegrationTests: NDKTestCase {
         let event = EventTestFactory.createEvent(content: "Retry event")
 
         // Initial publish: 2 succeed, 1 fails
-        try await cache.addUnpublishedEvent(
+        try await cache.addUnpublishedEventWithState(
             event,
             publishedRelays: ["wss://relay1.com", "wss://relay2.com"],
             pendingRelays: ["wss://relay3.com": "timeout"]
@@ -301,13 +301,13 @@ final class NDKNostrDBCacheOptimisticIntegrationTests: NDKTestCase {
         // Create a recent event
         let recentEvent = EventTestFactory.createEvent(content: "Recent event")
 
-        try await cache.addUnpublishedEvent(
+        try await cache.addUnpublishedEventWithState(
             oldEvent,
             publishedRelays: [],
             pendingRelays: ["wss://relay1.com": "timeout"]
         )
 
-        try await cache.addUnpublishedEvent(
+        try await cache.addUnpublishedEventWithState(
             recentEvent,
             publishedRelays: [],
             pendingRelays: ["wss://relay1.com": "timeout"]
@@ -330,7 +330,7 @@ final class NDKNostrDBCacheOptimisticIntegrationTests: NDKTestCase {
             let event = EventTestFactory.createEvent(content: "Event \(i)")
             events.append(event)
 
-            try await cache.addUnpublishedEvent(
+            try await cache.addUnpublishedEventWithState(
                 event,
                 publishedRelays: [],
                 pendingRelays: ["wss://relay1.com": "timeout"]

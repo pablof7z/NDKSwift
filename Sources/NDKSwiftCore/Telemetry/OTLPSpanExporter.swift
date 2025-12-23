@@ -25,8 +25,6 @@ final class OTLPSpanExporter: SpanExporter, @unchecked Sendable {
     func export(_ spans: [RecordedSpan]) async {
         guard !spans.isEmpty else { return }
 
-        print("📡 [Telemetry] Exporting \(spans.count) spans to \(endpoint)")
-
         let payload = buildOTLPPayload(spans)
 
         do {
@@ -42,15 +40,11 @@ final class OTLPSpanExporter: SpanExporter, @unchecked Sendable {
             if let httpResponse = response as? HTTPURLResponse {
                 if httpResponse.statusCode >= 400 {
                     let responseBody = String(data: data, encoding: .utf8) ?? "no body"
-                    print("📡 [Telemetry] Export failed with status \(httpResponse.statusCode): \(responseBody)")
                     NDKLogger.log(.warning, category: .performance,
                         "Telemetry export failed with status \(httpResponse.statusCode): \(responseBody)")
-                } else {
-                    print("📡 [Telemetry] Export succeeded with status \(httpResponse.statusCode)")
                 }
             }
         } catch {
-            print("📡 [Telemetry] Export error: \(error.localizedDescription)")
             NDKLogger.log(.warning, category: .performance,
                 "Telemetry export error: \(error.localizedDescription)")
         }

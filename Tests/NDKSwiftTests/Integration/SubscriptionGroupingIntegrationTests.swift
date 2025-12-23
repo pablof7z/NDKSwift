@@ -30,8 +30,8 @@ final class SubscriptionGroupingIntegrationTests: XCTestCase {
         // Verify subscription is created
         XCTAssertNotNil(subscription)
 
-        // The subscription should be active
-        XCTAssertTrue(subscription.isLoading || subscription.data.isEmpty)
+        // The subscription should start with empty data
+        XCTAssertTrue(subscription.data.isEmpty)
     }
 
     /// Test creating subscriptions with custom options

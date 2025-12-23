@@ -334,9 +334,6 @@ actor MockNDKCache: NDKCache {
     func canVerifyDomain(_: String) async -> Bool { true }
     func recordDomainVerificationAttempt(_: String) async {}
 
-    func saveRelayPreferences(pubkey _: String, writeRelays _: [String]?, readRelays _: [String]?, fetchedAt _: Date, expiresAt _: Date, checkedRelays _: Set<String>?) async throws {}
-    func getRelayPreferences(pubkey _: String) async -> (writeRelays: [String]?, readRelays: [String]?, fetchedAt: Date, expiresAt: Date, checkedRelays: Set<String>?)? { nil }
-
     func getEventsByTimeRange(from _: Timestamp, to _: Timestamp, filter _: NDKFilter?) async throws -> [NDKEvent] { [] }
     func getEventIdsWithTimestamps(from _: Timestamp, to _: Timestamp, filter _: NDKFilter?) async throws -> [(id: String, timestamp: Timestamp)] { [] }
     func hasEvents(ids: [String]) async -> [String: Bool] { ids.reduce(into: [:]) { $0[$1] = false } }

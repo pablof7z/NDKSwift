@@ -312,32 +312,6 @@ public protocol NDKCache: Actor {
     /// Record a domain verification attempt (for rate limiting)
     /// - Parameter domain: The domain that was attempted
     func recordDomainVerificationAttempt(_ domain: String) async
-
-    // MARK: - Relay Preferences Cache
-
-    /// Save relay preferences with EOSE tracking
-    /// - Parameters:
-    ///   - pubkey: The public key
-    ///   - writeRelays: Write relay URLs (nil if no relay list)
-    ///   - readRelays: Read relay URLs (nil if no relay list)
-    ///   - fetchedAt: When this was fetched
-    ///   - expiresAt: When this cache entry expires
-    ///   - checkedRelays: Which relays sent EOSE (for negative entries)
-    func saveRelayPreferences(
-        pubkey: String,
-        writeRelays: [String]?,
-        readRelays: [String]?,
-        fetchedAt: Date,
-        expiresAt: Date,
-        checkedRelays: Set<String>?
-    ) async throws
-
-    /// Get cached relay preferences
-    /// - Parameter pubkey: The public key to look up
-    /// - Returns: Tuple with relay preferences and metadata, or nil if not found/expired
-    func getRelayPreferences(
-        pubkey: String
-    ) async -> (writeRelays: [String]?, readRelays: [String]?, fetchedAt: Date, expiresAt: Date, checkedRelays: Set<String>?)?
 }
 
 // MARK: - Optional Protocol Extensions
@@ -547,28 +521,6 @@ public extension NDKCache {
     /// Default implementation that does nothing
     func recordDomainVerificationAttempt(_: String) async {
         // Default implementation - cache implementations should override
-    }
-
-    // MARK: - Default Relay Preferences Implementation
-
-    /// Default implementation that does nothing
-    func saveRelayPreferences(
-        pubkey _: String,
-        writeRelays _: [String]?,
-        readRelays _: [String]?,
-        fetchedAt _: Date,
-        expiresAt _: Date,
-        checkedRelays _: Set<String>?
-    ) async throws {
-        // Default implementation - cache implementations should override
-    }
-
-    /// Default implementation that returns nil
-    func getRelayPreferences(
-        pubkey _: String
-    ) async -> (writeRelays: [String]?, readRelays: [String]?, fetchedAt: Date, expiresAt: Date, checkedRelays: Set<String>?)? {
-        // Default implementation - cache implementations should override
-        return nil
     }
 
     // MARK: - Default Profile Metadata Implementation

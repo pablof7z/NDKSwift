@@ -239,7 +239,9 @@ public struct ByteBuffer {
     mutating func push<T: NativeStruct>(struct value: T, size: Int) {
         ensureSpace(size: size)
         var v = value
-        memcpy(_storage.memory.advanced(by: writerIndex &- size), &v, size)
+        _ = withUnsafeBytes(of: &v) { ptr in
+            memcpy(_storage.memory.advanced(by: writerIndex &- size), ptr.baseAddress!, size)
+        }
         _writerSize = _writerSize &+ size
     }
 
@@ -252,7 +254,9 @@ public struct ByteBuffer {
     mutating func push<T: Scalar>(value: T, len: Int) {
         ensureSpace(size: len)
         var v = value
-        memcpy(_storage.memory.advanced(by: writerIndex &- len), &v, len)
+        _ = withUnsafeBytes(of: &v) { ptr in
+            memcpy(_storage.memory.advanced(by: writerIndex &- len), ptr.baseAddress!, len)
+        }
         _writerSize = _writerSize &+ len
     }
 

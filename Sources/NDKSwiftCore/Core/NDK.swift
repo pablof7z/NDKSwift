@@ -89,6 +89,13 @@ public final class NDK {
     /// Outbox manager - provides simplified API for outbox operations
     public private(set) lazy var outbox: NDKOutboxManager = .init(ndk: self)
 
+    // MARK: - Relay Intelligence
+
+    /// Hint index for learning where users and events are found
+    public lazy var hintIndex: HintIndex = {
+        HintIndex()
+    }()
+
     // MARK: - Internal Components
 
     /// Event publishing and management
@@ -138,7 +145,13 @@ public final class NDK {
     private var initialRelayURLs: [RelayURL] = []
 
     /// Track whether connect() has been called
-    private var hasConnected = false
+    /// When false, publishing will queue events instead of auto-connecting to relays
+    public private(set) var hasConnected = false
+
+    /// Get the configured relay URLs (used for offline queuing before connect() is called)
+    public var configuredRelayURLs: [RelayURL] {
+        initialRelayURLs
+    }
 
     // MARK: - Lazy Internal Components
 
@@ -363,6 +376,10 @@ public final class NDK {
     /// Initiates WebSocket connections to all relays in the pool.
     /// Connections are managed automatically with reconnection logic.
     public func connect() async {
+        // Initialize subscription manager early to start listening for discoveries
+        // This prevents race condition where discoveries happen before listener starts
+        _ = dataRequirementManager
+
         // Ensure initial relays are added first
         if !initialRelayURLs.isEmpty {
             NDKLogger.log(.info, category: .relay, "Adding \(initialRelayURLs.count) initial relay(s) from configuration")
@@ -382,6 +399,9 @@ public final class NDK {
 
         // Mark that connect has been called
         hasConnected = true
+
+        // Activate any subscriptions that were created while offline
+        await dataRequirementManager.activateDeferredSubscriptions()
     }
 
     /// Disconnect from all relays
@@ -476,7 +496,9 @@ public final class NDK {
         relays: Set<RelayURL>? = nil,
         exclusiveRelays: Bool = false,
         subscriptionId: String? = nil,
-        closeOnEose: Bool? = nil
+        closeOnEose: Bool? = nil,
+        sorted: Bool = true,
+        includeRelayUpdates: Bool = false
     ) -> NDKSubscription<NDKEvent> {
         // Smart default: close on EOSE if maxAge > 0, otherwise stay open
         let shouldCloseOnEose = closeOnEose ?? (maxAge > 0)
@@ -489,24 +511,30 @@ public final class NDK {
             relays: relays,
             exclusiveRelays: exclusiveRelays,
             subscriptionId: subscriptionId,
-            closeOnEose: shouldCloseOnEose
+            closeOnEose: shouldCloseOnEose,
+            sorted: sorted,
+            includeRelayUpdates: includeRelayUpdates
         )
     }
 
     /// Subscribe to events with custom options
     public func subscribe(
         filter: NDKFilter,
-        options: NDKSubscriptionOptions? = nil
+        options: NDKSubscriptionOptions? = nil,
+        sorted: Bool = true,
+        includeRelayUpdates: Bool = false
     ) -> NDKSubscription<NDKEvent> {
         let opts = options ?? .default
         return NDKSubscription(
             ndk: self,
             filter: filter,
-            options: opts
+            options: opts,
+            sorted: sorted,
+            includeRelayUpdates: includeRelayUpdates
         )
     }
 
-    public func subscribe<T>(
+    public func subscribe<T: Sendable>(
         filter: NDKFilter,
         maxAge: TimeInterval = 0,
         cachePolicy: CachePolicy = .cacheWithNetwork,
@@ -514,7 +542,9 @@ public final class NDK {
         exclusiveRelays: Bool = false,
         subscriptionId: String? = nil,
         closeOnEose: Bool? = nil,
-        transform: @escaping (NDKEvent) -> T?
+        sorted: Bool = true,
+        includeRelayUpdates: Bool = false,
+        transform: @escaping @Sendable (NDKEvent) -> T?
     ) -> NDKSubscription<T> {
         // Smart default: close on EOSE if maxAge > 0, otherwise stay open
         let shouldCloseOnEose = closeOnEose ?? (maxAge > 0)
@@ -528,6 +558,8 @@ public final class NDK {
             exclusiveRelays: exclusiveRelays,
             subscriptionId: subscriptionId,
             closeOnEose: shouldCloseOnEose,
+            sorted: sorted,
+            includeRelayUpdates: includeRelayUpdates,
             transform: transform
         )
     }

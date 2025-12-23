@@ -82,11 +82,7 @@ public struct NDKUISearchableFeedView: View {
 
     private var feedContent: some View {
         Group {
-            if feedDataSource.isLoading && feedDataSource.events.isEmpty {
-                loadingView
-            } else if let error = feedDataSource.error {
-                errorView(error)
-            } else if feedDataSource.events.isEmpty {
+            if feedDataSource.events.isEmpty {
                 emptyFeedView
             } else {
                 eventList(events: feedDataSource.events)

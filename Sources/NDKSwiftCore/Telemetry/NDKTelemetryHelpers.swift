@@ -120,6 +120,7 @@ extension NDKRelayOrigin {
         case .explicit: return "explicit"
         case .outbox: return "outbox"
         case .outboxConfig: return "outbox_config"
+        case .fallback: return "fallback"
         }
     }
 }

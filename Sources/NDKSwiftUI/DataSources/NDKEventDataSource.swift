@@ -31,17 +31,11 @@ import SwiftUI
 /// ```
 @Observable
 @MainActor
-public final class NDKEventDataSource: @preconcurrency NDKSubscriptionProtocol {
+public final class NDKEventDataSource {
     // MARK: - Published Properties
 
     /// Array of events matching the filter, sorted by creation time
     public private(set) var events: [NDKEvent] = []
-
-    /// Whether the data source is currently loading
-    public private(set) var isLoading = false
-
-    /// Any error that occurred during loading
-    public private(set) var error: Error?
 
     // MARK: - Private Properties
 
@@ -98,15 +92,6 @@ public final class NDKEventDataSource: @preconcurrency NDKSubscriptionProtocol {
                 events = sortDescending
                     ? eventList.sorted { $0.createdAt > $1.createdAt }
                     : eventList.sorted { $0.createdAt < $1.createdAt }
-            }
-        }
-
-        // Observe loading and error states
-        Task { @MainActor in
-            while !Task.isCancelled {
-                isLoading = dataSource.isLoading
-                error = dataSource.error
-                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
             }
         }
     }

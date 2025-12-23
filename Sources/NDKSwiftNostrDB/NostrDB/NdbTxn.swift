@@ -195,7 +195,6 @@ class SafeNdbTxn<T: ~Copyable> {
         #if TXNDEBUG
             print("txn: open  gen\(self.generation) '\(self.name)' \(txn_count)")
         #endif
-        let moved = false
         let placeholderTxn = PlaceholderNdbTxn(txn: txn)
         guard let val = valueGetter(placeholderTxn) else { return nil }
         return SafeNdbTxn<T>(ndb: ndb, txn: txn, val: val, generation: generation, inherited: inherited, name: name)

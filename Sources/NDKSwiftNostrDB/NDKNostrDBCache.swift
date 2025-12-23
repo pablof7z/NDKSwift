@@ -45,7 +45,6 @@ import NDKSwiftCore
 /// - Negentropy: `getEventsByTimeRange`, `getEventIdsWithTimestamps`, `hasEvents`
 /// - Cache freshness: `getLastFetchTime`, `recordFetchTime`
 /// - NIP-05: All NIP-05 verification methods
-/// - Relay preferences: `saveRelayPreferences`, `getRelayPreferences`
 /// - Profile batch: `getMultipleProfileMetadata`, `saveProfileMetadata`
 ///
 /// ## Usage
@@ -198,7 +197,7 @@ public actor NDKNostrDBCache: NDKCache {
         // Try native nostrdb query first
         do {
             let ndbFilter = try NdbFilter(from: nostrFilter)
-            let noteKeys = try nostrDB.query(filters: [ndbFilter], maxResults: filter.limit ?? 500)
+            let noteKeys = try nostrDB.query(filters: [ndbFilter], maxResults: filter.limit ?? 10000)
 
             // Convert note keys to NDKEvents, filtering out deleted events
             for noteKey in noteKeys {
@@ -398,18 +397,10 @@ public actor NDKNostrDBCache: NDKCache {
 
         return AsyncThrowingStream { continuation in
             Task {
-                // Yield existing events first if requested
-                if includeExisting {
-                    do {
-                        let existing = try await self.queryEvents(filter)
-                        if !existing.isEmpty {
-                            continuation.yield(existing)
-                        }
-                    } catch {
-                        continuation.finish(throwing: error)
-                        return
-                    }
-                }
+                // Note: includeExisting is handled by nostrDB.subscribe which yields
+                // initial events as a batch (.events case) before live events (.event case)
+                // This avoids duplicate queries and ensures proper batching.
+                _ = includeExisting // Suppress unused parameter warning (always includes existing)
 
                 // Convert NDKFilter to NostrFilter and then NdbFilter for subscription
                 let nostrFilter = self.convertToNostrFilter(filter)
@@ -417,7 +408,9 @@ public actor NDKNostrDBCache: NDKCache {
                     let ndbFilter = try NdbFilter(from: nostrFilter)
 
                     // Subscribe to new events matching the filter
-                    let subscriptionStream = try nostrDB.subscribe(filters: [ndbFilter])
+                    // Use filter's limit if set, otherwise use 100000 to load all existing events
+                    let maxResults = filter.limit ?? 100000
+                    let subscriptionStream = try nostrDB.subscribe(filters: [ndbFilter], maxSimultaneousResults: maxResults)
 
                     // Process incoming events from the subscription
                     for try await item in subscriptionStream {
@@ -426,12 +419,27 @@ public actor NDKNostrDBCache: NDKCache {
                             // EOSE just indicates initial query is done, continue listening
                             continue
                         case .event(let noteKey):
-                            // Convert NoteKey to NDKEvent
+                            // Convert NoteKey to NDKEvent (single event from live subscription)
                             if let txn = nostrDB.lookup_note_by_key(noteKey),
                                let note = txn.unsafeUnownedValue,
                                let event = self.convertToNDKEvent(note)
                             {
                                 continuation.yield([event])
+                            }
+                        case .events(let noteKeys):
+                            // Convert batch of NoteKeys to NDKEvents (initial query results)
+                            var events: [NDKEvent] = []
+                            events.reserveCapacity(noteKeys.count)
+                            for noteKey in noteKeys {
+                                if let txn = nostrDB.lookup_note_by_key(noteKey),
+                                   let note = txn.unsafeUnownedValue,
+                                   let event = self.convertToNDKEvent(note)
+                                {
+                                    events.append(event)
+                                }
+                            }
+                            if !events.isEmpty {
+                                continuation.yield(events)
                             }
                         }
                     }
@@ -521,6 +529,9 @@ public actor NDKNostrDBCache: NDKCache {
                                     continuation.yield(userMetadata)
                                 }
                             }
+                        case .events:
+                            // Batch events - not used in this context
+                            continue
                         }
                     }
 
@@ -671,13 +682,25 @@ public actor NDKNostrDBCache: NDKCache {
 
     // MARK: - Optimistic Publishing
 
-    /// Add an unpublished event (called by NDK-core which decides what needs tracking)
-    /// The cache layer is dumb - it just stores what it's told.
+    /// Add an unpublished event with target relays (protocol conformance)
+    /// - Parameters:
+    ///   - event: The event to track
+    ///   - relays: Target relays for publishing
+    public func addUnpublishedEvent(_ event: NDKEvent, relays: Set<String>) async throws {
+        // Save event to nostrdb first
+        try await saveEvent(event)
+
+        // Store in unpublished file with all relays as pending
+        let pendingRelays = Dictionary(uniqueKeysWithValues: relays.map { ($0, "pending") })
+        try await publishingManager.addUnpublishedEvent(event, publishedRelays: [], pendingRelays: pendingRelays)
+    }
+
+    /// Add an unpublished event with detailed relay state
     /// - Parameters:
     ///   - event: The event to track
     ///   - publishedRelays: Relays that have successfully published
     ///   - pendingRelays: Relays pending publication with failure reasons
-    public func addUnpublishedEvent(_ event: NDKEvent, publishedRelays: [String], pendingRelays: [String: String]) async throws {
+    public func addUnpublishedEventWithState(_ event: NDKEvent, publishedRelays: [String], pendingRelays: [String: String]) async throws {
         // Save event to nostrdb first
         try await saveEvent(event)
 
@@ -725,6 +748,20 @@ public actor NDKNostrDBCache: NDKCache {
         limit: Int? = nil
     ) async -> [(event: NDKEvent, targetRelays: Set<String>)] {
         return await publishingManager.getUnpublishedEvents(maxAge: maxAge, limit: limit)
+    }
+
+    /// Get the stream of unpublished store changes for reactive updates
+    /// Returns nil if unpublished store is not available
+    public var unpublishedChanges: AsyncStream<UnpublishedChange>? {
+        get async {
+            await publishingManager.unpublishedChanges
+        }
+    }
+
+    /// Get all unpublished event records with full per-relay status
+    /// Returns a dictionary of eventId -> record containing publishedRelays and pendingRelays
+    public func getAllUnpublishedRecords() async -> [String: UnpublishedStore.UnpublishedEventRecord] {
+        return await publishingManager.getAllUnpublishedRecords()
     }
 
     // MARK: - Helper Methods

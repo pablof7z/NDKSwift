@@ -10,8 +10,6 @@ import SwiftUI
 @MainActor
 public class NDKUIFollowListDataSource {
     public private(set) var followList: Set<String> = []
-    public private(set) var isLoading = false
-    public private(set) var error: Error?
     public private(set) var lastUpdate: Date?
 
     private let dataSource: NDKSubscription<NDKEvent>
@@ -56,15 +54,6 @@ public class NDKUIFollowListDataSource {
                         lastUpdate = Date(timeIntervalSince1970: TimeInterval(event.createdAt))
                     }
                 }
-            }
-        }
-
-        // Observe loading and error states
-        Task { @MainActor in
-            while !Task.isCancelled {
-                isLoading = dataSource.isLoading
-                error = dataSource.error
-                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
             }
         }
     }

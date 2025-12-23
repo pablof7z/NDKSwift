@@ -174,6 +174,68 @@ public enum URLNormalizer {
 
         return components.url
     }
+
+    /// Checks if a relay URL is valid for use in outbox calculations
+    /// - Parameter url: The relay URL to check
+    /// - Returns: true if the relay should be used, false if it should be excluded
+    public static func isValidForOutbox(_ url: String) -> Bool {
+        // Must have wss:// scheme (secure WebSocket)
+        guard url.hasPrefix("wss://") else {
+            return false
+        }
+
+        // Extract host from URL
+        guard let urlComponents = URLComponents(string: url),
+              let host = urlComponents.host,
+              !host.isEmpty else {
+            return false
+        }
+
+        // Exclude localhost (127.x.x.x range, ::1, and "localhost")
+        if host == "localhost" || host == "::1" || host.hasPrefix("127.") {
+            return false
+        }
+
+        // Exclude .onion (Tor hidden services)
+        if host.hasSuffix(".onion") {
+            return false
+        }
+
+        // Exclude .local (mDNS/Bonjour)
+        if host.hasSuffix(".local") {
+            return false
+        }
+
+        // Exclude URLs with /npub paths (these are filter services, not proper relays)
+        if let path = urlComponents.path.nilIfEmpty, path.contains("/npub") {
+            return false
+        }
+
+        return true
+    }
+}
+
+// MARK: - Collection Extensions for Outbox Filtering
+
+public extension Array where Element == String {
+    /// Filter to only valid outbox relay URLs (wss://, no localhost, no .onion)
+    var validForOutbox: [String] {
+        filter { URLNormalizer.isValidForOutbox($0) }
+    }
+}
+
+public extension Set where Element == String {
+    /// Filter to only valid outbox relay URLs (wss://, no localhost, no .onion)
+    var validForOutbox: Set<String> {
+        filter { URLNormalizer.isValidForOutbox($0) }
+    }
+}
+
+public extension Array where Element == NDKRelay {
+    /// Filter to only valid outbox relays (wss://, no localhost, no .onion)
+    var validForOutbox: [NDKRelay] {
+        filter { URLNormalizer.isValidForOutbox($0.url) }
+    }
 }
 
 /// Errors that can occur during URL normalization

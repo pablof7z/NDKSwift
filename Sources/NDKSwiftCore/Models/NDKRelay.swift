@@ -8,6 +8,8 @@ public enum NDKRelayOrigin: Codable, Equatable, Sendable {
     case outbox(authorPubkey: String) // pubkey whose relay list led to discovery
     /// Added from NDKOutboxConfig for relay list queries
     case outboxConfig
+    /// System-added fallback relay (temporary, non-persistent)
+    case fallback
 }
 
 /// Relay information for NIP-65 (relay list metadata)
@@ -81,6 +83,7 @@ public enum NDKRelayConnectionState: Equatable, Codable, Sendable {
 public struct NDKRelayStats: Sendable, Equatable {
     public var connectedAt: Date?
     public var lastMessageAt: Date?
+    public var lastActivityAt: Date?
     public var messagesSent: Int = 0
     public var messagesReceived: Int = 0
     public var bytesReceived: Int = 0
@@ -95,6 +98,7 @@ public struct NDKRelayStats: Sendable, Equatable {
     public init(
         connectedAt: Date? = nil,
         lastMessageAt: Date? = nil,
+        lastActivityAt: Date? = nil,
         messagesSent: Int = 0,
         messagesReceived: Int = 0,
         bytesReceived: Int = 0,
@@ -106,6 +110,7 @@ public struct NDKRelayStats: Sendable, Equatable {
     ) {
         self.connectedAt = connectedAt
         self.lastMessageAt = lastMessageAt
+        self.lastActivityAt = lastActivityAt
         self.messagesSent = messagesSent
         self.messagesReceived = messagesReceived
         self.bytesReceived = bytesReceived
@@ -126,6 +131,9 @@ actor RelayStateActor {
 
     // Relay origin tracking
     var origin: NDKRelayOrigin = .explicit
+
+    // Persistence flag - persistent relays are never evicted
+    var isPersistent: Bool = false
 
     // NDK reference
     weak var ndk: NDK?
@@ -245,6 +253,16 @@ actor RelayStateActor {
         return origin
     }
 
+    // MARK: - Persistence
+
+    func setPersistent(_ persistent: Bool) {
+        isPersistent = persistent
+    }
+
+    func getPersistent() -> Bool {
+        return isPersistent
+    }
+
     // MARK: - NDK Reference
 
     func setNDK(_ newNdk: NDK?) {
@@ -264,6 +282,10 @@ actor RelayStateActor {
 
     func getStats() -> NDKRelayStats {
         return stats
+    }
+
+    func recordActivity() {
+        stats.lastActivityAt = Date()
     }
 
     func updateSignatureStats(_ updater: (inout NDKRelaySignatureStats) -> Void) {
@@ -393,10 +415,8 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
     private let stateActor = RelayStateActor()
 
     /// Subscription manager for this relay (handles grouping and merging)
-    /// Lazy to avoid initialization order issues with self
-    lazy var subscriptionManager: NDKRelaySubscriptionManager = {
-        NDKRelaySubscriptionManager(relay: self)
-    }()
+    /// Initialized eagerly; thread-safety guaranteed by NDKRelaySubscriptionManager being an actor
+    let subscriptionManager: NDKRelaySubscriptionManager
 
     /// Get the current connection (internal use only)
     var connection: NDKRelayConnection? {
@@ -412,6 +432,11 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
     public init(url: RelayURL, config: NDKConnectionConfig = .default) {
         self.url = url
         self.config = config
+        self.subscriptionManager = NDKRelaySubscriptionManager(relay: nil)
+        // Set the relay reference after initialization (breaking init cycle)
+        Task { [subscriptionManager] in
+            await subscriptionManager.setRelay(self)
+        }
     }
 
     // MARK: - Public Properties (Async)
@@ -435,6 +460,28 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
         }
     }
 
+    /// Record activity on this relay (updates lastActivityAt timestamp)
+    ///
+    /// Called automatically when messages are sent or received.
+    /// Can also be called manually to mark the relay as active.
+    public func recordActivity() async {
+        await stateActor.recordActivity()
+    }
+
+    /// Time in seconds since last activity on this relay
+    ///
+    /// Returns `.infinity` if no activity has been recorded.
+    /// Used for idle relay eviction decisions.
+    public var idleTime: TimeInterval {
+        get async {
+            let stats = await stateActor.getStats()
+            guard let lastActivity = stats.lastActivityAt else {
+                return .infinity
+            }
+            return Date().timeIntervalSince(lastActivity)
+        }
+    }
+
     /// Indicates how this relay was added to the pool
     ///
     /// - `.explicit`: Added by developer during initialization or via addRelay()
@@ -449,6 +496,24 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
     /// Set the origin of this relay
     func setOrigin(_ origin: NDKRelayOrigin) async {
         await stateActor.setOrigin(origin)
+    }
+
+    /// Whether this relay is persistent (never evicted from the pool)
+    ///
+    /// Persistent relays include:
+    /// - Relays explicitly added by the developer
+    /// - Outbox config relays
+    ///
+    /// Non-persistent relays may be evicted when idle to conserve resources.
+    public var isPersistent: Bool {
+        get async {
+            await stateActor.getPersistent()
+        }
+    }
+
+    /// Set the persistence flag for this relay
+    public func setPersistent(_ persistent: Bool) async {
+        await stateActor.setPersistent(persistent)
     }
 
     /// Relay information fetched via NIP-11
@@ -687,6 +752,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
         await stateActor.updateStats {
             $0.messagesSent += 1
             $0.bytesSent += message.count
+            $0.lastActivityAt = Date()
         }
     }
 
@@ -696,6 +762,7 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
             $0.messagesReceived += 1
             $0.bytesReceived += message.count
             $0.lastMessageAt = Date()
+            $0.lastActivityAt = Date()
         }
 
         // Parse and route message

@@ -13,7 +13,12 @@ actor NDKRelaySubscriptionManager {
     /// Maps subscription IDs to their groups for event routing
     private var subscriptionIdToGroup: [String: NDKRelaySubscription] = [:]
 
-    init(relay: NDKRelay) {
+    init(relay: NDKRelay?) {
+        self.relay = relay
+    }
+
+    /// Sets the relay reference (called after initialization to break init cycle)
+    func setRelay(_ relay: NDKRelay) {
         self.relay = relay
     }
 

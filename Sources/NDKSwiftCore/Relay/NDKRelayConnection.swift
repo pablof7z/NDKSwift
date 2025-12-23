@@ -24,8 +24,8 @@ public protocol NDKRelayConnectionDelegate: AnyObject, Sendable {
 /// try await connection.send(message: .event(event))
 /// ```
 public actor NDKRelayConnection {
-    private let url: URL
-    private let config: NDKConnectionConfig
+    private nonisolated let url: URL
+    private nonisolated let config: NDKConnectionConfig
 
     #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
         private var webSocketTask: URLSessionWebSocketTask?
@@ -65,6 +65,9 @@ public actor NDKRelayConnection {
 
     /// Track pending EVENT messages waiting for OK responses
     private var pendingEvents: [EventID: CheckedContinuation<Bool, Error>] = [:]
+
+    /// Track timeout tasks for pending events
+    private var eventTimeoutTasks: [EventID: Task<Void, Never>] = [:]
 
     /// Health check timer task
     private var healthCheckTask: Task<Void, Never>?
@@ -306,31 +309,24 @@ public actor NDKRelayConnection {
         // Store the continuation - now within actor context
         pendingEvents[eventId] = continuation
 
-        await withThrowingTaskGroup(of: Void.self) { group in
-            // Send event task
-            group.addTask { [weak self] in
-                guard let self = self else { return }
-                let eventMessage = NostrMessage.event(subscriptionId: nil, event: event)
-                try await self.send(eventMessage)
-                NDKLogger.log(.debug, category: .network, "Event sent, waiting for OK response...")
-            }
+        // Create independent timeout task that won't be cancelled if send succeeds
+        let timeoutTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(timeout * Double(TimeConstants.nanosecondsPerSecond)))
+            guard let self = self else { return }
+            await self.handleTimeout(eventId: eventId)
+        }
+        eventTimeoutTasks[eventId] = timeoutTask
 
-            // Timeout task
-            group.addTask { [weak self] in
-                try await Task.sleep(nanoseconds: UInt64(timeout * Double(TimeConstants.nanosecondsPerSecond)))
-                guard let self = self else { return }
-                await self.handleTimeout(eventId: eventId)
-            }
-
-            // Wait for any task to complete
-            do {
-                try await group.next()
-                group.cancelAll()
-            } catch {
-                group.cancelAll()
-                // Remove continuation and resume with error
-                resumePendingEvent(eventId: eventId, with: .failure(error))
-            }
+        // Send the event (don't wait for OK here - it will arrive asynchronously)
+        do {
+            let eventMessage = NostrMessage.event(subscriptionId: nil, event: event)
+            try await send(eventMessage)
+            NDKLogger.log(.debug, category: .network, "Event sent, waiting for OK response...")
+        } catch {
+            // Cancel timeout and resume with error immediately
+            timeoutTask.cancel()
+            eventTimeoutTasks.removeValue(forKey: eventId)
+            resumePendingEvent(eventId: eventId, with: .failure(error))
         }
     }
 
@@ -600,6 +596,10 @@ public actor NDKRelayConnection {
 
     /// Resume a pending event continuation with result
     private func resumePendingEvent(eventId: EventID, with result: Result<Bool, Error>) {
+        // Cancel and remove the timeout task
+        eventTimeoutTasks.removeValue(forKey: eventId)?.cancel()
+
+        // Resume the continuation if it exists
         if let continuation = pendingEvents.removeValue(forKey: eventId) {
             switch result {
             case let .success(value):
@@ -660,7 +660,7 @@ public actor NDKRelayConnection {
                 guard let self = self else { return }
 
                 // Wait for the configured interval
-                try? await Task.sleep(nanoseconds: UInt64(await self.config.healthCheckInterval * Double(TimeConstants.nanosecondsPerSecond)))
+                try? await Task.sleep(nanoseconds: UInt64(self.config.healthCheckInterval * Double(TimeConstants.nanosecondsPerSecond)))
 
                 guard !Task.isCancelled else { return }
 
@@ -692,10 +692,11 @@ public actor NDKRelayConnection {
 
                 // Set up timeout
                 let timeoutTask = Task { [weak self] in
-                    try? await Task.sleep(nanoseconds: UInt64(await self?.config.healthCheckTimeout ?? 10.0 * Double(TimeConstants.nanosecondsPerSecond)))
+                    guard let self = self else { return }
+                    try? await Task.sleep(nanoseconds: UInt64(self.config.healthCheckTimeout * Double(TimeConstants.nanosecondsPerSecond)))
                     if !checkHandled {
                         checkHandled = true
-                        NDKLogger.log(.warning, category: .connection, "⏰ Health check timeout for \(url)")
+                        NDKLogger.log(.warning, category: .connection, "⏰ Health check timeout for \(self.url)")
                         continuation.resume(returning: false)
                     }
                 }
