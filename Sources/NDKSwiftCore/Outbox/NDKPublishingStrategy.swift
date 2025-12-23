@@ -333,7 +333,7 @@ actor NDKPublishingStrategy {
         let tracker = ndk.outbox
 
         let discoveryTask = Task {
-            for await discovery in tracker.relayDiscoveriesInternal {
+            for await discovery in tracker.relayDiscoveries {
                 // Check if this is one of our missing pubkeys
                 if remainingPubkeys.contains(discovery.pubkey) {
                     NDKLogger.log(.debug, category: .outbox, "📡 Found relay info for \(discovery.pubkey.prefix(8))")

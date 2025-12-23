@@ -309,11 +309,12 @@ final class NDKOutboxModelTests: XCTestCase {
         )
     }
 
-    // MARK: - Batched Discovery Tests
+    // MARK: - Discovery Emission Tests
 
-    func testDiscoveryDebounceEmitsAfter100ms() async throws {
-        var discoveryEvents: [RelayDiscovery] = []
-        let expectation = XCTestExpectation(description: "Batched discovery emitted after debounce")
+    func testProcessRelayListEventEmitsImmediately() async throws {
+        var discoveryEvents: [RelayDiscoveryEvent] = []
+        let expectation = XCTestExpectation(description: "Discovery events emitted immediately")
+        expectation.expectedFulfillmentCount = 3 // Expect 3 individual events
 
         // Listen for discovery events
         let listenerTask = Task {
@@ -323,7 +324,10 @@ final class NDKOutboxModelTests: XCTestCase {
             }
         }
 
-        // Simulate multiple relay list events arriving quickly
+        // Small delay to ensure listener is ready
+        try await Task.sleep(nanoseconds: 10_000_000)
+
+        // Simulate multiple relay list events
         let event1 = NDKEvent(
             id: "event1",
             pubkey: "author1",
@@ -354,87 +358,23 @@ final class NDKOutboxModelTests: XCTestCase {
             sig: "sig3"
         )
 
-        // Process events with delays to ensure all are processed before debounce fires
+        // Process events - each should emit immediately (no debouncing in NDKOutboxManager)
         await ndk.outbox.processRelayListEvent(event1)
-        try await Task.sleep(nanoseconds: 35_000_000) // 35ms
         await ndk.outbox.processRelayListEvent(event2)
-        try await Task.sleep(nanoseconds: 35_000_000) // 35ms
         await ndk.outbox.processRelayListEvent(event3)
 
-        // Wait for debounce (100ms from last event + buffer)
-        await fulfillment(of: [expectation], timeout: 1.0)
-
-        // Should emit single batched discovery with all 3 authors
-        XCTAssertEqual(discoveryEvents.count, 1, "Expected 1 batched discovery event")
-        XCTAssertFalse(discoveryEvents.isEmpty, "Discovery events should not be empty")
-
-        if !discoveryEvents.isEmpty {
-            let authors = discoveryEvents[0].authors
-            XCTAssertEqual(authors.count, 3, "Expected 3 authors in batch")
-            XCTAssertTrue(authors.contains("author1"), "Missing author1")
-            XCTAssertTrue(authors.contains("author2"), "Missing author2")
-            XCTAssertTrue(authors.contains("author3"), "Missing author3")
-        }
-
-        listenerTask.cancel()
-    }
-
-    func testEOSEEmitsBatchedDiscoveryImmediately() async throws {
-        var discoveryEvents: [RelayDiscovery] = []
-        let expectation = XCTestExpectation(description: "Batched discovery emitted on EOSE")
-
-        // Listen for discovery events
-        let listenerTask = Task {
-            for await discovery in await ndk.outbox.relayDiscoveries {
-                discoveryEvents.append(discovery)
-                expectation.fulfill()
-            }
-        }
-
-        // Create 2 relay list events
-        let event1 = NDKEvent(
-            id: "event1",
-            pubkey: "author1",
-            createdAt: Timestamp.now,
-            kind: EventKind.relayList,
-            tags: [["r", "wss://relay1.test", "read"]],
-            content: "",
-            sig: "sig1"
-        )
-
-        let event2 = NDKEvent(
-            id: "event2",
-            pubkey: "author2",
-            createdAt: Timestamp.now,
-            kind: EventKind.relayList,
-            tags: [["r", "wss://relay2.test", "read"]],
-            content: "",
-            sig: "sig2"
-        )
-
-        // Process events - they should accumulate
-        await ndk.outbox.processRelayListEvent(event1)
-        await ndk.outbox.processRelayListEvent(event2)
-
-        // Small delay to ensure events are fully processed
-        try await Task.sleep(nanoseconds: 10_000_000) // 10ms
-
-        // Trigger EOSE immediately (before 100ms debounce)
-        await ndk.outbox.handleEOSE()
-
-        // Wait for emission (should happen much faster than 100ms debounce)
+        // Wait for events (should be immediate, but allow small buffer)
         await fulfillment(of: [expectation], timeout: 0.5)
 
-        // Should emit single batched discovery with both authors
-        XCTAssertEqual(discoveryEvents.count, 1, "Expected 1 batched discovery event on EOSE")
-        XCTAssertFalse(discoveryEvents.isEmpty, "Discovery events should not be empty")
+        // Should emit 3 individual discovery events (one per pubkey)
+        XCTAssertEqual(discoveryEvents.count, 3, "Expected 3 individual discovery events")
 
-        if !discoveryEvents.isEmpty {
-            let authors = discoveryEvents[0].authors
-            XCTAssertEqual(authors.count, 2, "Expected 2 authors in batch")
-            XCTAssertTrue(authors.contains("author1"), "Missing author1")
-            XCTAssertTrue(authors.contains("author2"), "Missing author2")
-        }
+        // Collect all discovered authors
+        let authors = Set(discoveryEvents.map { $0.pubkey })
+        XCTAssertEqual(authors.count, 3, "Expected 3 unique authors")
+        XCTAssertTrue(authors.contains("author1"), "Missing author1")
+        XCTAssertTrue(authors.contains("author2"), "Missing author2")
+        XCTAssertTrue(authors.contains("author3"), "Missing author3")
 
         listenerTask.cancel()
     }
