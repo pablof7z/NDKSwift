@@ -201,12 +201,10 @@ actor NDKSubscriptionRequirement {
                         fallbackRelayURLs = Set(ndk.configuredRelayURLs.map { $0.normalizedRelayURL }).subtracting(normalizedOutboxRelays)
                     }
 
-                    // If still empty, use the outbox relay itself as a fallback
-                    // The outbox relay (e.g. relay.damus.io) typically has events from many users
                     if fallbackRelayURLs.isEmpty {
-                        fallbackRelayURLs = normalizedOutboxRelays
+                        // No fallback relays configured - unknown authors won't be queried until their relays are discovered
                         NDKLogger.log(.info, category: .subscription,
-                                      "📍 No app relays configured, using outbox relay as fallback for \(strategy.unknownAuthors.count) unknown authors: \(normalizedOutboxRelays)")
+                                      "📍 No fallback relays configured, \(strategy.unknownAuthors.count) unknown authors will be queried when their relays are discovered")
                     } else {
                         NDKLogger.log(.debug, category: .subscription,
                                       "📍 No connected relays, using \(fallbackRelayURLs.count) configured relays for \(strategy.unknownAuthors.count) unknown authors")
