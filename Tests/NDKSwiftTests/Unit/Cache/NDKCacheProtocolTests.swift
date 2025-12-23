@@ -14,7 +14,6 @@ actor MockNDKCacheProtocol: NDKCache {
     private var keysets: [String: CashuSwift.Keyset] = [:]
     private var profileMetadata: [String: (metadata: [String: Any], updatedAt: Timestamp, eventId: String)] = [:]
     private var nip05Entries: [String: NIP05CacheEntry] = [:]
-    private var relayPreferences: [String: (writeRelays: [String]?, readRelays: [String]?, fetchedAt: Date, expiresAt: Date, checkedRelays: Set<String>?)] = [:]
     private var fetchTimes: [String: Date] = [:]
     private var relaySources: [String: Set<String>] = [:]
 
@@ -248,7 +247,6 @@ actor MockNDKCacheProtocol: NDKCache {
         keysets.removeAll()
         profileMetadata.removeAll()
         nip05Entries.removeAll()
-        relayPreferences.removeAll()
         fetchTimes.removeAll()
         relaySources.removeAll()
     }
@@ -349,25 +347,6 @@ actor MockNDKCacheProtocol: NDKCache {
 
     func recordDomainVerificationAttempt(_: String) async {
         // For testing, do nothing
-    }
-
-    // MARK: - Relay Preferences
-
-    func saveRelayPreferences(
-        pubkey: String,
-        writeRelays: [String]?,
-        readRelays: [String]?,
-        fetchedAt: Date,
-        expiresAt: Date,
-        checkedRelays: Set<String>?
-    ) async throws {
-        relayPreferences[pubkey] = (writeRelays, readRelays, fetchedAt, expiresAt, checkedRelays)
-    }
-
-    func getRelayPreferences(
-        pubkey: String
-    ) async -> (writeRelays: [String]?, readRelays: [String]?, fetchedAt: Date, expiresAt: Date, checkedRelays: Set<String>?)? {
-        return relayPreferences[pubkey]
     }
 }
 
@@ -801,36 +780,6 @@ final class NDKCacheProtocolTests: XCTestCase {
         // Then
         XCTAssertEqual(unverified.count, 2)
         XCTAssertTrue(unverified.allSatisfy { $0.status == NIP05VerificationStatus.unverified })
-    }
-
-    // MARK: - Relay Preferences Tests
-
-    func testSaveAndRetrieveRelayPreferences() async throws {
-        // Given
-        let pubkey = "test_pubkey"
-        let writeRelays = ["wss://write1.com", "wss://write2.com"]
-        let readRelays = ["wss://read1.com", "wss://read2.com"]
-        let fetchedAt = Date()
-        let expiresAt = Date().addingTimeInterval(3600)
-        let checkedRelays: Set<String> = ["wss://checked.com"]
-
-        // When
-        try await cache.saveRelayPreferences(
-            pubkey: pubkey,
-            writeRelays: writeRelays,
-            readRelays: readRelays,
-            fetchedAt: fetchedAt,
-            expiresAt: expiresAt,
-            checkedRelays: checkedRelays
-        )
-
-        let retrieved = await cache.getRelayPreferences(pubkey: pubkey)
-
-        // Then
-        XCTAssertNotNil(retrieved)
-        XCTAssertEqual(retrieved?.writeRelays, writeRelays)
-        XCTAssertEqual(retrieved?.readRelays, readRelays)
-        XCTAssertEqual(retrieved?.checkedRelays, checkedRelays)
     }
 
     // MARK: - Negentropy Tests

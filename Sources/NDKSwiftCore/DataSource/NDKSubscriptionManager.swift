@@ -445,6 +445,17 @@ actor NDKSubscriptionManager {
             }
         }
     }
+
+    /// Activate all deferred subscriptions after connect() is called
+    /// This is called when NDK transitions from offline to online mode
+    func activateDeferredSubscriptions() async {
+        NDKLogger.log(.info, category: .subscription,
+                      "🔄 Activating deferred subscriptions for \(activeRequirements.count) active requirements")
+
+        for (_, requirement) in activeRequirements {
+            await requirement.activateRelayStrategy()
+        }
+    }
 }
 
 // MARK: - Requirement Handle

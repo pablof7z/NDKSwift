@@ -1,0 +1,53 @@
+{
+    "configurations": [
+        {
+            "name": "Build with bun",
+            "request": "launch",
+            "cwd": "ndk-hooks",
+            "runtimeArgs": [
+                "run",
+                "build"
+            ]
+        },
+        {
+            "name": "Attach to Hermes application",
+            "request": "attach",
+            "type": "reactnativedirect",
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Debug Vitest with Bun",
+            "program": "${workspaceFolder}/node_modules/vitest/vitest.mjs",
+            "runtimeExecutable": "bun",
+            "args": [
+                "--run",
+                "--inspect-brk"
+            ],
+            "autoAttachChildProcesses": true,
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:OfflineDemo}",
+            "name": "Debug OfflineDemo",
+            "target": "OfflineDemo",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug OfflineDemo"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:OfflineDemo}",
+            "name": "Release OfflineDemo",
+            "target": "OfflineDemo",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release OfflineDemo"
+        }
+    ]
+}

@@ -112,13 +112,17 @@ public actor NDKEventManager {
                 if targetRelays.isEmpty {
                     targetRelays = Set(ndk.configuredRelayURLs)
                 }
+                // If still empty, use outbox config relays as last resort
+                if targetRelays.isEmpty {
+                    targetRelays = ndk.outboxConfig.outboxRelays
+                }
 
                 // Normalize URLs to match the relay pool's normalized URLs
                 let normalizedRelays = Set(targetRelays.compactMap { URLNormalizer.tryNormalizeRelayUrl($0) })
 
                 do {
                     try await cache.addUnpublishedEvent(event, relays: normalizedRelays)
-                    NDKLogger.log(.info, category: .event, "📦 Event \(event.id.prefix(8)) queued for publishing to \(normalizedRelays.count) relay(s) (offline mode)")
+                    NDKLogger.log(.info, category: .event, "📦 Event \(event.id.prefix(8)) queued for publishing to \(normalizedRelays.count) relay(s): \(normalizedRelays.sorted()) (offline mode)")
                 } catch {
                     NDKLogger.log(.warning, category: .cache, "Failed to queue event for offline publishing: \(error)")
                 }
@@ -359,6 +363,17 @@ public actor NDKEventManager {
 
         // Count events targeted for this relay
         let eventsForRelay = unpublishedEvents.filter { $0.targetRelays.contains(relay.url) }
+
+        // Debug logging to help trace relay matching
+        if !unpublishedEvents.isEmpty {
+            NDKLogger.log(.debug, category: .relay, "🔍 Checking \(unpublishedEvents.count) queued events for relay \(relay.url)")
+            if eventsForRelay.isEmpty {
+                // Log which relays the events ARE targeted for (to debug mismatches)
+                let targetRelaysSet = unpublishedEvents.flatMap { $0.targetRelays }
+                let uniqueTargets = Set(targetRelaysSet)
+                NDKLogger.log(.debug, category: .relay, "⚠️ No events target this relay. Events target: \(uniqueTargets.sorted())")
+            }
+        }
 
         // Only log if there are events to publish
         if !eventsForRelay.isEmpty {

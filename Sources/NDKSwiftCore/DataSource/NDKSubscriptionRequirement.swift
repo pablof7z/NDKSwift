@@ -139,6 +139,14 @@ actor NDKSubscriptionRequirement {
 
     /// Apply the relay selection strategy
     private func applyRelayStrategy() async {
+        // Don't create relay subscriptions if NDK hasn't been connected yet (offline mode)
+        // This prevents subscriptions from triggering relay discovery and addition before connect() is called
+        guard let ndk = ndk, ndk.hasConnected else {
+            NDKLogger.log(.info, category: .subscription,
+                          "⏸️  Deferring relay subscription creation for '\(subscriptionId)' - NDK not connected yet (offline mode). Subscriptions will be created when connect() is called.")
+            return
+        }
+
         switch relayStrategy {
         case let .explicit(relays):
             // Simple case: use explicit relays
@@ -193,8 +201,16 @@ actor NDKSubscriptionRequirement {
                         fallbackRelayURLs = Set(ndk.configuredRelayURLs.map { $0.normalizedRelayURL }).subtracting(normalizedOutboxRelays)
                     }
 
-                    NDKLogger.log(.debug, category: .subscription,
-                                  "📍 No connected relays, using \(fallbackRelayURLs.count) configured relays for \(strategy.unknownAuthors.count) unknown authors")
+                    // If still empty, use the outbox relay itself as a fallback
+                    // The outbox relay (e.g. relay.damus.io) typically has events from many users
+                    if fallbackRelayURLs.isEmpty {
+                        fallbackRelayURLs = normalizedOutboxRelays
+                        NDKLogger.log(.info, category: .subscription,
+                                      "📍 No app relays configured, using outbox relay as fallback for \(strategy.unknownAuthors.count) unknown authors: \(normalizedOutboxRelays)")
+                    } else {
+                        NDKLogger.log(.debug, category: .subscription,
+                                      "📍 No connected relays, using \(fallbackRelayURLs.count) configured relays for \(strategy.unknownAuthors.count) unknown authors")
+                    }
                 } else {
                     NDKLogger.log(.debug, category: .subscription,
                                   "📍 Using \(fallbackRelayURLs.count) fallback relays for \(strategy.unknownAuthors.count) unknown authors")
@@ -272,6 +288,7 @@ actor NDKSubscriptionRequirement {
 
             // Notify relay update observers about subscription activation
             let kinds = filter.kinds ?? []
+            FileHandle.standardError.write("[NDKSubscriptionRequirement] 🔔 Yielding subscriptionActivated to \(relayUpdateObservers.count) observers for relay \(relayURL) with \(authors.count) authors\n".data(using: .utf8)!)
             for (_, _, continuation) in relayUpdateObservers {
                 continuation.yield(.subscriptionActivated(relay: relayURL, kinds: kinds, authorCount: authors.count))
             }
@@ -486,6 +503,24 @@ actor NDKSubscriptionRequirement {
             continuation.finish()
         }
         relayUpdateObservers.removeAll()
+    }
+
+    /// Activate relay subscriptions that were deferred due to offline mode
+    /// This is called when connect() is called after subscriptions were created offline
+    func activateRelayStrategy() async {
+        // Only activate if we should fetch from network and haven't already created relay subscriptions
+        guard shouldFetchFromNetwork, relaySubscriptions.isEmpty else {
+            return
+        }
+
+        NDKLogger.log(.info, category: .subscription,
+                      "▶️  Activating deferred relay strategy for '\(subscriptionId)'")
+
+        // Apply the relay strategy now that we're connected
+        await applyRelayStrategy()
+
+        // Start the internal subscription if it hasn't been started yet
+        await internalSubscription.start()
     }
 
     // MARK: - Test Introspection

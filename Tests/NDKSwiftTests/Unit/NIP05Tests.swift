@@ -175,16 +175,6 @@ actor TestableCache: NDKCache {
         try await saveEvent(event)
     }
 
-    func getRelayPreferences(
-        pubkey _: String
-    ) async -> (writeRelays: [String]?, readRelays: [String]?, fetchedAt: Date, expiresAt: Date, checkedRelays: Set<String>?)? {
-        return nil
-    }
-
-    func saveRelayPreferences(pubkey _: String, writeRelays _: [String]?, readRelays _: [String]?, fetchedAt _: Date, expiresAt _: Date, checkedRelays _: Set<String>?) async throws {
-        // No-op for testing
-    }
-
     // NIP-05 implementations
     func saveNIP05Entry(_ entry: NIP05CacheEntry) async throws {
         nip05Entries[entry.identifier] = entry
