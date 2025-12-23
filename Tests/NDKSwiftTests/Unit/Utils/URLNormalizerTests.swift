@@ -263,4 +263,30 @@ final class URLNormalizerTests: XCTestCase {
         XCTAssertFalse(URLNormalizer.isValidForOutbox("ws://127.0.0.1"), "Both non-secure and localhost")
         XCTAssertFalse(URLNormalizer.isValidForOutbox("ws://127.0.0.1:8080/path"), "Both non-secure and localhost with path and port")
     }
+
+    func testIsValidForOutbox_npubPathRelays() {
+        // Test that relays with /npub paths are invalid (these are filter services, not relays)
+        XCTAssertFalse(
+            URLNormalizer.isValidForOutbox("wss://filter.nostr.wine/npub1l2vyh47mk2p0qlsku7hg0vn29faehy9hy34ygaclpn66ukqp3afqutajft"),
+            "Relay with /npub path should be invalid"
+        )
+        XCTAssertFalse(
+            URLNormalizer.isValidForOutbox("wss://relay.example.com/npub1abc123"),
+            "Relay with /npub path should be invalid"
+        )
+        XCTAssertFalse(
+            URLNormalizer.isValidForOutbox("wss://some-service.com/npub1xyz/"),
+            "Relay with /npub path and trailing slash should be invalid"
+        )
+
+        // Valid relays without /npub path should still work
+        XCTAssertTrue(
+            URLNormalizer.isValidForOutbox("wss://filter.nostr.wine"),
+            "Same host without /npub path should be valid"
+        )
+        XCTAssertTrue(
+            URLNormalizer.isValidForOutbox("wss://relay.example.com/some-path"),
+            "Relay with non-npub path should be valid"
+        )
+    }
 }

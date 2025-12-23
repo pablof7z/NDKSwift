@@ -454,13 +454,16 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
             )
 
             // Process relay lists as they arrive
+            var eventCount = 0
+
             for await batch in dataSource.events {
+                eventCount += batch.count
                 for event in batch {
                     await processRelayListEvent(event)
                 }
             }
 
-            NDKLogger.log(.info, category: .outbox, "✅ Relay discovery completed for \(authors.count) authors")
+            NDKLogger.log(.info, category: .outbox, "✅ Relay discovery completed for \(authors.count) authors - received \(eventCount) events total")
         }
     }
 

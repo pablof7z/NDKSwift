@@ -489,8 +489,8 @@ func restoreTerminalMode(_ original: termios) {
 
 @main
 struct OfflineDemo {
-    // No app relays - only outbox relay (relay.damus.io) for discovery
-    static let defaultRelays: [String] = []
+    // App relay for fallback queries
+    static let defaultRelays: [String] = ["wss://pyramid.fiatjaf.com"]
 
     nonisolated(unsafe) static var ndk: NDK!
     nonisolated(unsafe) static var cache: NDKNostrDBCache!
@@ -519,6 +519,12 @@ struct OfflineDemo {
         // Test mode - bypass TUI and just run through the flow
         if testMode {
             await runTestMode(resetCache: resetCache)
+            return
+        }
+
+        // Debug mode - bypass TUI and print diagnostic info directly
+        if debugMode {
+            await runDebugMode(resetCache: resetCache)
             return
         }
 
@@ -805,6 +811,8 @@ struct OfflineDemo {
     static func refreshOutboxData() async {
         var knownCount = 0
         var unknownCount = 0
+        var nilCount = 0
+        var emptyCount = 0
 
         for pubkey in followedPubkeys {
             // Get cached relay info (non-blocking)
@@ -814,18 +822,20 @@ struct OfflineDemo {
                 if !relays.isEmpty {
                     knownCount += 1
                 } else {
+                    emptyCount += 1
                     unknownCount += 1
                 }
             } else {
                 // Mark as unknown (empty set)
                 await tuiState.setAuthorRelays(pubkey, relays: [])
+                nilCount += 1
                 unknownCount += 1
             }
         }
 
-        // Only log periodically to avoid spam
+        // Log on first few calls and periodically
         if debugMode {
-            debug("refreshOutboxData: \(knownCount) known, \(unknownCount) unknown out of \(followedPubkeys.count)")
+            debug("refreshOutboxData: \(knownCount) known, \(unknownCount) unknown (nil=\(nilCount), empty=\(emptyCount)) out of \(followedPubkeys.count)")
         }
     }
 
@@ -1068,6 +1078,205 @@ struct OfflineDemo {
         }
 
         await refreshUI()
+    }
+
+    // MARK: - Debug Mode (No TUI)
+
+    /// Actor for thread-safe event counting in debug mode
+    actor EventCounter {
+        private(set) var count = 0
+
+        func add(_ amount: Int) {
+            count += amount
+        }
+    }
+
+    static func runDebugMode(resetCache: Bool) async {
+        print("╔══════════════════════════════════════════════════════════════════╗")
+        print("║           NDKSwift Outbox Discovery Debug Mode                   ║")
+        print("╚══════════════════════════════════════════════════════════════════╝")
+        print("")
+
+        // Initialize cache
+        let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+            .appendingPathComponent("OfflineDemo")
+
+        if resetCache {
+            try? FileManager.default.removeItem(at: cacheDir)
+            print("✓ Cache RESET")
+        } else {
+            print("✓ Using existing cache")
+        }
+
+        try! FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
+        cache = try! await NDKNostrDBCache(path: cacheDir.path)
+
+        // Count existing 10002 events
+        let filter10002 = NDKFilter(kinds: [10002])
+        let existing10002 = (try? await cache.queryEvents(filter10002)) ?? []
+        print("✓ Existing kind:10002 events in cache: \(existing10002.count)")
+
+        // Initialize signer
+        let signer = try! await loadOrCreateSigner()
+        print("✓ Signer: \(try! signer.npub.prefix(20))...")
+
+        // Initialize NDK with outbox relay
+        ndk = NDK(
+            relayURLs: ["wss://pyramid.fiatjaf.com"],
+            signer: signer,
+            cache: cache,
+            debugMode: true,  // Enable library debug logging
+            outboxEnabled: true,
+            outboxConfig: NDKOutboxConfig(
+                blacklistedRelays: [],
+                outboxRelays: ["wss://relay.damus.io"]
+            )
+        )
+        print("✓ NDK initialized")
+        print("  - App relay: wss://pyramid.fiatjaf.com")
+        print("  - Outbox relay: wss://relay.damus.io")
+
+        // Load follows
+        followedPubkeys = HardcodedFollows.pubkeys
+        print("✓ Loaded \(followedPubkeys.count) followed pubkeys")
+        print("")
+
+        // ==================== STEP 1: Connect ====================
+        print("═══════════════════════════════════════════════════════════════════")
+        print("STEP 1: Connecting to relays...")
+        print("═══════════════════════════════════════════════════════════════════")
+        await ndk.connect()
+
+        // Wait for connection
+        try? await Task.sleep(nanoseconds: 2_000_000_000)
+
+        // Check relay states
+        let relays = await ndk.pool.relays
+        print("Pool has \(relays.count) relays:")
+        for relay in relays {
+            let state = await relay.connectionState
+            print("  - \(relay.url): \(state)")
+        }
+        print("")
+
+        // ==================== STEP 2: Check Initial State ====================
+        print("═══════════════════════════════════════════════════════════════════")
+        print("STEP 2: Checking initial outbox state...")
+        print("═══════════════════════════════════════════════════════════════════")
+
+        var knownBefore = 0
+        for pubkey in followedPubkeys {
+            if let item = await ndk.outbox.getRelaysSyncFor(pubkey: pubkey, type: .read) {
+                if !item.readRelays.isEmpty {
+                    knownBefore += 1
+                }
+            }
+        }
+        print("Known authors before subscription: \(knownBefore) / \(followedPubkeys.count)")
+        print("")
+
+        // ==================== STEP 3: Create Subscription ====================
+        print("═══════════════════════════════════════════════════════════════════")
+        print("STEP 3: Creating subscription with \(followedPubkeys.count) authors for kind:1...")
+        print("═══════════════════════════════════════════════════════════════════")
+
+        let filter = NDKFilter(authors: followedPubkeys, kinds: [1])
+        let subscription = NDKSubscription<NDKEvent>(
+            ndk: ndk,
+            filter: filter,
+            maxAge: 0,
+            subscriptionId: "debug-sub",
+            includeRelayUpdates: true
+        )
+
+        // Start monitoring events in background
+        let eventCounter = EventCounter()
+        Task {
+            for await batch in subscription.events {
+                await eventCounter.add(batch.count)
+                let total = await eventCounter.count
+                // Only log occasionally to avoid spam
+                if total % 100 == 0 || total <= 10 {
+                    print("[kind:1] Received batch of \(batch.count) events (total: \(total))")
+                }
+            }
+        }
+        print("Subscription created, waiting for discovery to trigger...")
+        print("")
+
+        // ==================== STEP 4: Monitor Discovery ====================
+        print("═══════════════════════════════════════════════════════════════════")
+        print("STEP 4: Monitoring relay discovery for 30 seconds...")
+        print("═══════════════════════════════════════════════════════════════════")
+
+        for i in 1...30 {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+
+            // Count known authors
+            var currentKnown = 0
+            for pubkey in followedPubkeys {
+                if let item = await ndk.outbox.getRelaysSyncFor(pubkey: pubkey, type: .read) {
+                    if !item.readRelays.isEmpty {
+                        currentKnown += 1
+                    }
+                }
+            }
+
+            // Count 10002 events in cache
+            let current10002 = (try? await cache.queryEvents(filter10002)) ?? []
+
+            // Get pending count
+            let pending = await ndk.outbox.getPendingAuthorsForTesting()
+            let kind1Count = await eventCounter.count
+
+            print("[\(String(format: "%2d", i))s] kind:10002 in DB: \(String(format: "%4d", current10002.count)) | Known authors: \(String(format: "%4d", currentKnown))/\(followedPubkeys.count) | Pending: \(pending.count) | kind:1 events: \(kind1Count)")
+
+            // If we have enough, break early
+            if current10002.count >= 400 {
+                print("✓ SUCCESS! Got \(current10002.count) kind:10002 events!")
+                break
+            }
+        }
+
+        print("")
+        print("═══════════════════════════════════════════════════════════════════")
+        print("FINAL STATUS")
+        print("═══════════════════════════════════════════════════════════════════")
+
+        // Final count
+        let final10002 = (try? await cache.queryEvents(filter10002)) ?? []
+        print("kind:10002 events in cache: \(final10002.count)")
+
+        var finalKnown = 0
+        for pubkey in followedPubkeys {
+            if let item = await ndk.outbox.getRelaysSyncFor(pubkey: pubkey, type: .read) {
+                if !item.readRelays.isEmpty {
+                    finalKnown += 1
+                }
+            }
+        }
+        print("Known authors: \(finalKnown) / \(followedPubkeys.count)")
+        print("kind:1 events received: \(await eventCounter.count)")
+
+        // Show top relays by author count
+        var relayAuthorCounts: [String: Int] = [:]
+        for pubkey in followedPubkeys {
+            if let item = await ndk.outbox.getRelaysSyncFor(pubkey: pubkey, type: .read) {
+                for relay in item.readRelays {
+                    relayAuthorCounts[relay.url, default: 0] += 1
+                }
+            }
+        }
+        let topRelays = relayAuthorCounts.sorted { $0.value > $1.value }.prefix(10)
+        if !topRelays.isEmpty {
+            print("\nTop relays by author count:")
+            for (relay, count) in topRelays {
+                let shortRelay = relay.replacingOccurrences(of: "wss://", with: "").replacingOccurrences(of: "/", with: "")
+                print("  \(shortRelay): \(count) authors")
+            }
+        }
+
+        print("\n=== Debug Complete ===")
     }
 
     // MARK: - Test Mode
