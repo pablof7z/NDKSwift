@@ -892,6 +892,8 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
     }
 
     private func checkDatabaseCache(pubkey: String, maxAge: TimeInterval) async -> CachedRelayPreference? {
+        _ = maxAge // maxAge not applicable for cached events - we trust the cache
+
         // Query kind 10002 events directly from the cache
         let filter = NDKFilter(authors: [pubkey], kinds: [EventKind.relayList], limit: 1)
         guard let events = try? await ndk.cache.queryEvents(filter),
@@ -899,13 +901,12 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
             return nil
         }
 
+        // Use event creation time as fetchedAt (best available timestamp)
         let fetchedAt = Date(timeIntervalSince1970: TimeInterval(event.createdAt))
 
-        // Check maxAge
-        let age = Date().timeIntervalSince(fetchedAt)
-        if age > maxAge {
-            return nil
-        }
+        // Note: We don't check maxAge here because event.createdAt is when the USER
+        // created the event, not when we cached it. A kind 10002 could be years old
+        // but still be the user's current valid relay list.
 
         // Parse relay list from event
         let relayList = NDKRelayList.fromEvent(event)

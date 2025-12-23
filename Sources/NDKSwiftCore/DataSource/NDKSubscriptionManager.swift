@@ -113,8 +113,11 @@ actor NDKSubscriptionManager {
             activeRequirements[requirementId] = requirement
         }
 
-        // Start processing synchronously to ensure subscription is active before returning
-        await requirement.startProcessing()
+        // Start processing asynchronously - don't block the return
+        // This allows relay update forwarding to start immediately while subscriptions are being created
+        Task {
+            await requirement.startProcessing()
+        }
 
         return (
             handle: NDKSubscriptionRequirementHandle(

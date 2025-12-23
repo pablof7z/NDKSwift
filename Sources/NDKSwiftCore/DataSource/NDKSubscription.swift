@@ -347,15 +347,11 @@ public final class NDKSubscription<T: Sendable>: @unchecked Sendable {
 
         // Process relay updates from the stream (only if opt-in)
         if relayUpdatesContinuation != nil {
-            FileHandle.standardError.write("[NDKSubscription] Starting forwarding Task for relay updates\n".data(using: .utf8)!)
             Task { [weak self] in
                 guard let self = self else { return }
-                FileHandle.standardError.write("[NDKSubscription] Forwarding Task started, waiting for relay updates...\n".data(using: .utf8)!)
                 for await update in relayUpdateStream {
-                    FileHandle.standardError.write("[NDKSubscription] Forwarding relay update: \(update)\n".data(using: .utf8)!)
                     self.relayUpdatesContinuation?.yield(update)
                 }
-                FileHandle.standardError.write("[NDKSubscription] Forwarding Task ended\n".data(using: .utf8)!)
             }
         }
 
