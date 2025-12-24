@@ -7,7 +7,7 @@ import NDKSwiftUI
 public struct FeedView: View {
     let ndk: NDK
 
-    @State private var dataSource: NDKEventDataSource?
+    @State private var dataSource: NDKSubscription<NDKEvent>?
     @State private var selectedPubkey: String?
     @State private var isLoadingProfile = false
 
@@ -20,14 +20,9 @@ public struct FeedView: View {
             // Header with stats
             HStack {
                 if let ds = dataSource {
-                    Text("\(ds.eventCount) notes")
+                    Text("\(ds.data.count) notes")
                         .font(.caption)
                         .foregroundColor(.secondary)
-
-                    if ds.isLoading {
-                        ProgressView()
-                            .scaleEffect(0.7)
-                    }
                 }
 
                 Spacer()
@@ -43,14 +38,7 @@ public struct FeedView: View {
 
             // Feed list
             if let ds = dataSource {
-                if ds.events.isEmpty && ds.isLoading {
-                    VStack(spacing: 12) {
-                        ProgressView()
-                        Text("Loading feed...")
-                            .foregroundColor(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if ds.events.isEmpty {
+                if ds.data.isEmpty {
                     VStack(spacing: 12) {
                         Image(systemName: "text.bubble")
                             .font(.largeTitle)
@@ -64,7 +52,7 @@ public struct FeedView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     List {
-                        ForEach(ds.events, id: \.id) { event in
+                        ForEach(ds.data, id: \.id) { event in
                             NoteRow(event: event, ndk: ndk, onAuthorTap: { pubkey in
                                 selectedPubkey = pubkey
                             })
@@ -95,10 +83,9 @@ public struct FeedView: View {
 
     private func initializeDataSource() {
         // Subscribe to recent text notes (kind 1)
-        dataSource = NDKEventDataSource(
+        dataSource = NDKSubscription(
             ndk: ndk,
-            filter: NDKFilter(kinds: [1], limit: 50),
-            sortDescending: true
+            filter: NDKFilter(kinds: [1], limit: 50)
         )
     }
 

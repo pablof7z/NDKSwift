@@ -14,7 +14,7 @@ public struct OutboxExplorerView: View {
     @State private var follows: [FollowInfo] = []
     @State private var outboxStrategy: OutboxStrategyInfo?
     @State private var relayDecisions: [RelayDecision] = []
-    @State private var feedDataSource: NDKEventDataSource?
+    @State private var feedDataSource: NDKSubscription<NDKEvent>?
     @State private var poolSnapshot: PoolSnapshot?
     @State private var error: String?
 
@@ -331,16 +331,16 @@ public struct OutboxExplorerView: View {
 
     // MARK: - Feed Preview Section
 
-    private func feedPreviewSection(_ ds: NDKEventDataSource) -> some View {
+    private func feedPreviewSection(_ ds: NDKSubscription<NDKEvent>) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Image(systemName: "text.bubble.fill")
                     .foregroundColor(.cyan)
-                Text("Feed Preview (\(ds.events.count) notes)")
+                Text("Feed Preview (\(ds.data.count) notes)")
                     .font(.headline)
             }
 
-            ForEach(ds.events.prefix(5), id: \.id) { event in
+            ForEach(ds.data.prefix(5), id: \.id) { event in
                 VStack(alignment: .leading, spacing: 4) {
                     Text(event.pubkey.prefix(12) + "...")
                         .font(.caption.monospaced())
@@ -354,8 +354,8 @@ public struct OutboxExplorerView: View {
                 .cornerRadius(6)
             }
 
-            if ds.events.count > 5 {
-                Text("... and \(ds.events.count - 5) more")
+            if ds.data.count > 5 {
+                Text("... and \(ds.data.count - 5) more")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -546,14 +546,13 @@ public struct OutboxExplorerView: View {
         let followPubkeys = follows.map { $0.pubkey }
 
         // Create and execute subscription
-        feedDataSource = NDKEventDataSource(
+        feedDataSource = NDKSubscription(
             ndk: ndk,
             filter: NDKFilter(
                 authors: followPubkeys,
                 kinds: [1],
                 limit: 50
-            ),
-            sortDescending: true
+            )
         )
 
         // Wait a bit for events to come in
