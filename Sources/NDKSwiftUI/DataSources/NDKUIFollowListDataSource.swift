@@ -39,7 +39,7 @@ public class NDKUIFollowListDataSource {
             for await batch in dataSource.events {
                 for event in batch {
                     // Keep only the most recent event
-                    if latestEvent == nil || event.createdAt > latestEvent!.createdAt {
+                    if latestEvent == nil || event.createdAt > (latestEvent?.createdAt ?? 0) {
                         latestEvent = event
 
                         // Extract follow list from event

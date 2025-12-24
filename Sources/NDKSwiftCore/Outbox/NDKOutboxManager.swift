@@ -816,7 +816,7 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
             group.addTask {
                 for await batch in dataSource.events {
                     for event in batch {
-                        if relayListEvent == nil || event.createdAt > relayListEvent!.createdAt {
+                        if relayListEvent == nil || event.createdAt > (relayListEvent?.createdAt ?? 0) {
                             relayListEvent = event
                         }
                     }
