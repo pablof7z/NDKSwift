@@ -13,7 +13,7 @@ struct FeedTabView: View {
     let rendererStyle: RendererStyle
 
     @State private var followListDataSource: NDKUIFollowListDataSource?
-    @State private var eventDataSource: NDKEventDataSource?
+    @State private var eventDataSource: NDKSubscription<NDKEvent>?
     @State private var lastTappedItem = ""
     @State private var searchDataSource: NDKSearchDataSource?
     @State private var searchText: String = ""
@@ -37,16 +37,14 @@ struct FeedTabView: View {
                 }
                 // Show regular feed when not searching
                 else if let eventDataSource = eventDataSource {
-                    if eventDataSource.events.isEmpty && eventDataSource.isLoading {
-                        ProgressView("Loading feed...")
-                    } else if eventDataSource.events.isEmpty {
+                    if eventDataSource.data.isEmpty {
                         ContentUnavailableView(
                             "No Posts",
                             systemImage: "text.bubble",
                             description: Text("No kind:1 events found from followed users")
                         )
                     } else {
-                        feedList(events: eventDataSource.events)
+                        feedList(events: eventDataSource.data)
                     }
                 } else if let followListDataSource = followListDataSource {
                     if followListDataSource.isLoading || followListDataSource.followList.isEmpty {
@@ -58,7 +56,7 @@ struct FeedTabView: View {
                     ProgressView("Initializing...")
                 }
             }
-            .navigationTitle("Feed (\(searchText.isEmpty ? (eventDataSource?.events.count ?? 0) : (searchDataSource?.events.count ?? 0)))")
+            .navigationTitle("Feed (\(searchText.isEmpty ? (eventDataSource?.data.count ?? 0) : (searchDataSource?.events.count ?? 0)))")
             .navigationBarTitleDisplayMode(.inline)
         }
         .safeAreaInset(edge: .bottom) {
@@ -179,10 +177,9 @@ struct FeedTabView: View {
             kinds: [EventKind.textNote]
         )
 
-        eventDataSource = NDKEventDataSource(
+        eventDataSource = NDKSubscription(
             ndk: ndk,
-            filter: filter,
-            sortDescending: true
+            filter: filter
         )
     }
 }
@@ -194,23 +191,21 @@ struct ArticlesTabView: View {
     let rendererStyle: RendererStyle
 
     @State private var followListDataSource: NDKUIFollowListDataSource?
-    @State private var eventDataSource: NDKEventDataSource?
+    @State private var eventDataSource: NDKSubscription<NDKEvent>?
     @State private var selectedArticle: NDKEvent?
 
     var body: some View {
         NavigationStack {
             Group {
                 if let eventDataSource = eventDataSource {
-                    if eventDataSource.events.isEmpty && eventDataSource.isLoading {
-                        ProgressView("Loading articles...")
-                    } else if eventDataSource.events.isEmpty {
+                    if eventDataSource.data.isEmpty {
                         ContentUnavailableView(
                             "No Articles",
                             systemImage: "doc.text",
                             description: Text("No kind:30023 articles found from followed users")
                         )
                     } else {
-                        articlesList(events: eventDataSource.events)
+                        articlesList(events: eventDataSource.data)
                     }
                 } else if let followListDataSource = followListDataSource {
                     if followListDataSource.isLoading || followListDataSource.followList.isEmpty {
@@ -222,7 +217,7 @@ struct ArticlesTabView: View {
                     ProgressView("Initializing...")
                 }
             }
-            .navigationTitle("Articles (\(eventDataSource?.events.count ?? 0))")
+            .navigationTitle("Articles (\(eventDataSource?.data.count ?? 0))")
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(item: $selectedArticle) { article in
                 ArticleDetailView(ndk: ndk, event: article, rendererStyle: rendererStyle)
@@ -329,10 +324,9 @@ struct ArticlesTabView: View {
             kinds: [EventKind.longFormContent]
         )
 
-        eventDataSource = NDKEventDataSource(
+        eventDataSource = NDKSubscription(
             ndk: ndk,
-            filter: filter,
-            sortDescending: true
+            filter: filter
         )
     }
 
