@@ -19,7 +19,7 @@ Complete API documentation for NDKSwiftUI components and features.
   - [NDKZapButton](#ndkzapbutton)
 - [Data Sources](#data-sources)
   - [NDKProfileDataSource](#ndkprofiledatasource)
-  - [NDKEventDataSource](#ndkeventdatasource)
+  - [NDKSubscription](#ndksubscription)
   - [NDKContactsDataSource](#ndkcontactsdatasource)
 - [Utilities](#utilities)
 
@@ -303,18 +303,18 @@ var body: some View {
 }
 ```
 
-### NDKEventDataSource
+### NDKSubscription
 
-Observable data source for events.
+Observable data source for events with real-time updates.
 
 ```swift
-@StateObject private var eventData = NDKEventDataSource(
-    filter: NDKFilter(authors: [pubkey], kinds: [.text]),
-    ndk: ndk
+@State private var subscription = NDKSubscription<NDKEvent>(
+    ndk: ndk,
+    filter: NDKFilter(authors: [pubkey], kinds: [1])
 )
 
 var body: some View {
-    List(eventData.events) { event in
+    List(subscription.data, id: \.id) { event in
         NDKEventView(event: event)
     }
 }
@@ -385,16 +385,13 @@ Color.nostrBlue
 
 ```swift
 struct NostrFeedView: View {
-    @EnvironmentObject var ndk: NDK
-    @StateObject private var feedData = NDKEventDataSource(
-        filter: NDKFilter(kinds: [.text], limit: 50),
-        ndk: NDK.shared // Will be replaced by environment object
-    )
-    
+    @Environment(NDK.self) var ndk
+    @State private var subscription: NDKSubscription<NDKEvent>?
+
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
-                ForEach(feedData.events) { event in
+                ForEach(subscription?.data ?? [], id: \.id) { event in
                     VStack(alignment: .leading, spacing: 12) {
                         // Author header
                         HStack {
