@@ -13,7 +13,7 @@ public struct ShowcaseTabView: View {
 
     // Event data sources
     @State private var followListDataSource: NDKUIFollowListDataSource?
-    @State private var kind1DataSource: NDKEventDataSource?
+    @State private var kind1DataSource: NDKSubscription<NDKEvent>?
 
     let ndk: NDK
 
@@ -71,10 +71,9 @@ public struct ShowcaseTabView: View {
         .onChange(of: followListDataSource?.followList) { _, newFollowList in
             guard let followList = newFollowList, !followList.isEmpty else { return }
 
-            kind1DataSource = NDKEventDataSource(
+            kind1DataSource = NDKSubscription(
                 ndk: ndk,
-                filter: NDKFilter(authors: Array(followList), kinds: [EventKind.textNote]),
-                sortDescending: true
+                filter: NDKFilter(authors: Array(followList), kinds: [EventKind.textNote])
             )
         }
     }
@@ -353,7 +352,7 @@ public struct ShowcaseTabView: View {
     private func eventsForSection(_ section: ShowcaseSection) -> [NDKEvent]? {
         switch section {
         case .kind1Events:
-            return kind1DataSource?.events
+            return kind1DataSource?.data
         default:
             return nil
         }

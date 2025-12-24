@@ -6,7 +6,7 @@ import NDKSwiftCore
 /// Feed view with bottom search bar (when nostrdb is available)
 ///
 /// Features:
-/// - Displays event feed using NDKEventDataSource
+/// - Displays event feed using NDKSubscription
 /// - Bottom search bar (iOS 18+ style) when nostrdb cache is active
 /// - Real-time search on every keystroke
 /// - Search results replace feed content
@@ -22,22 +22,21 @@ import NDKSwiftCore
 /// ```
 public struct NDKUISearchableFeedView: View {
     private let ndk: NDK
-    @State private var feedDataSource: NDKEventDataSource
+    @State private var feedDataSource: NDKSubscription<NDKEvent>
     @State private var searchDataSource: NDKSearchDataSource
     @State private var searchText: String = ""
 
     public init(
         ndk: NDK,
         filter: NDKFilter,
-        sortDescending: Bool = true,
         maxAge: TimeInterval = 0
     ) {
         self.ndk = ndk
-        self._feedDataSource = State(initialValue: NDKEventDataSource(
+        self._feedDataSource = State(initialValue: NDKSubscription(
             ndk: ndk,
             filter: filter,
-            sortDescending: sortDescending,
-            maxAge: maxAge
+            maxAge: maxAge,
+            cachePolicy: .cacheWithNetwork
         ))
         self._searchDataSource = State(initialValue: NDKSearchDataSource(ndk: ndk, limit: 100))
     }
@@ -82,10 +81,10 @@ public struct NDKUISearchableFeedView: View {
 
     private var feedContent: some View {
         Group {
-            if feedDataSource.events.isEmpty {
+            if feedDataSource.data.isEmpty {
                 emptyFeedView
             } else {
-                eventList(events: feedDataSource.events)
+                eventList(events: feedDataSource.data)
             }
         }
     }
