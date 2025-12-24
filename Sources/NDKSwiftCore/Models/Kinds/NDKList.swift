@@ -532,7 +532,7 @@ extension NDKEvent: NDKListItem {
         if isParameterizedReplaceable {
             // Use 'a' tag for parameterized replaceable events
             let dTagElement = tags.first { !$0.isEmpty && $0[0] == NostrConstants.TagName.identifier }
-            let dTag = (dTagElement?.count ?? 0) > 1 ? dTagElement![1] : ""
+            let dTag = dTagElement.flatMap { $0.count > 1 ? $0[1] : nil } ?? ""
             let aTagValue = "\(kind):\(pubkey):\(dTag)"
             return [NostrConstants.TagName.address, aTagValue]
         } else {
@@ -545,7 +545,7 @@ extension NDKEvent: NDKListItem {
         get async {
             if isParameterizedReplaceable {
                 let dTagElement = tags.first { !$0.isEmpty && $0[0] == NostrConstants.TagName.identifier }
-                let dTag = (dTagElement?.count ?? 0) > 1 ? dTagElement![1] : ""
+                let dTag = dTagElement.flatMap { $0.count > 1 ? $0[1] : nil } ?? ""
                 return "\(kind):\(pubkey):\(dTag)"
             } else {
                 return id

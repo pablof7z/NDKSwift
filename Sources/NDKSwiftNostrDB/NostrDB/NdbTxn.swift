@@ -38,7 +38,9 @@ class NdbTxn<T>: RawNdbTxnAccessible {
            txn_generation == ndb.generation
         {
             // some parent thread is active, use that instead
-            print("txn: inherited txn")
+            #if DEBUG
+                print("txn: inherited txn")
+            #endif
             txn = active_txn
             inherited = true
             generation = txn_generation
@@ -87,11 +89,15 @@ class NdbTxn<T>: RawNdbTxnAccessible {
 
     deinit {
         if self.generation != ndb.generation {
-            print("txn: OLD GENERATION (\(self.generation) != \(ndb.generation)), IGNORING")
+            #if DEBUG
+                print("txn: OLD GENERATION (\(self.generation) != \(ndb.generation)), IGNORING")
+            #endif
             return
         }
         if ndb.is_closed {
-            print("txn: not closing. db closed")
+            #if DEBUG
+                print("txn: not closing. db closed")
+            #endif
             return
         }
         if let ref_count = Thread.current.threadDictionary["ndb_txn_ref_count"] as? Int {
@@ -105,11 +111,12 @@ class NdbTxn<T>: RawNdbTxnAccessible {
             }
         }
         if inherited {
-            print("txn: not closing. inherited ")
+            #if DEBUG
+                print("txn: not closing. inherited")
+            #endif
             return
         }
         if moved {
-            // print("txn: not closing. moved")
             return
         }
 
@@ -169,7 +176,9 @@ class SafeNdbTxn<T: ~Copyable> {
            txn_generation == ndb.generation
         {
             // some parent thread is active, use that instead
-            print("txn: inherited txn")
+            #if DEBUG
+                print("txn: inherited txn")
+            #endif
             txn = active_txn
             inherited = true
             generation = txn_generation
@@ -212,11 +221,15 @@ class SafeNdbTxn<T: ~Copyable> {
 
     deinit {
         if self.generation != ndb.generation {
-            print("txn: OLD GENERATION (\(self.generation) != \(ndb.generation)), IGNORING")
+            #if DEBUG
+                print("txn: OLD GENERATION (\(self.generation) != \(ndb.generation)), IGNORING")
+            #endif
             return
         }
         if ndb.is_closed {
-            print("txn: not closing. db closed")
+            #if DEBUG
+                print("txn: not closing. db closed")
+            #endif
             return
         }
         if let ref_count = Thread.current.threadDictionary["ndb_txn_ref_count"] as? Int {
@@ -230,11 +243,12 @@ class SafeNdbTxn<T: ~Copyable> {
             }
         }
         if inherited {
-            print("txn: not closing. inherited ")
+            #if DEBUG
+                print("txn: not closing. inherited")
+            #endif
             return
         }
         if moved {
-            // print("txn: not closing. moved")
             return
         }
 

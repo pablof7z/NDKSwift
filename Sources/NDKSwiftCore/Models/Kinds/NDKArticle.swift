@@ -104,7 +104,8 @@ public struct NDKArticle {
 
     /// Check if this article is valid (has a title)
     public var isValid: Bool {
-        return title != nil && !title!.isEmpty
+        guard let title = title else { return false }
+        return !title.isEmpty
     }
 
     // MARK: - Tag Helper Methods

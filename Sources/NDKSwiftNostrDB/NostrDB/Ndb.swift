@@ -208,7 +208,9 @@ class Ndb: @unchecked Sendable {
     private static var db_files: [String] = ["data.mdb", "lock.mdb"]
 
     static var empty: Ndb {
-        print("txn: NOSTRDB EMPTY")
+        #if DEBUG
+            print("txn: NOSTRDB EMPTY")
+        #endif
         return Ndb(ndb: ndb_t(ndb: nil))
     }
 
@@ -345,10 +347,14 @@ class Ndb: @unchecked Sendable {
     func close() {
         guard !is_closed else { return }
         closed = true
-        print("txn: CLOSING NOSTRDB")
+        #if DEBUG
+            print("txn: CLOSING NOSTRDB")
+        #endif
         ndb_destroy(ndb.ndb)
         generation += 1
-        print("txn: NOSTRDB CLOSED")
+        #if DEBUG
+            print("txn: NOSTRDB CLOSED")
+        #endif
     }
 
     func reopen() -> Bool {
@@ -358,7 +364,9 @@ class Ndb: @unchecked Sendable {
             return false
         }
 
-        print("txn: NOSTRDB REOPENED (gen \(generation))")
+        #if DEBUG
+            print("txn: NOSTRDB REOPENED (gen \(generation))")
+        #endif
 
         closed = false
         ndb = db
@@ -578,8 +586,9 @@ class Ndb: @unchecked Sendable {
             let rec: NdbProfile = try getDebugCheckedRoot(byteBuffer: &buf)
             return NdbCachedProfile(profile: rec, lastFetch: Date(), receivedAt: Date())
         } catch {
-            // Handle error appropriately
-            print("UNUSUAL: \(error)")
+            #if DEBUG
+                print("UNUSUAL: \(error)")
+            #endif
             return nil
         }
     }
@@ -1043,7 +1052,9 @@ class Ndb: @unchecked Sendable {
     // MARK: Deinitialization
 
     deinit {
-        print("txn: Ndb de-init")
+        #if DEBUG
+            print("txn: Ndb de-init")
+        #endif
         self.close()
     }
 }

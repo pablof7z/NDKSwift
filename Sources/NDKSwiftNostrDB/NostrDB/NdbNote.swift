@@ -524,7 +524,9 @@ class NdbNote: Codable, Equatable, Hashable, @unchecked Sendable {
                 memcpy(&kp.secret.0, sec.id.bytes, 32)
 
                 if ndb_create_keypair(&kp) <= 0 {
-                    print("bad keypair")
+                    #if DEBUG
+                        print("bad keypair")
+                    #endif
                 } else {
                     the_kp = kp
                 }
