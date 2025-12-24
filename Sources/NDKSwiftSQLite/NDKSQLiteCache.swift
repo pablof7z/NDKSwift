@@ -302,8 +302,8 @@ public actor NDKSQLiteCache: NDKCache {
         try await dbQueue.write { db in
             try db.execute(
                 sql: """
-                INSERT OR REPLACE INTO profiles 
-                (pubkey, name, display_name, about, picture, nip05, lud06, lud16, banner, website, 
+                INSERT OR REPLACE INTO profiles
+                (pubkey, name, display_name, about, picture, nip05, lud06, lud16, banner, website,
                  additional_fields, updated_at, event_id, json)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
@@ -1706,9 +1706,9 @@ public actor NDKSQLiteCache: NDKCache {
 
                     // Query for the latest kind 0 event for this pubkey
                     let sql = """
-                        SELECT e.json 
+                        SELECT e.json
                         FROM events e
-                        WHERE e.kind = 0 
+                        WHERE e.kind = 0
                         AND e.pubkey = ?
                         ORDER BY e.created_at DESC
                         LIMIT 1

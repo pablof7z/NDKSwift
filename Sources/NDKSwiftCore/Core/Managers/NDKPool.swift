@@ -228,7 +228,7 @@ public actor NDKPool {
                 for await batch in dataSource.events {
                     for event in batch {
                         // Always process the latest event
-                        if latestEvent == nil || event.createdAt > latestEvent!.createdAt {
+                        if latestEvent == nil || event.createdAt > (latestEvent?.createdAt ?? 0) {
                             latestEvent = event
                             await processBlockedRelayListUpdate(event)
                         }
