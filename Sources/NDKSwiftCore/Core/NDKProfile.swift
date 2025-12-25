@@ -90,7 +90,11 @@ public final class NDKProfile {
                     guard let self else { break }
 
                     await MainActor.run {
-                        self.metadata = metadata
+                        // Only update if metadata actually changed to avoid triggering unnecessary observation
+                        let isDifferent = self.metadata?.eventId != metadata?.eventId
+                        if isDifferent {
+                            self.metadata = metadata
+                        }
                     }
                 }
             } catch {
