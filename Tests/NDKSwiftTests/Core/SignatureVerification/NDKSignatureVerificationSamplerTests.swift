@@ -10,7 +10,7 @@ final class NDKSignatureVerificationSamplerTests: XCTestCase {
         config = NDKSignatureVerificationConfig(
             initialValidationRatio: 1.0,
             lowestValidationRatio: 0.1,
-            autoBlacklistInvalidRelays: false,
+            autoBlocklistInvalidRelays: false,
             validationRatioFunction: nil
         )
         sampler = NDKSignatureVerificationSampler(config: config)
@@ -26,7 +26,7 @@ final class NDKSignatureVerificationSamplerTests: XCTestCase {
         let stats = await sampler.getStats()
         XCTAssertEqual(stats.totalVerifications, 0)
         XCTAssertEqual(stats.failedVerifications, 0)
-        XCTAssertEqual(stats.blacklistedRelays, 0)
+        XCTAssertEqual(stats.blocklistedRelays, 0)
     }
 
     func testRelayBlacklistingFunctionality() async {
@@ -34,12 +34,12 @@ final class NDKSignatureVerificationSamplerTests: XCTestCase {
         let relayUrl = "wss://evil.relay.com"
 
         // Initially not blacklisted
-        let isBlacklisted = await sampler.isRelayBlacklisted(relayUrl)
+        let isBlacklisted = await sampler.isRelayBlocklisted(relayUrl)
         XCTAssertFalse(isBlacklisted)
 
         // Get blacklisted relays (should be empty)
-        let blacklistedRelays = await sampler.getBlacklistedRelays()
-        XCTAssertTrue(blacklistedRelays.isEmpty)
+        let blocklistedRelays = await sampler.getBlocklistedRelays()
+        XCTAssertTrue(blocklistedRelays.isEmpty)
     }
 
     func testDelegateSetup() async {
@@ -67,13 +67,13 @@ final class NDKSignatureVerificationSamplerTests: XCTestCase {
         let defaultConfig = NDKSignatureVerificationConfig.default
         XCTAssertEqual(defaultConfig.initialValidationRatio, 1.0)
         XCTAssertEqual(defaultConfig.lowestValidationRatio, 0.1)
-        XCTAssertFalse(defaultConfig.autoBlacklistInvalidRelays)
+        XCTAssertFalse(defaultConfig.autoBlocklistInvalidRelays)
 
         // Test disabled configuration
         let disabledConfig = NDKSignatureVerificationConfig.disabled
         XCTAssertEqual(disabledConfig.initialValidationRatio, 0.0)
         XCTAssertEqual(disabledConfig.lowestValidationRatio, 0.0)
-        XCTAssertFalse(disabledConfig.autoBlacklistInvalidRelays)
+        XCTAssertFalse(disabledConfig.autoBlocklistInvalidRelays)
     }
 
     func testRelaySignatureStats() {
@@ -101,7 +101,7 @@ final class NDKSignatureVerificationSamplerTests: XCTestCase {
         let customConfig = NDKSignatureVerificationConfig(
             initialValidationRatio: 0.5,
             lowestValidationRatio: 0.05,
-            autoBlacklistInvalidRelays: true,
+            autoBlocklistInvalidRelays: true,
             validationRatioFunction: { _, validatedCount, _ in
                 // Custom function that decreases ratio based on validated count
                 max(0.1, 1.0 - (Double(validatedCount) * 0.01))
@@ -118,13 +118,13 @@ final class NDKSignatureVerificationSamplerTests: XCTestCase {
 
 private class TestSignatureVerificationDelegate: NDKSignatureVerificationDelegate {
     var signatureFailureEvents: [(NDKEvent, RelayProtocol)] = []
-    var blacklistedRelays: [RelayProtocol] = []
+    var blocklistedRelays: [RelayProtocol] = []
 
     func signatureVerificationFailed(for event: NDKEvent, from relay: RelayProtocol) {
         signatureFailureEvents.append((event, relay))
     }
 
     func relayBlocklisted(_ relay: RelayProtocol) {
-        blacklistedRelays.append(relay)
+        blocklistedRelays.append(relay)
     }
 }

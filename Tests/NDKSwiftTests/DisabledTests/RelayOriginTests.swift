@@ -30,7 +30,7 @@ final class RelayOriginTests: XCTestCase {
 
     func testOutboxRelaysAutoConnect() async throws {
         // Verify that outbox relays are automatically added on connect
-        XCTAssertTrue(ndk.outboxConfig.outboxRelays.contains("wss://purplepag.es"))
+        XCTAssertTrue(ndk.discoveryConfig.discoveryRelays.contains("wss://purplepag.es"))
 
         // Connect and verify outbox relays are added
         await ndk.connect()
@@ -47,7 +47,7 @@ final class RelayOriginTests: XCTestCase {
         // Verify it has the correct origin
         if let relay = purplePages {
             let origin = await relay.origin
-            XCTAssertEqual(origin, .outboxConfig, "purplepag.es should have outboxConfig origin")
+            XCTAssertEqual(origin, .discoveryConfig, "purplepag.es should have outboxConfig origin")
         }
     }
 
@@ -63,7 +63,7 @@ final class RelayOriginTests: XCTestCase {
 
             if let relay = relay {
                 let origin = await relay.origin
-                XCTAssertEqual(origin, .explicit, "\(relayUrl) should have explicit origin")
+                XCTAssertEqual(origin, .appRelay, "\(relayUrl) should have explicit origin")
             }
         }
     }

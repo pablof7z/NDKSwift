@@ -22,14 +22,14 @@ final class OutboxSubscriptionFlowTests: XCTestCase {
 
     override func setUp() async throws {
         cache = MemoryCache()
-        let outboxConfig = NDKOutboxConfig(
-            blacklistedRelays: [],
-            outboxRelays: [outboxRelayURL]
+        let outboxConfig = NDKDiscoveryConfig(
+            blocklistedRelays: [],
+            discoveryRelays: [outboxRelayURL]
         )
         ndk = NDK(
             relayURLs: [fallbackRelayURL],
             cache: cache,
-            outboxConfig: outboxConfig
+            discoveryConfig: outboxConfig
         )
     }
 

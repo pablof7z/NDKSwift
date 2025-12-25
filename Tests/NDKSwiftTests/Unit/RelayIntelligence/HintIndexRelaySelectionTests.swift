@@ -8,7 +8,7 @@ final class HintIndexRelaySelectionTests: XCTestCase {
         let ndk = NDK()
 
         // Add explicit relay (fallback)
-        _ = await ndk.pool.addRelay("wss://explicit.example.com", origin: .explicit)
+        _ = await ndk.pool.addRelay("wss://explicit.example.com", origin: .appRelays)
 
         // Record hints for the author (simulate learning from observed events)
         await ndk.hintIndex.recordHint(pubkey: "author-pubkey", relay: "wss://author-hint.example.com", source: .eventObserved)
@@ -27,7 +27,7 @@ final class HintIndexRelaySelectionTests: XCTestCase {
         let ndk = NDK()
 
         // Add explicit relay
-        _ = await ndk.pool.addRelay("wss://explicit.example.com", origin: .explicit)
+        _ = await ndk.pool.addRelay("wss://explicit.example.com", origin: .appRelays)
 
         // Record hint for a user we'll mention in p-tag
         await ndk.hintIndex.recordHint(pubkey: "mentioned-user", relay: "wss://mentioned-user-relay.example.com", source: .nip19)
@@ -52,7 +52,7 @@ final class HintIndexRelaySelectionTests: XCTestCase {
         let ndk = NDK()
 
         // Add explicit relay
-        _ = await ndk.pool.addRelay("wss://explicit.example.com", origin: .explicit)
+        _ = await ndk.pool.addRelay("wss://explicit.example.com", origin: .appRelays)
 
         // Record hints for authors we want to fetch
         await ndk.hintIndex.recordHint(pubkey: "target-author", relay: "wss://target-author-relay.example.com", source: .eventObserved)
@@ -71,7 +71,7 @@ final class HintIndexRelaySelectionTests: XCTestCase {
         let ndk = NDK()
 
         // Add explicit relay
-        _ = await ndk.pool.addRelay("wss://explicit.example.com", origin: .explicit)
+        _ = await ndk.pool.addRelay("wss://explicit.example.com", origin: .appRelays)
 
         // Record hint for one author
         await ndk.hintIndex.recordHint(pubkey: "author-with-hint", relay: "wss://hint-relay.example.com", source: .eventObserved)
@@ -94,7 +94,7 @@ final class HintIndexRelaySelectionTests: XCTestCase {
         let ndk = NDK()
 
         // Add explicit relay
-        _ = await ndk.pool.addRelay("wss://explicit.example.com", origin: .explicit)
+        _ = await ndk.pool.addRelay("wss://explicit.example.com", origin: .appRelays)
 
         // Record hint for an event ID
         await ndk.hintIndex.recordHint(eventId: "event123", relay: "wss://event-source-relay.example.com", source: .eventObserved)
@@ -117,7 +117,7 @@ final class HintIndexRelaySelectionTests: XCTestCase {
         let ndk = NDK()
 
         // Add explicit relay
-        _ = await ndk.pool.addRelay("wss://explicit.example.com", origin: .explicit)
+        _ = await ndk.pool.addRelay("wss://explicit.example.com", origin: .appRelays)
 
         // Record hint for a pubkey
         await ndk.hintIndex.recordHint(pubkey: "test-pubkey", relay: "wss://hint-relay.example.com", source: .eventObserved)

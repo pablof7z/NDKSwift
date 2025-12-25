@@ -9,7 +9,7 @@ final class HintIndexIntrospectionTests: XCTestCase {
 
         await index.recordHint(pubkey: "pubkey1", relay: "wss://relay1.example.com", source: .eventObserved)
         await index.recordHint(pubkey: "pubkey2", relay: "wss://relay2.example.com", source: .nip19)
-        await index.recordHint(pubkey: "pubkey1", relay: "wss://relay3.example.com", source: .explicit)
+        await index.recordHint(pubkey: "pubkey1", relay: "wss://relay3.example.com", source: .app)
 
         let allPubkeys = await index.allPubkeyHints
         XCTAssertEqual(allPubkeys.count, 2) // Two unique pubkeys
@@ -98,12 +98,12 @@ final class HintIndexIntrospectionTests: XCTestCase {
         await index.recordHint(pubkey: "p1", relay: "wss://r1.example.com", source: .eventObserved)
         await index.recordHint(pubkey: "p2", relay: "wss://r2.example.com", source: .eventObserved)
         await index.recordHint(pubkey: "p3", relay: "wss://r3.example.com", source: .nip19)
-        await index.recordHint(pubkey: "p4", relay: "wss://r4.example.com", source: .explicit)
+        await index.recordHint(pubkey: "p4", relay: "wss://r4.example.com", source: .app)
 
         let breakdown = await index.sourceBreakdown
 
         XCTAssertEqual(breakdown[.eventObserved], 2)
         XCTAssertEqual(breakdown[.nip19], 1)
-        XCTAssertEqual(breakdown[.explicit], 1)
+        XCTAssertEqual(breakdown[.app], 1)
     }
 }
