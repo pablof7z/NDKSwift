@@ -7,6 +7,8 @@ public struct BentoGridImageView: ImageRenderer {
     public let onTap: ImageTapHandler?
 
     @Environment(\.onImageTap) private var envOnTap
+    @State private var showFullscreen = false
+    @State private var selectedIndex = 0
 
     private let spacing: CGFloat = 2
     private let cornerRadius: CGFloat = 8
@@ -17,13 +19,33 @@ public struct BentoGridImageView: ImageRenderer {
     }
 
     public var body: some View {
-        if urls.isEmpty {
-            EmptyView()
-        } else {
-            gridLayout
-                .cornerRadius(cornerRadius)
-                .clipped()
+        Group {
+            if urls.isEmpty {
+                EmptyView()
+            } else {
+                gridLayout
+                    .cornerRadius(cornerRadius)
+                    .clipped()
+            }
         }
+        #if os(iOS) || os(tvOS) || os(visionOS)
+        .fullScreenCover(isPresented: $showFullscreen) {
+            FullscreenImageViewer(
+                urls: urls,
+                selectedIndex: $selectedIndex,
+                isPresented: $showFullscreen
+            )
+        }
+        #elseif os(macOS)
+        .sheet(isPresented: $showFullscreen) {
+            FullscreenImageViewer(
+                urls: urls,
+                selectedIndex: $selectedIndex,
+                isPresented: $showFullscreen
+            )
+            .frame(minWidth: 600, minHeight: 400)
+        }
+        #endif
     }
 
     @ViewBuilder
@@ -114,6 +136,9 @@ public struct BentoGridImageView: ImageRenderer {
             onTap(urls[index], index)
         } else if let envOnTap {
             envOnTap(urls[index], index)
+        } else {
+            selectedIndex = index
+            showFullscreen = true
         }
     }
 }

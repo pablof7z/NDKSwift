@@ -566,12 +566,12 @@ actor NDKRelaySelector {
         var fallbackRelays = Set<String>()
         var candidateRelays: [String] = []
 
-        // 1. First priority: Explicit relays (user explicitly added)
-        let explicitRelays = await ndk.pool.explicitRelays()
-        let availableExplicitRelays = explicitRelays
+        // 1. First priority: App relays (developer configured)
+        let appRelays = await ndk.pool.appRelays
+        let availableAppRelays = appRelays
             .filter { !excludeRelays.contains($0.url) }
             .map { $0.url }
-        candidateRelays.append(contentsOf: availableExplicitRelays)
+        candidateRelays.append(contentsOf: availableAppRelays)
 
         // 2. Second priority: Current user's relays (from their relay list)
         let currentUserRelays = await ndk.pool.getCurrentUserRelayUrls()
@@ -583,7 +583,7 @@ actor NDKRelaySelector {
         fallbackRelays = Set(candidateRelays.prefix(neededCount))
 
         if !fallbackRelays.isEmpty {
-            NDKLogger.log(.debug, category: .outbox, "📍 Selected \(fallbackRelays.count) fallback relays from explicit+user relays")
+            NDKLogger.log(.debug, category: .outbox, "📍 Selected \(fallbackRelays.count) fallback relays from app+user relays")
         }
 
         return fallbackRelays
@@ -661,7 +661,7 @@ actor NDKRelaySelector {
     private func determineSelectionMethod(_ relays: Set<String>) -> SelectionMethod {
         // Simple heuristic - could be expanded
         if relays.isEmpty {
-            return .fallback
+            return .appRelays
         } else if relays.count <= 3 {
             return .contextual
         } else {
@@ -737,9 +737,9 @@ actor NDKRelaySelector {
     private func getPreferredRelaysForPublishing() async -> Set<String> {
         var preferred = Set<String>()
 
-        // Add explicit relays
-        let explicitRelays = await ndk.pool.explicitRelays()
-        preferred.formUnion(explicitRelays.map { $0.url })
+        // Add app relays
+        let appRelays = await ndk.pool.appRelays
+        preferred.formUnion(appRelays.map { $0.url })
 
         // Add connected relays
         let connectedRelays = await ndk.pool.connectedRelays()
@@ -756,9 +756,9 @@ actor NDKRelaySelector {
         let connectedRelays = await ndk.pool.connectedRelays()
         preferred.formUnion(connectedRelays.map { $0.url })
 
-        // Add explicit relays
-        let explicitRelays = await ndk.pool.explicitRelays()
-        preferred.formUnion(explicitRelays.map { $0.url })
+        // Add app relays
+        let appRelays = await ndk.pool.appRelays
+        preferred.formUnion(appRelays.map { $0.url })
 
         return preferred
     }
@@ -804,13 +804,13 @@ private enum RelayPurpose {
 enum SelectionMethod: Sendable {
     case outbox
     case contextual
-    case fallback
+    case appRelays
 
     var telemetryValue: String {
         switch self {
         case .outbox: return "outbox"
         case .contextual: return "contextual"
-        case .fallback: return "fallback"
+        case .appRelays: return "app_relays"
         }
     }
 }

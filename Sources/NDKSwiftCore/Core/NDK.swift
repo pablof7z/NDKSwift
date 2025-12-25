@@ -52,8 +52,8 @@ public final class NDK {
     /// Whether outbox model is enabled (default: true)
     public let outboxEnabled: Bool
 
-    /// Outbox configuration
-    public let outboxConfig: NDKOutboxConfig
+    /// Discovery configuration (relays for fetching user relay lists)
+    public let discoveryConfig: NDKDiscoveryConfig
 
     /// Configuration for automatic client tagging (NIP-89)
     public let clientTagConfig: NDKClientTagConfig?
@@ -192,7 +192,7 @@ public final class NDK {
     ///   - signatureVerificationConfig: Configuration for signature verification
     ///   - debugMode: Whether debug mode is enabled
     ///   - outboxEnabled: Whether outbox model is enabled
-    ///   - outboxConfig: Outbox configuration
+    ///   - discoveryConfig: Discovery configuration (relays for fetching user relay lists)
     ///   - clientTagConfig: Configuration for automatic client tagging
     ///   - connectionConfig: Connection reliability configuration
     public init(
@@ -203,7 +203,7 @@ public final class NDK {
         signatureVerificationConfig: NDKSignatureVerificationConfig = .default,
         debugMode: Bool = false,
         outboxEnabled: Bool = true,
-        outboxConfig: NDKOutboxConfig = .default,
+        discoveryConfig: NDKDiscoveryConfig = .default,
         clientTagConfig: NDKClientTagConfig? = nil,
         connectionConfig: NDKConnectionConfig = .default,
         telemetryConfig: NDKTelemetryConfig = .disabled
@@ -214,7 +214,7 @@ public final class NDK {
         self.signatureVerificationConfig = signatureVerificationConfig
         self.debugMode = debugMode
         self.outboxEnabled = outboxEnabled
-        self.outboxConfig = outboxConfig
+        self.discoveryConfig = discoveryConfig
         self.clientTagConfig = clientTagConfig
         self.connectionConfig = connectionConfig
         self.telemetryConfig = telemetryConfig
@@ -312,7 +312,7 @@ public final class NDK {
 
     /// Add a relay to the pool (async version)
     @discardableResult
-    public func addRelay(_ url: RelayURL, origin: NDKRelayOrigin = .explicit) async -> NDKRelay {
+    public func addRelay(_ url: RelayURL, origin: NDKRelayOrigin = .appRelays) async -> NDKRelay {
         let relay = await pool.addRelay(url, origin: origin)
 
         if hasConnected {
@@ -386,11 +386,11 @@ public final class NDK {
             await initializeRelays()
         }
 
-        // Add outbox relays from config
-        if !outboxConfig.outboxRelays.isEmpty {
-            NDKLogger.log(.info, category: .relay, "Adding \(outboxConfig.outboxRelays.count) outbox relay(s) from configuration")
-            for relayUrl in outboxConfig.outboxRelays {
-                await pool.addRelay(relayUrl, origin: .outboxConfig)
+        // Add discovery relays from config (e.g., purplepag.es)
+        if !discoveryConfig.discoveryRelays.isEmpty {
+            NDKLogger.log(.info, category: .relay, "Adding \(discoveryConfig.discoveryRelays.count) discovery relay(s) from configuration")
+            for relayUrl in discoveryConfig.discoveryRelays {
+                await pool.addRelay(relayUrl, origin: .discovery)
             }
         }
 
@@ -830,7 +830,7 @@ public final class NDK {
 
     /// Get the authors that caused us to connect to a specific relay
     /// - Parameter url: The relay URL to check
-    /// - Returns: Array of author pubkeys that caused this relay connection (empty for explicit relays)
+    /// - Returns: Array of author pubkeys that caused this relay connection (empty for app relays)
     public func getAuthorsForRelay(_ url: RelayURL) async -> [String] {
         await pool.getAuthorsForRelay(url)
     }

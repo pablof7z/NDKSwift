@@ -117,10 +117,9 @@ public enum SpanAttributes {
 extension NDKRelayOrigin {
     var telemetryValue: String {
         switch self {
-        case .explicit: return "explicit"
+        case .appRelays: return "app_relays"
         case .outbox: return "outbox"
-        case .outboxConfig: return "outbox_config"
-        case .fallback: return "fallback"
+        case .discovery: return "discovery"
         }
     }
 }

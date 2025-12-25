@@ -7,6 +7,7 @@ public struct NDKUIMarkdownView<
     Hashtag: HashtagRenderer,
     Link: LinkRenderer,
     Image: ImageRenderer,
+    Video: VideoRenderer,
     Event: EventRenderer
 >: View {
     let content: String
@@ -161,7 +162,11 @@ public struct NDKUIMarkdownView<
                 .cornerRadius(4)
 
         case .link(_, let url):
-            Link(url: url, onTap: nil)
+            if isVideoURL(url) {
+                Video(url: url, onTap: nil)
+            } else {
+                Link(url: url, onTap: nil)
+            }
 
         case .image(_, let url):
             Image(urls: [url], onTap: nil)
@@ -231,7 +236,11 @@ public struct NDKUIMarkdownView<
             Hashtag(tag: tag, onTap: nil)
 
         case .url(let url):
-            Link(url: url, onTap: nil)
+            if isVideoURL(url) {
+                Video(url: url, onTap: nil)
+            } else {
+                Link(url: url, onTap: nil)
+            }
 
         case .note(let note):
             EventPreviewLoader<Event>(reference: .note(note), onTap: nil)
@@ -252,6 +261,24 @@ public struct NDKUIMarkdownView<
             EventPreviewLoader<Event>(reference: .eventId(eventId), onTap: nil)
         }
     }
+
+    private func isVideoURL(_ url: URL) -> Bool {
+        let videoExtensions = ["mp4", "mov", "m4v", "webm", "avi", "mkv", "m3u8"]
+        let pathExtension = url.pathExtension.lowercased()
+
+        if videoExtensions.contains(pathExtension) {
+            return true
+        }
+
+        let urlString = url.absoluteString.lowercased()
+        for ext in videoExtensions {
+            if urlString.contains(".\(ext)?") || urlString.contains(".\(ext)&") || urlString.contains(".\(ext)#") {
+                return true
+            }
+        }
+
+        return false
+    }
 }
 
 // MARK: - Default Typealias
@@ -262,6 +289,7 @@ public typealias NDKMarkdown = NDKUIMarkdownView<
     DefaultHashtagView,
     DefaultLinkView,
     DefaultImageView,
+    DefaultVideoView,
     DefaultEventView
 >
 

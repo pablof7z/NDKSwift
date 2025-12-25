@@ -7,6 +7,8 @@ public struct StackedGalleryImageView: ImageRenderer {
     public let onTap: ImageTapHandler?
 
     @Environment(\.onImageTap) private var envOnTap
+    @State private var showFullscreen = false
+    @State private var selectedIndex = 0
 
     private let maxVisibleCards = 3
     private let cardOffset: CGFloat = 8
@@ -18,13 +20,33 @@ public struct StackedGalleryImageView: ImageRenderer {
     }
 
     public var body: some View {
-        if urls.isEmpty {
-            EmptyView()
-        } else if urls.count == 1 {
-            singleImage
-        } else {
-            stackedCards
+        Group {
+            if urls.isEmpty {
+                EmptyView()
+            } else if urls.count == 1 {
+                singleImage
+            } else {
+                stackedCards
+            }
         }
+        #if os(iOS) || os(tvOS) || os(visionOS)
+        .fullScreenCover(isPresented: $showFullscreen) {
+            FullscreenImageViewer(
+                urls: urls,
+                selectedIndex: $selectedIndex,
+                isPresented: $showFullscreen
+            )
+        }
+        #elseif os(macOS)
+        .sheet(isPresented: $showFullscreen) {
+            FullscreenImageViewer(
+                urls: urls,
+                selectedIndex: $selectedIndex,
+                isPresented: $showFullscreen
+            )
+            .frame(minWidth: 600, minHeight: 400)
+        }
+        #endif
     }
 
     private var singleImage: some View {
@@ -89,6 +111,9 @@ public struct StackedGalleryImageView: ImageRenderer {
             onTap(urls[index], index)
         } else if let envOnTap {
             envOnTap(urls[index], index)
+        } else {
+            selectedIndex = index
+            showFullscreen = true
         }
     }
 }

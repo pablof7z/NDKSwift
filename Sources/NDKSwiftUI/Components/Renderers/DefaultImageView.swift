@@ -7,6 +7,8 @@ public struct DefaultImageView: ImageRenderer {
     public let onTap: ImageTapHandler?
 
     @Environment(\.onImageTap) private var envOnTap
+    @State private var showFullscreen = false
+    @State private var selectedIndex = 0
 
     public init(urls: [URL], onTap: ImageTapHandler? = nil) {
         self.urls = urls
@@ -14,12 +16,43 @@ public struct DefaultImageView: ImageRenderer {
     }
 
     public var body: some View {
-        if urls.isEmpty {
-            EmptyView()
-        } else if urls.count == 1 {
-            singleImage(urls[0], index: 0)
+        Group {
+            if urls.isEmpty {
+                EmptyView()
+            } else if urls.count == 1 {
+                singleImage(urls[0], index: 0)
+            } else {
+                carousel
+            }
+        }
+        #if os(iOS) || os(tvOS) || os(visionOS)
+        .fullScreenCover(isPresented: $showFullscreen) {
+            FullscreenImageViewer(
+                urls: urls,
+                selectedIndex: $selectedIndex,
+                isPresented: $showFullscreen
+            )
+        }
+        #elseif os(macOS)
+        .sheet(isPresented: $showFullscreen) {
+            FullscreenImageViewer(
+                urls: urls,
+                selectedIndex: $selectedIndex,
+                isPresented: $showFullscreen
+            )
+            .frame(minWidth: 600, minHeight: 400)
+        }
+        #endif
+    }
+
+    private func handleTap(_ url: URL, _ index: Int) {
+        if let onTap {
+            onTap(url, index)
+        } else if let envOnTap {
+            envOnTap(url, index)
         } else {
-            carousel
+            selectedIndex = index
+            showFullscreen = true
         }
     }
 
@@ -55,12 +88,9 @@ public struct DefaultImageView: ImageRenderer {
             .aspectRatio(contentMode: .fit)
             .frame(maxWidth: .infinity)
             .cornerRadius(8)
+            .contentShape(Rectangle())
             .onTapGesture {
-                if let onTap {
-                    onTap(url, index)
-                } else if let envOnTap {
-                    envOnTap(url, index)
-                }
+                handleTap(url, index)
             }
     }
 }

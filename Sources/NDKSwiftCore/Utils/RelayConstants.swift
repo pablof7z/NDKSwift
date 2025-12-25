@@ -94,8 +94,8 @@ public enum RelayConstants {
         nostrBand
     ]
 
-    /// Default outbox relays
-    public static let defaultOutboxRelays: Set<String> = [
+    /// Default discovery relays (for fetching user relay lists)
+    public static let defaultDiscoveryRelays: Set<String> = [
         "wss://purplepag.es"
     ]
 }

@@ -182,23 +182,23 @@ actor NDKSubscriptionRequirement {
             var fallbackFilter = filter
             fallbackFilter.authors = Array(strategy.unknownAuthors)
 
-            // Get fallback relays (explicit relays, not outbox relays)
+            // Get fallback relays (app relays, not discovery relays)
             if let pool = ndk?.pool {
                 let allConnectedRelays = await pool.connectedRelayURLs
-                // Normalize outbox relay URLs to match the format of connected relays
-                let normalizedOutboxRelays = Set((ndk?.outboxConfig.outboxRelays ?? []).map { $0.normalizedRelayURL })
-                var fallbackRelayURLs = allConnectedRelays.subtracting(normalizedOutboxRelays)
+                // Normalize discovery relay URLs to match the format of connected relays
+                let normalizedDiscoveryRelays = Set((ndk?.discoveryConfig.discoveryRelays ?? []).map { $0.normalizedRelayURL })
+                var fallbackRelayURLs = allConnectedRelays.subtracting(normalizedDiscoveryRelays)
 
                 // If no relays are connected (offline mode), use configured relay URLs
                 // This ensures subscriptions are registered for replay when relays connect
                 if fallbackRelayURLs.isEmpty {
-                    // First try explicit relays in the pool
-                    let configuredRelays = await pool.explicitRelays()
-                    fallbackRelayURLs = Set(configuredRelays.map { $0.url }).subtracting(normalizedOutboxRelays)
+                    // First try app relays in the pool
+                    let configuredRelays = await pool.appRelays
+                    fallbackRelayURLs = Set(configuredRelays.map { $0.url }).subtracting(normalizedDiscoveryRelays)
 
                     // If pool is empty (connect() not called yet), use the initial relay URLs
                     if fallbackRelayURLs.isEmpty, let ndk = ndk {
-                        fallbackRelayURLs = Set(ndk.configuredRelayURLs.map { $0.normalizedRelayURL }).subtracting(normalizedOutboxRelays)
+                        fallbackRelayURLs = Set(ndk.configuredRelayURLs.map { $0.normalizedRelayURL }).subtracting(normalizedDiscoveryRelays)
                     }
 
                     if fallbackRelayURLs.isEmpty {
@@ -242,14 +242,10 @@ actor NDKSubscriptionRequirement {
         if relay == nil {
             NDKLogger.log(.info, category: .subscription,
                           "🔌 Relay not in pool, adding and connecting: \(relayURL)")
-            // Determine the correct origin based on whether this is a fallback
-            let origin: NDKRelayOrigin
-            if isFallback {
-                origin = .fallback
-            } else {
-                let originAuthor = filter.authors?.first ?? "unknown"
-                origin = .outbox(authorPubkey: originAuthor)
-            }
+            // Determine the correct origin - fallbacks use appRelays, otherwise track the author
+            let origin: NDKRelayOrigin = isFallback
+                ? .appRelays
+                : .outbox(authorPubkey: filter.authors?.first ?? "unknown")
             relay = await ndk.pool.addRelay(relayURL, origin: origin)
         }
 

@@ -34,15 +34,35 @@ public final class NDKRelayCollection {
     public struct RelayInfo: Identifiable {
         public let id: String
         public let url: String
+        public let origin: NDKRelayOrigin
         public var state: NDKRelayConnectionState
         public var isConnected: Bool { state == .connected }
         public var lastConnectedAt: Date?
         public var lastError: String?
 
-        init(relay: NDKRelay, state: NDKRelayConnectionState) {
+        init(relay: NDKRelay, state: NDKRelayConnectionState, origin: NDKRelayOrigin) {
             id = relay.url
             url = relay.url
+            self.origin = origin
             self.state = state
+        }
+    }
+
+    /// App-provided relays only
+    public var appRelays: [RelayInfo] {
+        relays.filter { $0.origin == .appRelays }
+    }
+
+    /// Discovery relays only (e.g., purplepag.es)
+    public var discoveryRelays: [RelayInfo] {
+        relays.filter { $0.origin == .discovery }
+    }
+
+    /// Outbox-discovered relays only
+    public var outboxRelays: [RelayInfo] {
+        relays.filter {
+            if case .outbox = $0.origin { return true }
+            return false
         }
     }
 
@@ -99,7 +119,8 @@ public final class NDKRelayCollection {
         var initialRelays: [RelayInfo] = []
         for relay in allRelays {
             let state = stateSnapshot[relay.url] ?? .disconnected
-            var info = RelayInfo(relay: relay, state: state)
+            let origin = await relay.origin
+            var info = RelayInfo(relay: relay, state: state, origin: origin)
 
             // Preserve existing metadata if we're refreshing
             if let existing = relays.first(where: { $0.url == relay.url }) {
@@ -163,7 +184,8 @@ public final class NDKRelayCollection {
 
         for relay in allRelays {
             let state = await relay.connectionState
-            var info = RelayInfo(relay: relay, state: state)
+            let origin = await relay.origin
+            var info = RelayInfo(relay: relay, state: state, origin: origin)
 
             // Preserve existing metadata
             if let existing = relays.first(where: { $0.url == relay.url }) {
@@ -201,7 +223,8 @@ public final class NDKRelayCollection {
 
         // Add to our collection
         let state = await relay.connectionState
-        let info = RelayInfo(relay: relay, state: state)
+        let origin = await relay.origin
+        let info = RelayInfo(relay: relay, state: state, origin: origin)
 
         await MainActor.run {
             relays.append(info)
@@ -271,7 +294,8 @@ public final class NDKRelayCollection {
         }
 
         let state = await relay.connectionState
-        let info = RelayInfo(relay: relay, state: state)
+        let origin = await relay.origin
+        let info = RelayInfo(relay: relay, state: state, origin: origin)
 
         await MainActor.run {
             relays.append(info)

@@ -2,14 +2,12 @@ import Foundation
 
 /// Indicates how a relay was added to the pool
 public enum NDKRelayOrigin: Codable, Equatable, Sendable {
-    /// Explicitly added by developer during NDK initialization or via addRelay()
-    case explicit
+    /// App-provided relays (initialization, addRelay(), fallbacks)
+    case appRelays
     /// Discovered through outbox model (from another user's relay list)
-    case outbox(authorPubkey: String) // pubkey whose relay list led to discovery
-    /// Added from NDKOutboxConfig for relay list queries
-    case outboxConfig
-    /// System-added fallback relay (temporary, non-persistent)
-    case fallback
+    case outbox(authorPubkey: String)
+    /// Discovery relays for fetching relay lists (e.g., purplepag.es)
+    case discovery
 }
 
 /// Relay information for NIP-65 (relay list metadata)
@@ -130,7 +128,7 @@ actor RelayStateActor {
     var info: NDKRelayInformation?
 
     // Relay origin tracking
-    var origin: NDKRelayOrigin = .explicit
+    var origin: NDKRelayOrigin = .appRelays
 
     // Persistence flag - persistent relays are never evicted
     var isPersistent: Bool = false
@@ -484,9 +482,9 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
 
     /// Indicates how this relay was added to the pool
     ///
-    /// - `.explicit`: Added by developer during initialization or via addRelay()
+    /// - `.appRelays`: App-provided relays (initialization, addRelay(), fallbacks)
     /// - `.outbox`: Discovered through another user's relay list
-    /// - `.outboxConfig`: Added from NDKOutboxConfig for relay list queries
+    /// - `.discovery`: Discovery relays for fetching relay lists (e.g., purplepag.es)
     public var origin: NDKRelayOrigin {
         get async {
             await stateActor.getOrigin()
@@ -501,8 +499,8 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
     /// Whether this relay is persistent (never evicted from the pool)
     ///
     /// Persistent relays include:
-    /// - Relays explicitly added by the developer
-    /// - Outbox config relays
+    /// - App relays (added by the developer)
+    /// - Discovery relays
     ///
     /// Non-persistent relays may be evicted when idle to conserve resources.
     public var isPersistent: Bool {

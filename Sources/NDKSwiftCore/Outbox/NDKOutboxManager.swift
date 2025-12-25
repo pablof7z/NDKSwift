@@ -677,12 +677,12 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
     private func getRelaysForDiscovery() async -> Set<RelayURL>? {
         let connectedRelays = await ndk.pool.connectedRelayURLs
 
-        if !ndk.outboxConfig.outboxRelays.isEmpty {
-            let normalizedOutboxRelays = Set(ndk.outboxConfig.outboxRelays.map { $0.normalizedRelayURL })
-            let connectedOutboxRelays = normalizedOutboxRelays.intersection(connectedRelays)
+        if !ndk.discoveryConfig.discoveryRelays.isEmpty {
+            let normalizedDiscoveryRelays = Set(ndk.discoveryConfig.discoveryRelays.map { $0.normalizedRelayURL })
+            let connectedDiscoveryRelays = normalizedDiscoveryRelays.intersection(connectedRelays)
 
-            if !connectedOutboxRelays.isEmpty {
-                return connectedOutboxRelays
+            if !connectedDiscoveryRelays.isEmpty {
+                return connectedDiscoveryRelays
             }
         }
 
@@ -707,9 +707,9 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
 
         // For negative cache, check if we'd query the same relays
         if cached.item == nil, let checkedRelays = cached.checkedRelays {
-            let currentOutboxRelays = ndk.outboxConfig.outboxRelays
-            if !currentOutboxRelays.isSubset(of: checkedRelays) {
-                // Some new outbox relays to check
+            let currentDiscoveryRelays = ndk.discoveryConfig.discoveryRelays
+            if !currentDiscoveryRelays.isSubset(of: checkedRelays) {
+                // Some new discovery relays to check
                 return nil
             }
         }

@@ -15,12 +15,62 @@ struct NDKUIMarkdownImageView: View {
     var onNostrEntityTap: ((ContentEntity) -> Void)?
     var onImageTap: ((URL) -> Void)?
 
+    @State private var showFullscreen = false
+    @State private var selectedIndex = 0
+
+    /// All image URLs found in the markdown blocks
+    private var allImageURLs: [URL] {
+        var urls: [URL] = []
+        for block in blocks {
+            urls.append(contentsOf: extractImageURLs(from: block))
+        }
+        return urls
+    }
+
+    private func extractImageURLs(from block: MarkdownBlock) -> [URL] {
+        switch block {
+        case let .paragraph(inlines):
+            return extractImageURLs(from: inlines)
+        case let .blockquote(inlines):
+            return extractImageURLs(from: inlines)
+        case let .list(items, _):
+            return items.flatMap { extractImageURLs(from: $0.content) }
+        default:
+            return []
+        }
+    }
+
+    private func extractImageURLs(from inlines: [MarkdownInline]) -> [URL] {
+        inlines.compactMap { inline in
+            if case let .image(_, url) = inline { return url }
+            return nil
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: configuration.paragraphSpacing) {
             ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
                 renderBlock(block)
             }
         }
+        #if os(iOS) || os(tvOS) || os(visionOS)
+        .fullScreenCover(isPresented: $showFullscreen) {
+            FullscreenImageViewer(
+                urls: allImageURLs,
+                selectedIndex: $selectedIndex,
+                isPresented: $showFullscreen
+            )
+        }
+        #elseif os(macOS)
+        .sheet(isPresented: $showFullscreen) {
+            FullscreenImageViewer(
+                urls: allImageURLs,
+                selectedIndex: $selectedIndex,
+                isPresented: $showFullscreen
+            )
+            .frame(minWidth: 600, minHeight: 400)
+        }
+        #endif
     }
 
     @ViewBuilder
@@ -160,8 +210,9 @@ struct NDKUIMarkdownImageView: View {
                         .aspectRatio(contentMode: .fit)
                         .frame(maxHeight: UIConstants.markdownImageMaxHeight)
                         .cornerRadius(configuration.codeBlockCornerRadius)
+                        .contentShape(Rectangle())
                         .onTapGesture {
-                            onImageTap?(url)
+                            handleImageTap(url)
                         }
                         .accessibilityLabel(alt.isEmpty ? "Image" : alt)
                 }
@@ -337,6 +388,17 @@ struct NDKUIMarkdownImageView: View {
             return "\(pubkey.prefix(8))...\(pubkey.suffix(4))"
         }
         return pubkey
+    }
+
+    private func handleImageTap(_ url: URL) {
+        if let onImageTap {
+            onImageTap(url)
+        } else {
+            if let index = allImageURLs.firstIndex(of: url) {
+                selectedIndex = index
+                showFullscreen = true
+            }
+        }
     }
 
     private func handleLinkTap(_ url: URL) {

@@ -10,6 +10,7 @@ public struct NDKUIRichTextView<
     Hashtag: HashtagRenderer,
     Link: LinkRenderer,
     Image: ImageRenderer,
+    Video: VideoRenderer,
     Event: EventRenderer
 >: View {
     let content: String
@@ -121,9 +122,14 @@ public struct NDKUIRichTextView<
             Hashtag(tag: tag, onTap: nil)
 
         case .url(let url):
-            // Non-image URLs are rendered as links
             // Image URLs are handled by groupConsecutiveImages
-            Link(url: url, onTap: nil)
+            // Video URLs are rendered as video players
+            if isVideoURL(url) {
+                Video(url: url, onTap: nil)
+            } else {
+                // Non-media URLs are rendered as links
+                Link(url: url, onTap: nil)
+            }
 
         case .eventMention(let eventId):
             EventPreviewLoader<Event>(reference: .eventId(eventId), onTap: nil)
@@ -182,6 +188,24 @@ public struct NDKUIRichTextView<
 
         return false
     }
+
+    private func isVideoURL(_ url: URL) -> Bool {
+        let videoExtensions = ["mp4", "mov", "m4v", "webm", "avi", "mkv", "m3u8"]
+        let pathExtension = url.pathExtension.lowercased()
+
+        if videoExtensions.contains(pathExtension) {
+            return true
+        }
+
+        let urlString = url.absoluteString.lowercased()
+        for ext in videoExtensions {
+            if urlString.contains(".\(ext)?") || urlString.contains(".\(ext)&") || urlString.contains(".\(ext)#") {
+                return true
+            }
+        }
+
+        return false
+    }
 }
 
 // MARK: - Default Typealias
@@ -192,6 +216,7 @@ public typealias NDKRichText = NDKUIRichTextView<
     DefaultHashtagView,
     DefaultLinkView,
     DefaultImageView,
+    DefaultVideoView,
     DefaultEventView
 >
 
@@ -264,7 +289,7 @@ struct FlowLayout: Layout {
                 )
                 .ndk(mockNDK)
 
-                NDKUIRichTextView<DefaultMentionView, DefaultHashtagView, DefaultLinkView, DefaultImageView, DefaultEventView>(
+                NDKUIRichTextView<DefaultMentionView, DefaultHashtagView, DefaultLinkView, DefaultImageView, DefaultVideoView, DefaultEventView>(
                     content: "Simple text with #nostr"
                 )
                 .ndk(mockNDK)

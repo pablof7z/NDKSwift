@@ -8,8 +8,8 @@ public enum HintSource: Sendable, Equatable, Hashable {
     case eventObserved
     /// From user's NIP-65 relay list
     case userRelayList
-    /// Explicitly provided by app or user
-    case explicit
+    /// Provided by app configuration
+    case app
 }
 
 /// A recorded relay hint - represents a learned association between an entity and a relay
