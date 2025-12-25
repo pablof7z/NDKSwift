@@ -51,11 +51,10 @@ final class BlossomClientMetadataTests: NDKTestCase {
             )
 
             // Upload with automatic metadata extraction
-            let blob = try await client.uploadWithAuth(
+            let blob = try await client.upload(
                 data: imageData,
                 mimeType: nil, // Let it auto-detect
                 to: "https://example.com",
-                signer: signer,
                 ndk: ndk
             )
 
@@ -94,11 +93,10 @@ final class BlossomClientMetadataTests: NDKTestCase {
             )
 
             // Upload without specifying MIME type
-            let blob = try await client.uploadWithAuth(
+            let blob = try await client.upload(
                 data: imageData,
                 mimeType: nil, // Should be inferred
                 to: "https://example.com",
-                signer: signer,
                 ndk: ndk
             )
 
@@ -131,11 +129,10 @@ final class BlossomClientMetadataTests: NDKTestCase {
         )
 
         // Upload PDF
-        let blob = try await client.uploadWithAuth(
+        let blob = try await client.upload(
             data: pdfData,
             mimeType: "application/pdf",
             to: "https://example.com",
-            signer: signer,
             ndk: ndk
         )
 
@@ -170,11 +167,10 @@ final class BlossomClientMetadataTests: NDKTestCase {
         )
 
         // Upload with explicit non-image MIME type
-        let blob = try await client.uploadWithAuth(
+        let blob = try await client.upload(
             data: data,
             mimeType: "application/octet-stream", // Override auto-detection
             to: "https://example.com",
-            signer: signer,
             ndk: ndk
         )
 
@@ -219,11 +215,10 @@ final class BlossomClientMetadataTests: NDKTestCase {
             )
 
             // Upload PNG with automatic metadata extraction
-            let blob = try await client.uploadWithAuth(
+            let blob = try await client.upload(
                 data: pngData,
                 mimeType: nil, // Auto-detect
                 to: "https://example.com",
-                signer: signer,
                 ndk: ndk
             )
 
