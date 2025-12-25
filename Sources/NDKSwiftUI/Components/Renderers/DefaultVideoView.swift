@@ -44,9 +44,16 @@ public struct DefaultVideoView: VideoRenderer {
         .onDisappear {
             cleanupPlayer()
         }
+        #if os(macOS)
+        .sheet(isPresented: $showFullscreen) {
+            FullscreenVideoPlayer(url: url)
+                .frame(minWidth: 800, minHeight: 450)
+        }
+        #else
         .fullScreenCover(isPresented: $showFullscreen) {
             FullscreenVideoPlayer(url: url)
         }
+        #endif
     }
 
     private var placeholder: some View {
@@ -109,9 +116,11 @@ public struct DefaultVideoView: VideoRenderer {
             forName: .AVPlayerItemDidPlayToEndTime,
             object: player.currentItem,
             queue: .main
-        ) { _ in
-            self.isPlaying = false
-            player.seek(to: .zero)
+        ) { [weak player] _ in
+            Task { @MainActor in
+                self.isPlaying = false
+                player?.seek(to: .zero)
+            }
         }
     }
 

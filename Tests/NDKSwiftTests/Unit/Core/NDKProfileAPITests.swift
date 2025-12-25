@@ -4,7 +4,6 @@ import XCTest
 /// Tests for the simplified profile API
 /// - ndk.profile(for:) -> NDKProfile
 /// - user.profile -> NDKProfile
-/// - ndk.profileUpdates(for:) -> AsyncStream
 @MainActor
 final class NDKProfileAPITests: XCTestCase {
 
@@ -136,30 +135,4 @@ final class NDKProfileAPITests: XCTestCase {
         XCTAssert(userProfile === ndkProfile)
     }
 
-    // MARK: - ndk.profileUpdates(for:) Tests
-
-    func testProfileUpdates_ReturnsAsyncStream() async {
-        // Given a pubkey
-
-        // When getting profile updates
-        let updates = await ndk.profileUpdates(for: testPubkey)
-
-        // Then returns AsyncStream
-        XCTAssert(updates is AsyncStream<NDKUserMetadata?>)
-    }
-
-    func testProfileUpdates_YieldsNilInitiallyWhenNoCachedData() async {
-        // Given a pubkey with no cached data
-
-        // When collecting first update
-        var firstUpdate: NDKUserMetadata??
-        for await update in await ndk.profileUpdates(for: testPubkey) {
-            firstUpdate = update
-            break
-        }
-
-        // Then yields nil (wrapped in Optional)
-        XCTAssertNotNil(firstUpdate)  // Optional is not nil
-        XCTAssertNil(firstUpdate!)     // But contained value is nil
-    }
 }

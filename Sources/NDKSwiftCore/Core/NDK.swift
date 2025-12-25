@@ -108,16 +108,44 @@ public final class NDK {
         NDKPool(ndk: self, config: self.connectionConfig)
     }()
 
-    /// User and profile management
-    public lazy var profileManager: NDKProfileManager = {
-        NDKProfileManager(ndk: self)
-    }()
+    // MARK: - Profile Cache (inlined weak reference registry)
 
-    /// Cache for observable profile instances (MainActor-bound)
+    /// Weak reference wrapper for NDKProfile instances
+    private final class WeakProfile: @unchecked Sendable {
+        weak var value: NDKProfile?
+        init(_ value: NDKProfile) { self.value = value }
+    }
+
+    /// Weak reference storage for profile deduplication
+    /// Profiles deallocate naturally when no longer referenced by views
     @MainActor
-    internal lazy var profileCache: NDKProfileCache = {
-        NDKProfileCache(ndk: self)
-    }()
+    private var profileRegistry: [PublicKey: WeakProfile] = [:]
+
+    /// Cleanup counter for periodic dead reference removal
+    @MainActor
+    private var profileCleanupCounter = 0
+
+    /// Get or create an observable profile for a pubkey (MainActor-bound)
+    /// Returns the same NDKProfile instance for the same pubkey (reference equality)
+    @MainActor
+    internal func getOrCreateProfile(_ pubkey: PublicKey) -> NDKProfile {
+        // Clean up dead references periodically (every 100 accesses)
+        profileCleanupCounter += 1
+        if profileCleanupCounter >= 100 {
+            profileCleanupCounter = 0
+            profileRegistry = profileRegistry.filter { $0.value.value != nil }
+        }
+
+        // Return existing profile if still alive
+        if let existing = profileRegistry[pubkey]?.value {
+            return existing
+        }
+
+        // Create new profile and store weak reference
+        let profile = NDKProfile(pubkey: pubkey, ndk: self)
+        profileRegistry[pubkey] = WeakProfile(profile)
+        return profile
+    }
 
     /// Event tracker for managing event metadata
     public let eventTracker: NDKEventTracker = .init()
@@ -881,12 +909,8 @@ public final class NDK {
     ///   - maxAge: Maximum age before re-verification is needed (default: 24 hours)
     /// - Returns: True if the NIP-05 is verified and belongs to this user
     public func verifyNIP05(for user: NDKUser, maxAge: TimeInterval = TimeConstants.day) async throws -> Bool {
-        var metadata: NDKUserMetadata?
-        for await m in await profileManager.subscribe(for: user.pubkey, maxAge: maxAge) {
-            metadata = m
-            break
-        }
-        guard let nip05 = metadata?.nip05 else { return false }
+        let nip05 = await MainActor.run { profile(for: user.pubkey).metadata?.nip05 }
+        guard let nip05 else { return false }
         return try await nip05Manager.verify(identifier: nip05, expectedPubkey: user.pubkey, maxAge: maxAge)
     }
 

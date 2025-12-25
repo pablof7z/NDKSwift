@@ -124,7 +124,7 @@ private class TestSignatureVerificationDelegate: NDKSignatureVerificationDelegat
         signatureFailureEvents.append((event, relay))
     }
 
-    func relayBlacklisted(_ relay: RelayProtocol) {
+    func relayBlocklisted(_ relay: RelayProtocol) {
         blacklistedRelays.append(relay)
     }
 }

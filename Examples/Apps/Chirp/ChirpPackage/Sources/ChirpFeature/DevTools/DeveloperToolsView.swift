@@ -115,20 +115,6 @@ struct DeveloperToolsView: View {
                 }
             }
 
-            // Cache Tools
-            Section("Cache") {
-                NavigationLink {
-                    ProfileManagerInspectorView()
-                } label: {
-                    ToolRow(
-                        icon: "person.crop.circle.badge.checkmark",
-                        title: "Profile Manager",
-                        subtitle: "Profile cache lookup and statistics",
-                        color: .cyan
-                    )
-                }
-            }
-
             // Logging & Telemetry
             Section("Logging & Telemetry") {
                 NavigationLink {

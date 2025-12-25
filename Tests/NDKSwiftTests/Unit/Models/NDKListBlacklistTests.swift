@@ -15,18 +15,18 @@ final class NDKListBlacklistTests: XCTestCase {
             ["r", "https://relay.example.com"], // Non-mint URL
         ]
 
-        // Test isMintBlacklisted
-        XCTAssertTrue(muteList.isMintBlacklisted("https://mint1.example.com"))
-        XCTAssertTrue(muteList.isMintBlacklisted("https://cashu-mint.example.com"))
-        XCTAssertTrue(muteList.isMintBlacklisted("https://fedimint.example.com"))
-        XCTAssertFalse(muteList.isMintBlacklisted("https://unknownmint.example.com"))
+        // Test isMintBlocklisted
+        XCTAssertTrue(muteList.isMintBlocklisted("https://mint1.example.com"))
+        XCTAssertTrue(muteList.isMintBlocklisted("https://cashu-mint.example.com"))
+        XCTAssertTrue(muteList.isMintBlocklisted("https://fedimint.example.com"))
+        XCTAssertFalse(muteList.isMintBlocklisted("https://unknownmint.example.com"))
 
-        // Test blacklistedMints
-        let blacklistedMints = muteList.blacklistedMints
-        XCTAssertEqual(blacklistedMints.count, 3)
-        XCTAssertTrue(blacklistedMints.contains("https://mint1.example.com"))
-        XCTAssertTrue(blacklistedMints.contains("https://cashu-mint.example.com"))
-        XCTAssertTrue(blacklistedMints.contains("https://fedimint.example.com"))
+        // Test blocklistedMints
+        let blocklistedMints = muteList.blocklistedMints
+        XCTAssertEqual(blocklistedMints.count, 3)
+        XCTAssertTrue(blocklistedMints.contains("https://mint1.example.com"))
+        XCTAssertTrue(blocklistedMints.contains("https://cashu-mint.example.com"))
+        XCTAssertTrue(blocklistedMints.contains("https://fedimint.example.com"))
     }
 
     func testBlockedRelaysList() {
@@ -65,9 +65,9 @@ final class NDKListBlacklistTests: XCTestCase {
         ]
 
         // Should return false/empty for blacklist checks
-        XCTAssertFalse(contactList.isMintBlacklisted("https://mint1.example.com"))
+        XCTAssertFalse(contactList.isMintBlocklisted("https://mint1.example.com"))
         XCTAssertFalse(contactList.isRelayBlocked("wss://relay1.example.com"))
-        XCTAssertTrue(contactList.blacklistedMints.isEmpty)
+        XCTAssertTrue(contactList.blocklistedMints.isEmpty)
         XCTAssertTrue(contactList.blockedRelays.isEmpty)
     }
 

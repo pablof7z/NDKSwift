@@ -81,6 +81,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
             amountMillisats: amountMillisats,
             comment: comment,
             relays: recipientRelays,
+            recipientLnurl: recipientInfo.lightningAddress,
             zappedEvent: event
         )
 

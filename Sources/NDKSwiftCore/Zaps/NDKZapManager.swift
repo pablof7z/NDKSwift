@@ -359,32 +359,30 @@ public actor NDKZapManager: ZapManaging {
 
         // Try to get provider pubkey from recipient's profile
         var providerPubkey: String?
-        for await profile in await ndk.profileManager.subscribe(for: recipientPubkey, maxAge: TimeConstants.hour) {
-            if let profile = profile {
-                // Try to resolve LNURL to get provider pubkey
-                if let lnurlAddress = profile.lud16 ?? profile.lud06 {
-                    do {
-                        let resolution = try await ndk.lnurlResolver.resolve(lnurlAddress)
-                        providerPubkey = resolution.providerPubkey
+        let lnurlAddress = await MainActor.run {
+            ndk.profile(for: recipientPubkey).metadata?.lud16 ??
+            ndk.profile(for: recipientPubkey).metadata?.lud06
+        }
+        if let lnurlAddress {
+            do {
+                let resolution = try await ndk.lnurlResolver.resolve(lnurlAddress)
+                providerPubkey = resolution.providerPubkey
 
-                        // If no provider pubkey from LNURL, check if service allows Nostr
-                        if providerPubkey == nil && resolution.payResponse.allowsNostr == true {
-                            // Some services that allow Nostr might use the recipient's pubkey
-                            // as the zap receipt signer
-                            providerPubkey = receipt.event.pubkey
-                        }
-                    } catch {
-                        NDKLogger.log(.warning, category: .general,
-                                    "Failed to resolve LNURL for \(lnurlAddress): \(error)")
-                        // Fall back to using receipt pubkey
-                        providerPubkey = receipt.event.pubkey
-                    }
-                } else {
-                    // No LNURL configured, use receipt pubkey
+                // If no provider pubkey from LNURL, check if service allows Nostr
+                if providerPubkey == nil && resolution.payResponse.allowsNostr == true {
+                    // Some services that allow Nostr might use the recipient's pubkey
+                    // as the zap receipt signer
                     providerPubkey = receipt.event.pubkey
                 }
+            } catch {
+                NDKLogger.log(.warning, category: .general,
+                            "Failed to resolve LNURL for \(lnurlAddress): \(error)")
+                // Fall back to using receipt pubkey
+                providerPubkey = receipt.event.pubkey
             }
-            break // Only need first value
+        } else {
+            // No LNURL configured, use receipt pubkey
+            providerPubkey = receipt.event.pubkey
         }
 
         guard let providerPubkey = providerPubkey,
