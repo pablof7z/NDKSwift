@@ -1,3 +1,4 @@
+@_exported import Kingfisher
 import NDKSwiftCore
 import SwiftUI
 
