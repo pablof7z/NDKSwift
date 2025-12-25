@@ -330,11 +330,10 @@ public class NDKBlossomServerManager {
 
         for serverUrl in userServers {
             do {
-                let result = try await client.uploadWithAuth(
+                let result = try await client.upload(
                     data: data,
                     mimeType: mimeType,
                     to: serverUrl,
-                    signer: ndk.requireSigner(),
                     ndk: ndk
                 )
                 return result
@@ -358,11 +357,10 @@ public class NDKBlossomServerManager {
 
         for serverUrl in serverUrls {
             do {
-                let result = try await client.uploadWithAuth(
+                let result = try await client.upload(
                     data: data,
                     mimeType: mimeType,
                     to: serverUrl,
-                    signer: ndk.requireSigner(),
                     ndk: ndk
                 )
                 results.append(result)

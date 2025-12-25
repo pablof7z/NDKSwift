@@ -3,27 +3,14 @@ import Foundation
 /// Blossom client for interacting with Blossom servers
 public actor BlossomClient {
     private let networkClient: NDKNetworkClient
-    private let uploadSessionManager: BlossomUploadSessionManager
     private var serverCache: [String: BlossomServerDescriptor] = [:]
-
-    // MARK: - Constants
 
     public init(urlSession: NDKNetworkFetching = URLSession.shared) {
         networkClient = NDKNetworkClient(session: urlSession)
-        uploadSessionManager = BlossomUploadSessionManager()
     }
 
     // MARK: - Private Helpers
 
-    /// Helper method to handle HTTP responses and extract error messages
-    private func handleHTTPResponse(_ response: URLResponse?, data _: Data, serverURL _: String) throws -> HTTPURLResponse {
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw NDKError.invalidResponse(from: "Blossom server")
-        }
-        return httpResponse
-    }
-
-    /// Helper method to create server error with message extraction
     private func createServerError(response: HTTPURLResponse, data: Data, serverURL: String) -> NDKError {
         let errorMessage = String(data: data, encoding: .utf8)
         return NDKError.serverError(relay: serverURL, code: response.statusCode, message: errorMessage)
@@ -33,13 +20,11 @@ public actor BlossomClient {
 
     /// Discover Blossom server capabilities
     public func discoverServer(_ serverURL: String) async throws -> BlossomServerDescriptor {
-        // Check cache first
         if let cached = serverCache[serverURL] {
             return cached
         }
 
         let baseURL = try URLUtils.validateURL(serverURL)
-
         let wellKnownURL = baseURL.appendingPathComponent(".well-known/blossom")
 
         var request = URLRequest(url: wellKnownURL)
@@ -51,10 +36,7 @@ public actor BlossomClient {
                 BlossomServerDescriptor.self,
                 for: request
             )
-
-            // Cache the descriptor
             serverCache[serverURL] = descriptor
-
             return descriptor
         } catch let error as NDKError {
             throw error
@@ -65,29 +47,67 @@ public actor BlossomClient {
 
     // MARK: - BUD-02: Upload
 
-    /// Upload a file to a Blossom server
-    /// - Parameters:
-    ///   - data: The file data to upload
-    ///   - mimeType: Optional MIME type of the file
-    ///   - serverURL: The Blossom server URL
-    ///   - auth: Blossom authentication
-    ///   - configuration: Upload configuration with timeout settings (default: `.default`)
-    ///   - onProgress: Optional callback for upload progress updates
-    /// - Returns: The uploaded blob descriptor
+    /// Upload a file to a Blossom server with progress streaming
+    /// - Returns: AsyncThrowingStream that yields progress events and completes with the uploaded blob
     public func upload(
         data: Data,
         mimeType: String? = nil,
         to serverURL: String,
-        auth: BlossomAuth,
-        configuration: BlossomUploadConfiguration = .default,
-        onProgress: (@Sendable (BlossomUploadProgress) -> Void)? = nil
-    ) async throws -> BlossomBlob {
-        let baseURL = try URLUtils.validateURL(serverURL)
+        ndk: NDK,
+        configuration: BlossomUploadConfiguration = .default
+    ) -> AsyncThrowingStream<BlossomUploadEvent, Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    let blob = try await performUpload(
+                        data: data,
+                        mimeType: mimeType,
+                        to: serverURL,
+                        ndk: ndk,
+                        configuration: configuration
+                    ) { bytesSent, totalBytes in
+                        continuation.yield(.progress(bytesSent: bytesSent, totalBytes: totalBytes))
+                    }
+                    continuation.yield(.completed(blob))
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
+    }
 
-        // Calculate SHA256
+    /// Upload and await only the final result (no progress tracking)
+    public func upload(
+        data: Data,
+        mimeType: String? = nil,
+        to serverURL: String,
+        ndk: NDK,
+        configuration: BlossomUploadConfiguration = .default
+    ) async throws -> BlossomBlob {
+        try await performUpload(
+            data: data,
+            mimeType: mimeType,
+            to: serverURL,
+            ndk: ndk,
+            configuration: configuration,
+            onProgress: nil
+        )
+    }
+
+    private func performUpload(
+        data: Data,
+        mimeType: String?,
+        to serverURL: String,
+        ndk: NDK,
+        configuration: BlossomUploadConfiguration,
+        onProgress: (@Sendable (Int64, Int64) -> Void)?
+    ) async throws -> BlossomBlob {
+        let signer = try ndk.requireSigner()
+        let baseURL = try URLUtils.validateURL(serverURL)
         let sha256Hex = Crypto.sha256(data).hexString
 
-        // Check if we need to discover the server first
+        // Discover server capabilities (optional - failures are non-fatal)
         let descriptor: BlossomServerDescriptor?
         do {
             descriptor = try await discoverServer(serverURL)
@@ -96,84 +116,122 @@ public actor BlossomClient {
             descriptor = nil
         }
 
-        // Validate file size if server has limits
+        // Validate constraints
         if let maxSize = descriptor?.maxUploadSize, data.count > maxSize {
             throw NDKError.fileTooLarge(maxSize: maxSize)
         }
 
-        // Validate mime type if server has restrictions
+        let finalMimeType = mimeType ?? BlossomMediaProcessor.inferMimeType(from: data)
+
         if let acceptedTypes = descriptor?.acceptsMimeTypes,
-           let mimeType = mimeType,
-           !acceptedTypes.contains(mimeType) && !acceptedTypes.contains("*/*")
+           !acceptedTypes.contains(finalMimeType) && !acceptedTypes.contains("*/*")
         {
-            throw NDKError.unsupportedMimeType(mimeType)
+            throw NDKError.unsupportedMimeType(finalMimeType)
         }
 
-        // Construct upload URL
+        // Create auth
+        let auth = try await BlossomAuth.createUploadAuth(
+            sha256: sha256Hex,
+            size: Int64(data.count),
+            mimeType: finalMimeType,
+            signer: signer,
+            ndk: ndk,
+            expiration: nil
+        )
+
+        // Build request
         let uploadPath = descriptor?.uploadUrl ?? "/upload"
         let uploadURL = baseURL.appendingPathComponent(uploadPath)
 
         var request = URLRequest(url: uploadURL)
         request.httpMethod = HTTPConstants.methodPut
-        // Note: We don't set httpBody here since we pass data separately to the upload session
+        request.setValue(finalMimeType, forHTTPHeaderField: HTTPConstants.headerContentType)
+        request.setValue(try auth.authorizationHeaderValue(), forHTTPHeaderField: HTTPConstants.headerAuthorization)
 
-        // Set headers
-        if let mimeType = mimeType {
-            request.setValue(mimeType, forHTTPHeaderField: HTTPConstants.headerContentType)
-        }
+        // Create session with custom timeouts
+        let sessionConfig = URLSessionConfiguration.default
+        sessionConfig.timeoutIntervalForRequest = configuration.timeoutIntervalForRequest
+        sessionConfig.timeoutIntervalForResource = configuration.timeoutIntervalForResource
+        sessionConfig.httpAdditionalHeaders = [HTTPConstants.headerUserAgent: HTTPConstants.userAgentNDKSwift]
 
-        let authHeader = try auth.authorizationHeaderValue()
-        request.setValue(authHeader, forHTTPHeaderField: HTTPConstants.headerAuthorization)
+        // Perform upload with optional progress tracking
+        let (responseData, httpResponse) = try await performURLSessionUpload(
+            request: request,
+            data: data,
+            configuration: sessionConfig,
+            onProgress: onProgress
+        )
 
-        do {
-            // Use upload session manager for progress tracking and custom timeouts
-            let (responseData, httpResponse) = try await uploadSessionManager.upload(
-                request: request,
-                data: data,
-                configuration: configuration,
-                onProgress: onProgress
+        // Handle response
+        switch httpResponse.statusCode {
+        case HTTPStatusCode.ok, HTTPStatusCode.created:
+            let uploadDescriptor = try JSONCoding.decode(BlossomUploadDescriptor.self, from: responseData)
+
+            guard uploadDescriptor.sha256 == sha256Hex else {
+                throw NDKError.invalidSHA256(sha256Hex)
+            }
+
+            // Extract dimensions for images
+            var dimensions: (width: Int, height: Int)?
+            if BlossomMediaProcessor.isProcessableImageType(finalMimeType) {
+                dimensions = BlossomMediaProcessor.processImage(data)
+            }
+
+            return BlossomBlob(
+                sha256: uploadDescriptor.sha256,
+                url: uploadDescriptor.url,
+                size: uploadDescriptor.size,
+                type: uploadDescriptor.type,
+                uploaded: Date(nostrTimestamp: uploadDescriptor.uploaded),
+                dimensions: dimensions
             )
 
-            // Handle HTTP status codes
-            switch httpResponse.statusCode {
-            case HTTPStatusCode.ok, HTTPStatusCode.created:
-                let uploadDescriptor = try JSONCoding.decode(BlossomUploadDescriptor.self, from: responseData)
-
-                // Verify SHA256 matches
-                guard uploadDescriptor.sha256 == sha256Hex else {
-                    throw NDKError.invalidSHA256(sha256Hex)
-                }
-
-                return BlossomBlob(
-                    sha256: uploadDescriptor.sha256,
-                    url: uploadDescriptor.url,
-                    size: uploadDescriptor.size,
-                    type: uploadDescriptor.type,
-                    uploaded: Date(nostrTimestamp: uploadDescriptor.uploaded)
-                )
-
-            case HTTPStatusCode.badRequest:
-                if descriptor?.maxUploadSize != nil {
-                    throw NDKError.fileTooLarge(maxSize: descriptor?.maxUploadSize ?? 0)
-                }
-                throw NDKError.unsupportedMimeType(mimeType ?? "unknown")
-
-            case HTTPStatusCode.unauthorized:
-                throw NDKError.unauthorized(relay: serverURL, message: ErrorMessageConstants.Messages.blossomAuthorizationFailed)
-
-            case HTTPStatusCode.tooManyRequests:
-                throw NDKError.uploadFailed(reason: "Rate limited by Blossom server")
-
-            default:
-                throw createServerError(response: httpResponse, data: responseData, serverURL: serverURL)
+        case HTTPStatusCode.badRequest:
+            if descriptor?.maxUploadSize != nil {
+                throw NDKError.fileTooLarge(maxSize: descriptor?.maxUploadSize ?? 0)
             }
-        } catch NDKError.invalidResponse {
-            // Map generic errors to Blossom-specific ones where needed
-            throw NDKError.uploadFailed(reason: "Invalid response from Blossom server")
-        } catch let error as NDKError {
-            throw error
-        } catch {
-            throw NDKError.networkError(for: serverURL, operation: "Blossom upload", error: error)
+            throw NDKError.unsupportedMimeType(finalMimeType)
+
+        case HTTPStatusCode.unauthorized:
+            throw NDKError.unauthorized(relay: serverURL, message: ErrorMessageConstants.Messages.blossomAuthorizationFailed)
+
+        case HTTPStatusCode.tooManyRequests:
+            throw NDKError.uploadFailed(reason: "Rate limited by Blossom server")
+
+        default:
+            throw createServerError(response: httpResponse, data: responseData, serverURL: serverURL)
+        }
+    }
+
+    private func performURLSessionUpload(
+        request: URLRequest,
+        data: Data,
+        configuration: URLSessionConfiguration,
+        onProgress: (@Sendable (Int64, Int64) -> Void)?
+    ) async throws -> (Data, HTTPURLResponse) {
+        if let onProgress = onProgress {
+            // Use delegate-based upload for progress tracking
+            return try await withCheckedThrowingContinuation { continuation in
+                let delegate = UploadProgressDelegate(
+                    onProgress: onProgress,
+                    onComplete: { result in
+                        continuation.resume(with: result)
+                    }
+                )
+                let session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
+                let task = session.uploadTask(with: request, from: data)
+                delegate.session = session
+                task.resume()
+            }
+        } else {
+            // Simple upload without progress
+            let session = URLSession(configuration: configuration)
+            defer { session.invalidateAndCancel() }
+            let (responseData, response) = try await session.upload(for: request, from: data)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw NDKError.invalidResponse(from: "Non-HTTP response received")
+            }
+            return (responseData, httpResponse)
         }
     }
 
@@ -182,10 +240,11 @@ public actor BlossomClient {
     /// List blobs on a Blossom server
     public func list(
         from serverURL: String,
-        auth: BlossomAuth,
+        ndk: NDK,
         since: Date? = nil,
         until: Date? = nil
     ) async throws -> [BlossomBlob] {
+        let signer = try ndk.requireSigner()
         let baseURL = try URLUtils.validateURL(serverURL)
 
         let descriptor: BlossomServerDescriptor?
@@ -199,7 +258,6 @@ public actor BlossomClient {
 
         var urlComponents = URLComponents(url: baseURL.appendingPathComponent(listPath), resolvingAgainstBaseURL: true)!
 
-        // Add query parameters
         var queryItems: [URLQueryItem] = []
         if let since = since {
             queryItems.append(URLQueryItem(name: "since", value: String(Timestamp.from(since))))
@@ -216,12 +274,17 @@ public actor BlossomClient {
             throw NDKError.invalidURL(serverURL)
         }
 
+        let auth = try await BlossomAuth.createListAuth(
+            signer: signer,
+            ndk: ndk,
+            since: since,
+            until: until
+        )
+
         var request = URLRequest(url: listURL)
         request.httpMethod = HTTPConstants.methodGet
         request.setValue(HTTPConstants.contentTypeApplicationJSON, forHTTPHeaderField: HTTPConstants.headerAccept)
-
-        let authHeader = try auth.authorizationHeaderValue()
-        request.setValue(authHeader, forHTTPHeaderField: HTTPConstants.headerAuthorization)
+        request.setValue(try auth.authorizationHeaderValue(), forHTTPHeaderField: HTTPConstants.headerAuthorization)
 
         do {
             let listResponse = try await networkClient.fetchAndDecode(
@@ -253,28 +316,32 @@ public actor BlossomClient {
     public func delete(
         sha256: String,
         from serverURL: String,
-        auth: BlossomAuth
+        ndk: NDK,
+        reason: String? = nil
     ) async throws {
+        let signer = try ndk.requireSigner()
         let baseURL = try URLUtils.validateURL(serverURL)
-
         let deleteURL = baseURL.appendingPathComponent(sha256)
+
+        let auth = try await BlossomAuth.createDeleteAuth(
+            sha256: sha256,
+            signer: signer,
+            ndk: ndk,
+            reason: reason
+        )
 
         var request = URLRequest(url: deleteURL)
         request.httpMethod = HTTPConstants.methodDelete
-
-        let authHeader = try auth.authorizationHeaderValue()
-        request.setValue(authHeader, forHTTPHeaderField: HTTPConstants.headerAuthorization)
+        request.setValue(try auth.authorizationHeaderValue(), forHTTPHeaderField: HTTPConstants.headerAuthorization)
 
         do {
             let (_, httpResponse) = try await networkClient.fetchAndValidateData(for: request)
 
             switch httpResponse.statusCode {
             case HTTPStatusCode.ok, HTTPStatusCode.noContent:
-                // Success
                 return
 
             default:
-                // This shouldn't happen as fetchAndValidateData handles errors
                 throw NDKError.serverError(relay: serverURL, code: httpResponse.statusCode, message: nil)
             }
         } catch NDKError.unauthorized {
@@ -290,7 +357,7 @@ public actor BlossomClient {
 
     // MARK: - Download
 
-    /// Download a blob from a Blossom server
+    /// Download a blob from a Blossom server (no auth required)
     public func download(
         sha256: String,
         from serverURL: String
@@ -302,8 +369,6 @@ public actor BlossomClient {
 
         do {
             let data = try await networkClient.fetchData(with: request)
-
-            // Verify SHA256
             let downloadedHex = Crypto.sha256(data).hexString
 
             guard downloadedHex == sha256 else {
@@ -319,107 +384,47 @@ public actor BlossomClient {
             throw NDKError.networkError(for: serverURL, operation: "Blossom download", error: error)
         }
     }
+}
 
-    // MARK: - Convenience Methods
+// MARK: - Upload Progress Delegate
 
-    /// Upload with automatic auth creation and metadata extraction
-    /// - Parameters:
-    ///   - data: The file data to upload
-    ///   - mimeType: Optional MIME type (will be inferred if not provided)
-    ///   - serverURL: The Blossom server URL
-    ///   - signer: The signer for creating auth
-    ///   - ndk: The NDK instance
-    ///   - expiration: Optional auth expiration date
-    ///   - configuration: Upload configuration with timeout settings (default: `.default`)
-    ///   - onProgress: Optional callback for upload progress updates
-    /// - Returns: The uploaded blob descriptor with metadata
-    public func uploadWithAuth(
-        data: Data,
-        mimeType: String? = nil,
-        to serverURL: String,
-        signer: NDKSigner,
-        ndk: NDK,
-        expiration: Date? = nil,
-        configuration: BlossomUploadConfiguration = .default,
-        onProgress: (@Sendable (BlossomUploadProgress) -> Void)? = nil
-    ) async throws -> BlossomBlob {
-        // Calculate SHA256
-        let sha256Hex = Crypto.sha256(data).hexString
+private final class UploadProgressDelegate: NSObject, URLSessionTaskDelegate, URLSessionDataDelegate, @unchecked Sendable {
+    private let onProgress: @Sendable (Int64, Int64) -> Void
+    private let onComplete: @Sendable (Result<(Data, HTTPURLResponse), Error>) -> Void
+    private var responseData = Data()
+    private var response: HTTPURLResponse?
+    var session: URLSession?
 
-        // Determine MIME type if not provided
-        let finalMimeType = mimeType ?? BlossomMediaProcessor.inferMimeType(from: data)
+    init(
+        onProgress: @escaping @Sendable (Int64, Int64) -> Void,
+        onComplete: @escaping @Sendable (Result<(Data, HTTPURLResponse), Error>) -> Void
+    ) {
+        self.onProgress = onProgress
+        self.onComplete = onComplete
+    }
 
-        // Extract media metadata if it's an image
-        var dimensions: (width: Int, height: Int)?
+    func urlSession(_ session: URLSession, task: URLSessionTask, didSendBodyData bytesSent: Int64, totalBytesSent: Int64, totalBytesExpectedToSend: Int64) {
+        onProgress(totalBytesSent, totalBytesExpectedToSend)
+    }
 
-        if BlossomMediaProcessor.isProcessableImageType(finalMimeType) {
-            dimensions = BlossomMediaProcessor.processImage(data)
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+        self.response = response as? HTTPURLResponse
+        completionHandler(.allow)
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        responseData.append(data)
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        defer { self.session?.invalidateAndCancel() }
+
+        if let error = error {
+            onComplete(.failure(error))
+        } else if let response = response {
+            onComplete(.success((responseData, response)))
+        } else {
+            onComplete(.failure(NDKError.invalidResponse(from: "No HTTP response")))
         }
-
-        // Create auth
-        let auth = try await BlossomAuth.createUploadAuth(
-            sha256: sha256Hex,
-            size: Int64(data.count),
-            mimeType: finalMimeType,
-            signer: signer,
-            ndk: ndk,
-            expiration: expiration
-        )
-
-        // Upload the file with progress tracking
-        let blob = try await upload(
-            data: data,
-            mimeType: finalMimeType,
-            to: serverURL,
-            auth: auth,
-            configuration: configuration,
-            onProgress: onProgress
-        )
-
-        // Return blob with extracted metadata
-        return BlossomBlob(
-            sha256: blob.sha256,
-            url: blob.url,
-            size: blob.size,
-            type: blob.type,
-            uploaded: blob.uploaded,
-            dimensions: dimensions
-        )
-    }
-
-    /// Delete with automatic auth creation
-    public func deleteWithAuth(
-        sha256: String,
-        from serverURL: String,
-        signer: NDKSigner,
-        ndk: NDK,
-        reason: String? = nil
-    ) async throws {
-        let auth = try await BlossomAuth.createDeleteAuth(
-            sha256: sha256,
-            signer: signer,
-            ndk: ndk,
-            reason: reason
-        )
-
-        try await delete(sha256: sha256, from: serverURL, auth: auth)
-    }
-
-    /// List with automatic auth creation
-    public func listWithAuth(
-        from serverURL: String,
-        signer: NDKSigner,
-        ndk: NDK,
-        since: Date? = nil,
-        until: Date? = nil
-    ) async throws -> [BlossomBlob] {
-        let auth = try await BlossomAuth.createListAuth(
-            signer: signer,
-            ndk: ndk,
-            since: since,
-            until: until
-        )
-
-        return try await list(from: serverURL, auth: auth, since: since, until: until)
     }
 }
