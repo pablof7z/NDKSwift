@@ -198,12 +198,11 @@ public struct ShowcaseTabView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 // Author header
-                NDKUIEventAuthorHeader(
-                    ndk: ndk,
-                    pubkey: event.pubkey,
-                    timestamp: event.createdAt,
-                    style: .minimal
-                )
+                HStack(spacing: 6) {
+                    NDKUIProfilePicture(ndk: ndk, pubkey: event.pubkey, size: 24)
+                    NDKUIUsername(ndk: ndk, pubkey: event.pubkey)
+                        .font(.caption)
+                }
 
                 // Content preview
                 switch renderMode {

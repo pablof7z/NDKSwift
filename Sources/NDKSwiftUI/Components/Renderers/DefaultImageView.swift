@@ -1,3 +1,4 @@
+import Kingfisher
 import SwiftUI
 
 /// Default implementation of ImageRenderer that displays images with tap support
@@ -13,19 +14,18 @@ public struct DefaultImageView: ImageRenderer {
     }
 
     public var body: some View {
-        CachedAsyncImage(url: url) { image in
-            image
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(maxWidth: .infinity)
-                .onTapGesture {
-                    (onTap ?? envOnTap)?(url)
-                }
-        } placeholder: {
-            ProgressView()
-                .frame(maxWidth: .infinity)
-                .frame(height: 200)
-        }
-        .cornerRadius(8)
+        KFImage(url)
+            .resizable()
+            .placeholder {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 200)
+            }
+            .aspectRatio(contentMode: .fit)
+            .frame(maxWidth: .infinity)
+            .cornerRadius(8)
+            .onTapGesture {
+                (onTap ?? envOnTap)?(url)
+            }
     }
 }

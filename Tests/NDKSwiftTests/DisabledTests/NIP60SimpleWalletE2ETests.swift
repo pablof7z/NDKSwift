@@ -66,8 +66,8 @@ final class NIP60SimpleWalletE2ETest: XCTestCase {
         )
 
         for try await status in depositStream {
-            if case let .minted(proofs) = status {
-                print("✅ Deposit completed with \(proofs.count) proofs")
+            if case let .minted(amount) = status {
+                print("✅ Deposit completed with \(amount) sats")
                 break
             }
         }

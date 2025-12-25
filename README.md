@@ -82,11 +82,9 @@ import NDKSwiftUI
 // Profile pictures with automatic caching
 NDKUIProfilePicture(ndk: ndk, pubkey: userPubkey, size: 50)
 
-// Event view with cached embedded images
-NDKUIEventView(event: event, ndk: ndk)
-    .onEventTapped { event in
-        // Handle tap
-    }
+// Rich text with automatic entity parsing
+NDKRichText(content: event.content)
+    .ndk(ndk)
 
 // Markdown with cached inline images
 NDKUIMarkdownRenderer(content: event.content, ndk: ndk)

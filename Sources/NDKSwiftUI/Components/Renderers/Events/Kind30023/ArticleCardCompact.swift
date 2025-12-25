@@ -1,8 +1,6 @@
-import SwiftUI
+import Kingfisher
 import NDKSwiftCore
-#if canImport(UIKit)
-import UIKit
-#endif
+import SwiftUI
 
 /// Compact article card renderer showing title, summary, and thumbnail
 /// Best for feed/list views where space is limited
@@ -12,13 +10,6 @@ public struct ArticleCardCompact: ArticleCardRenderer {
 
     @Environment(\.ndk) private var ndk
     @Environment(\.onEventTap) private var envOnTap
-
-    // MARK: - Metadata
-
-    public static var supportedKinds: [Int] { [30023] }
-    public static var variant: String { "compact" }
-    public static var category: String { "article" }
-    public static var priority: Int { 5 }
 
     // MARK: - Initialization
 
@@ -33,16 +24,12 @@ public struct ArticleCardCompact: ArticleCardRenderer {
         HStack(spacing: 12) {
             // Thumbnail
             if let imageURL = article.imageURL {
-                CachedAsyncImage(url: imageURL) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.2))
-                }
-                .frame(width: 80, height: 80)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                KFImage(imageURL)
+                    .resizable()
+                    .placeholder { Rectangle().fill(Color.gray.opacity(0.2)) }
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 80, height: 80)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
             }
 
             // Content

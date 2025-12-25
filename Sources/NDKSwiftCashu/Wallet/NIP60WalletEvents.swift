@@ -37,7 +37,7 @@ public struct NIP60WalletEvent {
 
 /// AsyncSequence implementation for streaming NIP-60 wallet events
 /// Provides a way to observe wallet state changes asynchronously
-public final class NIP60WalletEventStream: AsyncSequence {
+public final class NIP60WalletEventStream: AsyncSequence, @unchecked Sendable {
     public typealias Element = NIP60WalletEvent
 
     private let stream: AsyncStream<NIP60WalletEvent>

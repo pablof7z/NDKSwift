@@ -301,8 +301,8 @@ struct NIP60WalletREPL {
                     switch status {
                     case .pending:
                         print("⏳ Waiting for payment...")
-                    case let .minted(proofs):
-                        print("✅ Payment received! Minted \(proofs.count) proofs")
+                    case let .minted(amount):
+                        print("✅ Payment received! Minted \(amount) sats")
                         let newBalance = try await wallet.getBalance() ?? 0
                         print("💰 New balance: \(newBalance) sats")
                         keyboardTask.cancel()

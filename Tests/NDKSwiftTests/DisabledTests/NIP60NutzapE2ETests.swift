@@ -274,10 +274,9 @@ final class NIP60NutzapE2ETests: XCTestCase {
                 switch status {
                 case .pending:
                     print("   ⏳ Status: PENDING - Invoice not yet paid")
-                case let .minted(proofs):
+                case let .minted(amount):
                     print("   ✅ Status: MINTED - Payment confirmed!")
-                    print("   💎 Received \(proofs.count) proofs")
-                    print("   💰 Total value: \(proofs.reduce(0) { $0 + $1.amount }) sats")
+                    print("   💰 Total value: \(amount) sats")
                     depositCompleted = true
                 case .expired:
                     print("   ❌ Status: EXPIRED")

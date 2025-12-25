@@ -43,7 +43,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
 
     // MARK: - Event Stream
 
-    public let events = NIP60WalletEventStream()
+    public nonisolated let events = NIP60WalletEventStream()
 
     // MARK: - Blacklist Cache
 
