@@ -78,7 +78,7 @@ struct FollowPackFeedView: View {
             }
         }
         .padding(.vertical, 12)
-        .background(Color(white: 0.05))
+        .background(Color(.secondarySystemBackground))
     }
 
     // MARK: - Empty State

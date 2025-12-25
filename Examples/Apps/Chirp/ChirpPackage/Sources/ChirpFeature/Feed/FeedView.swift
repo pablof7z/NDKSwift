@@ -244,14 +244,9 @@ struct FeedPostRow: View {
                     }
 
                     // Post content
-                    NDKUIEventView(
-                        ndk: ndk,
-                        event: event,
-                        style: .feed,
-                        showAuthor: false,
-                        showTimestamp: false,
-                        showInteractions: false
-                    )
+                    Text(event.content)
+                        .font(.body)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     // Action bar
                     actionBar
