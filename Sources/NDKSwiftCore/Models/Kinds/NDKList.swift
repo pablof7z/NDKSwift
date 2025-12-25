@@ -514,18 +514,6 @@ public class NDKList {
 
 // MARK: - NDKListItem Implementations
 
-extension NDKUser: NDKListItem {
-    public func toListTag() async -> Tag {
-        return [NostrConstants.TagName.pubkey, pubkey]
-    }
-
-    public var reference: String {
-        get async {
-            pubkey
-        }
-    }
-}
-
 extension NDKEvent: NDKListItem {
     public func toListTag() async -> Tag {
         if isParameterizedReplaceable {

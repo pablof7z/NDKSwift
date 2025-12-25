@@ -14,7 +14,7 @@ public struct NDKNutzap {
     /// Create a new nutzap event
     public static func create(
         ndk: NDK,
-        recipient: NDKUser,
+        recipient: PublicKey,
         proofs: [CashuSwift.Proof],
         mint: URL,
         comment: String? = nil,
@@ -31,7 +31,7 @@ public struct NDKNutzap {
         tags.append([NostrConstants.TagName.url, mint.absoluteString])
 
         // Add recipient
-        tags.append([NostrConstants.TagName.pubkey, recipient.pubkey])
+        tags.append([NostrConstants.TagName.pubkey, recipient])
 
         // Add amount tag
         tags.append([NostrConstants.TagName.amount, String(totalAmount)])

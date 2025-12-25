@@ -9,7 +9,7 @@ public actor NIP05Manager {
     private let networkClient = NDKNetworkClient()
 
     /// In-flight requests to prevent duplicate network calls
-    private var inFlightRequests: [String: Task<NDKUser?, Error>] = [:]
+    private var inFlightRequests: [String: Task<PublicKey?, Error>] = [:]
 
     /// Default TTL for cache entries (24 hours)
     public static let defaultTTL: TimeInterval = TimeConstants.nip05CacheTTL
@@ -29,17 +29,17 @@ public actor NIP05Manager {
 
     // MARK: - Public API
 
-    /// Resolve a NIP-05 identifier to a user
+    /// Resolve a NIP-05 identifier to a public key
     /// - Parameters:
     ///   - identifier: The NIP-05 identifier (e.g., "alice@example.com")
     ///   - forceVerify: If true, bypasses cache and forces network verification
     ///   - maxAge: Maximum age of cached data to consider fresh (default: 24 hours)
-    /// - Returns: The NDKUser if found and verified, nil otherwise
-    public func resolveUser(
+    /// - Returns: The PublicKey if found and verified, nil otherwise
+    public func resolvePubkey(
         identifier: String,
         forceVerify: Bool = false,
         maxAge: TimeInterval = defaultTTL
-    ) async throws -> NDKUser? {
+    ) async throws -> PublicKey? {
         let normalizedIdentifier = identifier.normalized
 
         // Check if there's already an in-flight request
@@ -49,8 +49,8 @@ public actor NIP05Manager {
         }
 
         // Create new task for this request
-        let task = Task<NDKUser?, Error> {
-            try await performResolveUser(
+        let task = Task<PublicKey?, Error> {
+            try await performResolvePubkey(
                 identifier: normalizedIdentifier,
                 forceVerify: forceVerify,
                 maxAge: maxAge
@@ -111,10 +111,10 @@ public actor NIP05Manager {
         expectedPubkey: String,
         maxAge: TimeInterval = defaultTTL
     ) async throws -> Bool {
-        guard let user = try await resolveUser(identifier: identifier, maxAge: maxAge) else {
+        guard let pubkey = try await resolvePubkey(identifier: identifier, maxAge: maxAge) else {
             return false
         }
-        return user.pubkey == expectedPubkey
+        return pubkey == expectedPubkey
     }
 
     /// Process a metadata event to extract NIP-05 identifier
@@ -169,7 +169,7 @@ public actor NIP05Manager {
             for entry in unverifiedEntries {
                 group.addTask {
                     do {
-                        _ = try await self.resolveUser(
+                        _ = try await self.resolvePubkey(
                             identifier: entry.identifier,
                             forceVerify: true
                         )
@@ -219,17 +219,17 @@ public actor NIP05Manager {
 
     // MARK: - Private Implementation
 
-    private func performResolveUser(
+    private func performResolvePubkey(
         identifier: String,
         forceVerify: Bool,
         maxAge: TimeInterval
-    ) async throws -> NDKUser? {
+    ) async throws -> PublicKey? {
         // Step 1: Check memory cache
         if !forceVerify {
             if let cached = await checkMemoryCache(identifier: identifier, maxAge: maxAge) {
-                if cached.status == .verified, let user = cached.toUser(ndk: ndk) {
+                if cached.status == .verified, !cached.pubkey.isEmpty {
                     NDKLogger.log(.debug, category: .network, "✅ NIP-05: Memory cache hit for \(identifier)")
-                    return user
+                    return cached.pubkey
                 } else if cached.status == .invalid || cached.status == .failed {
                     NDKLogger.log(.debug, category: .network, "❌ NIP-05: Cached failure for \(identifier)")
                     return nil
@@ -243,9 +243,9 @@ public actor NIP05Manager {
                 // Update memory cache
                 await memoryCache.set(identifier, value: cached)
 
-                if cached.status == .verified, let user = cached.toUser(ndk: ndk) {
+                if cached.status == .verified, !cached.pubkey.isEmpty {
                     NDKLogger.log(.debug, category: .network, "✅ NIP-05: Database cache hit for \(identifier)")
-                    return user
+                    return cached.pubkey
                 } else if cached.status == .invalid || cached.status == .failed {
                     NDKLogger.log(.debug, category: .network, "❌ NIP-05: Cached failure for \(identifier)")
                     return nil
@@ -287,7 +287,7 @@ public actor NIP05Manager {
 
     private func performNetworkVerification(
         identifier: String
-    ) async throws -> NDKUser? {
+    ) async throws -> PublicKey? {
         // Parse identifier
         let parts = identifier.split(separator: "@")
         guard parts.count == 2 else {
@@ -399,8 +399,7 @@ public actor NIP05Manager {
 
         NDKLogger.log(.info, category: .network, "✅ NIP-05: Verified \(identifier) -> \(pubkey)")
 
-        // Create and return user
-        return NDKUser(pubkey: pubkey, ndk: ndk)
+        return pubkey
     }
 }
 
@@ -413,13 +412,6 @@ public struct NIP05CacheStatistics {
     public let invalidEntries: Int
     public let failedEntries: Int
     public let memoryHitRate: Double
-}
-
-extension NIP05CacheEntry {
-    func toUser(ndk: NDK) -> NDKUser? {
-        guard status == .verified, !pubkey.isEmpty else { return nil }
-        return NDKUser(pubkey: pubkey, ndk: ndk)
-    }
 }
 
 // MARK: - Additional Error Helpers

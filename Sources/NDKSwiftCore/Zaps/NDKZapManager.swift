@@ -63,8 +63,7 @@ public actor NDKZapManager: ZapManaging {
     // MARK: - Recipient Info Management
 
     /// Fetch all zap-related info for a recipient in one go
-    public func fetchRecipientZapInfo(for user: NDKUser, maxAge: TimeInterval = TimeConstants.day) async -> RecipientZapInfo {
-        let pubkey = user.pubkey
+    public func fetchRecipientZapInfo(for pubkey: PublicKey, maxAge: TimeInterval = TimeConstants.day) async -> RecipientZapInfo {
 
         // Check cache first
         if let cached = recipientInfoCache[pubkey], cached.isFresh(maxAge: maxAge) {
@@ -137,7 +136,7 @@ public actor NDKZapManager: ZapManaging {
     /// Smart zap with automatic protocol and payment provider selection
     public func zap(
         event: NDKEvent? = nil,
-        to recipient: NDKUser,
+        to pubkey: PublicKey,
         amountSats: Int64,
         comment: String? = nil,
         preferredType: ZapType? = nil,
@@ -145,7 +144,7 @@ public actor NDKZapManager: ZapManaging {
     ) async throws -> ZapResult {
         NDKLogger.log(.debug, category: .wallet, "// 1. Fetch all recipient info ONCE")
         // 1. Fetch all recipient info ONCE
-        let recipientInfo = await fetchRecipientZapInfo(for: recipient)
+        let recipientInfo = await fetchRecipientZapInfo(for: pubkey)
 
         NDKLogger.log(.debug, category: .wallet, "// 2. Select zap protocol based on available options")
         // 2. Select zap protocol based on available options
@@ -245,10 +244,10 @@ public actor NDKZapManager: ZapManaging {
         throw ZapError.noWalletConfigured
     }
 
-    /// Subscribe to zaps for an event or user (reactive, event-driven approach)
+    /// Subscribe to zaps for an event or pubkey (reactive, event-driven approach)
     public func subscribeToZaps(
         for event: NDKEvent? = nil,
-        user: NDKUser? = nil
+        pubkey: PublicKey? = nil
     ) -> AsyncThrowingStream<ZapInfo, Error> {
         AsyncThrowingStream { continuation in
             Task {
@@ -263,10 +262,10 @@ public actor NDKZapManager: ZapManaging {
                     if let event = event {
                         let eventId = event.id
                         filter.addTagFilter("e", values: [eventId])
-                    } else if let user = user {
-                        filter.addTagFilter("p", values: [user.pubkey])
+                    } else if let pubkey = pubkey {
+                        filter.addTagFilter("p", values: [pubkey])
                     } else {
-                        continuation.finish(throwing: NDKError.missingRequired("event or user"))
+                        continuation.finish(throwing: NDKError.missingRequired("event or pubkey"))
                         return
                     }
 
@@ -421,27 +420,6 @@ public struct ZapInfo {
 // MARK: - Removed objc_associatedObject pattern
 // ZapManager is now a lazy property on NDK class for cleaner Swift-native dependency injection
 
-// MARK: - User Extension
-
-extension NDKUser {
-    /// Zap this user
-    public func zap(
-        amountSats: Int64,
-        comment: String? = nil,
-        preferredType: ZapType? = nil,
-        preferredProvider: String? = nil
-    ) async throws -> ZapResult {
-        return try await ndk.zapManager.zap(
-            event: nil,
-            to: self,
-            amountSats: amountSats,
-            comment: comment,
-            preferredType: preferredType,
-            preferredProvider: preferredProvider
-        )
-    }
-}
-
 // MARK: - Event Extension
 
 extension NDKEvent {
@@ -453,13 +431,9 @@ extension NDKEvent {
         preferredType: ZapType? = nil,
         preferredProvider: String? = nil
     ) async throws -> ZapResult {
-        guard let author = ndk.getUser(pubkey) else {
-            throw NDKError.invalidDataFormat("pubkey", details: "Invalid event author pubkey")
-        }
-
         return try await ndk.zapManager.zap(
             event: self,
-            to: author,
+            to: pubkey,
             amountSats: amountSats,
             comment: comment,
             preferredType: preferredType,
