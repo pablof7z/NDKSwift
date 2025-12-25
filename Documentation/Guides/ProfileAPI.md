@@ -50,12 +50,15 @@ Text(profile.displayName)
 Use `profileUpdates(for:)` to get an `AsyncStream`:
 
 ```swift
-Task {
-    for await metadata in await ndk.profileUpdates(for: pubkey) {
+Task { @MainActor in
+    for await metadata in ndk.profileUpdates(for: pubkey) {
         print("Profile updated: \(metadata?.name ?? "Unknown")")
     }
 }
 ```
+
+> **Note:** `profileUpdates(for:)` shares the same underlying subscription as `profile(for:)`.
+> Multiple calls for the same pubkey will not create duplicate relay subscriptions.
 
 ## UI Components
 
@@ -169,8 +172,8 @@ Text(profile.name)
 // Use components for common UI elements
 NDKUIUsername(ndk: ndk, pubkey: pubkey)
 
-// AsyncStream for background tasks
-for await metadata in await ndk.profileUpdates(for: pubkey) {
+// AsyncStream for background tasks (requires MainActor)
+for await metadata in ndk.profileUpdates(for: pubkey) {
     // Process updates
 }
 ```
@@ -263,8 +266,9 @@ struct ProfileDetailView: View {
 
 ```swift
 class ProfileAnalyzer {
+    @MainActor
     func analyzeProfile(pubkey: String, ndk: NDK) async {
-        for await metadata in await ndk.profileUpdates(for: pubkey) {
+        for await metadata in ndk.profileUpdates(for: pubkey) {
             guard let metadata else { continue }
 
             // Process profile

@@ -120,10 +120,8 @@ public actor WalletHealthMonitor {
         // Current wallet state = what we have locally that's not deleted
         let current = await eventManager.getCurrentTokenEventIds()
         var result = Set<String>()
-        for eventId in current {
-            if !(await eventManager.shouldFilterEvent(eventId)) {
-                result.insert(eventId)
-            }
+        for eventId in current where !(await eventManager.shouldFilterEvent(eventId)) {
+            result.insert(eventId)
         }
         return result
     }

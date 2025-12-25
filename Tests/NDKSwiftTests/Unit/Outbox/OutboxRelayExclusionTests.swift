@@ -26,7 +26,7 @@ final class OutboxRelayExclusionTests: XCTestCase {
         // Verify outbox relays are not included in filtersByRelay
         for (relay, _) in strategy.filtersByRelay {
             XCTAssertFalse(
-                ndk.outboxConfig.outboxRelays.contains { outboxRelay in
+                ndk.discoveryConfig.discoveryRelays.contains { outboxRelay in
                     outboxRelay.normalizedRelayURL == relay
                 },
                 "Outbox relay \(relay) should not receive data queries for unknown authors"
@@ -99,12 +99,12 @@ final class OutboxRelayExclusionTests: XCTestCase {
     /// The outbox relay is for kind:10002 discovery only, not general event queries
     func testOutboxRelayNotUsedAsFallbackWhenNoFallbackRelaysConfigured() async throws {
         // Create NDK with ONLY outbox relay (no fallback relays)
-        let outboxConfig = NDKOutboxConfig(
-            outboxRelays: ["wss://relay.damus.io"]
+        let outboxConfig = NDKDiscoveryConfig(
+            discoveryRelays: ["wss://relay.damus.io"]
         )
         let ndk = NDK(
             relayURLs: [],  // NO fallback relays configured
-            outboxConfig: outboxConfig
+            discoveryConfig: outboxConfig
         )
 
         // Connect to make hasConnected = true
@@ -147,10 +147,10 @@ final class OutboxRelayExclusionTests: XCTestCase {
     /// Test that outbox relay discovery uses only outbox relays when available
     func testOutboxRelayDiscoveryUsesOutboxRelays() async throws {
         // Create NDK with custom outbox configuration
-        let outboxConfig = NDKOutboxConfig(
-            outboxRelays: ["wss://outbox1.example.com", "wss://outbox2.example.com"]
+        let outboxConfig = NDKDiscoveryConfig(
+            discoveryRelays: ["wss://outbox1.example.com", "wss://outbox2.example.com"]
         )
-        let ndk = NDK(outboxConfig: outboxConfig)
+        let ndk = NDK(discoveryConfig: outboxConfig)
 
         // Add regular relay
         await ndk.addRelay("wss://regular.example.com")

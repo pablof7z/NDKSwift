@@ -76,7 +76,7 @@ struct BunkerURLParser {
 }
 
 /// NIP-46 remote signer implementation supporting both bunker:// and nostrconnect:// flows
-public actor NDKBunkerSigner: NDKSigner, Sendable {
+public actor NDKBunkerSigner: NDKSigner {
     private let ndk: NDK
     private var userPubkey: String?
     private var bunkerPubkey: String?
@@ -568,7 +568,7 @@ public actor NDKBunkerSigner: NDKSigner, Sendable {
             "relayURLs": relayURLs,
             NostrConstants.JSONField.secret: secret ?? "",
             "localSignerData": await localSigner.serialize(),
-            "connectionType": connectionType.rawValue,
+            "connectionType": connectionType.rawValue
         ]
         return try NDKSignerSerialization.createContainer(type: Self.signerType, payload: payload)
     }

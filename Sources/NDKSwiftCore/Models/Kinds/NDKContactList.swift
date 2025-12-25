@@ -261,10 +261,8 @@ public class NDKContactList: NDKList {
     /// Merge another contact list into this one
     @discardableResult
     public func merge(with other: NDKContactList) -> NDKContactList {
-        for contact in other.contacts {
-            if !isFollowing(contact.pubkey) {
-                addContact(contact)
-            }
+        for contact in other.contacts where !isFollowing(contact.pubkey) {
+            addContact(contact)
         }
 
         return self
@@ -352,6 +350,20 @@ public extension NDK {
     func isFollowing(_ user: NDKUser) async throws -> Bool {
         guard let contactList = try await fetchContactList() else { return false }
         return contactList.isFollowing(user)
+    }
+
+    /// Follow a user by pubkey (add to contact list)
+    func follow(pubkey: String) async throws {
+        let contactList = try await fetchContactList() ?? NDKContactList(ndk: self)
+        contactList.addContact(pubkey: pubkey)
+        try await publishContactList(contactList)
+    }
+
+    /// Unfollow a user by pubkey (remove from contact list)
+    func unfollow(pubkey: String) async throws {
+        guard let contactList = try await fetchContactList() else { return }
+        contactList.removeContact(pubkey: pubkey)
+        try await publishContactList(contactList)
     }
 }
 

@@ -133,8 +133,7 @@ public actor NIP05Manager {
         // Check if we already have this in memory cache
         if let existing = await memoryCache.get(normalizedNip05),
            existing.pubkey == event.pubkey,
-           existing.status == .verified
-        {
+           existing.status == .verified {
             return
         }
 

@@ -549,8 +549,7 @@ extension NegentropyStorage {
 
             let item = items[mid]
             if item.timestamp < bound.timestamp ||
-                (item.timestamp == bound.timestamp && compareData(item.id, bound.id) < 0)
-            {
+                (item.timestamp == bound.timestamp && compareData(item.id, bound.id) < 0) {
                 low = mid + 1
             } else {
                 high = mid

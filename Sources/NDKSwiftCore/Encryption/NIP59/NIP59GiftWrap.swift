@@ -345,7 +345,7 @@ public enum NIP59 {
             event.createdAt,
             event.kind,
             event.tags,
-            event.content,
+            event.content
         ]
 
         // Serialize to canonical JSON

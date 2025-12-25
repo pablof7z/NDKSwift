@@ -1,12 +1,13 @@
-import SwiftUI
 import NDKSwiftCore
+import SwiftUI
 
 // MARK: - Callback Types
 
 public typealias MentionTapHandler = (String) -> Void
 public typealias HashtagTapHandler = (String) -> Void
 public typealias LinkTapHandler = (URL) -> Void
-public typealias ImageTapHandler = (URL) -> Void
+public typealias ImageTapHandler = (URL, Int) -> Void
+public typealias VideoTapHandler = (URL) -> Void
 public typealias EventTapHandler = (NDKEvent) -> Void
 
 // MARK: - Renderer Protocols
@@ -28,7 +29,12 @@ public protocol LinkRenderer: View {
 
 @MainActor
 public protocol ImageRenderer: View {
-    init(url: URL, onTap: ImageTapHandler?)
+    init(urls: [URL], onTap: ImageTapHandler?)
+}
+
+@MainActor
+public protocol VideoRenderer: View {
+    init(url: URL, onTap: VideoTapHandler?)
 }
 
 @MainActor

@@ -55,10 +55,8 @@ public enum Bech32HRP {
     public static func entityType(from string: String) -> String? {
         let lowercased = string.lowercased()
 
-        for hrp in [npub, nsec, note, nevent, naddr, nprofile, nrelay, lnurl] {
-            if lowercased.hasPrefix(hrp) {
-                return hrp
-            }
+        for hrp in [npub, nsec, note, nevent, naddr, nprofile, nrelay, lnurl] where lowercased.hasPrefix(hrp) {
+            return hrp
         }
 
         return nil

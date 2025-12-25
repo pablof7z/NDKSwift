@@ -103,8 +103,7 @@ public enum URLNormalizer {
     private static func removeDefaultPorts(_ components: inout URLComponents) {
         if let port = components.port {
             if (components.scheme == "ws" && port == NormalizationConstants.defaultWSPort) ||
-                (components.scheme == "wss" && port == NormalizationConstants.defaultWSSPort)
-            {
+                (components.scheme == "wss" && port == NormalizationConstants.defaultWSSPort) {
                 components.port = nil
             }
         }

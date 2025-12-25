@@ -351,9 +351,8 @@ extension NdbBlockGroup {
                 ndb_blocks_iterate_start(cptr, blocks_ptr.ptr, &iter)
 
                 // Collect blocks into array
-                outerLoop: while let ptr = ndb_blocks_iterate_next(&iter),
-                                 let block = NdbBlock(ndb_block_ptr(ptr: ptr))
-                {
+                while let ptr = ndb_blocks_iterate_next(&iter),
+                                 let block = NdbBlock(ndb_block_ptr(ptr: ptr)) {
                     linkedList.add(item: block)
                 }
 

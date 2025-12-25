@@ -8,6 +8,7 @@ typealias ArticleHeroView = NDKUIRichTextView<
     DefaultHashtagView,
     DefaultLinkView,
     DefaultImageView,
+    DefaultVideoView,
     ArticleCardHero
 >
 
@@ -16,6 +17,7 @@ typealias ArticleCompactView = NDKUIRichTextView<
     DefaultHashtagView,
     DefaultLinkView,
     DefaultImageView,
+    DefaultVideoView,
     ArticleCardCompact
 >
 
@@ -24,6 +26,7 @@ typealias ArticlePortraitView = NDKUIRichTextView<
     DefaultHashtagView,
     DefaultLinkView,
     DefaultImageView,
+    DefaultVideoView,
     ArticleCardPortrait
 >
 

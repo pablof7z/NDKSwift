@@ -1,5 +1,5 @@
-import SwiftUI
 import NDKSwiftCore
+import SwiftUI
 
 /// Default implementation of MentionRenderer that displays user mentions with profile loading
 public struct DefaultMentionView: MentionRenderer {

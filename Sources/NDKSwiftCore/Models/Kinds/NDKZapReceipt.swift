@@ -96,8 +96,7 @@ public struct NDKZapReceipt {
         let effectiveRequest = zapRequest ?? self.zapRequest
         if let request = effectiveRequest,
            let requestAmount = request.amountMillisats,
-           let receiptAmount = amountMillisats
-        {
+           let receiptAmount = amountMillisats {
             guard requestAmount == receiptAmount else {
                 return false
             }
@@ -136,8 +135,7 @@ public struct NDKZapReceipt {
                [NostrConstants.TagName.pubkey,
                 NostrConstants.TagName.event,
                 NostrConstants.TagName.address,
-                NostrConstants.TagName.uppercasePubkey].contains(tagName)
-            {
+                NostrConstants.TagName.uppercasePubkey].contains(tagName) {
                 tags.append(tag)
             }
         }

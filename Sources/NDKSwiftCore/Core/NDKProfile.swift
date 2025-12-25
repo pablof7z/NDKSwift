@@ -67,14 +67,34 @@ public final class NDKProfile {
         let pubkey = self.pubkey
 
         Task { [weak self] in
-            // Delegate to ProfileManager for caching and subscription management
-            for await metadata in await ndk.profileManager.subscribe(for: pubkey, maxAge: 0) {
-                guard !cancellation.isCancelled else { break }
-                guard let self else { break }
+            // Start relay subscription to fetch fresh profile data
+            // Events are automatically saved to cache by NDKSubscriptionRequirement
+            let filter = NDKFilter(authors: [pubkey], kinds: [EventKind.metadata])
+            let subscription = ndk.subscribe(filter: filter)
 
-                await MainActor.run {
-                    self.metadata = metadata
+            // Observe cache for profile changes (reactive updates)
+            let cacheStream = await ndk.cache.observeProfile(pubkey: pubkey, includeExisting: true)
+
+            // Consume subscription events in background (they go to cache automatically)
+            Task {
+                for await _ in subscription.events {
+                    guard !cancellation.isCancelled else { break }
+                    // Events are cached automatically, cache observation handles the rest
                 }
+            }
+
+            // React to cache changes
+            do {
+                for try await metadata in cacheStream {
+                    guard !cancellation.isCancelled else { break }
+                    guard let self else { break }
+
+                    await MainActor.run {
+                        self.metadata = metadata
+                    }
+                }
+            } catch {
+                NDKLogger.log(.warning, category: .general, "Profile observation error for \(pubkey.prefix(8)): \(error)")
             }
         }
     }

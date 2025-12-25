@@ -31,11 +31,9 @@ actor WalletStateCalculator {
         for tokenId in tokensToDelete {
             let tokenProofs = await proofStateManager.getAvailableProofsForEvent(tokenId)
 
-            for proof in tokenProofs {
-                // Only save proofs that aren't being destroyed
-                if !destroyProofCs.contains(proof.C) {
-                    proofsToSave.append(proof)
-                }
+            // Only save proofs that aren't being destroyed
+            for proof in tokenProofs where !destroyProofCs.contains(proof.C) {
+                proofsToSave.append(proof)
             }
         }
 

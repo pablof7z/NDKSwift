@@ -171,8 +171,6 @@ public struct NDKUIReplyIndicator: View {
 #if DEBUG
     struct NDKUIReplyIndicator_Previews: PreviewProvider {
         static var previews: some View {
-            let mockNDK = NDK(relayURLs: [])
-
             VStack(alignment: .leading, spacing: 16) {
                 Text("Reply indicator would appear here if event has reply tags")
                     .font(.caption)

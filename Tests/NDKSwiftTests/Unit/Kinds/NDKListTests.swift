@@ -363,14 +363,14 @@ final class NDKListTests: XCTestCase {
         try await muteList.addURL("https://fedimint.example.com")
         try await muteList.addURL("https://regular-site.com")
 
-        XCTAssertTrue(muteList.isMintBlacklisted("https://mint.example.com"))
-        XCTAssertTrue(muteList.isMintBlacklisted("https://fedimint.example.com"))
-        XCTAssertFalse(muteList.isMintBlacklisted("https://other-mint.com"))
+        XCTAssertTrue(muteList.isMintBlocklisted("https://mint.example.com"))
+        XCTAssertTrue(muteList.isMintBlocklisted("https://fedimint.example.com"))
+        XCTAssertFalse(muteList.isMintBlocklisted("https://other-mint.com"))
 
-        let blacklistedMints = muteList.blacklistedMints
-        XCTAssertEqual(blacklistedMints.count, 2)
-        XCTAssertTrue(blacklistedMints.contains("https://mint.example.com"))
-        XCTAssertTrue(blacklistedMints.contains("https://fedimint.example.com"))
+        let blocklistedMints = muteList.blocklistedMints
+        XCTAssertEqual(blocklistedMints.count, 2)
+        XCTAssertTrue(blocklistedMints.contains("https://mint.example.com"))
+        XCTAssertTrue(blocklistedMints.contains("https://fedimint.example.com"))
     }
 
     func testRelayBlocking() async throws {

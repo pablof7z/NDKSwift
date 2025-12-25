@@ -19,12 +19,12 @@ final class RelayPersistenceTests: XCTestCase {
 
     func test_pool_explicitRelays_arePersistent() async {
         let ndk = NDK()
-        let relay = await ndk.pool.addRelay("wss://relay.example.com", origin: .explicit)
+        let relay = await ndk.pool.addRelay("wss://relay.example.com", origin: .appRelays)
         let isPersistent = await relay.isPersistent
         XCTAssertTrue(isPersistent)
     }
 
-    func test_pool_outboxRelays_areNotPersistent() async {
+    func test_pool_discoveryRelays_areNotPersistent() async {
         let ndk = NDK()
         let relay = await ndk.pool.addRelay("wss://relay.example.com", origin: .outbox(authorPubkey: "test"))
         let isPersistent = await relay.isPersistent
@@ -33,7 +33,7 @@ final class RelayPersistenceTests: XCTestCase {
 
     func test_pool_outboxConfigRelays_arePersistent() async {
         let ndk = NDK()
-        let relay = await ndk.pool.addRelay("wss://relay.example.com", origin: .outboxConfig)
+        let relay = await ndk.pool.addRelay("wss://relay.example.com", origin: .discovery)
         let isPersistent = await relay.isPersistent
         XCTAssertTrue(isPersistent)
     }

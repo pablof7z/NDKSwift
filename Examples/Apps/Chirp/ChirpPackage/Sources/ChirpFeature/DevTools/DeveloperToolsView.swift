@@ -115,22 +115,8 @@ struct DeveloperToolsView: View {
                 }
             }
 
-            // Cache Tools
-            Section("Cache") {
-                NavigationLink {
-                    ProfileManagerInspectorView()
-                } label: {
-                    ToolRow(
-                        icon: "person.crop.circle.badge.checkmark",
-                        title: "Profile Manager",
-                        subtitle: "Profile cache lookup and statistics",
-                        color: .cyan
-                    )
-                }
-            }
-
-            // Logging
-            Section("Logging") {
+            // Logging & Telemetry
+            Section("Logging & Telemetry") {
                 NavigationLink {
                     LogsView()
                 } label: {
@@ -139,6 +125,17 @@ struct DeveloperToolsView: View {
                         title: "Log Viewer",
                         subtitle: "Real-time NDK logs",
                         color: .mint
+                    )
+                }
+
+                NavigationLink {
+                    TelemetrySettingsView()
+                } label: {
+                    ToolRow(
+                        icon: "chart.line.uptrend.xyaxis",
+                        title: "Telemetry",
+                        subtitle: "OpenTelemetry tracing",
+                        color: .purple
                     )
                 }
             }

@@ -393,8 +393,7 @@ private class ZapState: ObservableObject {
                 // This would require parsing the zap request to get the original sender
                 if let userPubkey = userPubkey,
                    let zapSender = extractZapSender(event),
-                   zapSender == userPubkey
-                {
+                   zapSender == userPubkey {
                     userZapped = true
                 }
             }
@@ -505,7 +504,7 @@ private struct AmountSelectorSheet: View {
                 LazyVGrid(columns: [
                     GridItem(.flexible()),
                     GridItem(.flexible()),
-                    GridItem(.flexible()),
+                    GridItem(.flexible())
                 ], spacing: 16) {
                     ForEach(amounts, id: \.self) { amount in
                         Button(action: { onAmountSelected(amount) }) {

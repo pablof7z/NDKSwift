@@ -84,7 +84,7 @@
          // Given
          let acceptedMints: Set<String> = ["mint1", "mint2"]
          let requiredAmount: Int64 = 50
-         let blacklistedMints: Set<String> = ["mint1"]
+         let blocklistedMints: Set<String> = ["mint1"]
 
          let proofs1 = [
              CashuSwift.Proof(keysetID: "id1", amount: 100, secret: "s1", C: "c1")
@@ -104,7 +104,7 @@
              requiredAmount: requiredAmount,
              mints: mockMints,
              proofStateManager: mockProofStateManager,
-             blacklistedMints: blacklistedMints
+             blocklistedMints: blocklistedMints
          )
 
          // Then

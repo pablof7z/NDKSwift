@@ -8,8 +8,8 @@ final class NDKOutboxManagerTests: NDKUnitTestCase {
     override func setUp() async throws {
         try await super.setUp()
         memoryCache = MemoryCache()
-        let outboxConfig = NDKOutboxConfig(
-            outboxRelays: [
+        let outboxConfig = NDKDiscoveryConfig(
+            discoveryRelays: [
                 "wss://outbox1.test",
                 "wss://outbox2.test",
             ]
@@ -21,7 +21,7 @@ final class NDKOutboxManagerTests: NDKUnitTestCase {
             ],
             signer: signer,
             cache: memoryCache,
-            outboxConfig: outboxConfig
+            discoveryConfig: outboxConfig
         )
         outboxManager = ndk.outbox
     }
@@ -113,7 +113,7 @@ final class NDKOutboxManagerTests: NDKUnitTestCase {
             // Create outbox manager with blacklisted relays
             let blacklistedManager = NDKOutboxManager(
                 ndk: self.ndk,
-                blacklistedRelays: ["wss://bad.relay"]
+                blocklistedRelays: ["wss://bad.relay"]
             )
 
             await blacklistedManager.track(

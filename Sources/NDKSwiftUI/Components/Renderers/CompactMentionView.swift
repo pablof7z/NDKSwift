@@ -1,5 +1,5 @@
-import SwiftUI
 import NDKSwiftCore
+import SwiftUI
 
 /// Compact mention - just shows truncated npub, no profile loading
 public struct CompactMentionView: MentionRenderer {

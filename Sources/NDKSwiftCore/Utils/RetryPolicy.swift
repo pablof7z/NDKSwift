@@ -93,8 +93,7 @@ public final class RetryPolicy {
         queue.sync {
             // Check if we've exceeded max attempts
             if let maxAttempts = configuration.maxAttempts,
-               attemptCount >= maxAttempts
-            {
+               attemptCount >= maxAttempts {
                 return nil
             }
 

@@ -10,8 +10,8 @@ final class NDKBlossomServerManagerTests: XCTestCase {
             name: "Example Blossom",
             description: "A test blossom server",
             isPaid: true,
-            isWhitelisted: false,
-            whitelistMessage: nil,
+            isAllowlisted: false,
+            allowlistMessage: nil,
             paidMessage: "Requires payment"
         )
 
@@ -20,8 +20,8 @@ final class NDKBlossomServerManagerTests: XCTestCase {
         XCTAssertEqual(info.name, "Example Blossom")
         XCTAssertEqual(info.description, "A test blossom server")
         XCTAssertTrue(info.isPaid)
-        XCTAssertFalse(info.isWhitelisted)
-        XCTAssertNil(info.whitelistMessage)
+        XCTAssertFalse(info.isAllowlisted)
+        XCTAssertNil(info.allowlistMessage)
         XCTAssertEqual(info.paidMessage, "Requires payment")
     }
 
@@ -45,9 +45,9 @@ final class NDKBlossomServerManagerTests: XCTestCase {
         XCTAssertEqual(info.name, "Test Blossom")
         XCTAssertEqual(info.description, "Test Blossom Server Description")
         XCTAssertTrue(info.isPaid)
-        XCTAssertTrue(info.isWhitelisted)
+        XCTAssertTrue(info.isAllowlisted)
         XCTAssertEqual(info.paidMessage, "Payment required for uploads")
-        XCTAssertEqual(info.whitelistMessage, "Whitelisted users only")
+        XCTAssertEqual(info.allowlistMessage, "Whitelisted users only")
     }
 
     func testServerNameExtraction() {
@@ -83,7 +83,7 @@ final class NDKBlossomServerManagerTests: XCTestCase {
             url: "https://example.com",
             name: "Test",
             isPaid: true,
-            isWhitelisted: true
+            isAllowlisted: true
         )
         XCTAssertEqual(paidAndWhitelisted.subtitle, "Paid & Whitelisted")
 
@@ -91,7 +91,7 @@ final class NDKBlossomServerManagerTests: XCTestCase {
             url: "https://example.com",
             name: "Test",
             isPaid: true,
-            isWhitelisted: false
+            isAllowlisted: false
         )
         XCTAssertEqual(paidOnly.subtitle, "Paid")
 
@@ -99,7 +99,7 @@ final class NDKBlossomServerManagerTests: XCTestCase {
             url: "https://example.com",
             name: "Test",
             isPaid: false,
-            isWhitelisted: true
+            isAllowlisted: true
         )
         XCTAssertEqual(whitelistedOnly.subtitle, "Whitelisted")
 
@@ -107,7 +107,7 @@ final class NDKBlossomServerManagerTests: XCTestCase {
             url: "https://example.com",
             name: "Test",
             isPaid: false,
-            isWhitelisted: false
+            isAllowlisted: false
         )
         XCTAssertNil(free.subtitle)
     }
@@ -168,9 +168,9 @@ final class NDKBlossomServerManagerTests: XCTestCase {
         XCTAssertEqual(info.name, "minimal.example.com")
         XCTAssertEqual(info.description, "Minimal server")
         XCTAssertFalse(info.isPaid)
-        XCTAssertFalse(info.isWhitelisted)
+        XCTAssertFalse(info.isAllowlisted)
         XCTAssertNil(info.paidMessage)
-        XCTAssertNil(info.whitelistMessage)
+        XCTAssertNil(info.allowlistMessage)
     }
 
     func testServerInfoWithMalformedTags() {
@@ -193,8 +193,8 @@ final class NDKBlossomServerManagerTests: XCTestCase {
         XCTAssertEqual(info.url, "https://test.com")
         XCTAssertEqual(info.name, "test.com") // Should fallback to extracted name
         XCTAssertTrue(info.isPaid)
-        XCTAssertTrue(info.isWhitelisted)
+        XCTAssertTrue(info.isAllowlisted)
         XCTAssertNil(info.paidMessage)
-        XCTAssertNil(info.whitelistMessage)
+        XCTAssertNil(info.allowlistMessage)
     }
 }

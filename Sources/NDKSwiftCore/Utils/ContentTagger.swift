@@ -141,7 +141,7 @@ public enum ContentTagger {
             // Hashtags
             (#"(?<=\s|^)(#[^\s!@#$%^&*()=+./,\[{\]};:'"?><]+)"#, "hashtag"),
             // URLs
-            (#"https?://[^\s<>"{}|\\^`\[\]]+"#, "url"),
+            (#"https?://[^\s<>"{}|\\^`\[\]]+"#, "url")
         ]
 
         var allMatches: [(range: Range<String.Index>, type: String, value: String)] = []

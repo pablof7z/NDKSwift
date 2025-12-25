@@ -121,15 +121,11 @@ public actor BlossomClient {
             throw NDKError.fileTooLarge(maxSize: maxSize)
         }
 
-        let finalMimeType = mimeType ?? BlossomMediaProcessor.inferMimeType(from: data)
+        let finalMimeType = mimeType ?? BlossomMediaProcessor.inferMimeType(from: data) ?? "application/octet-stream"
 
-        if let acceptedTypes = descriptor?.acceptsMimeTypes, !acceptedTypes.contains("*/*") {
-            guard let mimeType = finalMimeType else {
-                throw NDKError.missingRequired("mimeType", in: "upload")
-            }
-            if !acceptedTypes.contains(mimeType) {
-                throw NDKError.unsupportedMimeType(mimeType)
-            }
+        if let acceptedTypes = descriptor?.acceptsMimeTypes,
+           !acceptedTypes.contains(finalMimeType) && !acceptedTypes.contains("*/*") {
+            throw NDKError.unsupportedMimeType(finalMimeType)
         }
 
         // Create auth
@@ -190,13 +186,10 @@ public actor BlossomClient {
             )
 
         case HTTPStatusCode.badRequest:
-            if descriptor?.maxUploadSize != nil {
-                throw NDKError.fileTooLarge(maxSize: descriptor?.maxUploadSize ?? 0)
+            if let maxSize = descriptor?.maxUploadSize {
+                throw NDKError.fileTooLarge(maxSize: maxSize)
             }
-            if let mimeType = finalMimeType {
-                throw NDKError.unsupportedMimeType(mimeType)
-            }
-            throw NDKError.uploadFailed(reason: "Bad request - could not determine cause")
+            throw NDKError.unsupportedMimeType(finalMimeType)
 
         case HTTPStatusCode.unauthorized:
             throw NDKError.unauthorized(relay: serverURL, message: ErrorMessageConstants.Messages.blossomAuthorizationFailed)

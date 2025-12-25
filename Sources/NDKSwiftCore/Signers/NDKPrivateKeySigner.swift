@@ -130,7 +130,7 @@ public final class NDKPrivateKeySigner: NDKSigner {
 
     public func serialize() async throws -> Data {
         let payload: [String: Any] = [
-            "privateKey": privateKey,
+            "privateKey": privateKey
         ]
         return try NDKSignerSerialization.createContainer(type: Self.signerType, payload: payload)
     }

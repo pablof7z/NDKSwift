@@ -146,8 +146,7 @@ public class NDKSessionData {
             }
 
             if let cachedEvents = cachedEvents,
-               let cachedEvent = cachedEvents.first
-            {
+               let cachedEvent = cachedEvents.first {
                 latestTimestamps[kind] = cachedEvent.createdAt
 
                 // Process the cached event immediately
@@ -370,8 +369,8 @@ public class NDKSessionData {
             ndk: ndk,
             filter: filter,
             maxAge: 5 * TimeConstants.minute, // 5 minute cache
-            relays: ndk.outboxConfig.outboxRelays,
-            exclusiveRelays: true, // Only use the specified outbox relays
+            relays: ndk.discoveryConfig.discoveryRelays,
+            exclusiveRelays: true, // Only use the specified discovery relays
             subscriptionId: subscriptionId
         )
 

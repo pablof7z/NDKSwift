@@ -22,7 +22,7 @@ final class HintIndexTypesTests: XCTestCase {
         let nip19 = HintSource.nip19
         let eventObserved = HintSource.eventObserved
         let userRelayList = HintSource.userRelayList
-        let explicit = HintSource.explicit
+        let explicit = HintSource.app
 
         // Each should be distinct
         XCTAssertNotEqual(nip19, eventObserved)

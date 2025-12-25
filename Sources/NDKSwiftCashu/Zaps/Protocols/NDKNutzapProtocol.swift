@@ -58,7 +58,7 @@ public class NDKNutzapProtocol: NDKZapProtocol {
         // Store metadata for completion
         let metadata: [String: Any] = [
             "preferences": preferences,
-            "relays": Array(allRelays),
+            "relays": Array(allRelays)
         ]
 
         return PreparedZap(
@@ -75,7 +75,7 @@ public class NDKNutzapProtocol: NDKZapProtocol {
         confirmation: PaymentConfirmation
     ) async throws -> ZapResult {
         // Extract metadata
-        guard let _ = prepared.metadata["preferences"] as? NDKNutzapPreferences else {
+        guard prepared.metadata["preferences"] is NDKNutzapPreferences else {
             throw NDKError.missingRequired("nutzap preferences", in: "metadata")
         }
 

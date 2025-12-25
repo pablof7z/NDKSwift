@@ -62,10 +62,8 @@ enum WalletEventParsingUtils {
             throw NDKError.invalidDataFormat("event kind", details: "Expected kind \(expectedKind) but got \(event.kind)")
         }
 
-        for tagName in requiredTags {
-            if event.tags(withName: tagName).isEmpty {
-                throw NDKError.missingRequired(tagName, in: "event \(event.id)")
-            }
+        for tagName in requiredTags where event.tags(withName: tagName).isEmpty {
+            throw NDKError.missingRequired(tagName, in: "event \(event.id)")
         }
     }
 }

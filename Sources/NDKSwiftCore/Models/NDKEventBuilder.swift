@@ -138,10 +138,8 @@ public final class NDKEventBuilder: @unchecked Sendable {
 
             if hasUppercaseTags {
                 // Parent is a comment - copy its uppercase tags
-                for tag in event.tags {
-                    if ["A", "E", "I", "K", "P"].contains(tag.first) {
-                        builder.tag(tag)
-                    }
+                for tag in event.tags where ["A", "E", "I", "K", "P"].contains(tag.first) {
+                    builder.tag(tag)
                 }
             } else {
                 // Parent is a root event - create new uppercase tags
@@ -274,8 +272,7 @@ public final class NDKEventBuilder: @unchecked Sendable {
         } else if let ndk = ndk {
             // Try to get relay hint from user's relay list or outbox
             if let outboxItem = await ndk.outbox.getRelaysSyncFor(pubkey: pubkey, type: .read),
-               let firstRelay = outboxItem.readRelays.first?.url
-            {
+               let firstRelay = outboxItem.readRelays.first?.url {
                 relayHint = firstRelay
             } else {
                 relayHint = ""
@@ -801,7 +798,7 @@ public final class NDKEventBuilder: @unchecked Sendable {
             case let .eventMention(eventId):
                 // These are already handled by #[index] references in tags
                 tag([NostrConstants.TagName.event, eventId])
-            case .text(_), .url:
+            case .text, .url:
                 // These don't generate tags
                 break
             }
@@ -890,8 +887,7 @@ public final class NDKEventBuilder: @unchecked Sendable {
         if let clientConfig = ndk?.clientTagConfig,
            clientConfig.autoTag,
            !clientConfig.excludedKinds.contains(kind),
-           !tags.contains(where: { $0.first == NostrConstants.TagName.client })
-        {
+           !tags.contains(where: { $0.first == NostrConstants.TagName.client }) {
             // Add client tag - address is optional
             _ = clientTag(name: clientConfig.name, address: clientConfig.address, relay: clientConfig.relay)
         }

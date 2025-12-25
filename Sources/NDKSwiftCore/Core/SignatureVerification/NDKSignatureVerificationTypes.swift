@@ -9,7 +9,7 @@
 /// let config = NDKSignatureVerificationConfig(
 ///     initialValidationRatio: 0.5,  // Verify 50% of events from new relays
 ///     lowestValidationRatio: 0.1,   // Never go below 10% verification
-///     autoBlacklistInvalidRelays: true  // Auto-blacklist bad relays
+///     autoBlocklistInvalidRelays: true  // Auto-blocklist bad relays
 /// )
 /// ```
 public struct NDKSignatureVerificationConfig: Sendable {
@@ -19,8 +19,8 @@ public struct NDKSignatureVerificationConfig: Sendable {
     /// The lowest validation ratio any single relay can have
     public var lowestValidationRatio: Double
 
-    /// When true, automatically blacklist relays that provide events with invalid signatures
-    public var autoBlacklistInvalidRelays: Bool
+    /// When true, automatically blocklist relays that provide events with invalid signatures
+    public var autoBlocklistInvalidRelays: Bool
 
     /// Custom function to calculate validation ratio
     public var validationRatioFunction: (@Sendable (RelayProtocol, Int, Int) -> Double)?
@@ -29,7 +29,7 @@ public struct NDKSignatureVerificationConfig: Sendable {
     public static let `default` = NDKSignatureVerificationConfig(
         initialValidationRatio: 1.0,
         lowestValidationRatio: 0.1,
-        autoBlacklistInvalidRelays: false,
+        autoBlocklistInvalidRelays: false,
         validationRatioFunction: nil
     )
 
@@ -37,7 +37,7 @@ public struct NDKSignatureVerificationConfig: Sendable {
     public static let disabled = NDKSignatureVerificationConfig(
         initialValidationRatio: 0.0,
         lowestValidationRatio: 0.0,
-        autoBlacklistInvalidRelays: false,
+        autoBlocklistInvalidRelays: false,
         validationRatioFunction: nil
     )
 }
@@ -95,7 +95,7 @@ public enum NDKSignatureVerificationResult: Sendable {
 /// Protocol for signature verification delegate
 ///
 /// Implement this protocol to receive notifications about signature verification
-/// failures and relay blacklisting. This is useful for monitoring relay behavior
+/// failures and relay blocklisting. This is useful for monitoring relay behavior
 /// and taking custom actions when invalid signatures are detected.
 ///
 /// Example implementation:
@@ -106,9 +106,9 @@ public enum NDKSignatureVerificationResult: Sendable {
 ///         // Log to analytics, notify user, etc.
 ///     }
 ///
-///     func relayBlacklisted(_ relay: RelayProtocol) {
-///         print("Relay blacklisted: \(relay.url)")
-///         // Update UI, save to persistent blacklist, etc.
+///     func relayBlocklisted(_ relay: RelayProtocol) {
+///         print("Relay blocklisted: \(relay.url)")
+///         // Update UI, save to persistent blocklist, etc.
 ///     }
 /// }
 /// ```
@@ -123,11 +123,11 @@ public protocol NDKSignatureVerificationDelegate: AnyObject, Sendable {
     ///   - relay: The relay that provided the invalid signature
     func signatureVerificationFailed(for event: NDKEvent, from relay: RelayProtocol)
 
-    /// Called when a relay is blacklisted for providing invalid signatures
+    /// Called when a relay is blocklisted for providing invalid signatures
     ///
-    /// This occurs when `autoBlacklistInvalidRelays` is enabled in the configuration
+    /// This occurs when `autoBlocklistInvalidRelays` is enabled in the configuration
     /// and a relay provides an event with an invalid signature.
     ///
-    /// - Parameter relay: The blacklisted relay
-    func relayBlacklisted(_ relay: RelayProtocol)
+    /// - Parameter relay: The blocklisted relay
+    func relayBlocklisted(_ relay: RelayProtocol)
 }

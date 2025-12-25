@@ -13,14 +13,14 @@ final class OutboxDiscoveryOnConnectTests: NDKUnitTestCase {
         try await performAsyncTest(timeout: 5) {
             // GIVEN: NDK with outbox relay but NOT connected
             let outboxRelayURL = "wss://outbox.test"
-            let outboxConfig = NDKOutboxConfig(outboxRelays: [outboxRelayURL])
+            let outboxConfig = NDKDiscoveryConfig(discoveryRelays: [outboxRelayURL])
 
             self.ndk = NDK(
                 relayURLs: [],
                 signer: self.signer,
                 cache: self.cache,
                 outboxEnabled: true,
-                outboxConfig: outboxConfig
+                discoveryConfig: outboxConfig
             )
             // Note: NOT calling ndk.connect() - relays are not connected
 
@@ -53,14 +53,14 @@ final class OutboxDiscoveryOnConnectTests: NDKUnitTestCase {
         try await performAsyncTest(timeout: 10) {
             // GIVEN: NDK with outbox relay
             let outboxRelayURL = "wss://relay.damus.io"  // Real relay
-            let outboxConfig = NDKOutboxConfig(outboxRelays: [outboxRelayURL])
+            let outboxConfig = NDKDiscoveryConfig(discoveryRelays: [outboxRelayURL])
 
             self.ndk = NDK(
                 relayURLs: [],
                 signer: self.signer,
                 cache: self.cache,
                 outboxEnabled: true,
-                outboxConfig: outboxConfig
+                discoveryConfig: outboxConfig
             )
 
             let unknownAuthors = Set(["author1", "author2"])
@@ -117,14 +117,14 @@ final class OutboxDiscoveryOnConnectTests: NDKUnitTestCase {
     func testSubscriptionMarksAuthorsForDiscovery() async throws {
         try await performAsyncTest(timeout: 5) {
             // GIVEN: NDK with outbox enabled
-            let outboxConfig = NDKOutboxConfig(outboxRelays: ["wss://outbox.test"])
+            let outboxConfig = NDKDiscoveryConfig(discoveryRelays: ["wss://outbox.test"])
 
             self.ndk = NDK(
                 relayURLs: [],
                 signer: self.signer,
                 cache: self.cache,
                 outboxEnabled: true,
-                outboxConfig: outboxConfig
+                discoveryConfig: outboxConfig
             )
 
             let unknownAuthors = ["author1", "author2", "author3"]
@@ -148,14 +148,14 @@ final class OutboxDiscoveryOnConnectTests: NDKUnitTestCase {
         try await performAsyncTest(timeout: 15) {
             // GIVEN: NDK with a real relay
             let outboxRelayURL = "wss://relay.damus.io"
-            let outboxConfig = NDKOutboxConfig(outboxRelays: [outboxRelayURL])
+            let outboxConfig = NDKDiscoveryConfig(discoveryRelays: [outboxRelayURL])
 
             self.ndk = NDK(
                 relayURLs: [],
                 signer: self.signer,
                 cache: self.cache,
                 outboxEnabled: true,
-                outboxConfig: outboxConfig
+                discoveryConfig: outboxConfig
             )
 
             // Known pubkey that definitely has a kind:10002 event
@@ -227,14 +227,14 @@ final class OutboxDiscoveryOnConnectTests: NDKUnitTestCase {
         try await performAsyncTest(timeout: 20) {
             // GIVEN: NDK with outbox relay, NOT connected yet
             let outboxRelayURL = "wss://relay.damus.io"
-            let outboxConfig = NDKOutboxConfig(outboxRelays: [outboxRelayURL])
+            let outboxConfig = NDKDiscoveryConfig(discoveryRelays: [outboxRelayURL])
 
             self.ndk = NDK(
                 relayURLs: [],
                 signer: self.signer,
                 cache: self.cache,
                 outboxEnabled: true,
-                outboxConfig: outboxConfig
+                discoveryConfig: outboxConfig
             )
 
             // Known pubkey that definitely has a kind:10002 event
@@ -303,14 +303,14 @@ final class OutboxDiscoveryOnConnectTests: NDKUnitTestCase {
         try await performAsyncTest(timeout: 20) {
             // GIVEN: NDK with a real relay
             let outboxRelayURL = "wss://relay.damus.io"
-            let outboxConfig = NDKOutboxConfig(outboxRelays: [outboxRelayURL])
+            let outboxConfig = NDKDiscoveryConfig(discoveryRelays: [outboxRelayURL])
 
             self.ndk = NDK(
                 relayURLs: [],
                 signer: self.signer,
                 cache: self.cache,
                 outboxEnabled: true,
-                outboxConfig: outboxConfig
+                discoveryConfig: outboxConfig
             )
 
             // Use multiple known pubkeys that have kind:10002 events
@@ -370,14 +370,14 @@ final class OutboxDiscoveryOnConnectTests: NDKUnitTestCase {
         try await performAsyncTest(timeout: 15) {
             // GIVEN: NDK with a real relay
             let outboxRelayURL = "wss://relay.damus.io"
-            let outboxConfig = NDKOutboxConfig(outboxRelays: [outboxRelayURL])
+            let outboxConfig = NDKDiscoveryConfig(discoveryRelays: [outboxRelayURL])
 
             self.ndk = NDK(
                 relayURLs: [],
                 signer: self.signer,
                 cache: self.cache,
                 outboxEnabled: true,
-                outboxConfig: outboxConfig
+                discoveryConfig: outboxConfig
             )
 
             // Known pubkey that definitely has a kind:10002 event
@@ -427,14 +427,14 @@ final class OutboxDiscoveryOnConnectTests: NDKUnitTestCase {
     func testKnownAuthorsNotMarkedForDiscovery() async throws {
         try await performAsyncTest(timeout: 5) {
             // GIVEN: NDK with some known authors
-            let outboxConfig = NDKOutboxConfig(outboxRelays: ["wss://outbox.test"])
+            let outboxConfig = NDKDiscoveryConfig(discoveryRelays: ["wss://outbox.test"])
 
             self.ndk = NDK(
                 relayURLs: [],
                 signer: self.signer,
                 cache: self.cache,
                 outboxEnabled: true,
-                outboxConfig: outboxConfig
+                discoveryConfig: outboxConfig
             )
 
             // Cache relay info for author1

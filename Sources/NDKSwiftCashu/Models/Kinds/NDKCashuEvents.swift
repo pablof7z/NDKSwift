@@ -792,8 +792,7 @@ public struct NDKCashuMintAnnouncement {
         // Try to parse content as JSON first
         if let data = event.content.data(using: .utf8),
            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let description = json["description"] as? String
-        {
+           let description = json["description"] as? String {
             return description
         }
 

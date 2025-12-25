@@ -23,9 +23,9 @@ enum Example04_UserProfile {
             kinds: [EventKind.metadata]
         )
 
-        // Fetch profile using profileManager
+        // Fetch profile
         var fetchedMetadata: NDKUserMetadata?
-        for await metadata in await ndk.profileManager.subscribe(for: jackPubkey) {
+        for await metadata in await ndk.profileUpdates(for: jackPubkey) {
             fetchedMetadata = metadata
             break // Get first result
         }
@@ -88,7 +88,7 @@ enum Example04_UserProfile {
         // Fetch profiles for multiple users
         var foundProfiles = 0
         for pubkey in pubkeys {
-            for await metadata in await ndk.profileManager.subscribe(for: pubkey) {
+            for await metadata in await ndk.profileUpdates(for: pubkey) {
                 if let metadata = metadata {
                     foundProfiles += 1
                     print("\n👤 Profile: \(metadata.name ?? "Unknown")")

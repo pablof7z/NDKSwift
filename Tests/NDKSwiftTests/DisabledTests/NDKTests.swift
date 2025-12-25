@@ -413,10 +413,10 @@ final class NDKTests: NDKTestCase {
         XCTAssertFalse(ndkNoOutbox.outboxEnabled)
 
         // Test outbox config via initializer
-        let outboxRelays = Set(["wss://outbox1.test", "wss://outbox2.test"])
-        let config = NDKOutboxConfig(outboxRelays: outboxRelays)
-        let ndkWithConfig = NDK(outboxConfig: config)
-        XCTAssertEqual(ndkWithConfig.outboxConfig.outboxRelays, outboxRelays)
+        let discoveryRelays = Set(["wss://outbox1.test", "wss://outbox2.test"])
+        let config = NDKDiscoveryConfig(discoveryRelays: discoveryRelays)
+        let ndkWithConfig = NDK(discoveryConfig: config)
+        XCTAssertEqual(ndkWithConfig.discoveryConfig.discoveryRelays, discoveryRelays)
     }
 
     // MARK: - Integration with Other Components Tests
@@ -446,7 +446,7 @@ final class NDKTests: NDKTestCase {
         let customConfig = NDKSignatureVerificationConfig(
             initialValidationRatio: 0.5,
             lowestValidationRatio: 0.1,
-            autoBlacklistInvalidRelays: false,
+            autoBlocklistInvalidRelays: false,
             validationRatioFunction: nil
         )
 

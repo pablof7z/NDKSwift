@@ -123,7 +123,7 @@ public class NDKKeychainManager {
             kSecAttrService as String: service,
             kSecAttrAccount as String: identifier,
             kSecValueData as String: data,
-            kSecAttrAccessControl as String: accessControl,
+            kSecAttrAccessControl as String: accessControl
         ]
 
         // Add access group if specified
@@ -157,7 +157,7 @@ public class NDKKeychainManager {
             kSecAttrService as String: service,
             kSecAttrAccount as String: identifier,
             kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecMatchLimit as String: kSecMatchLimitOne
         ]
 
         // Add access group if specified
@@ -202,7 +202,7 @@ public class NDKKeychainManager {
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: identifier,
+            kSecAttrAccount as String: identifier
         ]
 
         // Add access group if specified
@@ -227,7 +227,7 @@ public class NDKKeychainManager {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: identifier,
-            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecMatchLimit as String: kSecMatchLimitOne
         ]
 
         // Add access group if specified
@@ -253,7 +253,7 @@ public class NDKKeychainManager {
             kSecAttrService as String: "\(service).session",
             kSecAttrAccount as String: identifier,
             kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         ]
 
         // Add access group if specified
@@ -282,7 +282,7 @@ public class NDKKeychainManager {
             kSecAttrService as String: "\(service).session",
             kSecAttrAccount as String: identifier,
             kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecMatchLimit as String: kSecMatchLimitOne
         ]
 
         // Add access group if specified
@@ -316,7 +316,7 @@ public class NDKKeychainManager {
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: "\(service).session",
-            kSecAttrAccount as String: identifier,
+            kSecAttrAccount as String: identifier
         ]
 
         // Add access group if specified
@@ -340,7 +340,7 @@ public class NDKKeychainManager {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: "\(service).session",
             kSecReturnAttributes as String: true,
-            kSecMatchLimit as String: kSecMatchLimitAll,
+            kSecMatchLimit as String: kSecMatchLimitAll
         ]
 
         // Add access group if specified
