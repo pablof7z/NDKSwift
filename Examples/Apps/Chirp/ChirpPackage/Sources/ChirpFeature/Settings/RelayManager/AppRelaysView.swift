@@ -10,7 +10,7 @@ struct AppRelaysView: View {
 
     var body: some View {
         List {
-            if state.relayCollection.appRelays.isEmpty {
+            if state.ndk.relays.isEmpty {
                 ContentUnavailableView(
                     "No Relays",
                     systemImage: "antenna.radiowaves.left.and.right.slash",
@@ -18,19 +18,18 @@ struct AppRelaysView: View {
                 )
             } else {
                 Section {
-                    ForEach(state.relayCollection.appRelays) { relay in
+                    ForEach(state.ndk.relays, id: \.url) { relay in
                         RelayRow(relay: relay)
                     }
                     .onDelete(perform: deleteRelays)
                 }
 
                 Section {
-                    let connectedCount = state.relayCollection.appRelays.filter { $0.isConnected }.count
                     HStack {
                         Text("Connected")
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Text("\(connectedCount) / \(state.relayCollection.appRelays.count)")
+                        Text("\(state.ndk.connectedRelayCount) / \(state.ndk.relays.count)")
                     }
                 }
             }
@@ -44,9 +43,6 @@ struct AppRelaysView: View {
                     Image(systemName: "plus")
                 }
             }
-        }
-        .refreshable {
-            await state.relayCollection.refresh()
         }
         .sheet(isPresented: $showingAddSheet) {
             AddRelaySheet(
@@ -79,10 +75,7 @@ struct AppRelaysView: View {
             return
         }
 
-        let ndk = state.ndk
-        let relayCollection = state.relayCollection
-        _ = await ndk.addRelay(cleanUrl)
-        await relayCollection.refresh()
+        _ = await state.ndk.addRelay(cleanUrl)
 
         isLoading = false
         showingAddSheet = false
@@ -90,14 +83,11 @@ struct AppRelaysView: View {
     }
 
     private func deleteRelays(at offsets: IndexSet) {
-        let ndk = state.ndk
-        let relayCollection = state.relayCollection
-        let relaysToDelete = offsets.map { state.relayCollection.appRelays[$0].url }
+        let relaysToDelete = offsets.map { state.ndk.relays[$0].url }
         Task {
             for url in relaysToDelete {
-                await ndk.removeRelay(url)
+                await state.ndk.removeRelay(url)
             }
-            await relayCollection.refresh()
         }
     }
 
@@ -121,7 +111,7 @@ struct AppRelaysView: View {
 }
 
 struct RelayRow: View {
-    let relay: NDKRelayCollection.RelayInfo
+    let relay: NDKRelay
 
     var body: some View {
         HStack(spacing: 12) {
@@ -137,7 +127,7 @@ struct RelayRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                if let error = relay.lastError {
+                if let error = relay.ui.lastError {
                     Text(error)
                         .font(.caption2)
                         .foregroundStyle(.red)
@@ -163,7 +153,7 @@ struct RelayRow: View {
     }
 
     private var statusColor: Color {
-        switch relay.state {
+        switch relay.ui.connectionState {
         case .connected, .authenticated:
             return .green
         case .connecting, .authenticating:
@@ -178,9 +168,9 @@ struct RelayRow: View {
     }
 
     private var statusText: String {
-        switch relay.state {
+        switch relay.ui.connectionState {
         case .connected:
-            if let lastConnected = relay.lastConnectedAt {
+            if let lastConnected = relay.ui.lastConnectedAt {
                 return "Connected at \(lastConnected.formatted(date: .omitted, time: .shortened))"
             }
             return "Connected"
@@ -279,8 +269,7 @@ struct AddRelaySheet: View {
 #Preview {
     let ndk = NDK(relayURLs: [])
     let authManager = NDKAuthManager(ndk: ndk)
-    let relayCollection = NDKRelayCollection(ndk: ndk)
-    let state = ChirpState(ndk: ndk, authManager: authManager, relayCollection: relayCollection)
+    let state = ChirpState(ndk: ndk, authManager: authManager)
 
     return NavigationStack {
         AppRelaysView()

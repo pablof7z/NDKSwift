@@ -186,8 +186,8 @@ public actor BlossomClient {
             )
 
         case HTTPStatusCode.badRequest:
-            if descriptor?.maxUploadSize != nil {
-                throw NDKError.fileTooLarge(maxSize: descriptor?.maxUploadSize ?? 0)
+            if let maxSize = descriptor?.maxUploadSize {
+                throw NDKError.fileTooLarge(maxSize: maxSize)
             }
             throw NDKError.unsupportedMimeType(finalMimeType)
 

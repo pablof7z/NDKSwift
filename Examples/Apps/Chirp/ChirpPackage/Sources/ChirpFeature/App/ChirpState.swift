@@ -8,7 +8,6 @@ import NDKSwiftNostrDB
 public final class ChirpState {
     public private(set) var ndk: NDK
     public private(set) var authManager: NDKAuthManager
-    public private(set) var relayCollection: NDKRelayCollection
     public var initState: InitializationState = .loading
 
     public enum InitializationState: Equatable {
@@ -31,10 +30,9 @@ public final class ChirpState {
         }
     }
 
-    internal init(ndk: NDK, authManager: NDKAuthManager, relayCollection: NDKRelayCollection) {
+    internal init(ndk: NDK, authManager: NDKAuthManager) {
         self.ndk = ndk
         self.authManager = authManager
-        self.relayCollection = relayCollection
     }
 
     public static func create() async throws -> ChirpState {
@@ -54,13 +52,12 @@ public final class ChirpState {
 
         // Create managers
         let authManager = NDKAuthManager(ndk: ndk)
-        let relayCollection = NDKRelayCollection(ndk: ndk)
 
         // Initialize auth manager (restore sessions)
         await authManager.initialize()
 
         // Create state
-        let state = ChirpState(ndk: ndk, authManager: authManager, relayCollection: relayCollection)
+        let state = ChirpState(ndk: ndk, authManager: authManager)
 
         // Start session if authenticated
         if authManager.isAuthenticated, let signer = authManager.activeSigner {
