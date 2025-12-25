@@ -155,10 +155,12 @@ public final class NDK {
 
     /// Weak reference storage for profile deduplication
     /// Profiles deallocate naturally when no longer referenced by views
+    @ObservationIgnored
     @MainActor
     private var profileRegistry: [PublicKey: WeakProfile] = [:]
 
     /// Cleanup counter for periodic dead reference removal
+    @ObservationIgnored
     @MainActor
     private var profileCleanupCounter = 0
 
