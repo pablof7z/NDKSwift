@@ -11,13 +11,6 @@ public struct ArticleCardHero: ArticleCardRenderer {
     @Environment(\.ndk) private var ndk
     @Environment(\.onEventTap) private var envOnTap
 
-    // MARK: - Metadata
-
-    public static var supportedKinds: [Int] { [30023] }
-    public static var variant: String { "hero" }
-    public static var category: String { "article" }
-    public static var priority: Int { 10 }
-
     // MARK: - Initialization
 
     public init(event: NDKEvent, onTap: EventTapHandler? = nil) {
