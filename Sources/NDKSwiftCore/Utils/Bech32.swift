@@ -8,14 +8,25 @@ public enum Bech32 {
     /// Generator coefficients for checksum
     private static let generator: [UInt32] = [0x3B6A_57B2, 0x2650_8E6D, 0x1EA1_19FA, 0x3D42_33DD, 0x2A14_62B3]
 
+    /// Charset as array for O(1) index access
+    private static let charsetArray: [Character] = Array("qpzry9x8gf2tvdw0s3jn54khce6mua7l")
+
     /// Encode data to bech32
     public static func encode(hrp: String, data: [UInt8]) throws -> String {
         let values = try convertBits(data: data, fromBits: 8, toBits: 5, pad: true)
         let checksum = createChecksum(hrp: hrp, values: values)
         let combined = values + checksum
 
-        let encoded = combined.map { charset[charset.index(charset.startIndex, offsetBy: Int($0))] }
-        return "\(hrp)1\(String(encoded))"
+        // Validate all values are in range before building string
+        for value in combined {
+            guard value < 32 else {
+                throw NDKError.validationError(ErrorMessageConstants.invalid("bech32 encoding: value \(value) out of range"))
+            }
+        }
+
+        // Build encoded string using validated values
+        let encoded = String(combined.map { charsetArray[Int($0)] })
+        return "\(hrp)1\(encoded)"
     }
 
     /// Decode bech32 string
