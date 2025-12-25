@@ -1,5 +1,5 @@
-import SwiftUI
 import NDKSwiftCore
+import SwiftUI
 
 /// Pill mention - shows name in a colored pill
 public struct PillMentionView: MentionRenderer {

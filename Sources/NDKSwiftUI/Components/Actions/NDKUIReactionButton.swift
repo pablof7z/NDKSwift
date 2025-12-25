@@ -284,17 +284,14 @@ private class ReactionState: ObservableObject {
         // Get current user's pubkey
         let userPubkey = try? await ndk.signer?.pubkey
 
-        // Process all reaction events
-        for event in events {
-            // Check if this reaction matches our emoji
-            if event.content == reaction {
-                totalCount += 1
+        // Process all reaction events matching our emoji
+        for event in events where event.content == reaction {
+            totalCount += 1
 
-                // Check if this is the current user's reaction
-                if let userPubkey = userPubkey, event.pubkey == userPubkey {
-                    userReacted = true
-                    userReactionEventId = event.id
-                }
+            // Check if this is the current user's reaction
+            if let userPubkey = userPubkey, event.pubkey == userPubkey {
+                userReacted = true
+                userReactionEventId = event.id
             }
         }
 

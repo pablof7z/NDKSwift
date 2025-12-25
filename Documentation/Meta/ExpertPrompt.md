@@ -961,12 +961,14 @@ Text(profile.displayName)
 **3. `ndk.profileUpdates(for:)` - AsyncStream for Non-SwiftUI Code**
 
 ```swift
-Task {
-    for await metadata in await ndk.profileUpdates(for: pubkey) {
+Task { @MainActor in
+    for await metadata in ndk.profileUpdates(for: pubkey) {
         print("Profile updated: \(metadata?.name ?? "Unknown")")
     }
 }
 ```
+
+> Note: `profileUpdates(for:)` shares the same subscription as `profile(for:)` - no duplicate subscriptions.
 
 #### SwiftUI Profile Components
 
@@ -1023,8 +1025,8 @@ Text(profile.name)
 // Use components for common UI elements
 NDKUIUsername(ndk: ndk, pubkey: pubkey)
 
-// AsyncStream for background tasks
-for await metadata in await ndk.profileUpdates(for: pubkey) {
+// AsyncStream for background tasks (requires MainActor)
+for await metadata in ndk.profileUpdates(for: pubkey) {
     // Process updates
 }
 ```
@@ -1059,9 +1061,10 @@ Following NDKSwift's core philosophy, never show loading states for profiles:
 
 ```swift
 // ❌ WRONG: Don't wait for profiles
+@MainActor
 func loadUserProfile() async {
     showLoadingSpinner()
-    for await metadata in await ndk.profileUpdates(for: pubkey) {
+    for await metadata in ndk.profileUpdates(for: pubkey) {
         if let metadata = metadata {
             updateUI(metadata)
         }

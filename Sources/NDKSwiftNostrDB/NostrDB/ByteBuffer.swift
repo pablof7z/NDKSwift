@@ -269,8 +269,7 @@ public struct ByteBuffer {
         ensureSpace(size: len)
         if str.utf8
             .withContiguousStorageIfAvailable({ self.push(bytes: $0, len: len) }) !=
-            nil
-        {
+            nil {
         } else {
             let utf8View = str.utf8
             for c in utf8View.reversed() {

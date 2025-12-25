@@ -107,15 +107,6 @@ final class RelayConstantsTests: XCTestCase {
         }
     }
 
-    func testDefaultOutboxRelays_ContainValidRelays() {
-        XCTAssertFalse(RelayConstants.defaultOutboxRelays.isEmpty, "defaultOutboxRelays should not be empty")
-
-        for relay in RelayConstants.defaultOutboxRelays {
-            XCTAssertTrue(RelayConstants.WebSocketScheme.isWebSocketURL(relay), "Outbox relay '\(relay)' should have WebSocket scheme")
-            XCTAssertNotNil(URLUtils.safeURL(relay), "Outbox relay '\(relay)' should be a valid URL")
-        }
-    }
-
     func testExampleRelay_IsValid() {
         XCTAssertEqual(RelayConstants.example, "wss://relay.example.com")
         XCTAssertTrue(RelayConstants.WebSocketScheme.isWebSocketURL(RelayConstants.example))

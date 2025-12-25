@@ -16,8 +16,8 @@ final class NDKOutboxConnectivityTests: XCTestCase {
 
     func testOutboxFallbackToConnectedRelays() async throws {
         // Configure NDK with an unreachable outbox relay
-        ndk = NDK(outboxConfig: NDKOutboxConfig(
-            outboxRelays: ["wss://unreachable.relay.test"]
+        ndk = NDK(discoveryConfig: NDKDiscoveryConfig(
+            discoveryRelays: ["wss://unreachable.relay.test"]
         ))
 
         // Add some test relays (won't actually connect in unit test environment)
@@ -36,14 +36,14 @@ final class NDKOutboxConnectivityTests: XCTestCase {
         // Verify that the discovery operation completed without crashing
         // This tests the fallback behavior when outbox relays are unreachable
         // The actual relay connections are not important in unit tests
-        XCTAssertNotNil(ndk.outboxConfig)
-        XCTAssertEqual(ndk.outboxConfig.outboxRelays.count, 1)
+        XCTAssertNotNil(ndk.discoveryConfig)
+        XCTAssertEqual(ndk.discoveryConfig.discoveryRelays.count, 1)
     }
 
     func testOutboxStrategyWithDisconnectedOutboxRelays() async throws {
         // Configure NDK with an unreachable outbox relay
-        ndk = NDK(outboxConfig: NDKOutboxConfig(
-            outboxRelays: ["wss://unreachable.relay.test"]
+        ndk = NDK(discoveryConfig: NDKDiscoveryConfig(
+            discoveryRelays: ["wss://unreachable.relay.test"]
         ))
 
         // Add test relays
@@ -65,13 +65,13 @@ final class NDKOutboxConnectivityTests: XCTestCase {
         // The strategy should have been created without crashing
         // This tests that the outbox logic executes gracefully when outbox relays are unreachable
         XCTAssertNotNil(strategy)
-        XCTAssertNotNil(ndk.outboxConfig)
+        XCTAssertNotNil(ndk.discoveryConfig)
     }
 
     func testRelayListFetchWithoutOutboxRelays() async throws {
         // Configure NDK with empty outbox relays
-        ndk = NDK(outboxConfig: NDKOutboxConfig(
-            outboxRelays: []
+        ndk = NDK(discoveryConfig: NDKDiscoveryConfig(
+            discoveryRelays: []
         ))
 
         // Add test relay
@@ -82,8 +82,8 @@ final class NDKOutboxConnectivityTests: XCTestCase {
         await ndk.outbox.trackUser(testPubkey)
 
         // The system should handle the lack of outbox relays gracefully
-        XCTAssertNotNil(ndk.outboxConfig)
-        XCTAssertEqual(ndk.outboxConfig.outboxRelays.count, 0)
+        XCTAssertNotNil(ndk.discoveryConfig)
+        XCTAssertEqual(ndk.discoveryConfig.discoveryRelays.count, 0)
 
         // The fetch should complete without errors even without outbox relays
         let relayScore = await ndk.outbox.getRelayScore(

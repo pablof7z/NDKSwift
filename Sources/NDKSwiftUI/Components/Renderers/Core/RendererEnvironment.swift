@@ -1,5 +1,5 @@
-import SwiftUI
 import NDKSwiftCore
+import SwiftUI
 
 // MARK: - Environment Keys
 
@@ -21,6 +21,10 @@ private struct OnLinkTapKey: EnvironmentKey {
 
 private struct OnImageTapKey: EnvironmentKey {
     static let defaultValue: ImageTapHandler? = nil
+}
+
+private struct OnVideoTapKey: EnvironmentKey {
+    static let defaultValue: VideoTapHandler? = nil
 }
 
 private struct OnEventTapKey: EnvironmentKey {
@@ -55,6 +59,11 @@ extension EnvironmentValues {
         set { self[OnImageTapKey.self] = newValue }
     }
 
+    public var onVideoTap: VideoTapHandler? {
+        get { self[OnVideoTapKey.self] }
+        set { self[OnVideoTapKey.self] = newValue }
+    }
+
     public var onEventTap: EventTapHandler? {
         get { self[OnEventTapKey.self] }
         set { self[OnEventTapKey.self] = newValue }
@@ -82,6 +91,10 @@ extension View {
 
     public func onImageTap(_ handler: @escaping ImageTapHandler) -> some View {
         environment(\.onImageTap, handler)
+    }
+
+    public func onVideoTap(_ handler: @escaping VideoTapHandler) -> some View {
+        environment(\.onVideoTap, handler)
     }
 
     public func onEventTap(_ handler: @escaping EventTapHandler) -> some View {

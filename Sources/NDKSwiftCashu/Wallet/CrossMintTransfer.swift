@@ -12,17 +12,17 @@ public enum CrossMintTransfer {
         requiredAmount: Int64,
         mints _: MintManager,
         proofStateManager: ProofStateManager,
-        blacklistedMints: Set<String> = []
+        blocklistedMints: Set<String> = []
     ) async -> String? {
         // Get mints that actually have proofs
         let proofsByMint = await proofStateManager.getAvailableProofsByMint()
         let ourMints = Set(proofsByMint.keys)
 
-        // Find intersection and exclude blacklisted mints
-        let commonMints = ourMints.intersection(acceptedMints).subtracting(blacklistedMints)
+        // Find intersection and exclude blocklisted mints
+        let commonMints = ourMints.intersection(acceptedMints).subtracting(blocklistedMints)
         NDKLogger.log(.debug, category: .wallet, "CrossMintTransfer.findMintWithSufficientBalance - ourMints: \(ourMints)")
         NDKLogger.log(.debug, category: .wallet, "CrossMintTransfer.findMintWithSufficientBalance - acceptedMints: \(acceptedMints)")
-        NDKLogger.log(.debug, category: .wallet, "CrossMintTransfer.findMintWithSufficientBalance - blacklistedMints: \(blacklistedMints)")
+        NDKLogger.log(.debug, category: .wallet, "CrossMintTransfer.findMintWithSufficientBalance - blocklistedMints: \(blocklistedMints)")
         NDKLogger.log(.debug, category: .wallet, "CrossMintTransfer.findMintWithSufficientBalance - commonMints: \(commonMints)")
 
         // Get mints with sufficient balance, then find first one in accepted mints
@@ -39,14 +39,14 @@ public enum CrossMintTransfer {
         requiredAmount: Int64,
         mints _: MintManager,
         proofStateManager: ProofStateManager,
-        blacklistedMints: Set<String> = []
+        blocklistedMints: Set<String> = []
     ) async -> [String] {
         // Get mints that actually have proofs
         let proofsByMint = await proofStateManager.getAvailableProofsByMint()
         let ourMints = Set(proofsByMint.keys)
 
-        // Find intersection and exclude blacklisted mints
-        let commonMints = ourMints.intersection(acceptedMints).subtracting(blacklistedMints)
+        // Find intersection and exclude blocklisted mints
+        let commonMints = ourMints.intersection(acceptedMints).subtracting(blocklistedMints)
 
         // Get all mints with sufficient balance, then filter by accepted mints
         let mintsWithBalance = await proofStateManager.getMintsWithSufficientBalance(amount: requiredAmount)
@@ -62,7 +62,7 @@ public enum CrossMintTransfer {
         mints _: MintManager,
         proofStateManager: ProofStateManager,
         feeBuffer: Int64 = PaymentConstants.defaultCashuFeeBuffer,
-        blacklistedMints: Set<String> = []
+        blocklistedMints: Set<String> = []
     ) async -> String? {
         let requiredAmount = amount + feeBuffer
 
@@ -73,8 +73,8 @@ public enum CrossMintTransfer {
         var bestMint: (url: String, balance: Int64)?
 
         for (mintURL, proofs) in proofsByMint {
-            // Skip the target mint (no self-transfer) and blacklisted mints
-            if mintURL == targetMint || blacklistedMints.contains(mintURL) { continue }
+            // Skip the target mint (no self-transfer) and blocklisted mints
+            if mintURL == targetMint || blocklistedMints.contains(mintURL) { continue }
 
             let balance = proofs.reduce(0) { $0 + Int64($1.amount) }
             if balance >= requiredAmount {
@@ -99,7 +99,7 @@ public enum CrossMintTransfer {
         acceptedMints: Set<String>,
         mints: MintManager,
         proofStateManager: ProofStateManager,
-        blacklistedMints: Set<String> = []
+        blocklistedMints: Set<String> = []
     ) async -> PaymentRoute {
         NDKLogger.log(.debug, category: .wallet, "CrossMintTransfer.findBestPaymentRoute - amount: \(amount), acceptedMints: \(acceptedMints)")
         // First, try to find a direct payment option
@@ -110,13 +110,13 @@ public enum CrossMintTransfer {
             requiredAmount: amountWithFeeBuffer,
             mints: mints,
             proofStateManager: proofStateManager,
-            blacklistedMints: blacklistedMints
+            blocklistedMints: blocklistedMints
         ) {
             return .direct(mint: directMint)
         }
 
         // No direct payment possible, try cross-mint transfer routes for all accepted mints
-        for targetMint in acceptedMints where !blacklistedMints.contains(targetMint) {
+        for targetMint in acceptedMints where !blocklistedMints.contains(targetMint) {
             // Find source mint with sufficient balance for transfer + fees
             if let sourceMint = await findSourceMintForTransfer(
                 amount: amount,
@@ -124,12 +124,11 @@ public enum CrossMintTransfer {
                 mints: mints,
                 proofStateManager: proofStateManager,
                 feeBuffer: PaymentConstants.defaultCashuFeeBuffer,
-                blacklistedMints: blacklistedMints
+                blocklistedMints: blocklistedMints
             ) {
                 // Estimate fees for the transfer
                 if let sourceURL = URL(string: sourceMint),
-                   let targetURL = URL(string: targetMint)
-                {
+                   let targetURL = URL(string: targetMint) {
                     do {
                         let fees = try await estimateTransferFees(
                             amount: amount,

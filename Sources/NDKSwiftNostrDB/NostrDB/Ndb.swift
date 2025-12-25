@@ -194,8 +194,7 @@ class Ndb: @unchecked Sendable {
     static func db_path(appGroupIdentifier: String? = nil) -> String? {
         // Use app group container if available, otherwise fall back to documents directory
         if let appGroup = appGroupIdentifier,
-           let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup)
-        {
+           let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup) {
             return remove_file_prefix(containerURL.absoluteString)
         }
         // Fallback to documents directory
@@ -1024,10 +1023,8 @@ class Ndb: @unchecked Sendable {
     /// Determines if a given note was seen on any of the listed relay URLs
     func was(noteKey: NoteKey, seenOnAnyOf relayURLs: [String], txn: SafeNdbTxn<Void>? = nil) throws -> Bool {
         guard let txn = txn ?? SafeNdbTxn.new(on: self) else { throw NdbLookupError.cannotOpenTransaction }
-        for relayUrl in relayURLs {
-            if try was(noteKey: noteKey, seenOn: relayUrl, txn: txn) {
-                return true
-            }
+        for relayUrl in relayURLs where try was(noteKey: noteKey, seenOn: relayUrl, txn: txn) {
+            return true
         }
         return false
     }

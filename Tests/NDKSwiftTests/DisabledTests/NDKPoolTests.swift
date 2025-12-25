@@ -75,7 +75,7 @@ final class NDKPoolTests: NDKTestCase {
         let pool = ndk.pool
 
         // Add explicit relay
-        await pool.addRelay("wss://explicit.relay.com", origin: .explicit)
+        await pool.addRelay("wss://explicit.relay.com", origin: .appRelay)
 
         // Add discovered relay (using outbox origin with a pubkey)
         await pool.addRelay("wss://discovered.relay.com", origin: .outbox(authorPubkey: TestFixtures.Keys.alice.publicKey))
@@ -83,7 +83,7 @@ final class NDKPoolTests: NDKTestCase {
         let allRelays = await pool.relays
         XCTAssertEqual(allRelays.count, 2)
 
-        let explicitRelays = await pool.explicitRelays()
+        let explicitRelays = await pool.appRelayRelays()
         XCTAssertEqual(explicitRelays.count, 1)
         XCTAssertEqual(explicitRelays.first?.url, "wss://explicit.relay.com/")
     }

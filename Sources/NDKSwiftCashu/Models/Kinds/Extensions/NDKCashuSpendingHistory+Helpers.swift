@@ -115,16 +115,14 @@ public extension NDKCashuSpendingHistory {
             case .in:
                 // Check if it's a mint (from Lightning) or receive (from ecash)
                 if memo?.lowercased().contains("lightning") == true ||
-                    memo?.lowercased().contains("deposit") == true
-                {
+                    memo?.lowercased().contains("deposit") == true {
                     return .mint
                 }
                 return .receive
             case .out:
                 // Check if it's a melt (to Lightning) or send (ecash)
                 if memo?.lowercased().contains("lightning") == true ||
-                    memo?.lowercased().contains("payment") == true
-                {
+                    memo?.lowercased().contains("payment") == true {
                     return .melt
                 }
                 return .send

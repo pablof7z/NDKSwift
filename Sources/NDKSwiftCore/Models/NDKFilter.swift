@@ -372,8 +372,7 @@ public struct NDKFilter: Codable, Equatable, Sendable {
         // Don't merge if either has tag filters, events, or pubkeys
         if !tagFilters.isEmpty || !other.tagFilters.isEmpty ||
             events != nil || other.events != nil ||
-            pubkeys != nil || other.pubkeys != nil
-        {
+            pubkeys != nil || other.pubkeys != nil {
             return false
         }
 

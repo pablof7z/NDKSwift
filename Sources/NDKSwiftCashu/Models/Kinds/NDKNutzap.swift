@@ -1,6 +1,6 @@
+import CashuSwift
 import Foundation
 import NDKSwiftCore
-import CashuSwift
 
 /// NIP-61 Nutzap (kind: 9321)
 /// A Nutzap is a P2PK Cashu token event where the payment itself is the receipt.
@@ -125,12 +125,10 @@ public struct NDKNutzap {
         }
 
         // 3. Verify DLEQ proofs if present
-        for proof in proofs {
-            if let _ = proof.dleq {
-                // DLEQ verification would require complex cryptographic operations
-                // For now, we assume they're valid if present
-                continue
-            }
+        for proof in proofs where proof.dleq != nil {
+            // DLEQ verification would require complex cryptographic operations
+            // For now, we assume they're valid if present
+            continue
         }
 
         return true

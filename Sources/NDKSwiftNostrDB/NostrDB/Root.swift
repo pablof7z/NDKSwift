@@ -78,8 +78,7 @@ public func getCheckedPrefixedSizeRoot<T: FlatBufferObject & Verifiable>(
 /// ``getPrefixedSizeCheckedRoot(byteBuffer:options:)`` would skip the first Bytes in
 /// the ``ByteBuffer`` and then calls ``getRoot(byteBuffer:)``
 public func getPrefixedSizeRoot<T: FlatBufferObject>(byteBuffer: inout ByteBuffer)
-    -> T
-{
+    -> T {
     byteBuffer.skipPrefix()
     return getRoot(byteBuffer: &byteBuffer)
 }

@@ -226,8 +226,7 @@ public struct NDKNostrEntityText: View {
         ) { match, _, _ in
             if let match = match,
                let range = Range(match.range, in: result.normalizedContent),
-               let attributedRange = attributed.range(of: String(result.normalizedContent[range]))
-            {
+               let attributedRange = attributed.range(of: String(result.normalizedContent[range])) {
                 attributed[attributedRange].foregroundColor = hashtagColor
                 attributed[attributedRange].font = font.weight(.medium)
             }

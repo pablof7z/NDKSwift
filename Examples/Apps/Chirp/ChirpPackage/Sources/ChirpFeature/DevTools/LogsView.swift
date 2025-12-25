@@ -5,8 +5,8 @@ struct LogsView: View {
     @State private var selectedLogLevel: NDKLogLevel = NDKLogger.logLevel
     @State private var enabledCategories: Set<NDKLogCategory> = NDKLogger.enabledCategories
     @State private var logNetworkTraffic: Bool = NDKLogger.logNetworkTraffic
-    @State private var logMessages: [String] = []
-    @State private var isCapturingLogs: Bool = false
+
+    private var logService: LogCaptureService { LogCaptureService.shared }
 
     let allCategories = NDKLogCategory.allCases
     let logLevels: [NDKLogLevel] = [.off, .error, .warning, .info, .debug, .trace]
@@ -54,30 +54,32 @@ struct LogsView: View {
             }
 
             Section {
-                Toggle("Capture Logs", isOn: $isCapturingLogs)
-                    .onChange(of: isCapturingLogs) { _, newValue in
-                        if newValue {
-                            startCapturingLogs()
+                Toggle("Capture Logs", isOn: Binding(
+                    get: { logService.isCapturing },
+                    set: { enabled in
+                        if enabled {
+                            logService.startCapturing()
                         } else {
-                            stopCapturingLogs()
+                            logService.stopCapturing()
                         }
                     }
+                ))
 
-                if isCapturingLogs {
+                if logService.isCapturing {
                     Button("Clear Logs") {
-                        logMessages.removeAll()
+                        logService.clearMessages()
                     }
                     .foregroundStyle(.red)
                 }
             } header: {
-                Text("Live Logs")
+                Text("Log Capture")
             } footer: {
-                Text("Enable log capture to see live logs in this view. Note: This only captures logs while this view is visible.")
+                Text("Logs are captured globally even when you navigate away from this view.")
             }
 
-            if !logMessages.isEmpty {
-                Section("Captured Logs (\(logMessages.count))") {
-                    ForEach(Array(logMessages.enumerated().reversed()), id: \.offset) { _, message in
+            if !logService.messages.isEmpty {
+                Section("Captured Logs (\(logService.messages.count))") {
+                    ForEach(Array(logService.messages.enumerated().reversed()), id: \.offset) { _, message in
                         Text(message)
                             .font(.caption)
                             .monospaced()
@@ -86,26 +88,6 @@ struct LogsView: View {
             }
         }
         .navigationTitle("Logs")
-        .onDisappear {
-            stopCapturingLogs()
-        }
-    }
-
-    private func startCapturingLogs() {
-        logMessages.removeAll()
-        NDKLogger.setLogHandler { message in
-            Task { @MainActor in
-                logMessages.append(message)
-                // Keep only last 100 messages to prevent memory issues
-                if logMessages.count > 100 {
-                    logMessages.removeFirst()
-                }
-            }
-        }
-    }
-
-    private func stopCapturingLogs() {
-        NDKLogger.setLogHandler(nil)
     }
 }
 

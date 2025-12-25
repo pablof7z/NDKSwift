@@ -18,6 +18,7 @@ public struct NDKZapRequest {
         amountMillisats: Int64,
         comment: String? = nil,
         relays: [String],
+        recipientLnurl: String? = nil,
         zappedEvent: NDKEvent? = nil,
         zappedEventCoordinate: String? = nil
     ) async throws -> NDKZapRequest {
@@ -29,14 +30,9 @@ public struct NDKZapRequest {
         tags.append([NostrConstants.TagName.amount, String(amountMillisats)])
 
         // Optional: lnurl tag
-        for await profile in await ndk.profileManager.subscribe(for: recipientPubkey, maxAge: TimeConstants.hour) {
-            if let profile = profile,
-               let lnurl = profile.lud06 ?? profile.lud16
-            {
-                let encoded = try encodeLNURL(lnurl)
-                tags.append([NostrConstants.TagName.lnurl, encoded])
-            }
-            break // Only need first value
+        if let lnurl = recipientLnurl {
+            let encoded = try encodeLNURL(lnurl)
+            tags.append([NostrConstants.TagName.lnurl, encoded])
         }
 
         // Optional: zapped event

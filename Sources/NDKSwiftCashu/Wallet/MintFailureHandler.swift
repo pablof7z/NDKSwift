@@ -19,9 +19,9 @@ public protocol MintFailureHandlerDelegate: AnyObject {
 public enum MintFailureUserDecision {
     /// Retry the mint operation
     case retry
-    /// Blacklist the mint and don't retry
-    case blacklistMint
-    /// Cancel without blacklisting
+    /// Blocklist the mint and don't retry
+    case blocklistMint
+    /// Cancel without blocklisting
     case cancel
 }
 
@@ -85,19 +85,19 @@ public actor MintFailureHandler {
                 // This would be handled by the calling code
             }
 
-        case .blacklistMint:
-            // Add mint to blacklist
+        case .blocklistMint:
+            // Add mint to blocklist
             do {
-                try await wallet.blacklistMint(operation.mintURL)
+                try await wallet.blocklistMint(operation.mintURL)
             } catch {
-                NDKLogger.log(.error, category: .wallet, "\(ErrorMessageConstants.failedTo("blacklist mint")): \(error)")
+                NDKLogger.log(.error, category: .wallet, "\(ErrorMessageConstants.failedTo("blocklist mint")): \(error)")
             }
 
             // Log the failed operation for potential manual recovery
             logFailedOperation(operation, paymentProof: paymentProof)
 
         case .cancel:
-            // User chose not to retry or blacklist
+            // User chose not to retry or blocklist
             NDKLogger.log(.info, category: .wallet, "User cancelled mint recovery for: \(operation.mintURL)")
 
             // Still log the operation for potential manual recovery
@@ -135,11 +135,11 @@ public actor MintFailureHandler {
                 NDKLogger.log(.info, category: .wallet, "✅ Successfully recovered \(proofs.count) proofs from deposit")
             }
 
-        case .blacklistMint:
+        case .blocklistMint:
             do {
-                try await wallet.blacklistMint(operation.mintURL)
+                try await wallet.blocklistMint(operation.mintURL)
             } catch {
-                NDKLogger.log(.error, category: .wallet, "\(ErrorMessageConstants.failedTo("blacklist mint after deposit failure")): \(error)")
+                NDKLogger.log(.error, category: .wallet, "\(ErrorMessageConstants.failedTo("blocklist mint after deposit failure")): \(error)")
             }
 
         case .cancel:
@@ -189,7 +189,7 @@ public enum MintFailureAlert {
         //          What would you like to do?"
         // Buttons:
         // - "Retry" -> .retry
-        // - "Blacklist Mint" -> .blacklistMint
+        // - "Blocklist Mint" -> .blocklistMint
         // - "Cancel" -> .cancel
 
         return .retry // Default action

@@ -1,4 +1,3 @@
-
 /// Relay access modes for relay list entries
 public enum NDKRelayAccess: String, CaseIterable {
     case read
@@ -231,10 +230,8 @@ public class NDKRelayList: NDKList {
     /// Merge another relay list into this one
     @discardableResult
     public func merge(with other: NDKRelayList) -> NDKRelayList {
-        for entry in other.relayEntries {
-            if !hasRelay(entry.relay.url) {
-                tags.append(entry.toTag())
-            }
+        for entry in other.relayEntries where !hasRelay(entry.relay.url) {
+            tags.append(entry.toTag())
         }
 
         // Update timestamp

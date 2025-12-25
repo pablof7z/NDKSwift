@@ -113,7 +113,7 @@ public struct ProfileView: View {
     private func postsContent(pubkey: String) -> some View {
         // Show content immediately - no loading state
         // Posts will stream in as they arrive
-        LazyVStack(spacing: 12) {
+        LazyVStack(spacing: 0) {
             if allEvents.isEmpty {
                 // Show empty state inline, not as a blocker
                 Text("No posts yet")
@@ -122,11 +122,10 @@ public struct ProfileView: View {
                     .frame(minHeight: 100)
             } else {
                 ForEach(allEvents, id: \.id) { event in
-                    FeedPostCard(ndk: state.ndk, event: event)
+                    FeedPostRow(ndk: state.ndk, event: event)
                 }
             }
         }
-        .padding(.horizontal)
         .padding(.bottom, 100)
         .task {
             if subscription == nil {

@@ -48,8 +48,8 @@ public actor NDKPool {
     private var relayMap: [String: NDKRelay] = [:]
     private nonisolated let config: NDKConnectionConfig
 
-    /// Set of relay URLs that were explicitly added by the developer
-    private var explicitRelayUrls: Set<String> = []
+    /// Set of relay URLs that were added as app relays
+    private var appRelayUrls: Set<String> = []
 
     /// NIP-77 sync handlers indexed by normalized relay URL
     /// This must be an instance property (not static) to benefit from actor isolation
@@ -271,7 +271,7 @@ public actor NDKPool {
 
     /// Add a relay to the pool
     @discardableResult
-    public func addRelay(_ url: RelayURL, origin: NDKRelayOrigin = .explicit) async -> NDKRelay {
+    public func addRelay(_ url: RelayURL, origin: NDKRelayOrigin = .appRelays) async -> NDKRelay {
         let normalizedUrl = url.normalizedRelayURL
 
         // Start telemetry span
@@ -307,12 +307,12 @@ public actor NDKPool {
         await relay.setOrigin(origin)
 
         // Set persistence based on origin
-        // Explicit and outboxConfig relays are persistent (never evicted)
-        // Outbox-discovered and fallback relays are not persistent (can be evicted when idle)
+        // App and discovery relays are persistent (never evicted)
+        // Outbox-discovered relays are not persistent (can be evicted when idle)
         switch origin {
-        case .explicit, .outboxConfig:
+        case .appRelays, .discovery:
             await relay.setPersistent(true)
-        case .outbox, .fallback:
+        case .outbox:
             await relay.setPersistent(false)
         }
 
@@ -321,9 +321,9 @@ public actor NDKPool {
         span?.set(SpanAttributes.decisionOutcome, "added")
         span?.set(SpanAttributes.poolSize, relayMap.count)
 
-        // Track explicit relays
-        if case .explicit = origin {
-            explicitRelayUrls.insert(normalizedUrl)
+        // Track app relays
+        if case .appRelays = origin {
+            appRelayUrls.insert(normalizedUrl)
         }
 
         // Set up connection state observer to publish queued events and emit pool events
@@ -427,7 +427,7 @@ public actor NDKPool {
         switch origin {
         case let .outbox(authorPubkey):
             return [authorPubkey]
-        case .explicit, .outboxConfig, .fallback:
+        case .appRelays, .discovery:
             return []
         }
     }
@@ -441,7 +441,7 @@ public actor NDKPool {
             switch origin {
             case let .outbox(authorPubkey):
                 mapping[url] = [authorPubkey]
-            case .explicit, .outboxConfig, .fallback:
+            case .appRelays, .discovery:
                 // These relays weren't added because of specific authors
                 mapping[url] = []
             }
@@ -458,17 +458,24 @@ public actor NDKPool {
         }
     }
 
-    /// Get explicit relays (added by developer)
-    public func explicitRelays() async -> [NDKRelay] {
+    /// Get app relays (added by app/developer)
+    public var appRelays: [NDKRelay] {
         relayMap.values.filter { relay in
-            explicitRelayUrls.contains(relay.url)
+            appRelayUrls.contains(relay.url)
         }
     }
 
-    /// Get connected explicit relays
-    public func connectedExplicitRelays() async -> [NDKRelay] {
-        await explicitRelays().asyncFilter { relay in
+    /// Get connected app relays
+    public func connectedAppRelays() async -> [NDKRelay] {
+        await appRelays.asyncFilter { relay in
             await relay.connectionState == .connected
+        }
+    }
+
+    /// Get relays filtered by origin
+    public func relays(withOrigin origin: NDKRelayOrigin) async -> [NDKRelay] {
+        await relays.asyncFilter { relay in
+            await relay.origin == origin
         }
     }
 

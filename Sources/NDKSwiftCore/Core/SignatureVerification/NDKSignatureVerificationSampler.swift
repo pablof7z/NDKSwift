@@ -8,8 +8,8 @@ public actor NDKSignatureVerificationSampler {
     /// Cache for verified signatures
     private let cache: NDKSignatureVerificationCache
 
-    /// Blacklisted relay URLs
-    private var blacklistedRelays: Set<String> = []
+    /// Blocklisted relay URLs
+    private var blocklistedRelays: Set<String> = []
 
     /// Delegate for signature verification events
     public weak var delegate: NDKSignatureVerificationDelegate?
@@ -54,10 +54,10 @@ public actor NDKSignatureVerificationSampler {
             return .invalid
         }
 
-        // Check if relay is blacklisted
-        if blacklistedRelays.contains(relay.url) {
-            span?.set(SpanAttributes.decisionOutcome, "relay_blacklisted")
-            span?.setStatus(.error("Relay is blacklisted"))
+        // Check if relay is blocklisted
+        if blocklistedRelays.contains(relay.url) {
+            span?.set(SpanAttributes.decisionOutcome, "relay_blocklisted")
+            span?.setStatus(.error("Relay is blocklisted"))
             return .invalid
         }
 
@@ -121,14 +121,14 @@ public actor NDKSignatureVerificationSampler {
         }
     }
 
-    /// Check if a relay is blacklisted
-    public func isBlacklisted(relay: RelayProtocol) -> Bool {
-        return blacklistedRelays.contains(relay.url)
+    /// Check if a relay is blocklisted
+    public func isBlocklisted(relay: RelayProtocol) -> Bool {
+        return blocklistedRelays.contains(relay.url)
     }
 
-    /// Get blacklisted relay URLs
-    public func getBlacklistedRelays() -> Set<String> {
-        return blacklistedRelays
+    /// Get blocklisted relay URLs
+    public func getBlocklistedRelays() -> Set<String> {
+        return blocklistedRelays
     }
 
     /// Clear the signature cache
@@ -137,8 +137,8 @@ public actor NDKSignatureVerificationSampler {
     }
 
     /// Get verification statistics
-    public func getStats() -> (totalVerifications: Int, failedVerifications: Int, blacklistedRelays: Int) {
-        return (totalVerifications, failedVerifications, blacklistedRelays.count)
+    public func getStats() -> (totalVerifications: Int, failedVerifications: Int, blocklistedRelays: Int) {
+        return (totalVerifications, failedVerifications, blocklistedRelays.count)
     }
 
     /// Set the signature verification delegate
@@ -234,14 +234,14 @@ public actor NDKSignatureVerificationSampler {
             delegateCopy?.signatureVerificationFailed(for: event, from: relay)
         }
 
-        // Blacklist the relay if configured
-        if config.autoBlacklistInvalidRelays {
-            blacklistedRelays.insert(relay.url)
+        // Blocklist the relay if configured
+        if config.autoBlocklistInvalidRelays {
+            blocklistedRelays.insert(relay.url)
 
-            // Notify delegate about blacklisting
+            // Notify delegate about blocklisting
             let delegateCopy = delegate
             await MainActor.run {
-                delegateCopy?.relayBlacklisted(relay)
+                delegateCopy?.relayBlocklisted(relay)
             }
 
             // Disconnect from the relay
@@ -251,8 +251,8 @@ public actor NDKSignatureVerificationSampler {
         }
     }
 
-    /// Check if a relay is blacklisted
-    public func isRelayBlacklisted(_ relayUrl: String) -> Bool {
-        return blacklistedRelays.contains(relayUrl)
+    /// Check if a relay is blocklisted
+    public func isRelayBlocklisted(_ relayUrl: String) -> Bool {
+        return blocklistedRelays.contains(relayUrl)
     }
 }

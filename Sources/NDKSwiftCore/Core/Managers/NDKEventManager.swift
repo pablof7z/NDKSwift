@@ -112,9 +112,9 @@ public actor NDKEventManager {
                 if targetRelays.isEmpty {
                     targetRelays = Set(ndk.configuredRelayURLs)
                 }
-                // If still empty, use outbox config relays as last resort
+                // If still empty, use discovery relays as last resort
                 if targetRelays.isEmpty {
-                    targetRelays = ndk.outboxConfig.outboxRelays
+                    targetRelays = ndk.discoveryConfig.discoveryRelays
                 }
 
                 // Normalize URLs to match the relay pool's normalized URLs

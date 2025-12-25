@@ -93,7 +93,7 @@ actor EOSETracker {
         }
 
         // Calculate progressive timeout (matching ndk-core logic)
-        guard expectedRelays.count > 0 else { return }
+        guard !expectedRelays.isEmpty else { return }
 
         let percentageOfRelaysThatHaveSentEose = Double(eosesSeen.count) / Double(expectedRelays.count)
 
@@ -131,8 +131,7 @@ actor EOSETracker {
     private func checkIfShouldEmitAfterTimeout() {
         // If we received an event in the last 20ms, restart the timer
         if let lastEventTime = lastEventReceivedAt,
-           Date().timeIntervalSince(lastEventTime) < 0.02
-        {
+           Date().timeIntervalSince(lastEventTime) < 0.02 {
             NDKLogger.log(.debug, category: .subscription,
                           "⏱️ [\(subscriptionId)] Recent event received, restarting EOSE timer")
             checkEOSEEmission()

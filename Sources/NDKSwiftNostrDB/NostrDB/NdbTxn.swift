@@ -10,7 +10,7 @@ import NDKSwiftCore
 import NostrDB
 
 #if TXNDEBUG
-    fileprivate var txn_count: Int = 0
+    private var txn_count: Int = 0
 #endif
 
 // Would use struct and ~Copyable but generics aren't supported well
@@ -35,8 +35,7 @@ class NdbTxn<T>: RawNdbTxnAccessible {
         if let active_txn = Thread.current.threadDictionary["ndb_txn"] as? ndb_txn,
            let txn_generation = Thread.current.threadDictionary["txn_generation"] as? Int,
            let ref_count = Thread.current.threadDictionary["ndb_txn_ref_count"] as? Int,
-           txn_generation == ndb.generation
-        {
+           txn_generation == ndb.generation {
             // some parent thread is active, use that instead
             #if DEBUG
                 print("txn: inherited txn")
@@ -173,8 +172,7 @@ class SafeNdbTxn<T: ~Copyable> {
         if let active_txn = Thread.current.threadDictionary["ndb_txn"] as? ndb_txn,
            let txn_generation = Thread.current.threadDictionary["txn_generation"] as? Int,
            let ref_count = Thread.current.threadDictionary["ndb_txn_ref_count"] as? Int,
-           txn_generation == ndb.generation
-        {
+           txn_generation == ndb.generation {
             // some parent thread is active, use that instead
             #if DEBUG
                 print("txn: inherited txn")

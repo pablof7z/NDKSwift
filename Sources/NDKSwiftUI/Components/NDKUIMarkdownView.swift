@@ -1,5 +1,5 @@
-import SwiftUI
 import NDKSwiftCore
+import SwiftUI
 
 /// A generic markdown view that renders parsed markdown content with pluggable inline renderers
 public struct NDKUIMarkdownView<
@@ -7,6 +7,7 @@ public struct NDKUIMarkdownView<
     Hashtag: HashtagRenderer,
     Link: LinkRenderer,
     Image: ImageRenderer,
+    Video: VideoRenderer,
     Event: EventRenderer
 >: View {
     let content: String
@@ -95,12 +96,45 @@ public struct NDKUIMarkdownView<
         }
     }
 
+    // MARK: - Grouped Inline Rendering
+
+    private typealias GroupedInline = ImageGroupingUtils.GroupedResult<MarkdownInline>
+
     @ViewBuilder
     private func renderInlines(_ inlines: [MarkdownInline]) -> some View {
-        FlowLayout(alignment: .leading, spacing: 0) {
-            ForEach(Array(inlines.enumerated()), id: \.offset) { _, inline in
-                renderInline(inline)
+        let grouped = ImageGroupingUtils.groupConsecutiveImages(
+            inlines,
+            getImageURL: { inline in
+                if case .image(_, let url) = inline {
+                    return url
+                }
+                return nil
+            },
+            isWhitespaceText: { inline in
+                if case .text(let text) = inline {
+                    let stripped = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if stripped.isEmpty { return true }
+                    // Also treat as whitespace if only punctuation remains
+                    return stripped.allSatisfy { $0.isPunctuation || $0.isWhitespace }
+                }
+                return false
             }
+        )
+
+        FlowLayout(alignment: .leading, spacing: 0) {
+            ForEach(Array(grouped.enumerated()), id: \.offset) { _, item in
+                renderGroupedInline(item)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func renderGroupedInline(_ item: GroupedInline) -> some View {
+        switch item {
+        case .single(let inline):
+            renderInline(inline)
+        case .imageGroup(let urls):
+            Image(urls: urls, onTap: nil)
         }
     }
 
@@ -128,10 +162,14 @@ public struct NDKUIMarkdownView<
                 .cornerRadius(4)
 
         case .link(_, let url):
-            Link(url: url, onTap: nil)
+            if isVideoURL(url) {
+                Video(url: url, onTap: nil)
+            } else {
+                Link(url: url, onTap: nil)
+            }
 
         case .image(_, let url):
-            Image(url: url, onTap: nil)
+            Image(urls: [url], onTap: nil)
 
         case .nostrEntity(let entity):
             renderNostrEntity(entity)
@@ -198,7 +236,11 @@ public struct NDKUIMarkdownView<
             Hashtag(tag: tag, onTap: nil)
 
         case .url(let url):
-            Link(url: url, onTap: nil)
+            if isVideoURL(url) {
+                Video(url: url, onTap: nil)
+            } else {
+                Link(url: url, onTap: nil)
+            }
 
         case .note(let note):
             EventPreviewLoader<Event>(reference: .note(note), onTap: nil)
@@ -219,6 +261,24 @@ public struct NDKUIMarkdownView<
             EventPreviewLoader<Event>(reference: .eventId(eventId), onTap: nil)
         }
     }
+
+    private func isVideoURL(_ url: URL) -> Bool {
+        let videoExtensions = ["mp4", "mov", "m4v", "webm", "avi", "mkv", "m3u8"]
+        let pathExtension = url.pathExtension.lowercased()
+
+        if videoExtensions.contains(pathExtension) {
+            return true
+        }
+
+        let urlString = url.absoluteString.lowercased()
+        for ext in videoExtensions {
+            if urlString.contains(".\(ext)?") || urlString.contains(".\(ext)&") || urlString.contains(".\(ext)#") {
+                return true
+            }
+        }
+
+        return false
+    }
 }
 
 // MARK: - Default Typealias
@@ -229,6 +289,7 @@ public typealias NDKMarkdown = NDKUIMarkdownView<
     DefaultHashtagView,
     DefaultLinkView,
     DefaultImageView,
+    DefaultVideoView,
     DefaultEventView
 >
 

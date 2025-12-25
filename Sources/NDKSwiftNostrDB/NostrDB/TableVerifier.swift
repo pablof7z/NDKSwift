@@ -122,8 +122,7 @@ public struct TableVerifier {
         required: Bool,
         completion: @escaping (inout Verifier, T, Int) throws -> Void
     ) throws
-        where T: UnionEnum
-    {
+        where T: UnionEnum {
         let keyPos = try dereference(key)
         let valPos = try dereference(field)
 
@@ -138,8 +137,7 @@ public struct TableVerifier {
         }
 
         if let _key = keyPos,
-           let _val = valPos
-        {
+           let _val = valPos {
             /// verifiying that the key is within the buffer
             try T.T.verify(&_verifier, at: _key, of: T.T.self)
             guard let _enum = try T(value: _verifier._buffer.read(
@@ -182,14 +180,12 @@ public struct TableVerifier {
         required: Bool,
         completion: @escaping (inout Verifier, T, Int) throws -> Void
     ) throws
-        where T: UnionEnum
-    {
+        where T: UnionEnum {
         let keyVectorPosition = try dereference(key)
         let offsetVectorPosition = try dereference(field)
 
         if let keyPos = keyVectorPosition,
-           let valPos = offsetVectorPosition
-        {
+           let valPos = offsetVectorPosition {
             try UnionVector<T>.verify(
                 &_verifier,
                 keyPosition: keyPos,

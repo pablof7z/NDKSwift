@@ -134,6 +134,7 @@ public typealias DefaultStyleRichText = NDKUIRichTextView<
     DefaultHashtagView,
     DefaultLinkView,
     DefaultImageView,
+    DefaultVideoView,
     DefaultEventView
 >
 
@@ -143,6 +144,7 @@ public typealias CompactStyleRichText = NDKUIRichTextView<
     CompactHashtagView,
     DefaultLinkView,
     DefaultImageView,
+    DefaultVideoView,
     DefaultEventView
 >
 
@@ -152,6 +154,7 @@ public typealias PillStyleRichText = NDKUIRichTextView<
     PillHashtagView,
     PillLinkView,
     DefaultImageView,
+    DefaultVideoView,
     DefaultEventView
 >
 
@@ -161,6 +164,7 @@ public typealias DefaultStyleMarkdown = NDKUIMarkdownView<
     DefaultHashtagView,
     DefaultLinkView,
     DefaultImageView,
+    DefaultVideoView,
     DefaultEventView
 >
 
@@ -170,6 +174,7 @@ public typealias CompactStyleMarkdown = NDKUIMarkdownView<
     CompactHashtagView,
     DefaultLinkView,
     DefaultImageView,
+    DefaultVideoView,
     DefaultEventView
 >
 
@@ -179,6 +184,7 @@ public typealias PillStyleMarkdown = NDKUIMarkdownView<
     PillHashtagView,
     PillLinkView,
     DefaultImageView,
+    DefaultVideoView,
     DefaultEventView
 >
 
@@ -188,6 +194,7 @@ public typealias LinkEmbedRichText = NDKUIRichTextView<
     DefaultHashtagView,
     LinkEmbedView,
     DefaultImageView,
+    DefaultVideoView,
     DefaultEventView
 >
 
@@ -197,6 +204,7 @@ public typealias EventInlineRichText = NDKUIRichTextView<
     DefaultHashtagView,
     DefaultLinkView,
     DefaultImageView,
+    DefaultVideoView,
     EventCardInlineView
 >
 
@@ -206,6 +214,7 @@ public typealias EventCompactRichText = NDKUIRichTextView<
     DefaultHashtagView,
     DefaultLinkView,
     DefaultImageView,
+    DefaultVideoView,
     EventCardCompactView
 >
 
@@ -215,6 +224,7 @@ public typealias ArticleHeroRichText = NDKUIRichTextView<
     DefaultHashtagView,
     DefaultLinkView,
     DefaultImageView,
+    DefaultVideoView,
     ArticleCardHero
 >
 
@@ -224,6 +234,7 @@ public typealias ArticleCompactRichText = NDKUIRichTextView<
     DefaultHashtagView,
     DefaultLinkView,
     DefaultImageView,
+    DefaultVideoView,
     ArticleCardCompact
 >
 
@@ -233,6 +244,7 @@ public typealias ArticlePortraitRichText = NDKUIRichTextView<
     DefaultHashtagView,
     DefaultLinkView,
     DefaultImageView,
+    DefaultVideoView,
     ArticleCardPortrait
 >
 
@@ -242,6 +254,7 @@ public typealias ArticleHeroMarkdown = NDKUIMarkdownView<
     DefaultHashtagView,
     DefaultLinkView,
     DefaultImageView,
+    DefaultVideoView,
     ArticleCardHero
 >
 
@@ -251,6 +264,7 @@ public typealias ArticleCompactMarkdown = NDKUIMarkdownView<
     CompactHashtagView,
     DefaultLinkView,
     DefaultImageView,
+    DefaultVideoView,
     ArticleCardCompact
 >
 
@@ -260,5 +274,6 @@ public typealias ArticlePortraitMarkdown = NDKUIMarkdownView<
     PillHashtagView,
     DefaultLinkView,
     DefaultImageView,
+    DefaultVideoView,
     ArticleCardPortrait
 >

@@ -15,10 +15,8 @@ public extension Array {
     /// - Returns: A new array containing only elements where isIncluded returns true
     func asyncFilter(_ isIncluded: (Element) async -> Bool) async -> [Element] {
         var result: [Element] = []
-        for element in self {
-            if await isIncluded(element) {
-                result.append(element)
-            }
+        for element in self where await isIncluded(element) {
+            result.append(element)
         }
         return result
     }

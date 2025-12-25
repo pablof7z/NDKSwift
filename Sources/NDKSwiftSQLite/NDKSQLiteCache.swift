@@ -208,9 +208,9 @@ public actor NDKSQLiteCache: NDKCache {
         let pubkey = row["pubkey"] as? String ?? "unknown"
 
         // Check if we have semantic fields populated
-        let hasSemanticFields = row["name"] as? String != nil ||
-            row["display_name"] as? String != nil ||
-            row["about"] as? String != nil
+        let hasSemanticFields = row["name"] is String ||
+            row["display_name"] is String ||
+            row["about"] is String
 
         if hasSemanticFields {
             // Add standard fields if present
@@ -242,8 +242,7 @@ public actor NDKSQLiteCache: NDKCache {
         } else {
             // Fallback to JSON parsing for backward compatibility
             if let jsonString = row["json"] as? String,
-               let jsonData = jsonString.data(using: .utf8)
-            {
+               let jsonData = jsonString.data(using: .utf8) {
                 let jsonDict: [String: Any]?
                 do {
                     jsonDict = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any]
@@ -309,7 +308,7 @@ public actor NDKSQLiteCache: NDKCache {
                 """,
                 arguments: [
                     pubkey, name, displayName, about, picture, nip05, lud06, lud16, banner, website,
-                    additionalFieldsData, updatedAt, eventId, json,
+                    additionalFieldsData, updatedAt, eventId, json
                 ]
             )
         }
@@ -503,8 +502,7 @@ public actor NDKSQLiteCache: NDKCache {
                 var result: [String: Data] = [:]
                 for row in rows {
                     if let key = row["key"] as? String,
-                       let value = row["value"] as? Data
-                    {
+                       let value = row["value"] as? Data {
                         result[key] = value
                     }
                 }
@@ -537,7 +535,7 @@ public actor NDKSQLiteCache: NDKCache {
                     event.kind,
                     event.content,
                     event.sig,
-                    JSONCoding.encodeToString(event),
+                    JSONCoding.encodeToString(event)
                 ]
             )
 
@@ -838,7 +836,7 @@ public actor NDKSQLiteCache: NDKCache {
                     verifiedAt,
                     lastCheckAt,
                     entry.errorMessage,
-                    entry.httpStatusCode,
+                    entry.httpStatusCode
                 ])
 
                 if debugMode {
@@ -864,7 +862,7 @@ public actor NDKSQLiteCache: NDKCache {
                     NIP05VerificationStatus.invalid.rawValue,
                     Timestamp.from(Date()),
                     "Belongs to different pubkey",
-                    identifier,
+                    identifier
                 ])
 
                 // If we know the actual owner, save that as verified
@@ -879,7 +877,7 @@ public actor NDKSQLiteCache: NDKCache {
                         NIP05VerificationStatus.verified.rawValue,
                         Timestamp.from(Date()),
                         Timestamp.from(Date()),
-                        Timestamp.now,
+                        Timestamp.now
                     ])
                 }
 
@@ -992,8 +990,7 @@ public actor NDKSQLiteCache: NDKCache {
 
                 if let existing = existing,
                    let windowStart = existing["window_start"] as? Int64,
-                   TimeInterval(now - windowStart) <= rateLimitWindow
-                {
+                   TimeInterval(now - windowStart) <= rateLimitWindow {
                     try db.execute(sql: """
                         UPDATE nip05_rate_limit
                         SET attempt_count = attempt_count + 1

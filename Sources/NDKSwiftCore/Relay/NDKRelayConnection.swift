@@ -35,7 +35,7 @@ public actor NDKRelayConnection {
             config.timeoutIntervalForRequest = NetworkConstants.timeoutStandardRequest
             config.timeoutIntervalForResource = NetworkConstants.timeoutResource
             config.httpAdditionalHeaders = [
-                "User-Agent": "NDKSwift 1.0",
+                "User-Agent": "NDKSwift 1.0"
             ]
             return URLSession(configuration: config)
         }()

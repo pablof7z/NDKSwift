@@ -81,6 +81,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
             amountMillisats: amountMillisats,
             comment: comment,
             relays: recipientRelays,
+            recipientLnurl: recipientInfo.lightningAddress,
             zappedEvent: event
         )
 
@@ -102,7 +103,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         let metadata: [String: Any] = [
             "zapRequest": zapRequest,
             "endpoint": endpoint,
-            "relays": recipientRelays,
+            "relays": recipientRelays
         ]
 
         return PreparedZap(
@@ -186,8 +187,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
                 // Check if this receipt matches our zap request
                 let receiptZapRequestId = receipt.zapRequestId
                 if let zapRequestId = zapRequestId,
-                   receiptZapRequestId == zapRequestId
-                {
+                   receiptZapRequestId == zapRequestId {
                     // Validate the receipt if we have provider pubkey
                     if let providerPubkey = providerPubkey {
                         let isValid = receipt.validate(lnurlProviderPubkey: providerPubkey)
@@ -301,7 +301,7 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
 
         components.queryItems = [
             URLQueryItem(name: "amount", value: String(amountMillisats)),
-            URLQueryItem(name: "nostr", value: zapRequestJSON),
+            URLQueryItem(name: "nostr", value: zapRequestJSON)
         ]
 
         if let lnurl = zapRequest.lnurl {

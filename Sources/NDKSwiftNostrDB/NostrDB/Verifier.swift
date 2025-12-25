@@ -192,8 +192,7 @@ public struct Verifier {
         /// since `subtractingReportingOverflow` & `addingReportingOverflow` returns true,
         /// if there is overflow we return failure
         if reportedOverflow.overflow || reportedOverflow.partialValue > _buffer
-            .capacity
-        {
+            .capacity {
             throw FlatbuffersErrors.signedOffsetOutOfBounds(
                 offset: Int(offset),
                 position: position

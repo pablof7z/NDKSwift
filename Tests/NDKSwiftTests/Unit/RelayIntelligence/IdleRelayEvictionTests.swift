@@ -30,7 +30,7 @@ final class IdleRelayEvictionTests: XCTestCase {
         let ndk = NDK()
 
         // Add a persistent relay (explicit origin)
-        _ = await ndk.pool.addRelay("wss://explicit-relay.example.com", origin: .explicit)
+        _ = await ndk.pool.addRelay("wss://explicit-relay.example.com", origin: .appRelays)
 
         // Evict with 0 second threshold
         let evicted = await ndk.pool.evictIdleRelays(idleThreshold: 0)
@@ -67,7 +67,7 @@ final class IdleRelayEvictionTests: XCTestCase {
         let ndk = NDK()
 
         // Add persistent relay
-        _ = await ndk.pool.addRelay("wss://persistent.example.com", origin: .explicit)
+        _ = await ndk.pool.addRelay("wss://persistent.example.com", origin: .appRelays)
 
         // Add non-persistent idle relay
         _ = await ndk.pool.addRelay("wss://idle.example.com", origin: .outbox(authorPubkey: "test1"))

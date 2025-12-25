@@ -11,8 +11,8 @@ import NDKSwiftCore
 ///
 /// This is needed to provide an array-like abstraction or iterators since swift arrays or iterator protocols require the element to be "copyable"
 struct NonCopyableLinkedList<T: ~Copyable>: ~Copyable {
-    private var head: Node<T>? = nil
-    private var tail: Node<T>? = nil
+    private var head: Node<T>?
+    private var tail: Node<T>?
     private(set) var count: Int = 0
 
     /// Iterates over each item of the list, with enumeration support.

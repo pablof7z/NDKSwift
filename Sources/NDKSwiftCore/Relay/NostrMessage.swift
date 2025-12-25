@@ -1,4 +1,3 @@
-
 /// Nostr message types
 public enum NostrMessageType: String {
     case event = "EVENT"

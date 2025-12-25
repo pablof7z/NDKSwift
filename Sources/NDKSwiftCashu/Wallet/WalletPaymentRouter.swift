@@ -55,15 +55,15 @@ actor WalletPaymentRouter {
         let acceptedMintURLs = Set(nutzapRequest.acceptedMints.map { $0.absoluteString })
         NDKLogger.log(.debug, category: .wallet, "WalletPaymentRouter.executeNutzapPayment - acceptedMints: \(acceptedMintURLs)")
 
-        // Get blacklisted mints from wallet
-        let blacklistedMints = await wallet.getBlacklistedMints()
+        // Get blocklisted mints from wallet
+        let blocklistedMints = await wallet.getBlocklistedMints()
 
         let paymentRoute = await CrossMintTransfer.findBestPaymentRoute(
             amount: nutzapRequest.amountSats,
             acceptedMints: acceptedMintURLs,
             mints: mints,
             proofStateManager: proofStateManager,
-            blacklistedMints: blacklistedMints
+            blocklistedMints: blocklistedMints
         )
 
         // Determine which mint to use and perform any necessary transfers

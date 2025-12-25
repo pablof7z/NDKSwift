@@ -21,8 +21,7 @@ extension NDKSQLiteCache {
                 if let url = row["url"] as? String,
                    let jsonString = row["json"] as? String,
                    let jsonData = jsonString.data(using: .utf8),
-                   let info = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any]
-                {
+                   let info = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] {
                     let name = info["name"] as? String
                     let pubkey = info["pubkey"] as? String
                     let version = info["version"] as? String
@@ -31,8 +30,7 @@ extension NDKSQLiteCache {
                     var units: [String] = []
                     if let nuts = info["nuts"] as? [String: Any],
                        let nut04 = nuts["4"] as? [String: Any],
-                       let methods = nut04["methods"] as? [[String: Any]]
-                    {
+                       let methods = nut04["methods"] as? [[String: Any]] {
                         units = methods.compactMap { $0["unit"] as? String }
                     }
                     let unitsJson = try? JSONSerialization.data(withJSONObject: units)

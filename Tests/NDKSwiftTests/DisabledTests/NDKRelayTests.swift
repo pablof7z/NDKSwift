@@ -54,7 +54,7 @@ final class NDKRelayTests: XCTestCase {
         XCTAssertFalse(isAuthenticated)
 
         let origin = await relay.origin
-        XCTAssertEqual(origin, .explicit)
+        XCTAssertEqual(origin, .appRelay)
     }
 
     func testSetOrigin() async {
@@ -64,9 +64,9 @@ final class NDKRelayTests: XCTestCase {
         let origin = await relay.origin
         XCTAssertEqual(origin, .outbox(authorPubkey: "test-pubkey"))
 
-        await relay.setOrigin(.outboxConfig)
+        await relay.setOrigin(.discoveryConfig)
         let origin2 = await relay.origin
-        XCTAssertEqual(origin2, .outboxConfig)
+        XCTAssertEqual(origin2, .discoveryConfig)
     }
 
     func testConnectionStateObserver() async {
@@ -305,15 +305,15 @@ final class NDKRelayTests: XCTestCase {
     // MARK: - Supporting Type Tests
 
     func testNDKRelayOrigin() {
-        let explicit = NDKRelayOrigin.explicit
-        let outbox = NDKRelayOrigin.outbox(authorPubkey: "test-pubkey")
-        let outboxConfig = NDKRelayOrigin.outboxConfig
+        let explicit = NDKRelayOrigin.appRelays
+        let outbox = NDKRelayOrigin.discovery(authorPubkey: "test-pubkey")
+        let outboxConfig = NDKRelayOrigin.discovery
 
         // Test equality
-        XCTAssertEqual(explicit, .explicit)
+        XCTAssertEqual(explicit, .appRelay)
         XCTAssertEqual(outbox, .outbox(authorPubkey: "test-pubkey"))
         XCTAssertNotEqual(outbox, .outbox(authorPubkey: "different-pubkey"))
-        XCTAssertEqual(outboxConfig, .outboxConfig)
+        XCTAssertEqual(outboxConfig, .discoveryConfig)
 
         // Test different origins are not equal
         XCTAssertNotEqual(explicit, outbox)
@@ -577,9 +577,9 @@ final class NDKRelayTests: XCTestCase {
 
     func testNDKRelayOriginCodable() throws {
         let testCases: [NDKRelayOrigin] = [
-            .explicit,
+            .appRelay,
             .outbox(authorPubkey: "test-pubkey"),
-            .outboxConfig,
+            .discoveryConfig,
         ]
 
         for origin in testCases {

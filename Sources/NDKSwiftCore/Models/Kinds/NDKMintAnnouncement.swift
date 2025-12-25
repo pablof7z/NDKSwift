@@ -30,8 +30,7 @@ public struct NDKMintAnnouncement: Codable, Sendable {
                 descriptions: [String: String]? = nil, pubkey: String? = nil,
                 contact: [[String]]? = nil, motd: String? = nil,
                 units: [String]? = nil, nuts: [String: AnyCodable]? = nil,
-                icon: URL? = nil)
-    {
+                icon: URL? = nil) {
         self.mintURL = mintURL
         self.name = name
         self.description = description

@@ -254,18 +254,15 @@ public enum Nutzap {
             // Extract P2PK data from proof secret for logging
             var p2pkInfo = "none"
             if let secretData = proof.secret.data(using: .utf8),
-               let secret = JSONCoding.safeParseJSON(from: secretData) as? [[String: Any]]
-            {
+               let secret = JSONCoding.safeParseJSON(from: secretData) as? [[String: Any]] {
                 for condition in secret {
                     if condition[NostrConstants.JSONField.kind] as? String == "P2PK",
-                       let data = condition["data"] as? String
-                    {
+                       let data = condition["data"] as? String {
                         p2pkInfo = data
 
                         // Validate P2PK pubkey format (compressed secp256k1 keys)
                         if data.count != CryptoConstants.KeyFormat.compressedPublicKeyHexLength ||
-                            !CryptoConstants.KeyFormat.compressedPublicKeyPrefixes.contains(where: { data.hasPrefix($0) })
-                        {
+                            !CryptoConstants.KeyFormat.compressedPublicKeyPrefixes.contains(where: { data.hasPrefix($0) }) {
                             let errorMessage = "\(ErrorMessageConstants.invalid("P2PK pubkey format")): \(data) (must be \(CryptoConstants.KeyFormat.compressedPublicKeyHexLength) hex chars starting with \(CryptoConstants.KeyFormat.compressedPublicKeyPrefixes.joined(separator: " or ")))"
                             NDKLogger.log(.error, category: .wallet, errorMessage)
                             invalidP2PKError = errorMessage
@@ -300,8 +297,7 @@ public enum Nutzap {
                let secretData = firstProof.secret.data(using: .utf8),
                let secret = JSONCoding.safeParseJSON(from: secretData) as? [[String: Any]],
                let p2pkCondition = secret.first(where: { $0[NostrConstants.JSONField.kind] as? String == "P2PK" }),
-               let data = p2pkCondition["data"] as? String
-            {
+               let data = p2pkCondition["data"] as? String {
                 expectedPubkey = data
             }
             throw NutzapRedemptionError.p2pkLockedToUnknownKey(expectedPubkey: expectedPubkey, actualPubkey: ourPubkeyHex)
@@ -442,7 +438,7 @@ public enum Nutzap {
                 object: nil,
                 userInfo: [
                     "event": event,
-                    NostrConstants.JSONField.amount: amount,
+                    NostrConstants.JSONField.amount: amount
                 ]
             )
         }

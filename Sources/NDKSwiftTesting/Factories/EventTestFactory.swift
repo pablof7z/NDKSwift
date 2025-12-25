@@ -60,7 +60,7 @@ public enum EventTestFactory {
             // Uppercase E for root (NIP-22)
             ["E", rootEvent.id],
             ["K", String(rootEvent.kind)],
-            ["P", rootEvent.pubkey],
+            ["P", rootEvent.pubkey]
         ]
 
         // Add lowercase e for parent if different from root
@@ -87,7 +87,7 @@ public enum EventTestFactory {
     ) -> NDKEvent {
         let tags: [[String]] = [
             ["e", parentEvent.id, "", "reply"],
-            ["p", parentEvent.pubkey],
+            ["p", parentEvent.pubkey]
         ]
 
         return NDKEvent.test(
@@ -112,7 +112,7 @@ public enum EventTestFactory {
     ) -> NDKEvent {
         var metadata: [String: String] = [
             "name": name,
-            "about": about,
+            "about": about
         ]
         if let picture { metadata["picture"] = picture }
         if let nip05 { metadata["nip05"] = nip05 }
@@ -157,7 +157,7 @@ public enum EventTestFactory {
     ) -> NDKEvent {
         let tags: [[String]] = [
             ["e", event.id],
-            ["p", event.pubkey],
+            ["p", event.pubkey]
         ]
         return NDKEvent.test(
             kind: 7,

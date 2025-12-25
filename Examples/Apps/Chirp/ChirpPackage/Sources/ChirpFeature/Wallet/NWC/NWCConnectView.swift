@@ -1,5 +1,50 @@
 import SwiftUI
 import NDKSwiftCore
+import UIKit
+
+// MARK: - Known NWC Wallets
+
+enum KnownNWCWallet: CaseIterable {
+    case primal
+    case other
+
+    var name: String {
+        switch self {
+        case .primal: return "Primal"
+        case .other: return "Wallet"
+        }
+    }
+
+    var urlScheme: String {
+        switch self {
+        case .primal: return "nostrnwc+primal"
+        case .other: return "nostrnwc"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .primal: return "bolt.fill"
+        case .other: return "wallet.bifold.fill"
+        }
+    }
+
+    var connectURL: URL? {
+        URL(string: "\(urlScheme)://connect")
+    }
+
+    func buildDeepLinkURL() -> URL? {
+        guard let baseURL = connectURL else { return nil }
+
+        var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)
+        components?.queryItems = [
+            URLQueryItem(name: "appname", value: "Chirp"),
+            URLQueryItem(name: "callback", value: "chirp://nwc"),
+        ]
+
+        return components?.url
+    }
+}
 
 /// NWC wallet connection flow
 struct NWCConnectView: View {
@@ -10,6 +55,10 @@ struct NWCConnectView: View {
     @State private var isConnecting = false
     @State private var errorMessage: String?
     @State private var showScanner = false
+    @State private var detectedWallets: [KnownNWCWallet] = []
+    @State private var isDetecting = true
+    @State private var awaitingCallback = false
+    @State private var pendingWalletName: String?
 
     var body: some View {
         VStack(spacing: 24) {
@@ -29,6 +78,58 @@ struct NWCConnectView: View {
                 .padding(.horizontal)
 
             Spacer()
+
+            // Detected Wallets Section
+            if isDetecting {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text("Detecting wallets...")
+                        .foregroundStyle(.secondary)
+                }
+            } else if awaitingCallback {
+                VStack(spacing: 12) {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                    Text("Waiting for \(pendingWalletName ?? "wallet")...")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                    Text("Complete the connection in your wallet app")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+                .padding()
+            } else if !detectedWallets.isEmpty {
+                VStack(spacing: 12) {
+                    Text("Open with installed wallet")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    ForEach(detectedWallets, id: \.name) { wallet in
+                        Button {
+                            openWalletApp(wallet)
+                        } label: {
+                            HStack {
+                                Image(systemName: wallet.icon)
+                                Text("Open in \(wallet.name)")
+                            }
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(.blue, in: RoundedRectangle(cornerRadius: 12))
+                        }
+                        .padding(.horizontal)
+                    }
+                }
+
+                // Divider
+                HStack {
+                    Rectangle().fill(.secondary.opacity(0.3)).frame(height: 1)
+                    Text("OR").font(.caption).foregroundStyle(.secondary)
+                    Rectangle().fill(.secondary.opacity(0.3)).frame(height: 1)
+                }
+                .padding(.horizontal, 32)
+            }
 
             // Connection URI input
             VStack(alignment: .leading, spacing: 8) {
@@ -72,7 +173,7 @@ struct NWCConnectView: View {
             if isConnecting {
                 ProgressView("Connecting...")
                     .padding()
-            } else {
+            } else if !awaitingCallback {
                 Button {
                     Task { await connect() }
                 } label: {
@@ -107,6 +208,17 @@ struct NWCConnectView: View {
                 }
             }
         }
+        .task {
+            await detectWallets()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("nwcCallbackReceived"))) { notification in
+            if let uri = notification.userInfo?["uri"] as? String {
+                print("[Chirp NWC] Received callback with URI")
+                connectionURI = uri
+                awaitingCallback = false
+                Task { await connect() }
+            }
+        }
     }
 
     @ViewBuilder
@@ -118,7 +230,7 @@ struct NWCConnectView: View {
 
             HStack(spacing: 24) {
                 walletBadge("Alby")
-                walletBadge("Mutiny")
+                walletBadge("Primal")
                 walletBadge("Zeus")
                 walletBadge("Others")
             }
@@ -134,6 +246,47 @@ struct NWCConnectView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
             .background(Color.secondary.opacity(0.2), in: Capsule())
+    }
+
+    private func detectWallets() async {
+        isDetecting = true
+        var installed: [KnownNWCWallet] = []
+
+        for wallet in KnownNWCWallet.allCases {
+            let urlString = "\(wallet.urlScheme)://connect"
+            print("[Chirp NWC] Checking wallet \(wallet.name) with URL: \(urlString)")
+
+            if let url = URL(string: urlString) {
+                let canOpen = UIApplication.shared.canOpenURL(url)
+                print("[Chirp NWC] canOpenURL(\(urlString)) = \(canOpen)")
+
+                if canOpen {
+                    installed.append(wallet)
+                    print("[Chirp NWC] Detected wallet: \(wallet.name)")
+                }
+            }
+        }
+
+        if installed.isEmpty {
+            print("[Chirp NWC] No wallet apps detected")
+        }
+
+        detectedWallets = installed
+        isDetecting = false
+    }
+
+    private func openWalletApp(_ wallet: KnownNWCWallet) {
+        guard let url = wallet.buildDeepLinkURL() else {
+            errorMessage = "Failed to build connection URL"
+            return
+        }
+
+        print("[Chirp NWC] Opening wallet with URL: \(url.absoluteString)")
+
+        pendingWalletName = wallet.name
+        awaitingCallback = true
+
+        UIApplication.shared.open(url)
     }
 
     private func connect() async {

@@ -610,8 +610,7 @@ public struct FlatBufferBuilder {
     /// - Returns: ``Offset`` of the vector
     @inline(__always)
     public mutating func createVector<T: NativeStruct>(ofStructs structs: [T])
-        -> Offset
-    {
+        -> Offset {
         startVector(
             structs.count * MemoryLayout<T>.size,
             elementSize: MemoryLayout<T>.alignment
@@ -669,8 +668,7 @@ public struct FlatBufferBuilder {
     @inline(__always)
     @discardableResult
     public mutating func create<T: NativeStruct>(
-        struct s: T) -> Offset
-    {
+        struct s: T) -> Offset {
         let size = MemoryLayout<T>.size
         preAlign(len: size, alignment: MemoryLayout<T>.alignment)
         _bb.push(struct: s, size: size)

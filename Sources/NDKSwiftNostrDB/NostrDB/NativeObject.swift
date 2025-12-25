@@ -31,8 +31,7 @@ public extension NativeObject {
     /// - Parameter type: Type of the Flatbuffer object
     /// - Returns: returns the encoded sized ByteBuffer
     func serialize<T: ObjectAPIPacker>(type: T.Type) -> ByteBuffer
-        where T.T == Self
-    {
+        where T.T == Self {
         var builder = FlatBufferBuilder(initialSize: 1024)
         return serialize(builder: &builder, type: type.self)
     }

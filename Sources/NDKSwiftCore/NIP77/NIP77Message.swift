@@ -330,8 +330,7 @@ extension NDKFilter {
         var tags: [String: Set<String>] = [:]
         for (key, value) in dict {
             if key.hasPrefix("#"), key.count > 1,
-               let values = value as? [String]
-            {
+               let values = value as? [String] {
                 let tagName = String(key.dropFirst())
                 tags[tagName] = Set(values)
             }

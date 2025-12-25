@@ -45,10 +45,10 @@ public actor NIP60Wallet: NDKPaymentProvider {
 
     public nonisolated let events = NIP60WalletEventStream()
 
-    // MARK: - Blacklist Cache
+    // MARK: - Blocklist Cache
 
-    private var cachedBlacklistedMints: Set<String> = []
-    private var blacklistLastFetched: Date?
+    private var cachedBlocklistedMints: Set<String> = []
+    private var blocklistLastFetched: Date?
 
     // MARK: - Configuration State
 
@@ -189,7 +189,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
                     NDKFilter(
                         authors: [userPubkey],
                         kinds: [EventKind.cashuSpendingHistory]
-                    ),
+                    )
                 ]
 
                 // Use resolved wallet relays
@@ -347,14 +347,14 @@ public actor NIP60Wallet: NDKPaymentProvider {
             let mintURLs = try await walletEvent.mints(signer: signer)
             NDKLogger.log(.debug, category: .wallet, "🏪 Extracted \(mintURLs.count) mint URLs from wallet config: \(mintURLs)")
 
-            // Get current blacklisted mints
-            let blacklistedMints = await getBlacklistedMints()
-            if !blacklistedMints.isEmpty {
-                NDKLogger.log(.info, category: .wallet, "Found \(blacklistedMints.count) blacklisted mints")
+            // Get current blocklisted mints
+            let blocklistedMints = await getBlocklistedMints()
+            if !blocklistedMints.isEmpty {
+                NDKLogger.log(.info, category: .wallet, "Found \(blocklistedMints.count) blocklisted mints")
             }
 
-            // Filter out blacklisted mints
-            let configuredMints = Set(mintURLs).subtracting(blacklistedMints)
+            // Filter out blocklisted mints
+            let configuredMints = Set(mintURLs).subtracting(blocklistedMints)
 
             // Remove mints that are no longer in the configuration
             let mintsToRemove = previousMints.subtracting(configuredMints)
@@ -373,9 +373,9 @@ public actor NIP60Wallet: NDKPaymentProvider {
                     continue
                 }
 
-                // Skip if blacklisted
-                if blacklistedMints.contains(mintURL) {
-                    NDKLogger.log(.debug, category: .wallet, "🚫 Skipping blacklisted mint: \(mintURL)")
+                // Skip if blocklisted
+                if blocklistedMints.contains(mintURL) {
+                    NDKLogger.log(.debug, category: .wallet, "🚫 Skipping blocklisted mint: \(mintURL)")
                     continue
                 }
 
@@ -422,20 +422,20 @@ public actor NIP60Wallet: NDKPaymentProvider {
         }
     }
 
-    // MARK: - Blacklist Management
+    // MARK: - Blocklist Management
 
-    /// Get the set of blacklisted mint URLs from the cached blocked mints list
+    /// Get the set of blocklisted mint URLs from the cached blocked mints list
     /// This returns the cached value that is kept up-to-date by the configuration subscription
-    public func getBlacklistedMints() async -> Set<String> {
-        return cachedBlacklistedMints
+    public func getBlocklistedMints() async -> Set<String> {
+        return cachedBlocklistedMints
     }
 
-    /// Add a mint to the blacklist and publish the updated blocked mints event
-    public func blacklistMint(_ mintURL: String) async throws {
-        NDKLogger.log(.info, category: .wallet, "Adding mint to blacklist: \(mintURL)")
+    /// Add a mint to the blocklist and publish the updated blocked mints event
+    public func blocklistMint(_ mintURL: String) async throws {
+        NDKLogger.log(.info, category: .wallet, "Adding mint to blocklist: \(mintURL)")
 
         // Get current blocked mints
-        var updatedBlockedMints = cachedBlacklistedMints
+        var updatedBlockedMints = cachedBlocklistedMints
         updatedBlockedMints.insert(mintURL)
 
         // Publish the updated blocked mints event
@@ -446,8 +446,8 @@ public actor NIP60Wallet: NDKPaymentProvider {
         )
 
         // Update local cache
-        cachedBlacklistedMints = updatedBlockedMints
-        blacklistLastFetched = Date()
+        cachedBlocklistedMints = updatedBlockedMints
+        blocklistLastFetched = Date()
 
         // Remove the mint from wallet if it exists
         if let url = URLUtils.safeURL(mintURL) {
@@ -456,17 +456,17 @@ public actor NIP60Wallet: NDKPaymentProvider {
 
         // Emit event about mint being removed
         events.yield(NIP60WalletEvent(type: .mintsRemoved([mintURL])))
-        // Emit blacklist update event
-        events.yield(NIP60WalletEvent(type: .blacklistUpdated(updatedBlockedMints)))
+        // Emit blocklist update event
+        events.yield(NIP60WalletEvent(type: .blocklistUpdated(updatedBlockedMints)))
 
-        NDKLogger.log(.info, category: .wallet, "Successfully blacklisted mint: \(mintURL)")
+        NDKLogger.log(.info, category: .wallet, "Successfully blocklisted mint: \(mintURL)")
     }
 
-    /// Remove a mint from the blacklist and publish the updated blocked mints event
-    public func unblacklistMint(_ mintURL: String) async throws {
-        NDKLogger.log(.info, category: .wallet, "Removing mint from blacklist: \(mintURL)")
+    /// Remove a mint from the blocklist and publish the updated blocked mints event
+    public func unblocklistMint(_ mintURL: String) async throws {
+        NDKLogger.log(.info, category: .wallet, "Removing mint from blocklist: \(mintURL)")
         // Get current blocked mints
-        var updatedBlockedMints = cachedBlacklistedMints
+        var updatedBlockedMints = cachedBlocklistedMints
         updatedBlockedMints.remove(mintURL)
         // Publish the updated blocked mints event
         _ = try await NDKBlockedMintsEvent.createAndPublish(
@@ -475,50 +475,48 @@ public actor NIP60Wallet: NDKPaymentProvider {
             signer: signer
         )
         // Update local cache
-        cachedBlacklistedMints = updatedBlockedMints
-        blacklistLastFetched = Date()
-        // Emit blacklist update event
-        events.yield(NIP60WalletEvent(type: .blacklistUpdated(updatedBlockedMints)))
-        NDKLogger.log(.info, category: .wallet, "Successfully removed mint from blacklist: \(mintURL)")
+        cachedBlocklistedMints = updatedBlockedMints
+        blocklistLastFetched = Date()
+        // Emit blocklist update event
+        events.yield(NIP60WalletEvent(type: .blocklistUpdated(updatedBlockedMints)))
+        NDKLogger.log(.info, category: .wallet, "Successfully removed mint from blocklist: \(mintURL)")
     }
 
     /// Process blocked mints update event (kind 10020)
     private func processBlockedMintsUpdate(_ event: NDKEvent) async {
         NDKLogger.log(.info, category: .wallet, "Processing blocked mints update")
 
-        // Update cached blacklisted mints
+        // Update cached blocklisted mints
         let blockedMintsEvent = NDKBlockedMintsEvent(event: event)
-        let newBlacklistedMints = Set(blockedMintsEvent.blockedMints)
-        let oldBlacklistedMints = cachedBlacklistedMints
+        let newBlocklistedMints = Set(blockedMintsEvent.blockedMints)
+        let oldBlocklistedMints = cachedBlocklistedMints
 
-        cachedBlacklistedMints = newBlacklistedMints
-        blacklistLastFetched = Date()
+        cachedBlocklistedMints = newBlocklistedMints
+        blocklistLastFetched = Date()
 
-        // Find newly blacklisted mints
-        let newlyBlacklisted = newBlacklistedMints.subtracting(oldBlacklistedMints)
+        // Find newly blocklisted mints
+        let newlyBlocklisted = newBlocklistedMints.subtracting(oldBlocklistedMints)
 
-        if !newlyBlacklisted.isEmpty {
-            NDKLogger.log(.info, category: .wallet, "Found \(newlyBlacklisted.count) newly blacklisted mints")
+        if !newlyBlocklisted.isEmpty {
+            NDKLogger.log(.info, category: .wallet, "Found \(newlyBlocklisted.count) newly blocklisted mints")
 
-            // Remove any newly blacklisted mints from wallet
+            // Remove any newly blocklisted mints from wallet
             let currentMints = await mints.getMintURLs()
-            for mintURL in newlyBlacklisted {
-                if currentMints.contains(mintURL) {
-                    NDKLogger.log(.warning, category: .wallet, "Removing newly blacklisted mint from wallet: \(mintURL)")
-                    if let url = URLUtils.safeURL(mintURL) {
-                        _ = await mints.removeMint(url: url)
-                    }
+            for mintURL in newlyBlocklisted where currentMints.contains(mintURL) {
+                NDKLogger.log(.warning, category: .wallet, "Removing newly blocklisted mint from wallet: \(mintURL)")
+                if let url = URLUtils.safeURL(mintURL) {
+                    _ = await mints.removeMint(url: url)
                 }
             }
 
             // Emit event about mints being removed
-            if !newlyBlacklisted.isEmpty {
-                events.yield(NIP60WalletEvent(type: .mintsRemoved(Array(newlyBlacklisted))))
+            if !newlyBlocklisted.isEmpty {
+                events.yield(NIP60WalletEvent(type: .mintsRemoved(Array(newlyBlocklisted))))
             }
         }
 
-        // Always emit blacklist update event when processing updates
-        events.yield(NIP60WalletEvent(type: .blacklistUpdated(newBlacklistedMints)))
+        // Always emit blocklist update event when processing updates
+        events.yield(NIP60WalletEvent(type: .blocklistUpdated(newBlocklistedMints)))
     }
 
     // MARK: - NDKPaymentProvider Protocol
