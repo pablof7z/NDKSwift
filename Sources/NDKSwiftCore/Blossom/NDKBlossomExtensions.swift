@@ -32,10 +32,9 @@ extension NDK {
     public func uploadToBlossom(
         data: Data,
         mimeType: String? = nil,
-        servers: [String]? = nil,
-        expiration: Date? = nil
+        servers: [String]? = nil
     ) async throws -> [BlossomBlob] {
-        let signer = try requireSigner()
+        _ = try requireSigner()
 
         // Use provided servers or discover from relay list
         let targetServers: [String]
@@ -55,13 +54,11 @@ extension NDK {
         // Try uploading to multiple servers
         for server in targetServers {
             do {
-                let blob = try await blossomClient.uploadWithAuth(
+                let blob = try await blossomClient.upload(
                     data: data,
                     mimeType: mimeType,
                     to: server,
-                    signer: signer,
-                    ndk: self,
-                    expiration: expiration
+                    ndk: self
                 )
                 uploadedBlobs.append(blob)
             } catch {
