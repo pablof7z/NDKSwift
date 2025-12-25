@@ -270,9 +270,9 @@ public class NDKRelayList: NDKList {
 // MARK: - Integration with NDK
 
 public extension NDK {
-    /// Fetch the relay list for a specific user
-    func fetchRelayList(for user: NDKUser) async throws -> NDKRelayList? {
-        let filter = NDKFilter(authors: [user.pubkey], kinds: [EventKind.relayList])
+    /// Fetch the relay list for a specific pubkey
+    func fetchRelayList(for pubkey: PublicKey) async throws -> NDKRelayList? {
+        let filter = NDKFilter(authors: [pubkey], kinds: [EventKind.relayList])
 
         // Use NDKSubscription with long maxAge for relay lists
         let dataSource = NDKSubscription(
@@ -291,8 +291,7 @@ public extension NDK {
     func fetchRelayList() async throws -> NDKRelayList? {
         guard let signer else { return nil }
         let pubkey = try await signer.pubkey
-        guard let currentUser = getUser(pubkey) else { return nil }
-        return try await fetchRelayList(for: currentUser)
+        return try await fetchRelayList(for: pubkey)
     }
 
     /// Publish a relay list
@@ -302,12 +301,5 @@ public extension NDK {
         try await relayList.sign()
         let event = relayList.toNDKEvent()
         _ = try await publish(event)
-    }
-}
-
-public extension NDKUser {
-    /// Fetch this user's relay list
-    func fetchRelayListEvent() async throws -> NDKRelayList? {
-        return try await ndk.fetchRelayList(for: self)
     }
 }

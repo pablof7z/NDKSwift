@@ -240,13 +240,18 @@ public actor NDKBunkerSigner: NDKSigner {
 
         // Handle NIP-05 flow
         if case let .nip05(nip05) = connectionType {
-            let user = try await NDKUser.fromNip05(nip05, ndk: ndk)
-            userPubkey = user.pubkey
-            if let nip46Urls = user.nip46Urls {
-                relayURLs = nip46Urls
+            guard let pubkey = try await ndk.resolveNip05(nip05) else {
+                throw NDKError.invalidInput(message: "NIP-05 verification failed for \(nip05)")
+            }
+            userPubkey = pubkey
+
+            // Get NIP-46 relays from cache if available
+            if let cached = await ndk.cache.getNIP05Entry(nip05.lowercased()),
+               let nip46Relays = cached.nip46Relays {
+                relayURLs = nip46Relays
             }
             if bunkerPubkey == nil {
-                bunkerPubkey = user.pubkey
+                bunkerPubkey = pubkey
             }
         }
 
