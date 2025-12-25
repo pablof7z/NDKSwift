@@ -3,12 +3,14 @@ import Foundation
 /// Blossom client for interacting with Blossom servers
 public actor BlossomClient {
     private let networkClient: NDKNetworkClient
+    private let uploadSessionManager: BlossomUploadSessionManager
     private var serverCache: [String: BlossomServerDescriptor] = [:]
 
     // MARK: - Constants
 
     public init(urlSession: NDKNetworkFetching = URLSession.shared) {
         networkClient = NDKNetworkClient(session: urlSession)
+        uploadSessionManager = BlossomUploadSessionManager()
     }
 
     // MARK: - Private Helpers
@@ -64,11 +66,21 @@ public actor BlossomClient {
     // MARK: - BUD-02: Upload
 
     /// Upload a file to a Blossom server
+    /// - Parameters:
+    ///   - data: The file data to upload
+    ///   - mimeType: Optional MIME type of the file
+    ///   - serverURL: The Blossom server URL
+    ///   - auth: Blossom authentication
+    ///   - configuration: Upload configuration with timeout settings (default: `.default`)
+    ///   - onProgress: Optional callback for upload progress updates
+    /// - Returns: The uploaded blob descriptor
     public func upload(
         data: Data,
         mimeType: String? = nil,
         to serverURL: String,
-        auth: BlossomAuth
+        auth: BlossomAuth,
+        configuration: BlossomUploadConfiguration = .default,
+        onProgress: (@Sendable (BlossomUploadProgress) -> Void)? = nil
     ) async throws -> BlossomBlob {
         let baseURL = try URLUtils.validateURL(serverURL)
 
@@ -103,7 +115,7 @@ public actor BlossomClient {
 
         var request = URLRequest(url: uploadURL)
         request.httpMethod = HTTPConstants.methodPut
-        request.httpBody = data
+        // Note: We don't set httpBody here since we pass data separately to the upload session
 
         // Set headers
         if let mimeType = mimeType {
@@ -114,9 +126,15 @@ public actor BlossomClient {
         request.setValue(authHeader, forHTTPHeaderField: HTTPConstants.headerAuthorization)
 
         do {
-            let (responseData, httpResponse) = try await networkClient.fetchAndValidateData(for: request)
+            // Use upload session manager for progress tracking and custom timeouts
+            let (responseData, httpResponse) = try await uploadSessionManager.upload(
+                request: request,
+                data: data,
+                configuration: configuration,
+                onProgress: onProgress
+            )
 
-            // The network client already handles common status codes, but we need specific Blossom handling
+            // Handle HTTP status codes
             switch httpResponse.statusCode {
             case HTTPStatusCode.ok, HTTPStatusCode.created:
                 let uploadDescriptor = try JSONCoding.decode(BlossomUploadDescriptor.self, from: responseData)
@@ -134,21 +152,24 @@ public actor BlossomClient {
                     uploaded: Date(nostrTimestamp: uploadDescriptor.uploaded)
                 )
 
+            case HTTPStatusCode.badRequest:
+                if descriptor?.maxUploadSize != nil {
+                    throw NDKError.fileTooLarge(maxSize: descriptor?.maxUploadSize ?? 0)
+                }
+                throw NDKError.unsupportedMimeType(mimeType ?? "unknown")
+
+            case HTTPStatusCode.unauthorized:
+                throw NDKError.unauthorized(relay: serverURL, message: ErrorMessageConstants.Messages.blossomAuthorizationFailed)
+
+            case HTTPStatusCode.tooManyRequests:
+                throw NDKError.uploadFailed(reason: "Rate limited by Blossom server")
+
             default:
-                // This shouldn't happen as fetchAndValidateData handles errors
                 throw createServerError(response: httpResponse, data: responseData, serverURL: serverURL)
             }
         } catch NDKError.invalidResponse {
             // Map generic errors to Blossom-specific ones where needed
             throw NDKError.uploadFailed(reason: "Invalid response from Blossom server")
-        } catch NDKError.rateLimited {
-            throw NDKError.uploadFailed(reason: "Rate limited by Blossom server")
-        } catch NDKError.unauthorized {
-            throw NDKError.unauthorized(relay: serverURL, message: ErrorMessageConstants.Messages.blossomAuthorizationFailed)
-        } catch NDKError.invalidRequest where descriptor?.maxUploadSize != nil {
-            throw NDKError.fileTooLarge(maxSize: descriptor?.maxUploadSize ?? 0)
-        } catch NDKError.invalidRequest {
-            throw NDKError.unsupportedMimeType(mimeType ?? "unknown")
         } catch let error as NDKError {
             throw error
         } catch {
@@ -302,13 +323,25 @@ public actor BlossomClient {
     // MARK: - Convenience Methods
 
     /// Upload with automatic auth creation and metadata extraction
+    /// - Parameters:
+    ///   - data: The file data to upload
+    ///   - mimeType: Optional MIME type (will be inferred if not provided)
+    ///   - serverURL: The Blossom server URL
+    ///   - signer: The signer for creating auth
+    ///   - ndk: The NDK instance
+    ///   - expiration: Optional auth expiration date
+    ///   - configuration: Upload configuration with timeout settings (default: `.default`)
+    ///   - onProgress: Optional callback for upload progress updates
+    /// - Returns: The uploaded blob descriptor with metadata
     public func uploadWithAuth(
         data: Data,
         mimeType: String? = nil,
         to serverURL: String,
         signer: NDKSigner,
         ndk: NDK,
-        expiration: Date? = nil
+        expiration: Date? = nil,
+        configuration: BlossomUploadConfiguration = .default,
+        onProgress: (@Sendable (BlossomUploadProgress) -> Void)? = nil
     ) async throws -> BlossomBlob {
         // Calculate SHA256
         let sha256Hex = Crypto.sha256(data).hexString
@@ -333,12 +366,14 @@ public actor BlossomClient {
             expiration: expiration
         )
 
-        // Upload the file
+        // Upload the file with progress tracking
         let blob = try await upload(
             data: data,
             mimeType: finalMimeType,
             to: serverURL,
-            auth: auth
+            auth: auth,
+            configuration: configuration,
+            onProgress: onProgress
         )
 
         // Return blob with extracted metadata
