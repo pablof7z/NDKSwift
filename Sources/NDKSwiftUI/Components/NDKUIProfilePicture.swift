@@ -99,7 +99,7 @@ public struct NDKUIProfilePicture: View {
 
         Group {
             if let pictureURL = profile.pictureURL {
-                CachedAsyncImage(url: pictureURL) { image in
+                AsyncImage(url: pictureURL) { image in
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fill)

@@ -33,7 +33,7 @@ public struct ArticleCardPortrait: ArticleCardRenderer {
         VStack(alignment: .leading, spacing: 0) {
             // Cover Image (tall portrait aspect ratio)
             if let imageURL = article.imageURL {
-                CachedAsyncImage(url: imageURL) { image in
+                AsyncImage(url: imageURL) { image in
                     image
                         .resizable()
                         .aspectRatio(3/4, contentMode: .fill)

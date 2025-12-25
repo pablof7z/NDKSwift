@@ -34,7 +34,7 @@ public struct ArticleCardHero: ArticleCardRenderer {
             // Hero Image with gradient overlay
             if let imageURL = article.imageURL {
                 ZStack(alignment: .bottomLeading) {
-                    CachedAsyncImage(url: imageURL) { image in
+                    AsyncImage(url: imageURL) { image in
                         image
                             .resizable()
                             .aspectRatio(16/9, contentMode: .fill)

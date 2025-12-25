@@ -147,7 +147,7 @@ struct NDKUIMarkdownImageView: View {
                         })
 
                 case let .image(alt, url):
-                    CachedAsyncImage(url: url) { image in
+                    AsyncImage(url: url) { image in
                         image
                             .resizable()
                             .aspectRatio(contentMode: .fit)

@@ -33,7 +33,7 @@ public struct ArticleCardCompact: ArticleCardRenderer {
         HStack(spacing: 12) {
             // Thumbnail
             if let imageURL = article.imageURL {
-                CachedAsyncImage(url: imageURL) { image in
+                AsyncImage(url: imageURL) { image in
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fill)

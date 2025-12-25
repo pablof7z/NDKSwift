@@ -67,9 +67,25 @@ public struct NDKUISearchableFeedView: View {
                     .padding(.top, 4)
                 }
 
-                NDKUISearchBar(text: $searchText, onClear: {
-                    searchDataSource.clear()
-                })
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(.secondary)
+                    TextField("Search...", text: $searchText)
+                        .textFieldStyle(.plain)
+                    if !searchText.isEmpty {
+                        Button {
+                            searchText = ""
+                            searchDataSource.clear()
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+                .padding(.horizontal)
             }
         }
         .onChange(of: searchText) { _, newValue in
