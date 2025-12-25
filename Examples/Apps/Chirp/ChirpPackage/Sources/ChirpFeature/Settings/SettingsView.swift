@@ -149,8 +149,7 @@ struct SettingsView: View {
 #Preview {
     let ndk = NDK(relayURLs: [])
     let authManager = NDKAuthManager(ndk: ndk)
-    let relayCollection = NDKRelayCollection(ndk: ndk)
-    let state = ChirpState(ndk: ndk, authManager: authManager, relayCollection: relayCollection)
+    let state = ChirpState(ndk: ndk, authManager: authManager)
 
     return NavigationStack {
         SettingsView()

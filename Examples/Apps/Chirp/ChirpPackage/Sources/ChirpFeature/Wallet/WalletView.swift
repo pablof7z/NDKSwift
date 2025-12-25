@@ -297,12 +297,12 @@ struct WalletSetupOptionCard: View {
 }
 
 #Preview {
-    NavigationStack {
+    let ndk = NDK(relayURLs: [])
+    let authManager = NDKAuthManager(ndk: ndk)
+    let state = ChirpState(ndk: ndk, authManager: authManager)
+
+    return NavigationStack {
         WalletView()
-            .environment(ChirpState(
-                ndk: NDK(relayURLs: []),
-                authManager: NDKAuthManager(ndk: NDK(relayURLs: [])),
-                relayCollection: NDKRelayCollection(ndk: NDK(relayURLs: []))
-            ))
+            .environment(state)
     }
 }

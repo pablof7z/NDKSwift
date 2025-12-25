@@ -194,8 +194,8 @@ struct DeveloperToolsView: View {
             cachePath = nil
         }
 
-        relayCount = state.relayCollection.totalCount
-        connectedRelayCount = state.relayCollection.connectedCount
+        relayCount = state.ndk.relays.count
+        connectedRelayCount = state.ndk.connectedRelayCount
 
         if let signer = state.ndk.signer {
             signerPubkey = try? await signer.pubkey
