@@ -8,7 +8,7 @@ import XCTest
 final class NDKProfileAPITests: XCTestCase {
 
     private var ndk: NDK!
-    private let testPubkey = "test_pubkey_12345"
+    private let testPubkey = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
 
     override func setUp() async throws {
         ndk = NDK()
@@ -83,8 +83,8 @@ final class NDKProfileAPITests: XCTestCase {
         // When accessing displayName
         let displayName = profile.displayName
 
-        // Then returns truncated pubkey
-        XCTAssert(displayName.hasPrefix("test_pubkey"))
+        // Then returns truncated pubkey (first 8 chars + ...)
+        XCTAssert(displayName.hasPrefix(String(testPubkey.prefix(8))))
         XCTAssert(displayName.hasSuffix("..."))
     }
 
