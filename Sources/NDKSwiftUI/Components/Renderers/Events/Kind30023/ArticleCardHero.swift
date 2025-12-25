@@ -1,8 +1,6 @@
-import SwiftUI
+import Kingfisher
 import NDKSwiftCore
-#if canImport(UIKit)
-import UIKit
-#endif
+import SwiftUI
 
 /// Hero article card renderer with large image and prominent title
 /// Best for featured content or detail views
@@ -34,16 +32,12 @@ public struct ArticleCardHero: ArticleCardRenderer {
             // Hero Image with gradient overlay
             if let imageURL = article.imageURL {
                 ZStack(alignment: .bottomLeading) {
-                    AsyncImage(url: imageURL) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(16/9, contentMode: .fill)
-                    } placeholder: {
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.2))
-                    }
-                    .frame(height: 200)
-                    .clipped()
+                    KFImage(imageURL)
+                        .resizable()
+                        .placeholder { Rectangle().fill(Color.gray.opacity(0.2)) }
+                        .aspectRatio(16/9, contentMode: .fill)
+                        .frame(height: 200)
+                        .clipped()
 
                     // Subtle gradient overlay for better text readability
                     LinearGradient(

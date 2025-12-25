@@ -1,9 +1,6 @@
+import Kingfisher
 import NDKSwiftCore
 import SwiftUI
-
-#if canImport(UIKit)
-    import UIKit
-#endif
 
 // MARK: - NDKUIProfilePicture
 
@@ -99,15 +96,12 @@ public struct NDKUIProfilePicture: View {
 
         Group {
             if let pictureURL = profile.pictureURL {
-                AsyncImage(url: pictureURL) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    placeholderView(for: profile)
-                }
-                .frame(width: size, height: size)
-                .clipShape(RoundedRectangle(cornerRadius: effectiveCornerRadius))
+                KFImage(pictureURL)
+                    .resizable()
+                    .placeholder { placeholderView(for: profile) }
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: size, height: size)
+                    .clipShape(RoundedRectangle(cornerRadius: effectiveCornerRadius))
             } else {
                 placeholderView(for: profile)
             }

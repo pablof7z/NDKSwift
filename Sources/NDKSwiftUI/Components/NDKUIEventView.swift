@@ -1,9 +1,6 @@
+import Kingfisher
 import NDKSwiftCore
 import SwiftUI
-
-#if canImport(UIKit)
-    import UIKit
-#endif
 
 // MARK: - NDKUIEventView
 
@@ -236,16 +233,12 @@ public struct NDKLongFormArticleView: View {
             VStack(alignment: .leading, spacing: NDKEventViewStyles.horizontalSpacing(for: style) / 2) {
                 // Article image if available
                 if let imageURL = extractImageURL() {
-                    AsyncImage(url: imageURL) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        Rectangle()
-                            .fill(Color.ndkGray5)
-                    }
-                    .frame(height: NDKEventViewStyles.imageHeight(for: style) * 0.6)
-                    .clipShape(RoundedRectangle(cornerRadius: NDKEventViewStyles.cardCornerRadius(for: style) / 2))
+                    KFImage(imageURL)
+                        .resizable()
+                        .placeholder { Rectangle().fill(Color.ndkGray5) }
+                        .aspectRatio(contentMode: .fill)
+                        .frame(height: NDKEventViewStyles.imageHeight(for: style) * 0.6)
+                        .clipShape(RoundedRectangle(cornerRadius: NDKEventViewStyles.cardCornerRadius(for: style) / 2))
                 }
 
                 // Title
@@ -518,16 +511,12 @@ private struct PictureGrid: View {
         case 2:
             HStack(spacing: 4) {
                 ForEach(Array(imageURLs.enumerated()), id: \.offset) { _, url in
-                    AsyncImage(url: url) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        Rectangle()
-                            .fill(Color.ndkGray5)
-                    }
-                    .frame(height: imageHeight)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    KFImage(url)
+                        .resizable()
+                        .placeholder { Rectangle().fill(Color.ndkGray5) }
+                        .aspectRatio(contentMode: .fill)
+                        .frame(height: imageHeight)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
             }
         case 3 ... 4:
@@ -574,17 +563,16 @@ private struct SingleImageView: View {
     let style: NDKUIEventView.EventStyle
 
     var body: some View {
-        AsyncImage(url: url) { image in
-            image
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-        } placeholder: {
-            Rectangle()
-                .fill(Color.ndkGray5)
-                .frame(height: imageHeight)
-        }
-        .frame(maxHeight: imageHeight)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        KFImage(url)
+            .resizable()
+            .placeholder {
+                Rectangle()
+                    .fill(Color.ndkGray5)
+                    .frame(height: imageHeight)
+            }
+            .aspectRatio(contentMode: .fit)
+            .frame(maxHeight: imageHeight)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     private var imageHeight: CGFloat {
@@ -601,16 +589,12 @@ private struct GridImageView: View {
     var body: some View {
         LazyVGrid(columns: gridColumns, spacing: 4) {
             ForEach(Array(urls.enumerated()), id: \.offset) { _, url in
-                AsyncImage(url: url) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    Rectangle()
-                        .fill(Color.ndkGray5)
-                }
-                .frame(height: gridImageHeight)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                KFImage(url)
+                    .resizable()
+                    .placeholder { Rectangle().fill(Color.ndkGray5) }
+                    .aspectRatio(contentMode: .fill)
+                    .frame(height: gridImageHeight)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
             }
         }
     }

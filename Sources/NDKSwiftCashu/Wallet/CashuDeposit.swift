@@ -3,8 +3,8 @@ import Foundation
 import NDKSwiftCore
 
 /// Represents the result of a deposit monitoring operation
-public enum DepositMonitoringResult {
-    case minted(proofs: [CashuSwift.Proof])
+public enum DepositMonitoringResult: Sendable {
+    case minted(amount: Int64)
     case expired
     case cancelled
 }
@@ -170,7 +170,9 @@ public enum CashuDeposit {
                                     }
                                 }
 
-                                continuation.yield(.minted(proofs: proofs))
+                                // Calculate total minted amount from proofs
+                                let totalMinted = Int64(proofs.reduce(0) { $0 + $1.amount })
+                                continuation.yield(.minted(amount: totalMinted))
                                 continuation.finish()
                                 return
                             }

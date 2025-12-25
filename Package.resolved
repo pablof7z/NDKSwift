@@ -73,6 +73,15 @@
       }
     },
     {
+      "identity" : "kingfisher",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/onevcat/Kingfisher.git",
+      "state" : {
+        "revision" : "d30a5fad881137e2267f96a8e3fc35c58999bb94",
+        "version" : "8.6.2"
+      }
+    },
+    {
       "identity" : "ripemd160",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/anquii/RIPEMD160.git",
@@ -124,15 +133,6 @@
       "state" : {
         "revision" : "04ccff117f6549121d5721ec84fdf0162122b90e",
         "version" : "0.5.0"
-      }
-    },
-    {
-      "identity" : "swiftsvg",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/mchoe/SwiftSVG.git",
-      "state" : {
-        "revision" : "c3a8866a25ace169ee8e5c037670ba14aa59606f",
-        "version" : "2.3.2"
       }
     }
   ],

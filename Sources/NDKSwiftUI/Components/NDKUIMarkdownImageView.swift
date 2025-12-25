@@ -1,3 +1,4 @@
+import Kingfisher
 import NDKSwiftCore
 import SwiftUI
 
@@ -147,23 +148,22 @@ struct NDKUIMarkdownImageView: View {
                         })
 
                 case let .image(alt, url):
-                    AsyncImage(url: url) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(maxHeight: UIConstants.markdownImageMaxHeight)
-                            .cornerRadius(configuration.codeBlockCornerRadius)
-                            .onTapGesture {
-                                onImageTap?(url)
-                            }
-                    } placeholder: {
-                        ProgressView()
-                            .frame(height: 100)
-                            .frame(maxWidth: .infinity)
-                            .background(Color.gray.opacity(OpacityConstants.subtle))
-                            .cornerRadius(configuration.codeBlockCornerRadius)
-                    }
-                    .accessibilityLabel(alt.isEmpty ? "Image" : alt)
+                    KFImage(url)
+                        .resizable()
+                        .placeholder {
+                            ProgressView()
+                                .frame(height: 100)
+                                .frame(maxWidth: .infinity)
+                                .background(Color.gray.opacity(OpacityConstants.subtle))
+                                .cornerRadius(configuration.codeBlockCornerRadius)
+                        }
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxHeight: UIConstants.markdownImageMaxHeight)
+                        .cornerRadius(configuration.codeBlockCornerRadius)
+                        .onTapGesture {
+                            onImageTap?(url)
+                        }
+                        .accessibilityLabel(alt.isEmpty ? "Image" : alt)
                 }
             }
         }

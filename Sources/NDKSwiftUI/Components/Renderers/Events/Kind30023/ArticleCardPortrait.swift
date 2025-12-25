@@ -1,8 +1,6 @@
-import SwiftUI
+import Kingfisher
 import NDKSwiftCore
-#if canImport(UIKit)
-import UIKit
-#endif
+import SwiftUI
 
 /// Portrait/vertical article card renderer with tall cover image
 /// Best for grid layouts and card-based UIs
@@ -33,16 +31,12 @@ public struct ArticleCardPortrait: ArticleCardRenderer {
         VStack(alignment: .leading, spacing: 0) {
             // Cover Image (tall portrait aspect ratio)
             if let imageURL = article.imageURL {
-                AsyncImage(url: imageURL) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(3/4, contentMode: .fill)
-                } placeholder: {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.2))
-                }
-                .frame(width: 240, height: 320)
-                .clipped()
+                KFImage(imageURL)
+                    .resizable()
+                    .placeholder { Rectangle().fill(Color.gray.opacity(0.2)) }
+                    .aspectRatio(3/4, contentMode: .fill)
+                    .frame(width: 240, height: 320)
+                    .clipped()
             }
 
             // Content section

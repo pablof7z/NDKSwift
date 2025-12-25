@@ -144,8 +144,8 @@ final class NIP60WalletE2ETests: XCTestCase {
                 switch status {
                 case .pending:
                     print("⏳ Deposit pending...")
-                case let .minted(proofs):
-                    print("✅ Deposit completed! Received \(proofs.count) proofs")
+                case let .minted(amount):
+                    print("✅ Deposit completed! Received \(amount) sats")
                     depositCompleted = true
                 case .expired:
                     XCTFail("Deposit expired before payment")
