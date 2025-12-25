@@ -203,8 +203,7 @@ public actor NDKNostrDBCache: NDKCache {
             for noteKey in noteKeys {
                 if let txn = nostrDB.lookup_note_by_key(noteKey),
                    let note = txn.unsafeUnownedValue,
-                   let event = convertToNDKEvent(note)
-                {
+                   let event = convertToNDKEvent(note) {
                     if !seenIds.contains(event.id) && !deletedEventIds.contains(event.id) {
                         seenIds.insert(event.id)
                         results.append(event)
@@ -382,7 +381,6 @@ public actor NDKNostrDBCache: NDKCache {
         }
     }
 
-
     // MARK: - Reactive Observation
 
     public func observeEvents(
@@ -422,8 +420,7 @@ public actor NDKNostrDBCache: NDKCache {
                             // Convert NoteKey to NDKEvent (single event from live subscription)
                             if let txn = nostrDB.lookup_note_by_key(noteKey),
                                let note = txn.unsafeUnownedValue,
-                               let event = self.convertToNDKEvent(note)
-                            {
+                               let event = self.convertToNDKEvent(note) {
                                 continuation.yield([event])
                             }
                         case .events(let noteKeys):
@@ -433,8 +430,7 @@ public actor NDKNostrDBCache: NDKCache {
                             for noteKey in noteKeys {
                                 if let txn = nostrDB.lookup_note_by_key(noteKey),
                                    let note = txn.unsafeUnownedValue,
-                                   let event = self.convertToNDKEvent(note)
-                                {
+                                   let event = self.convertToNDKEvent(note) {
                                     events.append(event)
                                 }
                             }
@@ -514,12 +510,10 @@ public actor NDKNostrDBCache: NDKCache {
                         case .event(let noteKey):
                             // Convert NoteKey to profile metadata
                             if let txn = nostrDB.lookup_note_by_key(noteKey),
-                               let note = txn.unsafeUnownedValue
-                            {
+                               let note = txn.unsafeUnownedValue {
                                 // Parse profile metadata from the event content
                                 if let data = note.content.data(using: .utf8),
-                                   let metadata = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-                                {
+                                   let metadata = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                                     let userMetadata = NDKUserMetadata(
                                         pubkey: pubkey,
                                         parsedMetadata: metadata,
@@ -630,8 +624,7 @@ public actor NDKNostrDBCache: NDKCache {
         for noteKey in noteKeys {
             if let txn = nostrDB.lookup_note_by_key(noteKey),
                let note = txn.unsafeUnownedValue,
-               let event = convertToNDKEvent(note)
-            {
+               let event = convertToNDKEvent(note) {
                 results.append(event)
             }
         }

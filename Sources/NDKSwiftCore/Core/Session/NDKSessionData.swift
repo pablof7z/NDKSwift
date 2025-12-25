@@ -146,8 +146,7 @@ public class NDKSessionData {
             }
 
             if let cachedEvents = cachedEvents,
-               let cachedEvent = cachedEvents.first
-            {
+               let cachedEvent = cachedEvents.first {
                 latestTimestamps[kind] = cachedEvent.createdAt
 
                 // Process the cached event immediately

@@ -128,10 +128,8 @@ public actor MintManager {
 
     /// Find mint URL for a given keyset ID
     public func findMintForKeyset(_ keysetId: String) -> String? {
-        for (mintUrl, mint) in mints {
-            if mint.keysets.contains(where: { $0.keysetID == keysetId }) {
-                return mintUrl
-            }
+        for (mintUrl, mint) in mints where mint.keysets.contains(where: { $0.keysetID == keysetId }) {
+            return mintUrl
         }
         return nil
     }

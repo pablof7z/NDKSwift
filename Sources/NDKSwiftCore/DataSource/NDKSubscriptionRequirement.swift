@@ -347,10 +347,8 @@ actor NDKSubscriptionRequirement {
         }
 
         // Notify observers with single-element batch
-        for (_, _, continuation, individualFilter) in observers {
-            if individualFilter.matches(event: event) {
-                continuation.yield([event])
-            }
+        for (_, _, continuation, individualFilter) in observers where individualFilter.matches(event: event) {
+            continuation.yield([event])
         }
     }
 

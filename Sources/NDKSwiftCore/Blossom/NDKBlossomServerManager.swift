@@ -8,18 +8,18 @@ public struct NDKBlossomServerInfo: Identifiable, Equatable, Hashable {
     public let name: String
     public let description: String
     public let isPaid: Bool
-    public let isWhitelisted: Bool
-    public let whitelistMessage: String?
+    public let isAllowlisted: Bool
+    public let allowlistMessage: String?
     public let paidMessage: String?
 
-    public init(url: String, name: String, description: String = "", isPaid: Bool = false, isWhitelisted: Bool = false, whitelistMessage: String? = nil, paidMessage: String? = nil) {
+    public init(url: String, name: String, description: String = "", isPaid: Bool = false, isAllowlisted: Bool = false, allowlistMessage: String? = nil, paidMessage: String? = nil) {
         id = url
         self.url = url
         self.name = name
         self.description = description
         self.isPaid = isPaid
-        self.isWhitelisted = isWhitelisted
-        self.whitelistMessage = whitelistMessage
+        self.isAllowlisted = isAllowlisted
+        self.allowlistMessage = allowlistMessage
         self.paidMessage = paidMessage
     }
 
@@ -30,8 +30,8 @@ public struct NDKBlossomServerInfo: Identifiable, Equatable, Hashable {
         var extractedUrl = ""
         var extractedName = ""
         var extractedIsPaid = false
-        var extractedIsWhitelisted = false
-        var extractedWhitelistMessage: String?
+        var extractedIsAllowlisted = false
+        var extractedAllowlistMessage: String?
         var extractedPaidMessage: String?
 
         // Parse tags
@@ -49,9 +49,9 @@ public struct NDKBlossomServerInfo: Identifiable, Equatable, Hashable {
                     extractedPaidMessage = tag[1]
                 }
             case "whitelist":
-                extractedIsWhitelisted = true
+                extractedIsAllowlisted = true
                 if tag.count > 1 {
-                    extractedWhitelistMessage = tag[1]
+                    extractedAllowlistMessage = tag[1]
                 }
             default:
                 break
@@ -61,8 +61,8 @@ public struct NDKBlossomServerInfo: Identifiable, Equatable, Hashable {
         url = extractedUrl
         name = extractedName.isEmpty ? Self.extractServerName(from: extractedUrl) : extractedName
         isPaid = extractedIsPaid
-        isWhitelisted = extractedIsWhitelisted
-        whitelistMessage = extractedWhitelistMessage
+        isAllowlisted = extractedIsAllowlisted
+        allowlistMessage = extractedAllowlistMessage
         paidMessage = extractedPaidMessage
     }
 
@@ -94,11 +94,11 @@ public struct NDKBlossomServerInfo: Identifiable, Equatable, Hashable {
 
     /// Display subtitle for the server
     public var subtitle: String? {
-        if isPaid && isWhitelisted {
+        if isPaid && isAllowlisted {
             return "Paid & Whitelisted"
         } else if isPaid {
             return "Paid"
-        } else if isWhitelisted {
+        } else if isAllowlisted {
             return "Whitelist Required"
         } else {
             return "Free"
@@ -107,13 +107,13 @@ public struct NDKBlossomServerInfo: Identifiable, Equatable, Hashable {
 
     /// Combined access message
     public var accessMessage: String? {
-        if let paidMsg = paidMessage, let whitelistMsg = whitelistMessage {
-            return "\(paidMsg)\n\(whitelistMsg)"
+        if let paidMsg = paidMessage, let allowlistMsg = allowlistMessage {
+            return "\(paidMsg)\n\(allowlistMsg)"
         } else if let paidMsg = paidMessage {
             return paidMsg
-        } else if let whitelistMsg = whitelistMessage {
-            return whitelistMsg
-        } else if isPaid || isWhitelisted {
+        } else if let allowlistMsg = allowlistMessage {
+            return allowlistMsg
+        } else if isPaid || isAllowlisted {
             return "Access restricted"
         }
         return nil
@@ -296,13 +296,13 @@ public class NDKBlossomServerManager {
                         // Update UI incrementally
                         let sortedServers = serverInfos.sorted { server1, server2 in
                             // Sort free servers first, then by name
-                            if server1.isPaid == server2.isPaid && server1.isWhitelisted == server2.isWhitelisted {
+                            if server1.isPaid == server2.isPaid && server1.isAllowlisted == server2.isAllowlisted {
                                 return server1.name < server2.name
                             }
                             if server1.isPaid != server2.isPaid {
                                 return !server1.isPaid
                             }
-                            return !server1.isWhitelisted
+                            return !server1.isAllowlisted
                         }
                         await MainActor.run {
                             discoveredServers = sortedServers
@@ -386,7 +386,7 @@ public class NDKBlossomServerManager {
 
     /// Get discovered servers that are free to use
     public var freeServers: [NDKBlossomServerInfo] {
-        discoveredServers.filter { !$0.isPaid && !$0.isWhitelisted }
+        discoveredServers.filter { !$0.isPaid && !$0.isAllowlisted }
     }
 
     /// Get discovered servers that require payment
@@ -395,8 +395,8 @@ public class NDKBlossomServerManager {
     }
 
     /// Get discovered servers that require whitelist
-    public var whitelistedServers: [NDKBlossomServerInfo] {
-        discoveredServers.filter { $0.isWhitelisted }
+    public var allowlistedServers: [NDKBlossomServerInfo] {
+        discoveredServers.filter { $0.isAllowlisted }
     }
 }
 

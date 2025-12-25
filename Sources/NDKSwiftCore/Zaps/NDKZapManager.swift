@@ -1,5 +1,5 @@
-import Foundation
 import CryptoKit
+import Foundation
 
 /// Manages zapping functionality with decoupled protocol and payment handling
 public actor NDKZapManager: ZapManaging {
@@ -317,7 +317,6 @@ public actor NDKZapManager: ZapManaging {
             }
         }
     }
-
 
     // MARK: - Private Methods
 

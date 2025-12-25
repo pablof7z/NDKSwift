@@ -36,7 +36,7 @@ public extension NDKError {
             "sign": NDKError.signingFailed,
             "verification": NDKError.verificationFailed,
             "verify": NDKError.verificationFailed,
-            "key derivation": NDKError.keyDerivationFailed,
+            "key derivation": NDKError.keyDerivationFailed
         ]
 
         let lowercased = operation.lowercased()

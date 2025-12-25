@@ -52,16 +52,14 @@ public enum ContentParser {
         var mentionMap: [Int: String] = [:]
         var eventMap: [Int: String] = [:]
 
-        for (index, tag) in tags.enumerated() {
-            if tag.count >= 2 {
-                switch tag[0] {
-                case "p":
-                    mentionMap[index] = tag[1]
-                case "e":
-                    eventMap[index] = tag[1]
-                default:
-                    break
-                }
+        for (index, tag) in tags.enumerated() where tag.count >= 2 {
+            switch tag[0] {
+            case "p":
+                mentionMap[index] = tag[1]
+            case "e":
+                eventMap[index] = tag[1]
+            default:
+                break
             }
         }
 
@@ -71,8 +69,7 @@ public enum ContentParser {
 
             for match in matches.reversed() {
                 if let range = Range(match.range, in: content),
-                   let indexRange = Range(match.range(at: 1), in: content)
-                {
+                   let indexRange = Range(match.range(at: 1), in: content) {
                     let indexString = String(content[indexRange])
                     if let index = Int(indexString) {
                         // Check if it's a user mention
@@ -111,7 +108,7 @@ public enum ContentParser {
             // Hashtags
             (#"(?<=\s|^)(#[^\s!@#$%^&*()=+./,\[{\]};:'"?><]+)"#, "hashtag"),
             // URLs
-            (#"https?://[^\s<>"{}|\\^`\[\]]+"#, "url"),
+            (#"https?://[^\s<>"{}|\\^`\[\]]+"#, "url")
         ]
 
         var allMatches: [(range: Range<String.Index>, type: String, value: String)] = []

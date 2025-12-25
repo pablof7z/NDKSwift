@@ -147,8 +147,7 @@ public extension NDK {
 
         // Check the relay's NIP-11 information first
         if let info = await relay.info,
-           let supportedNips = info.supportedNips
-        {
+           let supportedNips = info.supportedNips {
             // If NIP-11 says it supports NIP-77, trust it
             if supportedNips.contains(77) {
                 return true

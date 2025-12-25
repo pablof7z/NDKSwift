@@ -52,8 +52,10 @@ struct AccountSwitcher: View {
         }
         .navigationTitle("Accounts")
         .sheet(isPresented: $showAddAccount) {
-            AddAccountSheet()
-                .environment(state)
+            NavigationStack {
+                LoginView(isAddingAccount: true)
+            }
+            .environment(state)
         }
     }
 

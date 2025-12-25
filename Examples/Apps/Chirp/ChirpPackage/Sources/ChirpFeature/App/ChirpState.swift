@@ -45,7 +45,8 @@ public final class ChirpState {
         let ndk = NDK(
             relayURLs: [],
             cache: cache,
-            debugMode: true
+            debugMode: true,
+            telemetryConfig: TelemetrySettings.makeConfig()
         )
 
         // Connect to relays (needed for both authenticated and unauthenticated data fetching)

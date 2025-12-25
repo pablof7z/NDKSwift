@@ -42,8 +42,7 @@ public final class NDKUser: Equatable, Hashable {
 
         // Restore NIP-46 URLs if available
         if let cached = await ndk.cache.getNIP05Entry(nip05.lowercased()),
-           let nip46Relays = cached.nip46Relays
-        {
+           let nip46Relays = cached.nip46Relays {
             user.nip46Urls = nip46Relays
         }
 

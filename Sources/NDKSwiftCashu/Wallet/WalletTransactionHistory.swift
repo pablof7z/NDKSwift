@@ -176,10 +176,8 @@ public actor WalletTransactionHistory {
         }
 
         // Check if it's a token or quote event in any transaction
-        for transaction in transactions.values {
-            if transaction.events.allEventIds.contains(eventId) {
-                return transaction
-            }
+        for transaction in transactions.values where transaction.events.allEventIds.contains(eventId) {
+            return transaction
         }
 
         return nil
@@ -381,9 +379,8 @@ public actor WalletTransactionHistory {
         var recipient: String?
         var amount: Int64 = 0
 
-        for tag in event.tags {
-            if tag.count >= 2 {
-                switch tag[0] {
+        for tag in event.tags where tag.count >= 2 {
+            switch tag[0] {
                 case NostrConstants.TagName.pubkey:
                     recipient = tag[1]
                 case NostrConstants.TagName.proof:
@@ -397,7 +394,6 @@ public actor WalletTransactionHistory {
                     }
                 default:
                     break
-                }
             }
         }
 

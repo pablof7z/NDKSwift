@@ -21,9 +21,7 @@ struct FollowPackFeedView: View {
                     emptyState
                 } else {
                     ForEach(allEvents, id: \.id) { event in
-                        FeedPostCard(ndk: state.ndk, event: event)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
+                        FeedPostRow(ndk: state.ndk, event: event)
                     }
                 }
             }

@@ -107,8 +107,7 @@ struct NdbTagElem: Sequence, Hashable, Equatable {
     func matches_str(_ s: String, tag_len: Int? = nil) -> Bool {
         if str.flag == NDB_PACKED_ID,
            s.utf8.count == 64,
-           var decoded = hex_decode(s), decoded.count == 32
-        {
+           var decoded = hex_decode(s), decoded.count == 32 {
             return memcmp(&decoded, str.id, 32) == 0
         }
 

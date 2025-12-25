@@ -72,8 +72,7 @@ enum MarkdownParser {
                 index = newIndex
             } else if line.trimmed == "---" ||
                 line.trimmed == "***" ||
-                line.trimmed == "___"
-            {
+                line.trimmed == "___" {
                 blocks.append(.horizontalRule)
                 index += 1
             } else {
@@ -209,9 +208,8 @@ enum MarkdownParser {
             // Parse list item content
             let content: String
             if isOrdered {
-                if let _ = trimmed.firstIndex(of: "."),
-                   let spaceIndex = trimmed.firstIndex(of: " ")
-                {
+                if trimmed.contains("."),
+                   let spaceIndex = trimmed.firstIndex(of: " ") {
                     content = String(trimmed[trimmed.index(after: spaceIndex)...])
                 } else {
                     content = trimmed
@@ -246,8 +244,7 @@ enum MarkdownParser {
                 trimmed.starts(with: "```") ||
                 trimmed.starts(with: ">") ||
                 isListItem(line) ||
-                trimmed == "---" || trimmed == "***" || trimmed == "___"
-            {
+                trimmed == "---" || trimmed == "***" || trimmed == "___" {
                 break
             }
 
@@ -292,8 +289,7 @@ enum MarkdownParser {
 
             // Check for bold
             if index < text.index(text.endIndex, offsetBy: -2) &&
-                text[index] == "*" && text[text.index(after: index)] == "*"
-            {
+                text[index] == "*" && text[text.index(after: index)] == "*" {
                 if !currentText.isEmpty {
                     result.append(.text(currentText))
                     currentText = ""
@@ -330,8 +326,7 @@ enum MarkdownParser {
 
             // Check for images and links
             if text[index] == "!" && index < text.index(text.endIndex, offsetBy: -2) &&
-                text[text.index(after: index)] == "["
-            {
+                text[text.index(after: index)] == "[" {
                 if !currentText.isEmpty {
                     result.append(.text(currentText))
                     currentText = ""
@@ -369,8 +364,7 @@ enum MarkdownParser {
             // Check for Nostr entities
             if text[index] == "@" || text[index] == "#" ||
                 (text.distance(from: index, to: text.endIndex) >= 5 &&
-                    String(text[index ..< text.index(index, offsetBy: 5)]).starts(with: "nostr"))
-            {
+                    String(text[index ..< text.index(index, offsetBy: 5)]).starts(with: "nostr")) {
                 if !currentText.isEmpty {
                     result.append(.text(currentText))
                     currentText = ""
@@ -559,8 +553,7 @@ enum MarkdownParser {
             var mention = ""
 
             while index < text.endIndex,
-                  text[index].isLetter || text[index].isNumber || text[index] == "_"
-            {
+                  text[index].isLetter || text[index].isNumber || text[index] == "_" {
                 mention.append(text[index])
                 index = text.index(after: index)
             }
@@ -578,8 +571,7 @@ enum MarkdownParser {
                 var tag = ""
 
                 while index < text.endIndex,
-                      text[index].isLetter || text[index].isNumber || text[index] == "_"
-                {
+                      text[index].isLetter || text[index].isNumber || text[index] == "_" {
                     tag.append(text[index])
                     index = text.index(after: index)
                 }

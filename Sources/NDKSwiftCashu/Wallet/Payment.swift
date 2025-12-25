@@ -22,7 +22,7 @@ public enum MintFailureError: LocalizedError {
     public var recoverySuggestion: String? {
         switch self {
         case .requiresUserIntervention:
-            return "The mint has received payment but failed to issue tokens. You can retry minting or blacklist this mint."
+            return "The mint has received payment but failed to issue tokens. You can retry minting or blocklist this mint."
         }
     }
 }

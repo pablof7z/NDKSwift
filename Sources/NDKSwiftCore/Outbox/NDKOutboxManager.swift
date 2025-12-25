@@ -96,7 +96,7 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
     // MARK: - Cache Implementation (merged from tracker)
 
     private let memoryCache: LRUCache<String, CachedRelayPreference>
-    private let blacklistedRelays: Set<String>
+    private let blocklistedRelays: Set<String>
 
     /// Track pending fetches to avoid duplicate requests
     private var pendingFetches: [String: Task<NDKOutboxItem?, Error>] = [:]
@@ -116,12 +116,12 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
     init(
         ndk: NDK,
         capacity: Int = NDKOutboxManager.defaultCapacity,
-        blacklistedRelays: Set<String> = []
+        blocklistedRelays: Set<String> = []
     ) {
         self.ndk = ndk
         lookupTracker = RelayListLookupTracker()
         memoryCache = LRUCache(capacity: capacity, defaultTTL: Self.positiveEntryTTL)
-        self.blacklistedRelays = blacklistedRelays
+        self.blocklistedRelays = blocklistedRelays
 
         // Set up discovery stream
         var continuation: AsyncStream<RelayDiscoveryEvent>.Continuation!
@@ -604,8 +604,7 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         for key in allKeys {
             if let cached = await memoryCache.get(key),
                let item = cached.item,
-               Date() <= cached.expiresAt
-            {
+               Date() <= cached.expiresAt {
                 items.append(item)
             }
         }
@@ -621,9 +620,9 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         source: RelayListSource = .manual,
         emitDiscoveryEvent: Bool = true
     ) async {
-        // Filter out blacklisted and invalid relays (ws://, localhost) at the source
-        let filteredReadRelays = readRelays.subtracting(blacklistedRelays).validForOutbox
-        let filteredWriteRelays = writeRelays.subtracting(blacklistedRelays).validForOutbox
+        // Filter out blocklisted and invalid relays (ws://, localhost) at the source
+        let filteredReadRelays = readRelays.subtracting(blocklistedRelays).validForOutbox
+        let filteredWriteRelays = writeRelays.subtracting(blocklistedRelays).validForOutbox
 
         let readRelayInfos = filteredReadRelays
             .map { RelayInfo(url: $0) }
@@ -738,10 +737,10 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         let relayList = NDKRelayList.fromEvent(event)
 
         let writeRelayInfos = relayList.writeRelays.validForOutbox
-            .filter { !blacklistedRelays.contains($0.url) }
+            .filter { !blocklistedRelays.contains($0.url) }
             .map { RelayInfo(url: $0.url) }
         let readRelayInfos = relayList.readRelays.validForOutbox
-            .filter { !blacklistedRelays.contains($0.url) }
+            .filter { !blocklistedRelays.contains($0.url) }
             .map { RelayInfo(url: $0.url) }
 
         let item = NDKOutboxItem(
@@ -860,8 +859,8 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
 
         NDKLogger.log(.debug, category: .outbox, "📝 Raw relay list data - Read: \(relayList.readRelays.map { $0.url }), Write: \(relayList.writeRelays.map { $0.url })")
 
-        let readRelayUrls = Set(relayList.readRelays.validForOutbox.map { $0.url }).subtracting(blacklistedRelays)
-        let writeRelayUrls = Set(relayList.writeRelays.validForOutbox.map { $0.url }).subtracting(blacklistedRelays)
+        let readRelayUrls = Set(relayList.readRelays.validForOutbox.map { $0.url }).subtracting(blocklistedRelays)
+        let writeRelayUrls = Set(relayList.writeRelays.validForOutbox.map { $0.url }).subtracting(blocklistedRelays)
 
         let readRelayInfos = readRelayUrls.map { RelayInfo(url: $0) }
         let writeRelayInfos = writeRelayUrls.map { RelayInfo(url: $0) }
@@ -869,7 +868,7 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
         let rawReadCount = relayList.readRelays.count
         let rawWriteCount = relayList.writeRelays.count
         if rawReadCount != readRelayUrls.count || rawWriteCount != writeRelayUrls.count {
-            NDKLogger.log(.debug, category: .outbox, "🚫 Filtered invalid/blacklisted relays - Raw: \(rawReadCount)r/\(rawWriteCount)w → Valid: \(readRelayUrls.count)r/\(writeRelayUrls.count)w")
+            NDKLogger.log(.debug, category: .outbox, "🚫 Filtered invalid/blocklisted relays - Raw: \(rawReadCount)r/\(rawWriteCount)w → Valid: \(readRelayUrls.count)r/\(writeRelayUrls.count)w")
         }
 
         let item = NDKOutboxItem(

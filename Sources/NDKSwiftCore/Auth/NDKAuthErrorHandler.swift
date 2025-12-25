@@ -262,7 +262,7 @@ public enum NDKAuthErrorHandler {
                     "Too many failed attempts. Please use your device passcode.",
                     true,
                     nil
-                ),
+                )
             ]
 
             if let mapping = errorMappings[error.code] {

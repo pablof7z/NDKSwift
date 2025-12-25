@@ -169,7 +169,7 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
             createdAt,
             kind,
             tags,
-            content,
+            content
         ]
 
         return try JSONCoding.serializeToString(array)
@@ -343,7 +343,7 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
             NostrConstants.JSONField.kind: kind,
             NostrConstants.JSONField.tags: tags,
             NostrConstants.JSONField.content: content,
-            NostrConstants.JSONField.sig: sig,
+            NostrConstants.JSONField.sig: sig
         ]
     }
 

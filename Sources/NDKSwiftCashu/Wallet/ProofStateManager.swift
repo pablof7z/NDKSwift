@@ -298,8 +298,7 @@ public actor ProofStateManager {
 
         for proof in proofs {
             if let entry = proofState[proof.C],
-               let ownerEventId = entry.ownerEventId
-            {
+               let ownerEventId = entry.ownerEventId {
                 ownerIds.insert(ownerEventId)
             }
         }

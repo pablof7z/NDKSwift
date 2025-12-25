@@ -43,10 +43,8 @@ public actor WalletEventManager {
         var newEventIds = Set<String>()
 
         // Keep existing token events that aren't being deleted
-        for existingId in currentTokenEventIds {
-            if !tokenChange.deletedTokenIds.contains(existingId) {
-                newEventIds.insert(existingId)
-            }
+        for existingId in currentTokenEventIds where !tokenChange.deletedTokenIds.contains(existingId) {
+            newEventIds.insert(existingId)
         }
 
         // Create deletion events for tokens being deleted
@@ -55,7 +53,7 @@ public actor WalletEventManager {
                 .kind(EventKind.deletion) // Event deletion
                 .content("")
                 .tags([
-                    ["k", String(7375)], // Cashu token kind
+                    ["k", String(7375)] // Cashu token kind
                 ] + tokenChange.deletedTokenIds.map { ["e", $0] })
                 .build(signer: signer)
 

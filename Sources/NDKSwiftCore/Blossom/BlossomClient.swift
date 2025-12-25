@@ -121,11 +121,10 @@ public actor BlossomClient {
             throw NDKError.fileTooLarge(maxSize: maxSize)
         }
 
-        let finalMimeType = mimeType ?? BlossomMediaProcessor.inferMimeType(from: data)
+        let finalMimeType = mimeType ?? BlossomMediaProcessor.inferMimeType(from: data) ?? "application/octet-stream"
 
         if let acceptedTypes = descriptor?.acceptsMimeTypes,
-           !acceptedTypes.contains(finalMimeType) && !acceptedTypes.contains("*/*")
-        {
+           !acceptedTypes.contains(finalMimeType) && !acceptedTypes.contains("*/*") {
             throw NDKError.unsupportedMimeType(finalMimeType)
         }
 

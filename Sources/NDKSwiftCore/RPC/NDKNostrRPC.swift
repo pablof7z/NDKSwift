@@ -82,8 +82,7 @@ public actor NDKNostrRPC {
         let id = json["id"] as? String ?? ""
 
         if let method = json["method"] as? String,
-           let params = json["params"] as? [String]
-        {
+           let params = json["params"] as? [String] {
             return NDKRPCRequest(
                 id: id,
                 pubkey: event.pubkey,
@@ -120,7 +119,7 @@ public actor NDKNostrRPC {
         let request: [String: Any] = [
             "id": id,
             "method": method,
-            "params": params,
+            "params": params
         ]
 
         let requestData = try JSONSerialization.data(withJSONObject: request)

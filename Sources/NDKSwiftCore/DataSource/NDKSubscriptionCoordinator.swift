@@ -167,8 +167,7 @@ actor InternalSubscriptionManager {
 
         // Try fingerprint-based routing for relay-specific IDs
         if let fingerprint = relayIdToFingerprint[subscriptionId],
-           let subscriptions = fingerprintSubscriptions[fingerprint]
-        {
+           let subscriptions = fingerprintSubscriptions[fingerprint] {
             NDKLogger.log(.trace, category: .subscription, "🔀 Routing via fingerprint: \(subscriptionId) → \(fingerprint) (\(subscriptions.count) subscriptions)")
             for subscription in subscriptions {
                 if !deliveredTo.contains(subscription.id) {
@@ -193,8 +192,7 @@ actor InternalSubscriptionManager {
 
         // NEW: Try fingerprint-based routing for relay-specific IDs
         if let fingerprint = relayIdToFingerprint[subscriptionId],
-           let subscriptions = fingerprintSubscriptions[fingerprint]
-        {
+           let subscriptions = fingerprintSubscriptions[fingerprint] {
             NDKLogger.log(.trace, category: .subscription, "🔀 Routing EOSE via fingerprint: \(subscriptionId) → \(fingerprint)")
             for subscription in subscriptions {
                 await subscription.handleEOSE(from: relay)
@@ -404,7 +402,7 @@ actor NDKSubscriptionCoordinator: Hashable {
 
     /// Start the subscription
     func start() async {
-        guard !isActive, let _ = ndk else {
+        guard !isActive, ndk != nil else {
             let reason = isActive ? "already active" : ErrorMessageConstants.Messages.ndkReferenceLost
             let filterSummary = filters.map { filter in
                 var parts: [String] = []

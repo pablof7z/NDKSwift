@@ -61,8 +61,7 @@ actor NDKRelaySubscriptionManager {
 
             // Find existing group or create new one
             if let existingGroup = subscriptionGroups[fingerprint],
-               await existingGroup.canAcceptNewItems()
-            {
+               await existingGroup.canAcceptNewItems() {
                 // Grouped with existing subscription!
                 let groupSize = await existingGroup.itemCount
                 span?.set(SpanAttributes.groupId, fingerprint)
@@ -183,10 +182,8 @@ actor NDKRelaySubscriptionManager {
     /// Handles relay reconnection
     func handleRelayReconnection() async {
         // Re-execute all active groups
-        for group in subscriptionGroups.values {
-            if await group.isActive() {
-                await group.execute()
-            }
+        for group in subscriptionGroups.values where await group.isActive() {
+            await group.execute()
         }
     }
 }

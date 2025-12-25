@@ -1,5 +1,5 @@
-import SwiftUI
 import NDKSwiftCore
+import SwiftUI
 
 /// A generic markdown view that renders parsed markdown content with pluggable inline renderers
 public struct NDKUIMarkdownView<
@@ -95,12 +95,45 @@ public struct NDKUIMarkdownView<
         }
     }
 
+    // MARK: - Grouped Inline Rendering
+
+    private typealias GroupedInline = ImageGroupingUtils.GroupedResult<MarkdownInline>
+
     @ViewBuilder
     private func renderInlines(_ inlines: [MarkdownInline]) -> some View {
-        FlowLayout(alignment: .leading, spacing: 0) {
-            ForEach(Array(inlines.enumerated()), id: \.offset) { _, inline in
-                renderInline(inline)
+        let grouped = ImageGroupingUtils.groupConsecutiveImages(
+            inlines,
+            getImageURL: { inline in
+                if case .image(_, let url) = inline {
+                    return url
+                }
+                return nil
+            },
+            isWhitespaceText: { inline in
+                if case .text(let text) = inline {
+                    let stripped = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if stripped.isEmpty { return true }
+                    // Also treat as whitespace if only punctuation remains
+                    return stripped.allSatisfy { $0.isPunctuation || $0.isWhitespace }
+                }
+                return false
             }
+        )
+
+        FlowLayout(alignment: .leading, spacing: 0) {
+            ForEach(Array(grouped.enumerated()), id: \.offset) { _, item in
+                renderGroupedInline(item)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func renderGroupedInline(_ item: GroupedInline) -> some View {
+        switch item {
+        case .single(let inline):
+            renderInline(inline)
+        case .imageGroup(let urls):
+            Image(urls: urls, onTap: nil)
         }
     }
 
@@ -131,7 +164,7 @@ public struct NDKUIMarkdownView<
             Link(url: url, onTap: nil)
 
         case .image(_, let url):
-            Image(url: url, onTap: nil)
+            Image(urls: [url], onTap: nil)
 
         case .nostrEntity(let entity):
             renderNostrEntity(entity)

@@ -1,7 +1,7 @@
 // MARK: - NDKBlockedMintsEvent
 
 /// NIP-60 Blocked Mints Event (kind: 10020)
-/// Public event that contains blacklisted mint URLs that the user wants to avoid
+/// Public event that contains blocklisted mint URLs that the user wants to avoid
 public struct NDKBlockedMintsEvent: NDKPublishableEvent {
     public let event: NDKEvent
 

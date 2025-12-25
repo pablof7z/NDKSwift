@@ -1,5 +1,5 @@
-import SwiftUI
 import NDKSwiftCore
+import SwiftUI
 
 /// Default implementation of EventRenderer that displays embedded events as simple cards.
 ///

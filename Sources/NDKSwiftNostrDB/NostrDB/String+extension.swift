@@ -98,8 +98,7 @@ extension String: ObjectAPIPacker {
 
 extension String: NativeObject {
     public func serialize<T: ObjectAPIPacker>(type _: T.Type) -> ByteBuffer
-        where T.T == Self
-    {
+        where T.T == Self {
         fatalError("serialize should never be called from string directly")
     }
 

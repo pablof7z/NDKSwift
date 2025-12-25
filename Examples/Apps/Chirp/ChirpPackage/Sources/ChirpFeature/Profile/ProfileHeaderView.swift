@@ -3,15 +3,25 @@ import NDKSwiftCore
 import NDKSwiftUI
 
 public struct ProfileHeaderView: View {
+    @Environment(ChirpState.self) private var state
     let ndk: NDK
     let pubkey: String
 
     @State private var isNip05Verified: Bool = false
     @State private var isVerifying: Bool = false
+    @State private var isFollowLoading: Bool = false
 
     public init(ndk: NDK, pubkey: String) {
         self.ndk = ndk
         self.pubkey = pubkey
+    }
+
+    private var isOwnProfile: Bool {
+        state.ndk.sessionData?.pubkey == pubkey
+    }
+
+    private var isFollowing: Bool {
+        state.ndk.sessionData?.followList.contains(pubkey) ?? false
     }
 
     public var body: some View {
@@ -38,7 +48,7 @@ public struct ProfileHeaderView: View {
                         image
                             .resizable()
                             .aspectRatio(contentMode: .fill)
-                            .frame(height: 150)
+                            .frame(height: 120)
                             .clipped()
                     case .failure, .empty:
                         defaultBanner
@@ -49,60 +59,68 @@ public struct ProfileHeaderView: View {
             } else {
                 defaultBanner
             }
-
-            // Avatar positioned at bottom-left, overlapping
-            NDKUIProfilePicture(ndk: ndk, pubkey: pubkey, size: 86)
-                .overlay {
-                    Circle()
-                        .stroke(Color(uiColor: .systemBackground), lineWidth: 4)
-                }
-                .offset(x: 16, y: 43)
         }
-        .frame(height: 150)
+        .frame(height: 120)
     }
 
     private var defaultBanner: some View {
         Rectangle()
             .fill(Color(.secondarySystemBackground))
-            .frame(height: 150)
+            .frame(height: 120)
     }
 
     // MARK: - Profile Info Section
 
     private func profileInfoSection(profile: NDKProfile) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Top row: spacer for avatar overlap
-            Spacer()
-                .frame(height: 50)
+        VStack(alignment: .leading, spacing: 12) {
+            // Avatar row with name and follow button
+            HStack(alignment: .top, spacing: 12) {
+                // Avatar
+                NDKUIProfilePicture(ndk: ndk, pubkey: pubkey, size: 72)
+                    .overlay {
+                        Circle()
+                            .stroke(Color(uiColor: .systemBackground), lineWidth: 3)
+                    }
+                    .offset(y: -36)
 
-            // Name and handle
-            VStack(alignment: .leading, spacing: 2) {
-                NDKUIDisplayName(ndk: ndk, pubkey: pubkey)
-                    .font(.title3.weight(.bold))
+                // Name and handle
+                VStack(alignment: .leading, spacing: 2) {
+                    NDKUIDisplayName(ndk: ndk, pubkey: pubkey)
+                        .font(.title3.weight(.bold))
 
-                HStack(spacing: 4) {
-                    if let nip05 = profile.nip05, !nip05.isEmpty {
-                        Text(nip05)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                    HStack(spacing: 4) {
+                        if let nip05 = profile.nip05, !nip05.isEmpty {
+                            Text(nip05)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
 
-                        if isNip05Verified {
-                            Image(systemName: "checkmark.seal.fill")
-                                .font(.caption)
-                                .foregroundStyle(.blue)
+                            if isNip05Verified {
+                                Image(systemName: "checkmark.seal.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.blue)
+                            }
+                        } else {
+                            Text(formatNpub(pubkey))
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
                         }
-                    } else {
-                        Text(formatNpub(pubkey))
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                    }
+                    .task {
+                        if let nip05 = profile.nip05, !nip05.isEmpty {
+                            await verifyNip05(nip05: nip05)
+                        }
                     }
                 }
-                .task {
-                    if let nip05 = profile.nip05, !nip05.isEmpty {
-                        await verifyNip05(nip05: nip05)
-                    }
+
+                Spacer()
+
+                // Follow button (only show if not own profile)
+                if !isOwnProfile {
+                    followButton
+                        .padding(.top, 4)
                 }
             }
+            .padding(.top, 8)
 
             // Bio
             if !profile.about.isEmpty {
@@ -111,6 +129,7 @@ public struct ProfileHeaderView: View {
                     .foregroundStyle(.primary)
                     .lineLimit(4)
                     .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, -24) // Adjust for avatar offset
             }
 
             // Lightning address
@@ -127,6 +146,57 @@ public struct ProfileHeaderView: View {
         .padding(.horizontal, 16)
         .padding(.bottom, 16)
     }
+
+    // MARK: - Follow Button
+
+    private var followButton: some View {
+        Button {
+            toggleFollow()
+        } label: {
+            Group {
+                if isFollowLoading {
+                    ProgressView()
+                        .tint(isFollowing ? Color.primary : Color.white)
+                } else {
+                    Text(isFollowing ? "Following" : "Follow")
+                }
+            }
+            .font(.subheadline.weight(.semibold))
+            .frame(width: 100, height: 34)
+            .foregroundStyle(isFollowing ? Color.primary : Color.white)
+            .background(isFollowing ? Color(.secondarySystemBackground) : .blue)
+            .clipShape(Capsule())
+            .overlay {
+                Capsule()
+                    .stroke(isFollowing ? Color(.separator) : .clear, lineWidth: 1)
+            }
+        }
+        .disabled(isFollowLoading)
+    }
+
+    private func toggleFollow() {
+        guard !isFollowLoading else { return }
+        isFollowLoading = true
+
+        let ndk = state.ndk
+        let shouldUnfollow = isFollowing
+        let targetPubkey = pubkey
+
+        Task {
+            do {
+                if shouldUnfollow {
+                    try await ndk.unfollow(pubkey: targetPubkey)
+                } else {
+                    try await ndk.follow(pubkey: targetPubkey)
+                }
+            } catch {
+                print("Follow/unfollow error: \(error)")
+            }
+            await MainActor.run { isFollowLoading = false }
+        }
+    }
+
+    // MARK: - Helpers
 
     private func formatNpub(_ pubkey: String) -> String {
         if let npub = try? Bech32.npub(from: pubkey) {

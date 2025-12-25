@@ -278,8 +278,7 @@ public actor NDKNWCWallet: NDKPaymentProvider {
         // Check cache
         if let cachedBalance = _cachedBalance,
            let lastCheck = _lastBalanceCheck,
-           Date().timeIntervalSince(lastCheck) < balanceCacheDuration
-        {
+           Date().timeIntervalSince(lastCheck) < balanceCacheDuration {
             return GetBalanceResponse(balance: cachedBalance)
         }
 

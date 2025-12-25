@@ -78,8 +78,7 @@ actor NDKRelaySubscription {
     func scheduleExecution(delay: TimeInterval, delayType: NDKSubscriptionDelayType) {
         // If we already have a timer, we might need to adjust it
         if let existingFireTime = fireTime,
-           let existingDelayType = self.delayType
-        {
+           let existingDelayType = self.delayType {
             let timeUntilFire = existingFireTime.timeIntervalSinceNow
 
             switch (existingDelayType, delayType) {

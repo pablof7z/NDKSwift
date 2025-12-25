@@ -51,8 +51,7 @@ public enum NDKLogFormatter {
 
         // Convert back to JSON string
         if let data = try? JSONSerialization.data(withJSONObject: truncatedFilter, options: [.sortedKeys]),
-           let jsonString = String(data: data, encoding: .utf8)
-        {
+           let jsonString = String(data: data, encoding: .utf8) {
             return jsonString
         }
 

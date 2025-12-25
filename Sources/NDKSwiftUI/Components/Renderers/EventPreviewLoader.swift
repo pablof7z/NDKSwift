@@ -1,5 +1,5 @@
-import SwiftUI
 import NDKSwiftCore
+import SwiftUI
 
 /// A generic view that loads events by reference and renders them using the provided EventRenderer
 public struct EventPreviewLoader<Event: EventRenderer>: View {

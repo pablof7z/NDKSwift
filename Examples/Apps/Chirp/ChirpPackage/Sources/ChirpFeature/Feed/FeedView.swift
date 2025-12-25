@@ -249,10 +249,12 @@ struct FeedPostRow: View {
                         Spacer()
                     }
 
+                    // Reply indicator
+                    NDKUIReplyIndicator(ndk: ndk, event: event)
+
                     // Post content
-                    Text(event.content)
-                        .font(.body)
-                        .fixedSize(horizontal: false, vertical: true)
+                    NDKRichText(content: event.content, tags: event.tags)
+                        .ndk(ndk)
 
                     // Action bar
                     actionBar
@@ -335,10 +337,12 @@ struct FeedPostCard: View {
                 Spacer()
             }
 
+            // Reply indicator
+            NDKUIReplyIndicator(ndk: ndk, event: event)
+
             // Content
-            Text(event.content)
-                .font(.body)
-                .fixedSize(horizontal: false, vertical: true)
+            NDKRichText(content: event.content, tags: event.tags)
+                .ndk(ndk)
         }
         .padding()
         .background(Color(.secondarySystemGroupedBackground))

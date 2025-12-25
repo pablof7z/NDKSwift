@@ -244,7 +244,7 @@ public actor NDKEventTracker {
             "eventsWithPublishStatus": relayPublishStatuses.count,
             "eventsWithOKMessages": relayOKMessages.count,
             "eventsWithCustomProperties": customProperties.count,
-            "eventsWithTimestamps": firstSeenTimestamps.count,
+            "eventsWithTimestamps": firstSeenTimestamps.count
         ]
     }
 }

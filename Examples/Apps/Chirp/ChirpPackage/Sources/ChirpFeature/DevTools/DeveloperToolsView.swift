@@ -129,8 +129,8 @@ struct DeveloperToolsView: View {
                 }
             }
 
-            // Logging
-            Section("Logging") {
+            // Logging & Telemetry
+            Section("Logging & Telemetry") {
                 NavigationLink {
                     LogsView()
                 } label: {
@@ -139,6 +139,17 @@ struct DeveloperToolsView: View {
                         title: "Log Viewer",
                         subtitle: "Real-time NDK logs",
                         color: .mint
+                    )
+                }
+
+                NavigationLink {
+                    TelemetrySettingsView()
+                } label: {
+                    ToolRow(
+                        icon: "chart.line.uptrend.xyaxis",
+                        title: "Telemetry",
+                        subtitle: "OpenTelemetry tracing",
+                        color: .purple
                     )
                 }
             }

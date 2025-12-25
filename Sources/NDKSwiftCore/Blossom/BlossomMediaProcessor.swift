@@ -82,8 +82,7 @@ public enum BlossomMediaProcessor {
         } else if Array(bytes[ImageSignatures.webpOffset...]).starts(with: ImageSignatures.webp) {
             return "image/webp"
         } else if Array(bytes[ImageSignatures.ftypOffset...]).starts(with: ImageSignatures.ftypBox),
-                  Array(bytes[(ImageSignatures.ftypOffset + ImageSignatures.ftypBox.count)...]).starts(with: ImageSignatures.heicType)
-        {
+                  Array(bytes[(ImageSignatures.ftypOffset + ImageSignatures.ftypBox.count)...]).starts(with: ImageSignatures.heicType) {
             return "image/heic"
         }
 

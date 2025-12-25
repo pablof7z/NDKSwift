@@ -1,6 +1,6 @@
+import CashuSwift
 import Foundation
 import NDKSwiftCore
-import CashuSwift
 
 /// Fallback handler for funding Nutzaps via Lightning when no direct Cashu provider is available
 public class CashuZapFallbackHandler: ZapFallbackHandler {

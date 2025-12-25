@@ -32,7 +32,7 @@ public struct NDKUIRichTextView<
     public var body: some View {
         Group {
             if let parsed = parsedContent {
-                renderComponents(parsed.components)
+                renderGroupedComponents(parsed.components)
             } else {
                 Text(content)
             }
@@ -53,18 +53,54 @@ public struct NDKUIRichTextView<
         }
     }
 
+    // MARK: - Grouped Rendering
+
+    private typealias GroupedItem = ImageGroupingUtils.GroupedResult<NDKParsedContent.Component>
+
     @ViewBuilder
-    private func renderComponents(_ components: [NDKParsedContent.Component]) -> some View {
+    private func renderGroupedComponents(_ components: [NDKParsedContent.Component]) -> some View {
         let merged = mergeTextComponents(components)
-        FlowLayout(alignment: .leading, spacing: 0) {
-            ForEach(Array(merged.enumerated()), id: \.offset) { _, component in
-                renderComponent(component)
+        let grouped = ImageGroupingUtils.groupConsecutiveImages(
+            merged,
+            getImageURL: { component in
+                if case .url(let url) = component, isImageURL(url) {
+                    return url
+                }
+                return nil
+            },
+            isWhitespaceText: { component in
+                if case .text(let text) = component {
+                    // Treat text as "whitespace" if it only contains whitespace and punctuation
+                    // This allows grouping images that might be separated by newlines and stray punctuation
+                    let stripped = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if stripped.isEmpty { return true }
+                    // Also treat as whitespace if only punctuation remains
+                    let punctuationOnly = stripped.allSatisfy { $0.isPunctuation || $0.isWhitespace }
+                    return punctuationOnly
+                }
+                return false
+            }
+        )
+
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(grouped.enumerated()), id: \.offset) { _, item in
+                renderGroupedItem(item)
             }
         }
     }
 
     @ViewBuilder
-    private func renderComponent(_ component: NDKParsedContent.Component) -> some View {
+    private func renderGroupedItem(_ item: GroupedItem) -> some View {
+        switch item {
+        case .single(let component):
+            renderSingleComponent(component)
+        case .imageGroup(let urls):
+            Image(urls: urls, onTap: nil)
+        }
+    }
+
+    @ViewBuilder
+    private func renderSingleComponent(_ component: NDKParsedContent.Component) -> some View {
         switch component {
         case .text(let text):
             Text(text)
@@ -73,7 +109,6 @@ public struct NDKUIRichTextView<
             Mention(pubkey: pubkey, npub: npub, onTap: nil)
 
         case .nprofileMention(let nprofile):
-            // Decode nprofile to extract pubkey
             if let decoded = try? ContentTagger.decodeNostrEntity(nprofile),
                let pubkey = decoded.pubkey {
                 Mention(pubkey: pubkey, npub: nprofile, onTap: nil)
@@ -86,11 +121,9 @@ public struct NDKUIRichTextView<
             Hashtag(tag: tag, onTap: nil)
 
         case .url(let url):
-            if isImageURL(url) {
-                Image(url: url, onTap: nil)
-            } else {
-                Link(url: url, onTap: nil)
-            }
+            // Non-image URLs are rendered as links
+            // Image URLs are handled by groupConsecutiveImages
+            Link(url: url, onTap: nil)
 
         case .eventMention(let eventId):
             EventPreviewLoader<Event>(reference: .eventId(eventId), onTap: nil)
@@ -105,6 +138,8 @@ public struct NDKUIRichTextView<
             EventPreviewLoader<Event>(reference: .naddr(naddr), onTap: nil)
         }
     }
+
+    // MARK: - Component Helpers
 
     private func mergeTextComponents(_ components: [NDKParsedContent.Component]) -> [NDKParsedContent.Component] {
         var merged: [NDKParsedContent.Component] = []
@@ -183,9 +218,6 @@ struct FlowLayout: Layout {
     }
 
     private func arrangeSubviews(proposal: ProposedViewSize, subviews: Subviews) -> (size: CGSize, positions: [CGPoint], sizes: [CGSize]) {
-        // Use proposed width, or fallback to a large finite value (10000) when unconstrained.
-        // Using .infinity would cause SwiftUI layout issues, so we use a practical maximum
-        // that's larger than any reasonable screen width but still finite for calculations.
         let maxWidth = proposal.width ?? 10000
         var positions: [CGPoint] = []
         var sizes: [CGSize] = []
@@ -196,17 +228,14 @@ struct FlowLayout: Layout {
         var totalWidth: CGFloat = 0
 
         for subview in subviews {
-            // Measure with full maxWidth to get natural size
             let size = subview.sizeThatFits(ProposedViewSize(width: maxWidth, height: nil))
 
-            // If item doesn't fit on current line and we're not at start, wrap first
             if currentX + size.width > maxWidth && currentX > 0 {
                 currentX = 0
                 currentY += lineHeight + spacing
                 lineHeight = 0
             }
 
-            // Clamp width to maxWidth for oversized items
             let finalWidth = min(size.width, maxWidth)
             let finalSize = CGSize(width: finalWidth, height: size.height)
             sizes.append(finalSize)
@@ -218,7 +247,6 @@ struct FlowLayout: Layout {
             totalHeight = currentY + lineHeight
         }
 
-        // Constrain total width to maxWidth
         return (CGSize(width: min(totalWidth, maxWidth), height: totalHeight), positions, sizes)
     }
 }
@@ -231,13 +259,11 @@ struct FlowLayout: Layout {
             let mockNDK = NDK(relayURLs: [])
 
             VStack(spacing: 20) {
-                // Using default renderers via typealias
                 NDKRichText(
                     content: "Hello @npub1234... check out #bitcoin at https://example.com"
                 )
                 .ndk(mockNDK)
 
-                // Explicit generic parameters
                 NDKUIRichTextView<DefaultMentionView, DefaultHashtagView, DefaultLinkView, DefaultImageView, DefaultEventView>(
                     content: "Simple text with #nostr"
                 )

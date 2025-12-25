@@ -166,10 +166,8 @@ public enum NIP04 {
 
         // Verify all padding bytes are the same
         let paddingStart = data.count - paddingLength
-        for i in paddingStart ..< data.count {
-            if data[i] != lastByte {
-                throw Crypto.CryptoError.invalidPoint
-            }
+        for i in paddingStart ..< data.count where data[i] != lastByte {
+            throw Crypto.CryptoError.invalidPoint
         }
 
         return data.prefix(paddingStart)

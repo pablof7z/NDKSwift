@@ -1,4 +1,3 @@
-
 /// Protocol for objects that can be stored in an NDKList
 public protocol NDKListItem {
     /// Convert this item to a Tag for storage in a list
@@ -74,7 +73,7 @@ public class NDKList {
         EventKind.categorizedPeopleList, // Categorized people list
         EventKind.categorizedBookmarkList, // Categorized bookmark list
         EventKind.relayListMetadata, // Relay list metadata
-        EventKind.blossomServerList, // Blossom server list
+        EventKind.blossomServerList // Blossom server list
     ]
 
     /// Initialize a new list
@@ -635,7 +634,7 @@ public extension NDKList {
     }
 }
 
-// MARK: - Blacklist/Blocklist Helpers
+// MARK: - Blocklist/Blocklist Helpers
 
 public extension NDKList {
     /// Check if this is a mute list (kind 10000)
@@ -648,8 +647,8 @@ public extension NDKList {
         return kind == EventKind.blockedRelays
     }
 
-    /// Check if a specific mint URL is blacklisted (for mute lists containing mint URLs)
-    func isMintBlacklisted(_ mintUrl: String) -> Bool {
+    /// Check if a specific mint URL is blocklisted (for mute lists containing mint URLs)
+    func isMintBlocklisted(_ mintUrl: String) -> Bool {
         guard isMuteList else { return false }
         return urls.contains(mintUrl)
     }
@@ -665,8 +664,8 @@ public extension NDKList {
         }
     }
 
-    /// Get all blacklisted mint URLs from a mute list
-    var blacklistedMints: [String] {
+    /// Get all blocklisted mint URLs from a mute list
+    var blocklistedMints: [String] {
         guard isMuteList else { return [] }
         return urls.filter { url in
             // Check if URL looks like a mint URL (contains cashu or fedimint patterns)

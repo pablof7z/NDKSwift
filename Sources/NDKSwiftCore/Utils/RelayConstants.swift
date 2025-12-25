@@ -1,4 +1,3 @@
-
 /// Centralized constants for commonly used Nostr relay URLs
 public enum RelayConstants {
     // MARK: - WebSocket Schemes
@@ -69,7 +68,7 @@ public enum RelayConstants {
     /// Default set of relays for general use
     public static let defaultRelays: [String] = [
         damus,
-        nosLol,
+        nosLol
     ]
 
     /// Extended set of relays for better coverage
@@ -78,25 +77,25 @@ public enum RelayConstants {
         nosLol,
         primal,
         nostrBand,
-        nostrWine,
+        nostrWine
     ]
 
     /// Test relays for E2E tests
     public static let testRelays: [String] = [
         damus,
         nosLol,
-        primal,
+        primal
     ]
 
     /// Relays optimized for wallet operations
     public static let walletRelays: [String] = [
         primal,
         damus,
-        nostrBand,
+        nostrBand
     ]
 
     /// Default outbox relays
     public static let defaultOutboxRelays: Set<String> = [
-        "wss://purplepag.es",
+        "wss://purplepag.es"
     ]
 }

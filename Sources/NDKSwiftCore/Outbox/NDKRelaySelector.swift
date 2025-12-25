@@ -66,10 +66,8 @@ actor NDKRelaySelector {
             // Merge p-tagged user relays into the main map
             for (relayUrl, pubkeys) in pTaggedRelays {
                 var existingPubkeys = relayToPubkeys[relayUrl, default: []]
-                for pubkey in pubkeys {
-                    if !existingPubkeys.contains(pubkey) {
-                        existingPubkeys.append(pubkey)
-                    }
+                for pubkey in pubkeys where !existingPubkeys.contains(pubkey) {
+                    existingPubkeys.append(pubkey)
                 }
                 relayToPubkeys[relayUrl] = existingPubkeys
             }
@@ -407,8 +405,7 @@ actor NDKRelaySelector {
         // Check cache first
         if let cached = blockedRelaysCache,
            let expiry = blockedRelaysCacheExpiry,
-           expiry > Date()
-        {
+           expiry > Date() {
             return cached
         }
 
@@ -713,10 +710,8 @@ actor NDKRelaySelector {
             // Merge fallback relays into main map
             for (relayUrl, pubkeys) in fallbackRelayMap {
                 var existingPubkeys = relayMap[relayUrl, default: []]
-                for pubkey in pubkeys {
-                    if !existingPubkeys.contains(pubkey) {
-                        existingPubkeys.append(pubkey)
-                    }
+                for pubkey in pubkeys where !existingPubkeys.contains(pubkey) {
+                    existingPubkeys.append(pubkey)
                 }
                 relayMap[relayUrl] = existingPubkeys
             }

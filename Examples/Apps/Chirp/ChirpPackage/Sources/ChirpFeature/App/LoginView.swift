@@ -12,6 +12,9 @@ struct LoginView: View {
     @Environment(ChirpState.self) private var state
     @Environment(\.dismiss) private var dismiss
 
+    /// When true, just adds account and dismisses instead of triggering full login flow
+    var isAddingAccount: Bool = false
+
     var body: some View {
         ZStack {
             Color.clear.background(.ultraThinMaterial)
@@ -39,7 +42,7 @@ struct LoginView: View {
                     // Login Options
                     VStack(spacing: 16) {
                         NavigationLink {
-                            PrivateKeyLoginView()
+                            PrivateKeyLoginView(isAddingAccount: isAddingAccount)
                         } label: {
                             LoginOptionCard(
                                 icon: "key.fill",
@@ -52,7 +55,7 @@ struct LoginView: View {
                         .buttonStyle(.plain)
 
                         NavigationLink {
-                            RemoteSignerLoginView()
+                            RemoteSignerLoginView(isAddingAccount: isAddingAccount)
                         } label: {
                             LoginOptionCard(
                                 icon: "link.badge.plus",
@@ -154,6 +157,8 @@ struct LoginOptionCard: View {
 struct PrivateKeyLoginView: View {
     @Environment(ChirpState.self) private var state
     @Environment(\.dismiss) private var dismiss
+
+    var isAddingAccount: Bool = false
 
     @State private var privateKeyInput = ""
     @State private var isLoggingIn = false
@@ -259,7 +264,11 @@ struct PrivateKeyLoginView: View {
         do {
             let signer = try NDKPrivateKeySigner.from(userInput: privateKeyInput)
             try await state.authManager.addSession(signer)
-            state.handleSuccessfulLogin()
+            if isAddingAccount {
+                dismiss()
+            } else {
+                state.handleSuccessfulLogin()
+            }
         } catch {
             withAnimation {
                 errorMessage = error.localizedDescription
@@ -273,11 +282,13 @@ struct PrivateKeyLoginView: View {
 // MARK: - Remote Signer Login
 
 enum KnownSigner: CaseIterable {
+    case amber
     case primal
     case other
 
     var name: String {
         switch self {
+        case .amber: return "Amber"
         case .primal: return "Primal"
         case .other: return "Signer App"
         }
@@ -285,15 +296,42 @@ enum KnownSigner: CaseIterable {
 
     var urlScheme: String {
         switch self {
+        case .amber: return "nostrsigner"
         case .primal: return "primal"
         case .other: return "nostrconnect"
         }
+    }
+
+    var icon: String {
+        switch self {
+        case .amber: return "key.fill"
+        case .primal: return "bolt.fill"
+        case .other: return "arrow.up.forward.app"
+        }
+    }
+
+    static func detect() -> KnownSigner? {
+        for signer in KnownSigner.allCases {
+            let urlString = "\(signer.urlScheme)://"
+            print("[Chirp] Checking \(signer.name) with URL: \(urlString)")
+            if let url = URL(string: urlString),
+               UIApplication.shared.canOpenURL(url) {
+                print("[Chirp] ✓ Detected: \(signer.name)")
+                return signer
+            } else {
+                print("[Chirp] ✗ Not available: \(signer.name)")
+            }
+        }
+        print("[Chirp] No signer apps detected")
+        return nil
     }
 }
 
 struct RemoteSignerLoginView: View {
     @Environment(ChirpState.self) private var state
     @Environment(\.dismiss) private var dismiss
+
+    var isAddingAccount: Bool = false
 
     @State private var bunkerInput = ""
     @State private var nostrConnectURL: String?
@@ -353,13 +391,20 @@ struct RemoteSignerLoginView: View {
                     }
                     .padding(.top, 32)
 
+                    // DEBUG: Show detection status
+                    #if DEBUG
+                    Text("Debug: \(detectedSigner?.name ?? "No signer detected")")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                    #endif
+
                     // Detected Signer App Button
                     if let signer = detectedSigner, let url = nostrConnectURL {
                         Button {
-                            openSignerApp(signer: signer, connectURL: url)
+                            openSignerApp(connectURL: url)
                         } label: {
                             HStack {
-                                Image(systemName: "arrow.up.forward.app.fill")
+                                Image(systemName: signer.icon)
                                 Text("Open in \(signer.name)")
                             }
                             .font(.system(size: 17, weight: .semibold))
@@ -462,13 +507,7 @@ struct RemoteSignerLoginView: View {
     }
 
     private func detectSignerApps() {
-        for signer in KnownSigner.allCases {
-            if let url = URL(string: "\(signer.urlScheme)://"),
-               UIApplication.shared.canOpenURL(url) {
-                detectedSigner = signer
-                return
-            }
-        }
+        detectedSigner = KnownSigner.detect()
     }
 
     private func generateNostrConnectQR() async {
@@ -550,7 +589,11 @@ struct RemoteSignerLoginView: View {
             try await state.authManager.addSession(signer)
             await MainActor.run {
                 isWaitingForConnection = false
-                state.handleSuccessfulLogin()
+                if isAddingAccount {
+                    dismiss()
+                } else {
+                    state.handleSuccessfulLogin()
+                }
             }
         } catch {
             await MainActor.run {
@@ -580,8 +623,12 @@ struct RemoteSignerLoginView: View {
                 _ = try await signer.connect()
                 try await state.authManager.addSession(signer)
                 await MainActor.run {
-                    state.handleSuccessfulLogin()
                     bunkerInput = ""
+                    if isAddingAccount {
+                        dismiss()
+                    } else {
+                        state.handleSuccessfulLogin()
+                    }
                 }
             } catch {
                 await MainActor.run {
@@ -593,8 +640,9 @@ struct RemoteSignerLoginView: View {
         isWaitingForConnection = false
     }
 
-    private func openSignerApp(signer: KnownSigner, connectURL: String) {
+    private func openSignerApp(connectURL: String) {
         guard let url = URL(string: connectURL) else { return }
+        print("[Chirp] Opening signer with nostrconnect URL")
         UIApplication.shared.open(url)
     }
 }

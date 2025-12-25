@@ -250,7 +250,7 @@ public final class NDKRelayCollection {
                 case let .relayRemoved(url):
                     await handleRelayRemoved(url)
 
-                case .relayConnected(_), .relayDisconnected:
+                case .relayConnected, .relayDisconnected:
                     // State changes are already handled by individual relay observers
                     // Pool events are primarily for external consumers like NostrManager
                     break

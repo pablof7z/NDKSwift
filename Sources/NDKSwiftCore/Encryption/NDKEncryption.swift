@@ -121,8 +121,7 @@ public extension NDKEvent {
 
         // Check cache first (if available)
         if let cache = ndk?.cache,
-           let cached = await cache.getDecryptedContent(for: id, viewerPubkey: viewerPubkey)
-        {
+           let cached = await cache.getDecryptedContent(for: id, viewerPubkey: viewerPubkey) {
             return cached
         }
 

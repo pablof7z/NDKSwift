@@ -748,7 +748,7 @@ public final class NDK {
                 NostrConstants.JSONField.kind: authEvent.kind,
                 NostrConstants.JSONField.tags: authEvent.tags,
                 NostrConstants.JSONField.content: authEvent.content,
-                NostrConstants.JSONField.sig: authEvent.sig,
+                NostrConstants.JSONField.sig: authEvent.sig
             ]
             let authMessage: [Any] = ["AUTH", eventDict]
             let jsonData = try JSONSerialization.data(withJSONObject: authMessage, options: [.withoutEscapingSlashes])
@@ -780,22 +780,22 @@ public final class NDK {
     /// - Returns: A tuple containing:
     ///   - totalVerifications: Total number of signature verifications performed
     ///   - failedVerifications: Number of signature verifications that failed
-    ///   - blacklistedRelays: Number of relays currently blacklisted due to signature failures
-    public func getSignatureVerificationStats() async -> (totalVerifications: Int, failedVerifications: Int, blacklistedRelays: Int) {
+    ///   - blocklistedRelays: Number of relays currently blocklisted due to signature failures
+    public func getSignatureVerificationStats() async -> (totalVerifications: Int, failedVerifications: Int, blocklistedRelays: Int) {
         await signatureVerificationSampler.getStats()
     }
 
-    /// Check if a relay is blacklisted due to signature verification failures
+    /// Check if a relay is blocklisted due to signature verification failures
     /// - Parameter relay: The relay to check
-    /// - Returns: true if the relay is blacklisted, false otherwise
-    public func isRelayBlacklisted(_ relay: NDKRelay) async -> Bool {
-        await signatureVerificationSampler.isRelayBlacklisted(relay.url)
+    /// - Returns: true if the relay is blocklisted, false otherwise
+    public func isRelayBlocklisted(_ relay: NDKRelay) async -> Bool {
+        await signatureVerificationSampler.isRelayBlocklisted(relay.url)
     }
 
-    /// Get the set of relay URLs that are currently blacklisted
-    /// - Returns: Set of blacklisted relay URLs
-    public func getBlacklistedRelays() async -> Set<String> {
-        await signatureVerificationSampler.getBlacklistedRelays()
+    /// Get the set of relay URLs that are currently blocklisted
+    /// - Returns: Set of blocklisted relay URLs
+    public func getBlocklistedRelays() async -> Set<String> {
+        await signatureVerificationSampler.getBlocklistedRelays()
     }
 
     /// Clear the signature verification cache

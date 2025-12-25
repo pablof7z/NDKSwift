@@ -1,4 +1,3 @@
-
 /// Cache for storing already verified event signatures
 /// This prevents re-verification of the same event across different relays
 actor NDKSignatureVerificationCache {

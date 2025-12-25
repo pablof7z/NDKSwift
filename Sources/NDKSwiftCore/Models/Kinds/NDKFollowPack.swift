@@ -46,8 +46,7 @@ public struct NDKFollowPack {
         // Look for an "imeta" tag first
         if let imetaTag = event.tags.first(where: { $0.first == "imeta" }),
            let imeta = ImetaUtils.mapImetaTag(imetaTag),
-           let url = imeta.url
-        {
+           let url = imeta.url {
             return url
         }
         // Fallback to "image" tag
