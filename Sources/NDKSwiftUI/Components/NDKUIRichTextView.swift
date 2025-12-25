@@ -58,6 +58,12 @@ public struct NDKUIRichTextView<
 
     private typealias GroupedItem = ImageGroupingUtils.GroupedResult<NDKParsedContent.Component>
 
+    private enum RenderableItem {
+        case inlineGroup([NDKParsedContent.Component])
+        case imageGroup([URL])
+        case blockComponent(NDKParsedContent.Component)
+    }
+
     @ViewBuilder
     private func renderGroupedComponents(_ components: [NDKParsedContent.Component]) -> some View {
         let merged = mergeTextComponents(components)
@@ -83,20 +89,78 @@ public struct NDKUIRichTextView<
             }
         )
 
+        // Group consecutive inline elements together
+        let renderableItems = groupInlineElements(grouped)
+
         VStack(alignment: .leading, spacing: 8) {
-            ForEach(Array(grouped.enumerated()), id: \.offset) { _, item in
-                renderGroupedItem(item)
+            ForEach(Array(renderableItems.enumerated()), id: \.offset) { _, item in
+                renderRenderableItem(item)
             }
         }
     }
 
+    private func groupInlineElements(_ items: [GroupedItem]) -> [RenderableItem] {
+        var result: [RenderableItem] = []
+        var currentInlineGroup: [NDKParsedContent.Component] = []
+
+        for item in items {
+            switch item {
+            case .imageGroup(let urls):
+                // Flush any pending inline group
+                if !currentInlineGroup.isEmpty {
+                    result.append(.inlineGroup(currentInlineGroup))
+                    currentInlineGroup = []
+                }
+                result.append(.imageGroup(urls))
+
+            case .single(let component):
+                if isInlineComponent(component) {
+                    currentInlineGroup.append(component)
+                } else {
+                    // Flush any pending inline group
+                    if !currentInlineGroup.isEmpty {
+                        result.append(.inlineGroup(currentInlineGroup))
+                        currentInlineGroup = []
+                    }
+                    result.append(.blockComponent(component))
+                }
+            }
+        }
+
+        // Flush remaining inline components
+        if !currentInlineGroup.isEmpty {
+            result.append(.inlineGroup(currentInlineGroup))
+        }
+
+        return result
+    }
+
+    private func isInlineComponent(_ component: NDKParsedContent.Component) -> Bool {
+        switch component {
+        case .text, .userMention, .nprofileMention, .hashtag:
+            return true
+        case .url(let url):
+            // URLs that aren't images or videos are inline (links)
+            return !isImageURL(url) && !isVideoURL(url)
+        case .eventMention, .noteMention, .neventMention, .naddrMention:
+            // Event embeds are block elements
+            return false
+        }
+    }
+
     @ViewBuilder
-    private func renderGroupedItem(_ item: GroupedItem) -> some View {
+    private func renderRenderableItem(_ item: RenderableItem) -> some View {
         switch item {
-        case .single(let component):
-            renderSingleComponent(component)
+        case .inlineGroup(let components):
+            FlowLayout(alignment: .leading, spacing: 0) {
+                ForEach(Array(components.enumerated()), id: \.offset) { _, component in
+                    renderSingleComponent(component)
+                }
+            }
         case .imageGroup(let urls):
             Image(urls: urls, onTap: nil)
+        case .blockComponent(let component):
+            renderSingleComponent(component)
         }
     }
 
