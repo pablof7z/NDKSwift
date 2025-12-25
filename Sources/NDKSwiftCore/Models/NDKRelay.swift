@@ -421,7 +421,10 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
 
     // MARK: - Observable UI State
 
-    // Only accessed from @MainActor (via the ui getter), safe to mark nonisolated(unsafe)
+    /// Backing storage for `ui`. Marked `nonisolated(unsafe)` because:
+    /// - The `ui` getter is `@MainActor`, guaranteeing single-threaded access
+    /// - The property is only ever read/written from MainActor context
+    /// - This avoids requiring NDKRelay to be actor-isolated just for UI state
     nonisolated(unsafe) private var _ui: UIState?
 
     /// MainActor-isolated observable state for SwiftUI binding.
@@ -435,8 +438,8 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
             return existing
         }
         let uiState = UIState()
+        _ui = uiState  // Store first to prevent duplicate creation in edge cases
         uiState.bind(to: self)
-        _ui = uiState
         return uiState
     }
 
@@ -1291,7 +1294,10 @@ extension NDKRelay {
             return nil
         }
 
-        // nonisolated(unsafe) allows deinit to cancel the task (cancel() is thread-safe)
+        /// Background task that observes relay state changes.
+        /// Marked `nonisolated(unsafe)` to allow deinit to cancel it (Task.cancel() is thread-safe).
+        /// `@ObservationIgnored` since this is internal machinery, not observable state.
+        @ObservationIgnored
         nonisolated(unsafe) private var observerTask: Task<Void, Never>?
 
         init() {}
