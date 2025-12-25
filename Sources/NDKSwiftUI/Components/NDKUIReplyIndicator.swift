@@ -162,10 +162,7 @@ public struct NDKUIReplyIndicator: View {
         let filter = NDKFilter(ids: [eventId])
         let subscription = ndk.subscribe(filter: filter, cachePolicy: .cacheWithNetwork)
 
-        for await event in subscription.eventsUntilEOSE {
-            replyToEvent = event
-            break
-        }
+        replyToEvent = await subscription.first()
     }
 }
 

@@ -194,13 +194,9 @@ final class NDKSubscriptionTests: NDKTestCase {
 
             let event = EventTestFactory.createTextNote()
 
-            // Start collecting events until EOSE
+            // Start collecting events with timeout
             let collectTask = Task {
-                var collected: [NDKEvent] = []
-                for await event in dataSource.eventsUntilEOSE {
-                    collected.append(event)
-                }
-                return collected
+                await dataSource.collect(timeout: 1.0)
             }
 
             // Give time to set up
@@ -215,7 +211,7 @@ final class NDKSubscriptionTests: NDKTestCase {
             // Wait for collection to complete
             let events = await collectTask.value
 
-            // Should have received the event before EOSE
+            // Should have received the event
             XCTAssertEqual(events.count, 1)
             XCTAssertEqual(events.first?.id, event.id)
         }

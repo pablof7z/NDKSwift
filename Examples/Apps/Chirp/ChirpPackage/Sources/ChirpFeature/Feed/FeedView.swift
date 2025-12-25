@@ -222,16 +222,22 @@ struct FeedPostRow: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(alignment: .top, spacing: 12) {
-                // Avatar
-                NDKUIProfilePicture(ndk: ndk, pubkey: event.pubkey, size: 40)
+                // Avatar - tappable to go to profile
+                NavigationLink(destination: ProfileView(pubkey: event.pubkey)) {
+                    NDKUIProfilePicture(ndk: ndk, pubkey: event.pubkey, size: 40)
+                }
+                .buttonStyle(.plain)
 
                 // Content column
                 VStack(alignment: .leading, spacing: 4) {
                     // Name and time row
                     HStack(spacing: 4) {
-                        NDKUIDisplayName(ndk: ndk, pubkey: event.pubkey)
-                            .font(.subheadline.weight(.semibold))
-                            .lineLimit(1)
+                        NavigationLink(destination: ProfileView(pubkey: event.pubkey)) {
+                            NDKUIDisplayName(ndk: ndk, pubkey: event.pubkey)
+                                .font(.subheadline.weight(.semibold))
+                                .lineLimit(1)
+                        }
+                        .buttonStyle(.plain)
 
                         Text("·")
                             .foregroundStyle(.secondary)
@@ -294,22 +300,70 @@ struct FeedPostRow: View {
     }
 
     private var relativeTime: String {
-        let date = Date(timeIntervalSince1970: TimeInterval(event.createdAt))
-        let now = Date()
-        let interval = now.timeIntervalSince(date)
+        formatRelativeTime(event.createdAt)
+    }
+}
 
-        if interval < 60 {
-            return "now"
-        } else if interval < 3600 {
-            let minutes = Int(interval / 60)
-            return "\(minutes)m"
-        } else if interval < 86400 {
-            let hours = Int(interval / 3600)
-            return "\(hours)h"
-        } else {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "MMM d"
-            return formatter.string(from: date)
+// MARK: - Feed Post Card (Card-style for profiles/explore)
+
+struct FeedPostCard: View {
+    let ndk: NDK
+    let event: NDKEvent
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Header with avatar and name
+            HStack(spacing: 10) {
+                NavigationLink(destination: ProfileView(pubkey: event.pubkey)) {
+                    NDKUIProfilePicture(ndk: ndk, pubkey: event.pubkey, size: 40)
+                }
+                .buttonStyle(.plain)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    NavigationLink(destination: ProfileView(pubkey: event.pubkey)) {
+                        NDKUIDisplayName(ndk: ndk, pubkey: event.pubkey)
+                            .font(.subheadline.weight(.semibold))
+                            .lineLimit(1)
+                    }
+                    .buttonStyle(.plain)
+
+                    Text(formatRelativeTime(event.createdAt))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+            }
+
+            // Content
+            Text(event.content)
+                .font(.body)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .padding()
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+// MARK: - Shared Utilities
+
+private func formatRelativeTime(_ timestamp: Timestamp) -> String {
+    let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
+    let now = Date()
+    let interval = now.timeIntervalSince(date)
+
+    if interval < 60 {
+        return "now"
+    } else if interval < 3600 {
+        let minutes = Int(interval / 60)
+        return "\(minutes)m"
+    } else if interval < 86400 {
+        let hours = Int(interval / 3600)
+        return "\(hours)h"
+    } else {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+        return formatter.string(from: date)
     }
 }

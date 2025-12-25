@@ -8,17 +8,26 @@ public struct ProfileView: View {
     @State private var allEvents: [NDKEvent] = []
     @State private var selectedTab: ProfileTab = .posts
 
+    /// The pubkey to display. If nil, shows current user's profile.
+    let pubkey: String?
+
     enum ProfileTab: String, CaseIterable {
         case posts = "Posts"
         case replies = "Replies"
         case media = "Media"
     }
 
-    public init() {}
+    public init(pubkey: String? = nil) {
+        self.pubkey = pubkey
+    }
+
+    private var displayPubkey: String? {
+        pubkey ?? state.ndk.sessionData?.pubkey
+    }
 
     public var body: some View {
         Group {
-            if let pubkey = state.ndk.sessionData?.pubkey {
+            if let pubkey = displayPubkey {
                 profileContent(pubkey: pubkey)
             } else {
                 EmptyStateView(
