@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 
 /// Protocol for handling relay authentication requests (NIP-42)
 public protocol NDKAuthenticationDelegate: AnyObject, Sendable {
@@ -11,19 +12,41 @@ public protocol NDKAuthenticationDelegate: AnyObject, Sendable {
 }
 
 /// Main entry point for NDKSwift
+@Observable
 public final class NDK {
     // MARK: - Core Properties
 
     /// Active signer for this NDK instance
+    @ObservationIgnored
     public var signer: NDKSigner?
 
     /// Active session data for reactive filters
+    @ObservationIgnored
     public var sessionData: NDKSessionData?
 
     /// Cache for storing events (always present, defaults to in-memory)
+    @ObservationIgnored
     public let cache: NDKCache
 
+    // MARK: - Observable Relay State
+
+    /// Observable array of relays for SwiftUI binding.
+    /// This is automatically synchronized with the relay pool.
+    @MainActor
+    public private(set) var relays: [NDKRelay] = []
+
+    /// Number of currently connected relays
+    @MainActor
+    public var connectedRelayCount: Int {
+        relays.filter { $0.ui.isConnected }.count
+    }
+
+    /// Task that observes pool changes and syncs to observable relays array
+    @ObservationIgnored
+    private var relayObserverTask: Task<Void, Never>?
+
     /// Active user (derived from signer)
+    @ObservationIgnored
     public var activeUser: NDKUser? {
         get async {
             guard let signer else { return nil }
@@ -38,38 +61,49 @@ public final class NDK {
     }
 
     /// Whether debug mode is enabled
+    @ObservationIgnored
     public let debugMode: Bool
 
     /// Signature verification configuration
+    @ObservationIgnored
     public let signatureVerificationConfig: NDKSignatureVerificationConfig
 
     /// Signature verification delegate
+    @ObservationIgnored
     public weak var signatureVerificationDelegate: NDKSignatureVerificationDelegate?
 
     /// Authentication delegate for handling relay authentication (NIP-42)
+    @ObservationIgnored
     public weak var authenticationDelegate: NDKAuthenticationDelegate?
 
     /// Whether outbox model is enabled (default: true)
+    @ObservationIgnored
     public let outboxEnabled: Bool
 
     /// Outbox configuration
+    @ObservationIgnored
     public let outboxConfig: NDKOutboxConfig
 
     /// Configuration for automatic client tagging (NIP-89)
+    @ObservationIgnored
     public let clientTagConfig: NDKClientTagConfig?
 
     /// Connection reliability configuration
+    @ObservationIgnored
     public let connectionConfig: NDKConnectionConfig
 
     /// Telemetry configuration
+    @ObservationIgnored
     public let telemetryConfig: NDKTelemetryConfig
 
     /// Tracer for creating telemetry spans
+    @ObservationIgnored
     public private(set) lazy var tracer: NDKTracer = {
         NDKTracer(config: telemetryConfig)
     }()
 
     /// Track pending auth events by event ID to relay (thread-safe via actor)
+    @ObservationIgnored
     private let pendingAuthEvents = PendingAuthEvents()
 
     private actor PendingAuthEvents {
@@ -87,11 +121,13 @@ public final class NDK {
     // MARK: - Outbox API
 
     /// Outbox manager - provides simplified API for outbox operations
+    @ObservationIgnored
     public private(set) lazy var outbox: NDKOutboxManager = .init(ndk: self)
 
     // MARK: - Relay Intelligence
 
     /// Hint index for learning where users and events are found
+    @ObservationIgnored
     public lazy var hintIndex: HintIndex = {
         HintIndex()
     }()
@@ -99,35 +135,42 @@ public final class NDK {
     // MARK: - Internal Components
 
     /// Event publishing and management
+    @ObservationIgnored
     lazy var eventManager: NDKEventManager = {
         NDKEventManager(ndk: self, cache: self.cache)
     }()
 
     /// Relay pool management
+    @ObservationIgnored
     public lazy var pool: NDKPool = {
         NDKPool(ndk: self, config: self.connectionConfig)
     }()
 
     /// User and profile management
+    @ObservationIgnored
     public lazy var profileManager: NDKProfileManager = {
         NDKProfileManager(ndk: self)
     }()
 
     /// Cache for observable profile instances (MainActor-bound)
+    @ObservationIgnored
     @MainActor
     internal lazy var profileCache: NDKProfileCache = {
         NDKProfileCache(ndk: self)
     }()
 
     /// Event tracker for managing event metadata
+    @ObservationIgnored
     public let eventTracker: NDKEventTracker = .init()
 
     /// Internal subscription manager for NDKSubscriptionManager
+    @ObservationIgnored
     lazy var internalSubscriptionManager: InternalSubscriptionManager = {
         InternalSubscriptionManager(ndk: self)
     }()
 
     /// Signature verification sampler
+    @ObservationIgnored
     private lazy var signatureVerificationSampler: NDKSignatureVerificationSampler = {
         let sampler = NDKSignatureVerificationSampler(config: self.signatureVerificationConfig)
         // Set tracer for telemetry - tracer is already initialized by this point
@@ -137,47 +180,57 @@ public final class NDK {
     }()
 
     /// Data requirement manager for declarative data access
+    @ObservationIgnored
     lazy var dataRequirementManager: NDKSubscriptionManager = {
         NDKSubscriptionManager(ndk: self)
     }()
 
     /// Initial relay URLs to add after construction
+    @ObservationIgnored
     private var initialRelayURLs: [RelayURL] = []
 
     /// Track whether connect() has been called
     /// When false, publishing will queue events instead of auto-connecting to relays
+    @ObservationIgnored
     public private(set) var hasConnected = false
 
     /// Get the configured relay URLs (used for offline queuing before connect() is called)
+    @ObservationIgnored
     public var configuredRelayURLs: [RelayURL] {
         initialRelayURLs
     }
 
     // MARK: - Lazy Internal Components
 
+    @ObservationIgnored
     lazy var relayRanker: NDKRelayRanker = {
         NDKRelayRanker(ndk: self, tracker: outbox)
     }()
 
+    @ObservationIgnored
     lazy var relaySelector: NDKRelaySelector = {
         NDKRelaySelector(ndk: self, tracker: outbox, ranker: relayRanker)
     }()
 
+    @ObservationIgnored
     lazy var publishingStrategy: NDKPublishingStrategy = {
         NDKPublishingStrategy(ndk: self, selector: relaySelector, ranker: relayRanker)
     }()
 
     /// NIP-05 manager for efficient resolution and caching
+    @ObservationIgnored
     public lazy var nip05Manager: NIP05Manager = {
         NIP05Manager(ndk: self)
     }()
 
     /// Blossom server manager for managing server lists and uploads
+    @ObservationIgnored
     public lazy var blossomServerManager: NDKBlossomServerManager = {
         NDKBlossomServerManager(ndk: self)
     }()
 
     /// Zap manager for handling zaps and payments
+    @ObservationIgnored
     public lazy var zapManager: any ZapManaging = {
         NDKZapManager(ndk: self)
     }()
@@ -336,30 +389,53 @@ public final class NDK {
         await pool.removeRelay(url)
     }
 
-    public var relays: [NDKRelay] {
+    /// Get relays from the pool (async access for internal operations)
+    @ObservationIgnored
+    public var poolRelays: [NDKRelay] {
         get async {
             await pool.relays
         }
     }
 
     /// Stream of relay pool changes for event-driven observation
+    @ObservationIgnored
     public var relayChanges: AsyncStream<NDKPoolChangeEvent> {
         get async {
             await pool.relayChanges
         }
     }
 
-    /// Get an observable relay collection for SwiftUI integration
-    /// This provides a reactive view of relay states without modifying core architecture
-    @MainActor
-    public func createRelayCollection() -> NDKRelayCollection {
-        return NDKRelayCollection(ndk: self)
-    }
-
     /// Get a quick snapshot of relay connection states
     /// Useful for one-time status checks without setting up observers
     public func getRelayConnectionSummary() async -> (connected: Int, total: Int) {
         await pool.getConnectionSummary()
+    }
+
+    /// Start observing the relay pool and sync to the observable relays array
+    private func startRelayObserver() {
+        relayObserverTask?.cancel()
+        relayObserverTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+
+            // Initial load
+            self.relays = await self.pool.relays
+
+            // Observe changes
+            for await change in await self.pool.relayChanges {
+                guard !Task.isCancelled else { break }
+                switch change {
+                case .relayAdded(let relay):
+                    if !self.relays.contains(where: { $0.url == relay.url }) {
+                        self.relays.append(relay)
+                    }
+                case .relayRemoved(let url):
+                    self.relays.removeAll { $0.url == url }
+                case .relayConnected, .relayDisconnected:
+                    // State changes are handled by individual relay.ui observers
+                    break
+                }
+            }
+        }
     }
 
     /// Connect to all configured relays
@@ -393,6 +469,9 @@ public final class NDK {
                 await pool.addRelay(relayUrl, origin: .outboxConfig)
             }
         }
+
+        // Start observing relay pool changes for the observable relays array
+        startRelayObserver()
 
         NDKLogger.log(.info, category: .relay, "Connecting to all relays in pool")
         await pool.connectAll()

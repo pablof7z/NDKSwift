@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 
 /// Indicates how a relay was added to the pool
 public enum NDKRelayOrigin: Codable, Equatable, Sendable {
@@ -417,6 +418,30 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
     /// Subscription manager for this relay (handles grouping and merging)
     /// Initialized eagerly; thread-safety guaranteed by NDKRelaySubscriptionManager being an actor
     let subscriptionManager: NDKRelaySubscriptionManager
+
+    // MARK: - Observable UI State
+
+    /// Backing storage for `ui`. Marked `nonisolated(unsafe)` because:
+    /// - The `ui` getter is `@MainActor`, guaranteeing single-threaded access
+    /// - The property is only ever read/written from MainActor context
+    /// - This avoids requiring NDKRelay to be actor-isolated just for UI state
+    nonisolated(unsafe) private var _ui: UIState?
+
+    /// MainActor-isolated observable state for SwiftUI binding.
+    ///
+    /// This property provides synchronous access to the relay's state
+    /// for use in SwiftUI views. The state is automatically kept in
+    /// sync with the relay's internal actor state.
+    @MainActor
+    public var ui: UIState {
+        if let existing = _ui {
+            return existing
+        }
+        let uiState = UIState()
+        _ui = uiState  // Store first to prevent duplicate creation in edge cases
+        uiState.bind(to: self)
+        return uiState
+    }
 
     /// Get the current connection (internal use only)
     var connection: NDKRelayConnection? {
@@ -1218,5 +1243,85 @@ public struct NDKRelaySubscriptionInfo: Sendable, Equatable {
         self.createdAt = createdAt
         eventCount = 0
         lastEventAt = nil
+    }
+}
+
+// MARK: - Observable UI State
+
+extension NDKRelay {
+    /// MainActor-isolated observable state projection for SwiftUI.
+    ///
+    /// This provides a reactive view of the relay's state that can be
+    /// directly observed by SwiftUI views. The state is automatically
+    /// synchronized with the relay's internal actor state.
+    ///
+    /// Example:
+    /// ```swift
+    /// struct RelayStatusView: View {
+    ///     let relay: NDKRelay
+    ///
+    ///     var body: some View {
+    ///         HStack {
+    ///             Circle()
+    ///                 .fill(relay.ui.isConnected ? .green : .gray)
+    ///             Text(relay.url)
+    ///             if let latency = relay.ui.stats.latency {
+    ///                 Text("\(Int(latency * 1000))ms")
+    ///             }
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    @Observable
+    @MainActor
+    public final class UIState {
+        public private(set) var connectionState: NDKRelayConnectionState = .disconnected
+        public private(set) var stats: NDKRelayStats = NDKRelayStats()
+        public private(set) var info: NDKRelayInformation?
+        public private(set) var activeSubscriptions: [NDKRelaySubscriptionInfo] = []
+        public private(set) var lastConnectedAt: Date?
+
+        /// Whether the relay is currently connected or authenticated
+        public var isConnected: Bool {
+            connectionState == .connected || connectionState == .authenticated
+        }
+
+        /// Last error message if connection failed
+        public var lastError: String? {
+            if case .failed(let message) = connectionState {
+                return message
+            }
+            return nil
+        }
+
+        /// Background task that observes relay state changes.
+        /// Marked `nonisolated(unsafe)` to allow deinit to cancel it (Task.cancel() is thread-safe).
+        /// `@ObservationIgnored` since this is internal machinery, not observable state.
+        @ObservationIgnored
+        nonisolated(unsafe) private var observerTask: Task<Void, Never>?
+
+        init() {}
+
+        func bind(to relay: NDKRelay) {
+            observerTask?.cancel()
+            observerTask = Task { [weak self, weak relay] in
+                guard let relay else { return }
+                for await state in relay.stateStream {
+                    guard let self, !Task.isCancelled else { break }
+                    let wasConnected = self.isConnected
+                    self.connectionState = state.connectionState
+                    self.stats = state.stats
+                    self.info = state.info
+                    self.activeSubscriptions = state.activeSubscriptions
+                    if !wasConnected && self.isConnected {
+                        self.lastConnectedAt = Date()
+                    }
+                }
+            }
+        }
+
+        deinit {
+            observerTask?.cancel()
+        }
     }
 }

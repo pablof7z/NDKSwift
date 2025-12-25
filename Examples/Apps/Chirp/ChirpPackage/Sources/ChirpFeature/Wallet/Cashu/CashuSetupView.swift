@@ -255,12 +255,12 @@ struct CashuSetupView: View {
 }
 
 #Preview {
-    NavigationStack {
-        CashuSetupView(walletState: WalletState(ndk: NDK(relayURLs: [])))
-            .environment(ChirpState(
-                ndk: NDK(relayURLs: []),
-                authManager: NDKAuthManager(ndk: NDK(relayURLs: [])),
-                relayCollection: NDKRelayCollection(ndk: NDK(relayURLs: []))
-            ))
+    let ndk = NDK(relayURLs: [])
+    let authManager = NDKAuthManager(ndk: ndk)
+    let state = ChirpState(ndk: ndk, authManager: authManager)
+
+    return NavigationStack {
+        CashuSetupView(walletState: WalletState(ndk: ndk))
+            .environment(state)
     }
 }
