@@ -45,16 +45,15 @@ public final class NDK {
     @ObservationIgnored
     private var relayObserverTask: Task<Void, Never>?
 
-    /// Active user (derived from signer)
+    /// Active user's public key (derived from signer)
     @ObservationIgnored
-    public var activeUser: NDKUser? {
+    public var activePubkey: PublicKey? {
         get async {
             guard let signer else { return nil }
             do {
-                let pubkey = try await signer.pubkey
-                return getUser(pubkey)
+                return try await signer.pubkey
             } catch {
-                NDKLogger.log(.warning, category: .signer, "Failed to get active user from signer: \(error.localizedDescription)")
+                NDKLogger.log(.warning, category: .signer, "Failed to get active pubkey from signer: \(error.localizedDescription)")
                 return nil
             }
         }
@@ -669,9 +668,9 @@ public final class NDK {
         )
     }
 
-    // MARK: - User Management
+    // MARK: - Public Key Parsing
 
-    /// Get or create an NDKUser instance from a public key identifier
+    /// Parse a public key from various identifier formats
     ///
     /// Supports multiple formats:
     /// - Hex public key (64 characters)
@@ -679,8 +678,8 @@ public final class NDK {
     /// - nprofile bech32 format (extracts pubkey, ignores relay hints)
     ///
     /// - Parameter identifier: Public key in any supported format
-    /// - Returns: An NDKUser instance if the identifier is valid, nil otherwise
-    public func getUser(_ identifier: String) -> NDKUser? {
+    /// - Returns: The parsed PublicKey if the identifier is valid, nil otherwise
+    public func parsePubkey(_ identifier: String) -> PublicKey? {
         // Check if it's a known nostr bech32 format
         if let hrp = Bech32.getHRP(identifier) {
             switch hrp {
@@ -689,14 +688,14 @@ public final class NDK {
                     NDKLogger.log(.warning, category: .general, "Failed to parse npub \(identifier.prefix(16))")
                     return nil
                 }
-                return NDKUser(pubkey: pubkey, ndk: self)
+                return pubkey
 
             case Bech32HRP.nprofile:
                 guard let nprofile = try? Bech32.decodeNProfile(identifier) else {
                     NDKLogger.log(.warning, category: .general, "Failed to parse nprofile \(identifier.prefix(16))")
                     return nil
                 }
-                return NDKUser(pubkey: nprofile.pubkey, ndk: self)
+                return nprofile.pubkey
 
             default:
                 // Unknown HRP - fall through to hex parsing
@@ -711,7 +710,16 @@ public final class NDK {
             return nil
         }
 
-        return NDKUser(pubkey: identifier, ndk: self)
+        return identifier
+    }
+
+    /// Resolve a NIP-05 identifier to a public key
+    /// - Parameters:
+    ///   - nip05: The NIP-05 identifier (e.g., "alice@example.com")
+    ///   - forceVerify: If true, bypasses cache and forces network verification
+    /// - Returns: The PublicKey if found and verified, nil otherwise
+    public func resolveNip05(_ nip05: String, forceVerify: Bool = false) async throws -> PublicKey? {
+        try await nip05Manager.resolvePubkey(identifier: nip05, forceVerify: forceVerify)
     }
 
     // MARK: - Content Parsing (Now a utility)
@@ -968,27 +976,26 @@ public final class NDK {
     /// - Parameters:
     ///   - query: The search prefix
     ///   - limit: Maximum number of results (default: 10)
-    /// - Returns: Array of tuples containing user, NIP-05 identifier, and verification status
-    public func searchNIP05(_ query: String, limit: Int = 10) async -> [(user: NDKUser, nip05: String, status: NIP05VerificationStatus)] {
+    /// - Returns: Array of tuples containing pubkey, NIP-05 identifier, and verification status
+    public func searchNIP05(_ query: String, limit: Int = 10) async -> [(pubkey: PublicKey, nip05: String, status: NIP05VerificationStatus)] {
         let entries = await nip05Manager.search(query, limit: limit)
 
-        var results: [(user: NDKUser, nip05: String, status: NIP05VerificationStatus)] = []
+        var results: [(pubkey: PublicKey, nip05: String, status: NIP05VerificationStatus)] = []
         for entry in entries {
-            let user = NDKUser(pubkey: entry.pubkey, ndk: self)
-            results.append((user: user, nip05: entry.identifier, status: entry.status))
+            results.append((pubkey: entry.pubkey, nip05: entry.identifier, status: entry.status))
         }
         return results
     }
 
-    /// Verify a NIP-05 identifier for a user
+    /// Verify a NIP-05 identifier for a pubkey
     /// - Parameters:
-    ///   - user: The user whose NIP-05 to verify
+    ///   - pubkey: The public key whose NIP-05 to verify
     ///   - maxAge: Maximum age before re-verification is needed (default: 24 hours)
-    /// - Returns: True if the NIP-05 is verified and belongs to this user
-    public func verifyNIP05(for user: NDKUser, maxAge: TimeInterval = TimeConstants.day) async throws -> Bool {
-        let nip05 = await MainActor.run { profile(for: user.pubkey).metadata?.nip05 }
+    /// - Returns: True if the NIP-05 is verified and belongs to this pubkey
+    public func verifyNIP05(for pubkey: PublicKey, maxAge: TimeInterval = TimeConstants.day) async throws -> Bool {
+        let nip05 = await MainActor.run { profile(for: pubkey).metadata?.nip05 }
         guard let nip05 else { return false }
-        return try await nip05Manager.verify(identifier: nip05, expectedPubkey: user.pubkey, maxAge: maxAge)
+        return try await nip05Manager.verify(identifier: nip05, expectedPubkey: pubkey, maxAge: maxAge)
     }
 
     // MARK: - Internal Fetch Utilities

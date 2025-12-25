@@ -58,19 +58,6 @@ public struct NDKUIDisplayName: View {
         self.fallbackStyle = fallbackStyle
     }
 
-    /// Initialize with NDK instance and NDKUser
-    /// - Parameters:
-    ///   - ndk: The NDK instance
-    ///   - user: The NDKUser instance
-    ///   - fallbackStyle: How to display name when profile is unavailable
-    public init(
-        ndk: NDK,
-        user: NDKUser,
-        fallbackStyle: FallbackStyle = .npub
-    ) {
-        self.init(ndk: ndk, pubkey: user.pubkey, fallbackStyle: fallbackStyle)
-    }
-
     // MARK: - Body
 
     public var body: some View {
