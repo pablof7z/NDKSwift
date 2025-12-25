@@ -275,17 +275,7 @@ class DebuggerViewModel: ObservableObject {
             closeOnEose: true
         )
 
-        var fetchedEvents: [NDKEvent] = []
-
-        let collectTask = Task {
-            for await event in subscription.eventsUntilEOSE {
-                fetchedEvents.append(event)
-                if fetchedEvents.count >= 50 { break }
-            }
-        }
-
-        try? await Task.sleep(for: .seconds(5))
-        collectTask.cancel()
+        let fetchedEvents = await subscription.collect(timeout: 5.0, limit: 50)
 
         queriedEvents = fetchedEvents.sorted { $0.createdAt > $1.createdAt }
         log("Fetched \(fetchedEvents.count) events from relays", level: .info)

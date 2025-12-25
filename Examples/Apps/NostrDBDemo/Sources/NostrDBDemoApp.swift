@@ -141,19 +141,8 @@ class NostrDBViewModel: ObservableObject {
             closeOnEose: true
         )
 
-        var fetchedEvents: [NDKEvent] = []
-
         // Collect events until timeout or EOSE
-        let collectTask = Task {
-            for await event in subscription.eventsUntilEOSE {
-                fetchedEvents.append(event)
-                if fetchedEvents.count >= 50 { break }
-            }
-        }
-
-        // Timeout after 5 seconds
-        try? await Task.sleep(for: .seconds(5))
-        collectTask.cancel()
+        let fetchedEvents = await subscription.collect(timeout: 5.0, limit: 50)
 
         let fetchTime = CFAbsoluteTimeGetCurrent() - startTime
         log("Fetched \(fetchedEvents.count) events in \(String(format: "%.3f", fetchTime * 1000))ms")
