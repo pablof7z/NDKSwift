@@ -6,6 +6,32 @@ import NDKSwiftUI
 
 private let testPubkey = "fa984bd7dbb282f07e16e7ae87b26a2a7b9b90b7246a44771f0cf5ae58018f52"
 
+// MARK: - Local Author Header (replacement for NDKUIEventAuthorHeader)
+
+private struct AuthorHeader: View {
+    let ndk: NDK
+    let pubkey: String
+    let timestamp: Timestamp?
+
+    var body: some View {
+        HStack(spacing: 8) {
+            NDKUIProfilePicture(ndk: ndk, pubkey: pubkey, size: 32)
+
+            VStack(alignment: .leading, spacing: 2) {
+                NDKUIUsername(ndk: ndk, pubkey: pubkey)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+
+                if let timestamp = timestamp {
+                    NDKUIRelativeTime(timestamp: timestamp)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+}
+
 // MARK: - Feed Tab View (Kind:1 from follows)
 
 struct FeedTabView: View {
@@ -102,19 +128,12 @@ struct FeedTabView: View {
 
     @ViewBuilder
     private func eventCard(for event: NDKEvent) -> some View {
-        VStack(alignment: .leading, spacing: NDKEventViewStyles.verticalSpacing(for: .feed)) {
-            // Author header
-            NDKUIEventAuthorHeader(
-                ndk: ndk,
-                pubkey: event.pubkey,
-                timestamp: event.createdAt,
-                style: .standard
-            )
-
-            // Content using selected renderer style
+        VStack(alignment: .leading, spacing: 8) {
+            AuthorHeader(ndk: ndk, pubkey: event.pubkey, timestamp: event.createdAt)
             richTextContent(for: event)
         }
-        .padding(NDKEventViewStyles.containerPadding(for: .feed))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 
     @ViewBuilder
@@ -251,17 +270,11 @@ struct ArticlesTabView: View {
 
     @ViewBuilder
     private func articlePreviewCard(for event: NDKEvent) -> some View {
-        VStack(alignment: .leading, spacing: NDKEventViewStyles.verticalSpacing(for: .feed)) {
-            // Author header
-            NDKUIEventAuthorHeader(
-                ndk: ndk,
-                pubkey: event.pubkey,
-                timestamp: event.createdAt,
-                style: .standard
-            )
+        VStack(alignment: .leading, spacing: 8) {
+            AuthorHeader(ndk: ndk, pubkey: event.pubkey, timestamp: event.createdAt)
 
             // Article preview
-            VStack(alignment: .leading, spacing: NDKEventViewStyles.verticalSpacing(for: .feed)) {
+            VStack(alignment: .leading, spacing: 8) {
                 // Cover image
                 if let imageURL = extractImageURL(from: event) {
                     CachedAsyncImage(url: imageURL) { image in
@@ -272,45 +285,46 @@ struct ArticlesTabView: View {
                         Rectangle()
                             .fill(Color.gray.opacity(0.2))
                     }
-                    .frame(height: NDKEventViewStyles.imageHeight(for: .feed))
+                    .frame(height: 200)
                     .clipped()
                 }
 
                 // Title
                 if let title = extractTitle(from: event) {
                     Text(title)
-                        .font(NDKEventViewStyles.titleFont(for: .feed))
+                        .font(.headline)
                         .fontWeight(.semibold)
-                        .lineLimit(NDKEventViewStyles.titleLineLimit(for: .feed))
+                        .lineLimit(2)
                 }
 
                 // Summary
                 if let summary = extractSummary(from: event) {
                     Text(summary)
-                        .font(NDKEventViewStyles.contentFont(for: .feed))
+                        .font(.body)
                         .foregroundStyle(.secondary)
-                        .lineLimit(NDKEventViewStyles.contentLineLimit(for: .feed))
+                        .lineLimit(3)
                 }
 
                 // Metadata
                 HStack {
                     Image(systemName: "doc.text")
-                        .font(NDKEventViewStyles.captionFont(for: .feed))
+                        .font(.caption)
                         .foregroundStyle(.secondary)
 
                     Text("Article")
-                        .font(NDKEventViewStyles.captionFont(for: .feed))
+                        .font(.caption)
                         .foregroundStyle(.secondary)
 
                     Spacer()
 
                     Image(systemName: "chevron.right")
-                        .font(NDKEventViewStyles.captionFont(for: .feed))
+                        .font(.caption)
                         .foregroundStyle(.tertiary)
                 }
             }
         }
-        .padding(NDKEventViewStyles.containerPadding(for: .feed))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 
     private func updateEventSubscription(for followList: Set<String>?) {
@@ -382,12 +396,7 @@ struct ArticleDetailView: View {
                 }
 
                 // Author
-                NDKUIEventAuthorHeader(
-                    ndk: ndk,
-                    pubkey: event.pubkey,
-                    timestamp: event.createdAt,
-                    style: .standard
-                )
+                AuthorHeader(ndk: ndk, pubkey: event.pubkey, timestamp: event.createdAt)
 
                 Divider()
 
@@ -470,4 +479,3 @@ struct ArticleDetailView: View {
         return nil
     }
 }
-

@@ -449,8 +449,8 @@ enum Example09_NutzapsAndHistory {
                             case .pending:
                                 log("Waiting for payment...")
 
-                            case let .minted(proofs):
-                                log("✅ Tokens minted successfully!")
+                            case let .minted(amount):
+                                log("✅ Tokens minted successfully! \(amount) sats")
                                 depositReceived = true
 // Exit the loop
 

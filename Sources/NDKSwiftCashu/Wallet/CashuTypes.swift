@@ -5,7 +5,7 @@ import NDKSwiftCore
 // MARK: - Payment Types
 
 /// Mint quote for Lightning deposits
-public struct CashuMintQuote: Codable {
+public struct CashuMintQuote: Codable, Sendable {
     public let quoteId: String
     public let mintURL: String
     public let amount: Int64
@@ -24,9 +24,9 @@ public struct CashuMintQuote: Codable {
 }
 
 /// Deposit status for monitoring Lightning deposits to mint
-public enum DepositStatus {
+public enum DepositStatus: Sendable, Equatable {
     case pending
-    case minted(proofs: [CashuSwift.Proof]) // Tokens successfully minted after deposit
+    case minted(amount: Int64) // Amount successfully minted after deposit
     case expired
     case cancelled
 }

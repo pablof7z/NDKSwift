@@ -268,7 +268,7 @@ public struct ListTransactionsResponse: Codable {
     public let transactions: [Transaction]
 }
 
-public struct Transaction: Codable {
+public struct Transaction: Codable, Sendable {
     public let type: TransactionType
     public let invoice: String?
     public let description: String?
@@ -298,7 +298,7 @@ public struct Transaction: Codable {
     }
 }
 
-public enum TransactionType: String, Codable {
+public enum TransactionType: String, Codable, Sendable {
     case incoming
     case outgoing
 }
