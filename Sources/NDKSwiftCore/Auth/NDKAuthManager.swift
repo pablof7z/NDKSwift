@@ -434,12 +434,12 @@ public class NDKAuthManager {
     }
 
     /// Add a read-only session (no signing capabilities)
-    /// - Parameter user: The NDKUser to create a read-only session for
+    /// - Parameter pubkey: The public key to create a read-only session for
     /// - Returns: The created session
-    public func addSession(user: NDKUser) async throws -> NDKSession {
+    public func addSession(pubkey: PublicKey) async throws -> NDKSession {
         // Create read-only session (no signerType)
         var session = NDKSession(
-            pubkey: user.pubkey,
+            pubkey: pubkey,
             signerType: nil, // nil indicates read-only
             requiresBiometric: false,
             isHardwareBacked: false
@@ -474,7 +474,7 @@ public class NDKAuthManager {
         // Clear signer on NDK for read-only mode
         ndk.signer = nil
 
-        NDKLogger.log(.info, category: .auth, "Created read-only session for user: \(user.pubkey)")
+        NDKLogger.log(.info, category: .auth, "Created read-only session for pubkey: \(pubkey)")
 
         return session
     }

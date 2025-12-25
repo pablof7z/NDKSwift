@@ -459,12 +459,9 @@ private class ZapState: ObservableObject {
 
         do {
             // Send zap using NDKZapManager
-            guard let recipient = ndk.getUser(event.pubkey) else {
-                throw NDKError.invalidDataFormat("pubkey", details: "Invalid event author pubkey")
-            }
             _ = try await zapManager.zap(
                 event: event,
-                to: recipient,
+                to: event.pubkey,
                 amountSats: Int64(amount),
                 comment: nil, // Could be made configurable
                 preferredType: nil,

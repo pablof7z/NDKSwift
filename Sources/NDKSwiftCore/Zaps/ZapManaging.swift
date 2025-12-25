@@ -22,7 +22,7 @@ public protocol ZapManaging: Actor, Sendable {
     func register(fallbackHandler: ZapFallbackHandler)
 
     /// Fetch recipient zap information
-    func fetchRecipientZapInfo(for user: NDKUser, maxAge: TimeInterval) async -> RecipientZapInfo
+    func fetchRecipientZapInfo(for pubkey: PublicKey, maxAge: TimeInterval) async -> RecipientZapInfo
 
     /// Clear cached recipient info
     func clearRecipientCache(for pubkey: String?)
@@ -30,7 +30,7 @@ public protocol ZapManaging: Actor, Sendable {
     /// Send a zap
     /// - Parameters:
     ///   - event: Optional event to zap
-    ///   - recipient: User to receive the zap
+    ///   - pubkey: Public key to receive the zap
     ///   - amountSats: Amount in satoshis
     ///   - comment: Optional comment
     ///   - preferredType: Preferred zap type (lightning or nutzap)
@@ -38,7 +38,7 @@ public protocol ZapManaging: Actor, Sendable {
     /// - Returns: Result of the zap operation
     func zap(
         event: NDKEvent?,
-        to recipient: NDKUser,
+        to pubkey: PublicKey,
         amountSats: Int64,
         comment: String?,
         preferredType: ZapType?,
@@ -48,6 +48,6 @@ public protocol ZapManaging: Actor, Sendable {
     /// Subscribe to zap updates for a user or event
     func subscribeToZaps(
         for event: NDKEvent?,
-        user: NDKUser?
+        pubkey: PublicKey?
     ) -> AsyncThrowingStream<ZapInfo, Error>
 }

@@ -63,32 +63,6 @@ public struct NDKUIProfilePicture: View {
         self.borderWidth = borderWidth
     }
 
-    /// Initialize with NDK instance and NDKUser
-    /// - Parameters:
-    ///   - ndk: The NDK instance
-    ///   - user: The NDKUser instance
-    ///   - size: The size of the profile picture (default: 40)
-    ///   - cornerRadius: Custom corner radius (default: circular)
-    ///   - borderColor: Optional border color
-    ///   - borderWidth: Border width (default: 0)
-    public init(
-        ndk: NDK,
-        user: NDKUser,
-        size: CGFloat = 40,
-        cornerRadius: CGFloat? = nil,
-        borderColor: Color? = nil,
-        borderWidth: CGFloat = 0
-    ) {
-        self.init(
-            ndk: ndk,
-            pubkey: user.pubkey,
-            size: size,
-            cornerRadius: cornerRadius,
-            borderColor: borderColor,
-            borderWidth: borderWidth
-        )
-    }
-
     // MARK: - Body
 
     public var body: some View {

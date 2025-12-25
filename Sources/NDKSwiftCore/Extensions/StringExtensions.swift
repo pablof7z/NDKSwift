@@ -57,6 +57,13 @@ public extension String {
 // MARK: - Nostr Format Conversion Extensions
 
 public extension String {
+    /// Convert this hex pubkey to npub format
+    var npub: String {
+        get throws {
+            try Bech32.npub(from: self)
+        }
+    }
+
     /// Convert a hex pubkey to npub format
     static func toNpub(_ pubkey: String) throws -> String {
         return try Bech32.npub(from: pubkey)
