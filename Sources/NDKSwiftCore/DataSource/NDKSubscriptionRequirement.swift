@@ -170,11 +170,32 @@ actor NDKSubscriptionRequirement {
 
     /// Apply outbox strategy with filter splitting
     private func applyOutboxStrategy(_ strategy: OutboxFilterStrategy) async {
+        NDKLogger.log(.info, category: .subscription,
+                      "🔌 [Outbox] Applying outbox strategy for '\(subscriptionId)':")
+        NDKLogger.log(.info, category: .subscription,
+                      "   - Relay-specific filters: \(strategy.filtersByRelay.count)")
+        NDKLogger.log(.info, category: .subscription,
+                      "   - Unknown authors: \(strategy.unknownAuthors.count)")
+        NDKLogger.log(.info, category: .subscription,
+                      "   - Authors to discover: \(strategy.authorsToDiscover.count)")
+
+        var newRelaysAdded = 0
+        var existingRelaysUsed = 0
+
         // Create subscriptions for each relay with its specific filter
         // These are AUTHOR-SPECIFIC relays (from their kind:10002) - NOT fallbacks
         for (relay, relayFilter) in strategy.filtersByRelay {
+            let isNew = await ndk?.pool.relay(for: relay) == nil
             await createSubscription(for: relayFilter, on: relay, isFallback: false)
+            if isNew {
+                newRelaysAdded += 1
+            } else {
+                existingRelaysUsed += 1
+            }
         }
+
+        NDKLogger.log(.info, category: .subscription,
+                      "   - Outbox relay connections: \(existingRelaysUsed) existing, \(newRelaysAdded) new")
 
         // If there are unknown authors, use fallback relays
         // These are FALLBACK relays - they should NOT count toward author coverage
@@ -214,12 +235,24 @@ actor NDKSubscriptionRequirement {
                                   "📍 Using \(fallbackRelayURLs.count) fallback relays for \(strategy.unknownAuthors.count) unknown authors")
                 }
 
+                var fallbackNewRelays = 0
                 for relay in fallbackRelayURLs {
+                    let isNew = await ndk?.pool.relay(for: relay) == nil
                     // Mark these as fallback relays - they should NOT count toward author coverage
                     await createSubscription(for: fallbackFilter, on: relay, isFallback: true)
+                    if isNew {
+                        fallbackNewRelays += 1
+                    }
                 }
+                NDKLogger.log(.info, category: .subscription,
+                              "   - Fallback relay connections: \(fallbackRelayURLs.count) total, \(fallbackNewRelays) new")
             }
         }
+
+        // Final summary
+        let totalRelays = relaySubscriptions.count
+        NDKLogger.log(.info, category: .subscription,
+                      "📊 [Outbox] Final summary for '\(subscriptionId)': \(totalRelays) total relay subscriptions")
     }
 
     /// Create subscriptions on specific relays
@@ -246,7 +279,8 @@ actor NDKSubscriptionRequirement {
             let origin: NDKRelayOrigin = isFallback
                 ? .appRelays
                 : .outbox(authorPubkey: filter.authors?.first ?? "unknown")
-            relay = await ndk.pool.addRelay(relayURL, origin: origin)
+            // Use ndk.addRelay to ensure auto-connect happens
+            relay = await ndk.addRelay(relayURL, origin: origin)
         }
 
         guard let relay = relay else {

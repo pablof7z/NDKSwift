@@ -47,8 +47,8 @@ public extension NDK {
         // Get or create relay connection
         var relay = await pool.getRelay(for: relayURL)
         if relay == nil {
-            relay = await pool.addRelay(relayURL)
-            try await relay?.connect()
+            // Use addRelay to ensure auto-connect happens
+            relay = await addRelay(relayURL)
         }
 
         guard relay != nil else {

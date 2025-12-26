@@ -30,15 +30,26 @@ public final class NDK {
 
     // MARK: - Observable Relay State
 
-    /// Observable array of relays for SwiftUI binding.
+    /// Observable array of ALL relays for SwiftUI binding.
     /// This is automatically synchronized with the relay pool.
     @MainActor
     public private(set) var relays: [NDKRelay] = []
+
+    /// Observable array of app relays only (origin: .appRelays)
+    /// These are relays explicitly configured by the app, not discovered via outbox.
+    @MainActor
+    public private(set) var appRelays: [NDKRelay] = []
 
     /// Number of currently connected relays
     @MainActor
     public var connectedRelayCount: Int {
         relays.filter { $0.ui.isConnected }.count
+    }
+
+    /// Number of currently connected app relays
+    @MainActor
+    public var connectedAppRelayCount: Int {
+        appRelays.filter { $0.ui.isConnected }.count
     }
 
     /// Task that observes pool changes and syncs to observable relays array
@@ -390,25 +401,13 @@ public final class NDK {
         return result
     }
 
-    /// Add a relay to the pool (async version)
+    /// Add a relay to the pool
+    ///
+    /// If `connect()` has already been called, the relay will be automatically connected.
+    /// Otherwise, it will be connected when `connect()` is called.
     @discardableResult
     public func addRelay(_ url: RelayURL, origin: NDKRelayOrigin = .appRelays) async -> NDKRelay {
-        let relay = await pool.addRelay(url, origin: origin)
-
-        if hasConnected {
-            // Auto-connect the relay since connect() has already been called
-            NDKLogger.log(.info, category: .relay, "Auto-connecting relay \(url) since connect() has been called")
-            do {
-                try await relay.connect()
-            } catch {
-                NDKLogger.log(.error, category: .relay, "Failed to auto-connect relay \(url): \(error)")
-            }
-        } else {
-            // Warn that the relay won't be connected until connect() is called
-            NDKLogger.log(.warning, category: .relay, "⚠️ Relay \(url) added but not connected. Call connect() to establish connections to all relays.")
-        }
-
-        return relay
+        await pool.addRelay(url, origin: origin)
     }
 
     /// Remove a relay from the pool
@@ -446,6 +445,7 @@ public final class NDK {
 
             // Initial load
             self.relays = await self.pool.relays
+            self.appRelays = await self.pool.appRelays
 
             // Observe changes
             for await change in await self.pool.relayChanges {
@@ -455,8 +455,16 @@ public final class NDK {
                     if !self.relays.contains(where: { $0.url == relay.url }) {
                         self.relays.append(relay)
                     }
+                    // Check if it's an app relay
+                    let origin = await relay.origin
+                    if case .appRelays = origin {
+                        if !self.appRelays.contains(where: { $0.url == relay.url }) {
+                            self.appRelays.append(relay)
+                        }
+                    }
                 case .relayRemoved(let url):
                     self.relays.removeAll { $0.url == url }
+                    self.appRelays.removeAll { $0.url == url }
                 case .relayConnected, .relayDisconnected:
                     // State changes are handled by individual relay.ui observers
                     break
@@ -500,11 +508,12 @@ public final class NDK {
         // Start observing relay pool changes for the observable relays array
         startRelayObserver()
 
+        // Mark that connect has been called BEFORE connecting
+        // This ensures any relays added during connectAll() will auto-connect
+        hasConnected = true
+
         NDKLogger.log(.info, category: .relay, "Connecting to all relays in pool")
         await pool.connectAll()
-
-        // Mark that connect has been called
-        hasConnected = true
 
         // Activate any subscriptions that were created while offline
         await dataRequirementManager.activateDeferredSubscriptions()

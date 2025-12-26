@@ -276,15 +276,8 @@ actor NDKPublishingStrategy {
             return relay
         }
 
-        // Try to connect
-        let relay = await ndk.pool.addRelay(normalizedUrl)
-        await relay.setNDK(ndk)
-        do {
-            try await relay.connect()
-        } catch {
-            NDKLogger.log(.warning, category: .outbox, "Failed to connect to relay \(normalizedUrl): \(error)")
-        }
-        return relay
+        // Add relay via NDK to ensure auto-connect happens
+        return await ndk.addRelay(normalizedUrl)
     }
 
     private func updateOverallStatus(for item: OutboxItem) async {

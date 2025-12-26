@@ -10,7 +10,7 @@ struct AppRelaysView: View {
 
     var body: some View {
         List {
-            if state.ndk.relays.isEmpty {
+            if state.ndk.appRelays.isEmpty {
                 ContentUnavailableView(
                     "No Relays",
                     systemImage: "antenna.radiowaves.left.and.right.slash",
@@ -18,7 +18,7 @@ struct AppRelaysView: View {
                 )
             } else {
                 Section {
-                    ForEach(state.ndk.relays, id: \.url) { relay in
+                    ForEach(state.ndk.appRelays, id: \.url) { relay in
                         RelayRow(relay: relay)
                     }
                     .onDelete(perform: deleteRelays)
@@ -29,7 +29,7 @@ struct AppRelaysView: View {
                         Text("Connected")
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Text("\(state.ndk.connectedRelayCount) / \(state.ndk.relays.count)")
+                        Text("\(state.ndk.connectedAppRelayCount) / \(state.ndk.appRelays.count)")
                     }
                 }
             }
@@ -83,7 +83,7 @@ struct AppRelaysView: View {
     }
 
     private func deleteRelays(at offsets: IndexSet) {
-        let relaysToDelete = offsets.map { state.ndk.relays[$0].url }
+        let relaysToDelete = offsets.map { state.ndk.appRelays[$0].url }
         Task {
             for url in relaysToDelete {
                 await state.ndk.removeRelay(url)
