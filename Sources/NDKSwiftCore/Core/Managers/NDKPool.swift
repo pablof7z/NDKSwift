@@ -51,13 +51,15 @@ public actor NDKPool {
     /// Set of relay URLs that were added as app relays
     private var appRelayUrls: Set<String> = []
 
+    /// Whether connectAll() has been called - new relays will auto-connect after this
+    private var hasStartedConnecting = false
+
     /// NIP-77 sync handlers indexed by normalized relay URL
     /// This must be an instance property (not static) to benefit from actor isolation
     var syncHandlers: [String: NIP77SyncHandler] = [:]
 
-    /// Stream of relay pool changes for event-driven observation
-    private let poolChangeStream: AsyncStream<NDKPoolChangeEvent>
-    private let poolChangeContinuation: AsyncStream<NDKPoolChangeEvent>.Continuation
+    /// Continuations for relay pool change subscribers (supports multiple consumers)
+    private var poolChangeContinuations: [UUID: AsyncStream<NDKPoolChangeEvent>.Continuation] = [:]
 
     /// Stream of relay publish events for event-driven observation
     private let publishEventStream: AsyncStream<NDKRelayPublishEvent>
@@ -82,9 +84,6 @@ public actor NDKPool {
         self.connectionMonitor = NDKConnectionMonitor()
         self.networkMonitor = NDKNetworkMonitor()
 
-        // Initialize the relay change stream
-        (poolChangeStream, poolChangeContinuation) = AsyncStream<NDKPoolChangeEvent>.makeStream()
-
         // Initialize the publish event stream
         (publishEventStream, publishEventContinuation) = AsyncStream<NDKRelayPublishEvent>.makeStream()
 
@@ -95,10 +94,10 @@ public actor NDKPool {
         }
     }
 
-    /// Public accessor for relay pool changes stream
+    /// Create a new relay pool changes stream for a subscriber
     ///
-    /// Provides real-time notifications of relay pool state changes including additions, removals,
-    /// connections, and disconnections. Use this stream to react to pool changes in your application.
+    /// Each call creates a new stream that receives all pool change events.
+    /// Multiple consumers can subscribe and each will receive all events.
     ///
     /// Example:
     /// ```swift
@@ -113,7 +112,32 @@ public actor NDKPool {
     /// }
     /// ```
     public var relayChanges: AsyncStream<NDKPoolChangeEvent> {
-        poolChangeStream
+        let id = UUID()
+        // Use makeStream() for proper actor isolation - the continuation is stored
+        // directly on the actor rather than inside a non-isolated closure
+        let (stream, continuation) = AsyncStream<NDKPoolChangeEvent>.makeStream()
+        poolChangeContinuations[id] = continuation
+
+        // Set up termination handler to clean up the continuation when stream ends
+        continuation.onTermination = { @Sendable [weak self] _ in
+            Task { [weak self] in
+                await self?.removePoolChangeSubscriber(id)
+            }
+        }
+
+        return stream
+    }
+
+    /// Remove a pool change subscriber
+    private func removePoolChangeSubscriber(_ id: UUID) {
+        poolChangeContinuations.removeValue(forKey: id)
+    }
+
+    /// Emit a pool change event to all subscribers
+    private func emitPoolChange(_ event: NDKPoolChangeEvent) {
+        for continuation in poolChangeContinuations.values {
+            continuation.yield(event)
+        }
     }
 
     /// Public accessor for relay publish events stream
@@ -321,6 +345,22 @@ public actor NDKPool {
         span?.set(SpanAttributes.decisionOutcome, "added")
         span?.set(SpanAttributes.poolSize, relayMap.count)
 
+        // Log pool size on addition (helps debug connection explosion)
+        let originStr: String
+        switch origin {
+        case .appRelays: originStr = "appRelays"
+        case .discovery: originStr = "discovery"
+        case let .outbox(pubkey): originStr = "outbox(\(pubkey.prefix(8)))"
+        }
+        NDKLogger.log(.debug, category: .relay,
+                      "📊 Pool: added relay \(normalizedUrl) (origin: \(originStr)) - pool size now: \(relayMap.count)")
+
+        // Log warning if pool is growing too large
+        if relayMap.count > 50 {
+            NDKLogger.log(.warning, category: .relay,
+                          "⚠️ Pool size exceeds 50 relays (\(relayMap.count)) - potential connection explosion")
+        }
+
         // Track app relays
         if case .appRelays = origin {
             appRelayUrls.insert(normalizedUrl)
@@ -332,7 +372,9 @@ public actor NDKPool {
             switch state {
             case .connected, .authenticated:
                 // Emit pool connection event
-                self.poolChangeContinuation.yield(.relayConnected(relay))
+                Task {
+                    await self.emitPoolChange(.relayConnected(relay))
+                }
                 if case .authenticated = state {
                     NDKLogger.log(.info, category: .relay, "🔐 Relay authenticated: \(relay.url)")
                     // Also retry any auth-failed events when transitioning to authenticated
@@ -349,10 +391,14 @@ public actor NDKPool {
                 }
             case .disconnected:
                 // Emit pool disconnection event
-                self.poolChangeContinuation.yield(.relayDisconnected(relay))
+                Task {
+                    await self.emitPoolChange(.relayDisconnected(relay))
+                }
             case let .failed(error):
                 // Emit pool disconnection event
-                self.poolChangeContinuation.yield(.relayDisconnected(relay))
+                Task {
+                    await self.emitPoolChange(.relayDisconnected(relay))
+                }
                 Task {
                     let shouldLog = await connectionErrorRateLimiter.shouldLogError(for: relay.url, errorType: "relayFailed")
                     if shouldLog {
@@ -366,7 +412,17 @@ public actor NDKPool {
         }
 
         // Emit relay added event
-        poolChangeContinuation.yield(.relayAdded(relay))
+        emitPoolChange(.relayAdded(relay))
+
+        // Auto-connect if pool has already started connecting
+        if hasStartedConnecting {
+            NDKLogger.log(.info, category: .relay, "🔌 Auto-connecting relay \(normalizedUrl) (pool already connecting)")
+            do {
+                try await relay.connect()
+            } catch {
+                NDKLogger.log(.error, category: .relay, "❌ Failed to auto-connect relay \(normalizedUrl): \(error)")
+            }
+        }
 
         return relay
     }
@@ -384,7 +440,7 @@ public actor NDKPool {
             await relay.disconnect()
 
             // Emit relay removed event
-            poolChangeContinuation.yield(.relayRemoved(normalizedUrl))
+            emitPoolChange(.relayRemoved(normalizedUrl))
             span?.set(SpanAttributes.poolSize, relayMap.count)
             span?.success()
             NDKLogger.log(.info, category: .relay, "✅ Removed relay from pool: \(normalizedUrl), remaining relays: \(relayMap.count)")
@@ -580,6 +636,9 @@ public actor NDKPool {
     /// print("Connected to \(summary.connected) relays")
     /// ```
     public func connectAll() async {
+        // Mark that connecting has started - new relays will auto-connect from now on
+        hasStartedConnecting = true
+
         let relayCount = relays.count
 
         let span = ndk?.startSpan("relay.pool.connect_all", category: .relayPool)
