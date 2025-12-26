@@ -144,7 +144,7 @@ struct FeaturedFollowPackCard: View {
             HStack(spacing: 4) {
                 Text("by")
                     .foregroundStyle(.white.opacity(0.7))
-                NDKUIDisplayName(ndk: ndk, pubkey: pack.creatorPubkey)
+                Text(ndk.profile(for: pack.creatorPubkey).displayName)
                     .foregroundStyle(.white.opacity(0.7))
             }
             .font(.system(size: 14))

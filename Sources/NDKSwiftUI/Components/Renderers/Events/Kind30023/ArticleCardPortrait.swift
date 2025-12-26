@@ -45,7 +45,7 @@ public struct ArticleCardPortrait: ArticleCardRenderer {
                 // Metadata
                 if let ndk = ndk {
                     VStack(alignment: .leading, spacing: 4) {
-                        NDKUIUsername(ndk: ndk, pubkey: event.pubkey)
+                        Text(ndk.profile(for: event.pubkey).displayName)
                             .font(.caption)
                             .foregroundStyle(.secondary)
 

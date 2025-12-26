@@ -22,7 +22,7 @@ struct RelaySetCard: View {
             HStack(spacing: 2) {
                 Text("by")
                     .foregroundStyle(.secondary)
-                NDKUIDisplayName(ndk: ndk, pubkey: relaySet.creatorPubkey)
+                Text(ndk.profile(for: relaySet.creatorPubkey).displayName)
                     .foregroundStyle(.secondary)
             }
             .font(.system(size: 13))

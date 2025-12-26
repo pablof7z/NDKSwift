@@ -200,7 +200,7 @@ public struct ShowcaseTabView: View {
                 // Author header
                 HStack(spacing: 6) {
                     NDKUIProfilePicture(ndk: ndk, pubkey: event.pubkey, size: 24)
-                    NDKUIUsername(ndk: ndk, pubkey: event.pubkey)
+                    Text(ndk.profile(for: event.pubkey).displayName)
                         .font(.caption)
                 }
 

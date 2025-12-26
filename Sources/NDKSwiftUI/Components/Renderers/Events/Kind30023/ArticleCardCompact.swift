@@ -52,7 +52,7 @@ public struct ArticleCardCompact: ArticleCardRenderer {
                 // Metadata
                 if let ndk = ndk {
                     HStack(spacing: 4) {
-                        NDKUIUsername(ndk: ndk, pubkey: event.pubkey)
+                        Text(ndk.profile(for: event.pubkey).displayName)
                             .font(.caption)
                             .foregroundStyle(.secondary)
 

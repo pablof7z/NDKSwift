@@ -98,12 +98,9 @@ struct AccountRow: View {
 
                 // Display name and pubkey
                 VStack(alignment: .leading, spacing: 4) {
-                    NDKUIDisplayName(
-                        ndk: state.ndk,
-                        pubkey: session.pubkey
-                    )
-                    .font(.body)
-                    .foregroundStyle(.primary)
+                    Text(state.ndk.profile(for: session.pubkey).displayName)
+                        .font(.body)
+                        .foregroundStyle(.primary)
 
                     Text(formatPubkey(session.pubkey))
                         .font(.caption)

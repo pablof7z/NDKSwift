@@ -19,7 +19,7 @@ public struct DefaultMentionView: MentionRenderer {
     public var body: some View {
         Group {
             if let ndk = ndk {
-                NDKUIDisplayName(ndk: ndk, pubkey: pubkey)
+                Text(ndk.profile(for: pubkey).displayName)
             } else {
                 Text("@\(String(npub.prefix(16)))...")
             }

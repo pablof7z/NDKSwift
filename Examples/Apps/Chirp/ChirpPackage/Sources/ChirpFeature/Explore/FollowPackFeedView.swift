@@ -64,7 +64,7 @@ struct FollowPackFeedView: View {
                         VStack(spacing: 6) {
                             NDKUIProfilePicture(ndk: state.ndk, pubkey: pubkey, size: 48)
 
-                            NDKUIDisplayName(ndk: state.ndk, pubkey: pubkey)
+                            Text(state.ndk.profile(for: pubkey).displayName)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
