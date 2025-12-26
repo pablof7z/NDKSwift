@@ -85,7 +85,7 @@ public struct ProfileHeaderView: View {
 
                 // Name and handle
                 VStack(alignment: .leading, spacing: 2) {
-                    NDKUIDisplayName(ndk: ndk, pubkey: pubkey)
+                    Text(ndk.profile(for: pubkey).displayName)
                         .font(.title3.weight(.bold))
 
                     HStack(spacing: 4) {
@@ -183,15 +183,8 @@ public struct ProfileHeaderView: View {
         let targetPubkey = pubkey
 
         Task {
-            do {
-                if shouldUnfollow {
-                    try await ndk.unfollow(pubkey: targetPubkey)
-                } else {
-                    try await ndk.follow(pubkey: targetPubkey)
-                }
-            } catch {
-                print("Follow/unfollow error: \(error)")
-            }
+            // TODO: Implement follow/unfollow - methods don't exist on NDK yet
+            print("Follow/unfollow not implemented: shouldUnfollow=\(shouldUnfollow), pubkey=\(targetPubkey)")
             await MainActor.run { isFollowLoading = false }
         }
     }

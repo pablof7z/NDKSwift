@@ -30,7 +30,7 @@ struct ThreadedPostRow: View {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 4) {
                         NavigationLink(destination: ProfileView(pubkey: event.pubkey)) {
-                            NDKUIDisplayName(ndk: ndk, pubkey: event.pubkey)
+                            Text(ndk.profile(for: event.pubkey).displayName)
                                 .font(.subheadline)
                                 .fontWeight(.semibold)
                         }
@@ -139,7 +139,7 @@ struct ActivePostView: View {
                 // Content
                 VStack(alignment: .leading, spacing: 8) {
                     NavigationLink(destination: ProfileView(pubkey: event.pubkey)) {
-                        NDKUIDisplayName(ndk: ndk, pubkey: event.pubkey)
+                        Text(ndk.profile(for: event.pubkey).displayName)
                             .font(.headline)
                             .fontWeight(.bold)
                     }

@@ -23,7 +23,7 @@ struct FollowPackRowView: View {
                     Text("\(pack.memberCount) accounts")
                     Text("·")
                     Text("by")
-                    NDKUIDisplayName(ndk: ndk, pubkey: pack.creatorPubkey)
+                    Text(ndk.profile(for: pack.creatorPubkey).displayName)
                 }
                 .font(.subheadline)
                 .foregroundStyle(.secondary)

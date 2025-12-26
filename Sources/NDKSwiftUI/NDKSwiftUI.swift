@@ -25,18 +25,17 @@ import SwiftUI
 ///
 ///     var body: some View {
 ///         VStack {
-///             // All components now use direct NDK parameters
+///             // Profile components use direct NDK parameters
 ///             NDKUIProfilePicture(ndk: ndk, pubkey: pubkey)
-///             NDKUIDisplayName(ndk: ndk, pubkey: pubkey)
+///             Text(ndk.profile(for: pubkey).displayName)
 ///
-///             // Action buttons now also use direct NDK parameters
+///             // Action buttons also use direct NDK parameters
 ///             HStack {
 ///                 NDKUIReactionButton.like(ndk: ndk, event: event)
 ///                 NDKUIZapButton(ndk: ndk, event: event)
 ///                 NDKUIFollowButton(ndk: ndk, pubkey: pubkey)
 ///             }
 ///         }
-///         // No environment injection needed anymore!
 ///     }
 /// }
 /// ```

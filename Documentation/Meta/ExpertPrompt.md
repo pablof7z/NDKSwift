@@ -980,15 +980,12 @@ import NDKSwiftUI
 // Profile picture with automatic loading and fallbacks
 NDKUIProfilePicture(ndk: ndk, pubkey: pubkey, size: 50)
 
-// Username with NIP-05 support and smart fallbacks
-NDKUIUsername(ndk: ndk, pubkey: pubkey)
+// Display name - use profile.displayName directly
+Text(ndk.profile(for: pubkey).displayName)
     .font(.headline)
-
-// Display name with customizable fallback styles
-NDKUIDisplayName(ndk: ndk, pubkey: pubkey, fallbackStyle: .npub)
 ```
 
-All UI components use `ndk.profile(for:)` internally and auto-update.
+Profile data uses `ndk.profile(for:)` which is `@Observable` and auto-updates.
 
 #### How It Works
 
@@ -1020,10 +1017,10 @@ Benefits:
 ```swift
 // Direct property access in SwiftUI
 let profile = ndk.profile(for: pubkey)
-Text(profile.name)
+Text(profile.displayName)
 
-// Use components for common UI elements
-NDKUIUsername(ndk: ndk, pubkey: pubkey)
+// Use profile picture component for avatars
+NDKUIProfilePicture(ndk: ndk, pubkey: pubkey, size: 40)
 
 // AsyncStream for background tasks (requires MainActor)
 for await metadata in ndk.profileUpdates(for: pubkey) {

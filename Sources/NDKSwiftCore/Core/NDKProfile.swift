@@ -9,7 +9,14 @@ public final class NDKProfile {
 
     /// Best available display name
     public var displayName: String {
-        metadata?.bestDisplayName ?? String(pubkey.prefix(12)) + "..."
+        if let metadata = metadata {
+            return metadata.bestDisplayName
+        }
+        // Fallback to npub when metadata not yet loaded
+        if let npub = try? Bech32.npub(from: pubkey) {
+            return String(npub.prefix(16)) + "..."
+        }
+        return String(pubkey.prefix(12)) + "..."
     }
 
     /// Profile picture URL
@@ -91,8 +98,7 @@ public final class NDKProfile {
 
                     await MainActor.run {
                         // Only update if metadata actually changed to avoid triggering unnecessary observation
-                        let isDifferent = self.metadata?.eventId != metadata?.eventId
-                        if isDifferent {
+                        if self.metadata?.eventId != metadata?.eventId {
                             self.metadata = metadata
                         }
                     }

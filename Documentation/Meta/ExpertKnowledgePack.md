@@ -125,7 +125,7 @@ The following core functionalities have been **verified through testing** as of 
     - `ndk.profile(for:)` for SwiftUI (@Observable, auto-updating)
     - `user.profile` for convenience (same as above)
     - `ndk.profileUpdates(for:)` for AsyncStream in non-UI code
-    - Use built-in `NDKUIProfilePicture`, `NDKUIUsername`, and `NDKUIDisplayName` components
+    - Use `Text(profile.displayName)` for display names, `NDKUIProfilePicture` for avatars
     - **Do NOT** create custom profile management wrappers or data sources
 
 ---

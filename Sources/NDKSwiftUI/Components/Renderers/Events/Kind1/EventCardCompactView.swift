@@ -26,7 +26,7 @@ public struct EventCardCompactView: EventRenderer {
 
                 VStack(alignment: .leading, spacing: 2) {
                     if let ndk = ndk {
-                        NDKUIDisplayName(ndk: ndk, pubkey: event.pubkey)
+                        Text(ndk.profile(for: event.pubkey).displayName)
                             .font(.subheadline.weight(.semibold))
                     } else {
                         Text("@\(String(event.pubkey.prefix(8)))...")

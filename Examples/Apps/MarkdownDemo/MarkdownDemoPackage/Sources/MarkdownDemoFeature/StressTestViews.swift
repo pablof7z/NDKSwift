@@ -18,7 +18,7 @@ private struct AuthorHeader: View {
             NDKUIProfilePicture(ndk: ndk, pubkey: pubkey, size: 32)
 
             VStack(alignment: .leading, spacing: 2) {
-                NDKUIUsername(ndk: ndk, pubkey: pubkey)
+                Text(ndk.profile(for: pubkey).displayName)
                     .font(.subheadline)
                     .fontWeight(.medium)
 

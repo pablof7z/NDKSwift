@@ -22,7 +22,7 @@ public struct PillMentionView: MentionRenderer {
                 .font(.caption2)
             Group {
                 if let ndk = ndk {
-                    NDKUIDisplayName(ndk: ndk, pubkey: pubkey)
+                    Text(ndk.profile(for: pubkey).displayName)
                 } else {
                     Text("@\(String(npub.prefix(8)))...")
                 }

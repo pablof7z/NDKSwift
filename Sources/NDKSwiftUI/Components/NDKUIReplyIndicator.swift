@@ -92,7 +92,7 @@ public struct NDKUIReplyIndicator: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
 
-                        NDKUIDisplayName(ndk: ndk, pubkey: replyToEvent.pubkey, fallbackStyle: .npub)
+                        Text(ndk.profile(for: replyToEvent.pubkey).displayName)
                             .font(.caption)
                             .fontWeight(.medium)
                             .foregroundStyle(.secondary)
@@ -105,7 +105,7 @@ public struct NDKUIReplyIndicator: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
-                    NDKUIDisplayName(ndk: ndk, pubkey: replyToEvent.pubkey, fallbackStyle: .npub)
+                    Text(ndk.profile(for: replyToEvent.pubkey).displayName)
                         .font(.caption)
                         .fontWeight(.medium)
                         .foregroundStyle(.secondary)

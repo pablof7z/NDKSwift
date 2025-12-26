@@ -67,7 +67,7 @@ public struct ArticleCardHero: ArticleCardRenderer {
                         HStack(spacing: 6) {
                             NDKUIProfilePicture(ndk: ndk, pubkey: article.pubkey, size: 20)
 
-                            NDKUIUsername(ndk: ndk, pubkey: article.pubkey)
+                            Text(ndk.profile(for: article.pubkey).displayName)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }

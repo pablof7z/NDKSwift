@@ -62,12 +62,12 @@ Task { @MainActor in
 
 ## UI Components
 
-### NDKUIUsername
+### Display Name
 
-Displays a user's name with NIP-05 support and smart fallbacks:
+Use the profile's `displayName` property directly - no wrapper component needed:
 
 ```swift
-NDKUIUsername(ndk: ndk, pubkey: pubkey)
+Text(ndk.profile(for: pubkey).displayName)
     .font(.headline)
 ```
 
@@ -77,14 +77,6 @@ Displays a user's profile picture with automatic loading:
 
 ```swift
 NDKUIProfilePicture(ndk: ndk, pubkey: pubkey, size: 50)
-```
-
-### NDKUIDisplayName
-
-Similar to `NDKUIUsername` with customizable fallback styles:
-
-```swift
-NDKUIDisplayName(ndk: ndk, pubkey: pubkey, fallbackStyle: .npub)
 ```
 
 ## How It Works
@@ -167,10 +159,10 @@ profile.metadata      // NDKUserMetadata? (full metadata object)
 ```swift
 // Direct property access in SwiftUI
 let profile = ndk.profile(for: pubkey)
-Text(profile.name)
+Text(profile.displayName)
 
-// Use components for common UI elements
-NDKUIUsername(ndk: ndk, pubkey: pubkey)
+// Use profile picture component
+NDKUIProfilePicture(ndk: ndk, pubkey: pubkey, size: 40)
 
 // AsyncStream for background tasks (requires MainActor)
 for await metadata in ndk.profileUpdates(for: pubkey) {
@@ -211,7 +203,7 @@ struct FeedView: View {
                 NDKUIProfilePicture(ndk: ndk, pubkey: post.author, size: 40)
 
                 VStack(alignment: .leading) {
-                    NDKUIUsername(ndk: ndk, pubkey: post.author)
+                    Text(ndk.profile(for: post.author).displayName)
                         .font(.headline)
 
                     Text(post.content)

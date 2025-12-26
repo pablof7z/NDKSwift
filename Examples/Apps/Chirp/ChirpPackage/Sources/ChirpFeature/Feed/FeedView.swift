@@ -239,7 +239,7 @@ struct FeedPostRow: View {
                     // Name and time row
                     HStack(spacing: 4) {
                         NavigationLink(destination: ProfileView(pubkey: event.pubkey)) {
-                            NDKUIDisplayName(ndk: ndk, pubkey: event.pubkey)
+                            Text(ndk.profile(for: event.pubkey).displayName)
                                 .font(.subheadline.weight(.semibold))
                                 .lineLimit(1)
                         }
@@ -329,7 +329,7 @@ struct FeedPostCard: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     NavigationLink(destination: ProfileView(pubkey: event.pubkey)) {
-                        NDKUIDisplayName(ndk: ndk, pubkey: event.pubkey)
+                        Text(ndk.profile(for: event.pubkey).displayName)
                             .font(.subheadline.weight(.semibold))
                             .lineLimit(1)
                     }

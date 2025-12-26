@@ -25,7 +25,7 @@ public struct EventCardInlineView: EventRenderer {
                 }
 
                 if let ndk = ndk {
-                    NDKUIDisplayName(ndk: ndk, pubkey: event.pubkey)
+                    Text(ndk.profile(for: event.pubkey).displayName)
                         .font(.caption.weight(.medium))
                 } else {
                     Text("@\(String(event.pubkey.prefix(8)))...")
