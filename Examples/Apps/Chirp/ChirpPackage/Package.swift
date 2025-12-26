@@ -19,10 +19,10 @@ let package = Package(
         .target(
             name: "ChirpFeature",
             dependencies: [
-                .product(name: "NDKSwiftCore", package: "NDKSwift-observable-relays"),
-                .product(name: "NDKSwiftUI", package: "NDKSwift-observable-relays"),
-                .product(name: "NDKSwiftNostrDB", package: "NDKSwift-observable-relays"),
-                .product(name: "NDKSwiftCashu", package: "NDKSwift-observable-relays")
+                .product(name: "NDKSwiftCore", package: "NDKSwift-z94ws0"),
+                .product(name: "NDKSwiftUI", package: "NDKSwift-z94ws0"),
+                .product(name: "NDKSwiftNostrDB", package: "NDKSwift-z94ws0"),
+                .product(name: "NDKSwiftCashu", package: "NDKSwift-z94ws0")
             ]
         ),
         .testTarget(

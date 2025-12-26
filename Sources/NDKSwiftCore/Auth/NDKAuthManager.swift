@@ -260,6 +260,17 @@ public class NDKAuthManager {
                 // Clear signer on NDK for read-only mode
                 ndk.signer = nil
 
+                // Create session data for read-only session
+                // This enables the app to access the user's follow list, etc.
+                let sessionData = NDKSessionData(pubkey: updatedSession.pubkey, ndk: ndk)
+                ndk.sessionData = sessionData
+
+                // Load session data in background
+                Task {
+                    await sessionData.load([.followList, .muteList])
+                    NDKLogger.log(.info, category: .auth, "Read-only session data loaded for user: \(updatedSession.pubkey)")
+                }
+
                 // Save updated session metadata
                 try await saveSessionMetadata(updatedSession)
 
@@ -305,8 +316,22 @@ public class NDKAuthManager {
             // Set signer on NDK if available
             ndk.signer = signer
 
-            // Don't initialize session data here - let the app call startSession()
-            // This avoids duplicate subscriptions
+            // Start NDK session to load session data (follow list, mute list, etc.)
+            // This ensures the app state is updated when switching accounts
+            Task {
+                do {
+                    _ = try await ndk.startSession(
+                        signer: signer,
+                        config: NDKSessionConfiguration(
+                            dataRequirements: [.followList, .muteList],
+                            preloadStrategy: .progressive
+                        )
+                    )
+                    NDKLogger.log(.info, category: .auth, "NDK session started after account switch")
+                } catch {
+                    NDKLogger.log(.warning, category: .auth, "Failed to start NDK session after account switch: \(error)")
+                }
+            }
 
             // Save updated session metadata
             try await saveSessionMetadata(updatedSession)
