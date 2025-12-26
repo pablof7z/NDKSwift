@@ -71,14 +71,20 @@ public struct FeedView: View {
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         ForEach(allEvents, id: \.id) { event in
-                            FeedPostRow(ndk: state.ndk, event: event)
-                                .id(event.id)
-                                .onAppear {
-                                    trackScrollPosition(event: event, data: allEvents)
-                                    loadMoreIfNeeded(event: event, data: allEvents, followList: state.ndk.sessionData?.followList)
-                                }
+                            NavigationLink(value: event) {
+                                FeedPostRow(ndk: state.ndk, event: event)
+                            }
+                            .buttonStyle(.plain)
+                            .id(event.id)
+                            .onAppear {
+                                trackScrollPosition(event: event, data: allEvents)
+                                loadMoreIfNeeded(event: event, data: allEvents, followList: state.ndk.sessionData?.followList)
+                            }
                         }
                     }
+                }
+                .navigationDestination(for: NDKEvent.self) { event in
+                    ThreadView(event: event)
                 }
                 .refreshable {
                     if let subscription = subscription {
