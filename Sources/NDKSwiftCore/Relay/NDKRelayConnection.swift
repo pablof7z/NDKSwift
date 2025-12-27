@@ -90,9 +90,28 @@ public actor NDKRelayConnection {
     }
 
     deinit {
-        Task { [weak self] in
-            await self?.disconnect()
+        // Synchronous cleanup - actor deinit runs on actor executor in Swift 5.9+
+        retryPolicy.cancel()
+        healthCheckTask?.cancel()
+        stateMonitorTask?.cancel()
+
+        // Cancel pending event timeout tasks
+        for task in eventTimeoutTasks.values {
+            task.cancel()
         }
+
+        // Resume pending continuations to prevent leaks
+        let connectionError = NDKError.connectionLost(relay: url.absoluteString, message: "Connection deallocated")
+        for continuation in connectionContinuations {
+            continuation.resume(throwing: connectionError)
+        }
+        for continuation in pendingEvents.values {
+            continuation.resume(throwing: connectionError)
+        }
+
+        #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)
+            webSocketTask?.cancel(with: .normalClosure, reason: nil)
+        #endif
     }
 
     // MARK: - Connection Management

@@ -44,8 +44,6 @@ public enum NetworkConstants {
     public static let cleanupInterval: TimeInterval = 5 * TimeConstants.minute // 5 minutes
     /// Default capacity for general-purpose caches - prevents unbounded memory growth
     public static let defaultCacheCapacity = 1000
-    /// Profile cache size - based on typical social graph sizes
-    public static let profileCacheSize = 1000
     /// NIP-05 verification cache - reduces redundant network requests
     public static let nip05CacheCapacity = 1000
     /// Rate limiter capacity for NIP-05 domains - prevents DoS attacks
