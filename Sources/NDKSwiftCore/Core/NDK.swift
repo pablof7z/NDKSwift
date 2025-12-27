@@ -156,44 +156,46 @@ public final class NDK {
         NDKPool(ndk: self, config: self.connectionConfig)
     }()
 
-    // MARK: - Profile Cache (inlined weak reference registry)
+    // MARK: - Profile Cache (LRU with strong references)
 
-    /// Weak reference wrapper for NDKProfile instances
-    private final class WeakProfile: @unchecked Sendable {
-        weak var value: NDKProfile?
-        init(_ value: NDKProfile) { self.value = value }
-    }
+    /// Maximum number of profiles to keep in cache
+    private static let profileCacheLimit = 500
 
-    /// Weak reference storage for profile deduplication
-    /// Profiles deallocate naturally when no longer referenced by views
+    /// Strong reference storage for profiles (LRU cache)
     @ObservationIgnored
     @MainActor
-    private var profileRegistry: [PublicKey: WeakProfile] = [:]
+    private var profileCache: [PublicKey: NDKProfile] = [:]
 
-    /// Cleanup counter for periodic dead reference removal
+    /// LRU access order tracking (oldest first)
     @ObservationIgnored
     @MainActor
-    private var profileCleanupCounter = 0
+    private var profileAccessOrder: [PublicKey] = []
 
     /// Get or create an observable profile for a pubkey (MainActor-bound)
     /// Returns the same NDKProfile instance for the same pubkey (reference equality)
+    /// Uses LRU eviction when cache reaches capacity
     @MainActor
     internal func getOrCreateProfile(_ pubkey: PublicKey) -> NDKProfile {
-        // Clean up dead references periodically (every 100 accesses)
-        profileCleanupCounter += 1
-        if profileCleanupCounter >= 100 {
-            profileCleanupCounter = 0
-            profileRegistry = profileRegistry.filter { $0.value.value != nil }
-        }
-
-        // Return existing profile if still alive
-        if let existing = profileRegistry[pubkey]?.value {
+        // Return existing profile if cached, updating LRU position
+        if let existing = profileCache[pubkey] {
+            // Move to end of access order (most recently used)
+            if let index = profileAccessOrder.firstIndex(of: pubkey) {
+                profileAccessOrder.remove(at: index)
+            }
+            profileAccessOrder.append(pubkey)
             return existing
         }
 
-        // Create new profile and store weak reference
+        // Evict oldest profiles if at capacity
+        while profileCache.count >= Self.profileCacheLimit, let oldest = profileAccessOrder.first {
+            profileCache.removeValue(forKey: oldest)
+            profileAccessOrder.removeFirst()
+        }
+
+        // Create new profile and cache with strong reference
         let profile = NDKProfile(pubkey: pubkey, ndk: self)
-        profileRegistry[pubkey] = WeakProfile(profile)
+        profileCache[pubkey] = profile
+        profileAccessOrder.append(pubkey)
         return profile
     }
 
@@ -405,9 +407,14 @@ public final class NDK {
     ///
     /// If `connect()` has already been called, the relay will be automatically connected.
     /// Otherwise, it will be connected when `connect()` is called.
+    ///
+    /// - Parameters:
+    ///   - url: The relay URL to add
+    ///   - origin: The origin of this relay (why it's being added)
+    ///   - reason: Optional human-readable reason for debugging
     @discardableResult
-    public func addRelay(_ url: RelayURL, origin: NDKRelayOrigin = .appRelays) async -> NDKRelay {
-        await pool.addRelay(url, origin: origin)
+    public func addRelay(_ url: RelayURL, origin: NDKRelayOrigin = .appRelays, reason: String? = nil) async -> NDKRelay {
+        await pool.addRelay(url, origin: origin, reason: reason)
     }
 
     /// Remove a relay from the pool
@@ -479,7 +486,7 @@ public final class NDK {
     /// This should be called before connect() to ensure relays are added
     public func initializeRelays() async {
         for url in initialRelayURLs {
-            await addRelay(url)
+            await addRelay(url, reason: "initial relay from config")
         }
         initialRelayURLs.removeAll() // Clear after adding
     }
@@ -501,7 +508,7 @@ public final class NDK {
         if !discoveryConfig.discoveryRelays.isEmpty {
             NDKLogger.log(.info, category: .relay, "Adding \(discoveryConfig.discoveryRelays.count) discovery relay(s) from configuration")
             for relayUrl in discoveryConfig.discoveryRelays {
-                await pool.addRelay(relayUrl, origin: .discovery)
+                await pool.addRelay(relayUrl, origin: .discovery, reason: "discovery relay from config")
             }
         }
 
@@ -612,7 +619,6 @@ public final class NDK {
         exclusiveRelays: Bool = false,
         subscriptionId: String? = nil,
         closeOnEose: Bool? = nil,
-        sorted: Bool = true,
         includeRelayUpdates: Bool = false
     ) -> NDKSubscription<NDKEvent> {
         // Smart default: close on EOSE if maxAge > 0, otherwise stay open
@@ -627,7 +633,6 @@ public final class NDK {
             exclusiveRelays: exclusiveRelays,
             subscriptionId: subscriptionId,
             closeOnEose: shouldCloseOnEose,
-            sorted: sorted,
             includeRelayUpdates: includeRelayUpdates
         )
     }
@@ -636,7 +641,6 @@ public final class NDK {
     public func subscribe(
         filter: NDKFilter,
         options: NDKSubscriptionOptions? = nil,
-        sorted: Bool = true,
         includeRelayUpdates: Bool = false
     ) -> NDKSubscription<NDKEvent> {
         let opts = options ?? .default
@@ -644,7 +648,6 @@ public final class NDK {
             ndk: self,
             filter: filter,
             options: opts,
-            sorted: sorted,
             includeRelayUpdates: includeRelayUpdates
         )
     }
@@ -657,7 +660,6 @@ public final class NDK {
         exclusiveRelays: Bool = false,
         subscriptionId: String? = nil,
         closeOnEose: Bool? = nil,
-        sorted: Bool = true,
         includeRelayUpdates: Bool = false,
         transform: @escaping @Sendable (NDKEvent) -> T?
     ) -> NDKSubscription<T> {
@@ -673,7 +675,6 @@ public final class NDK {
             exclusiveRelays: exclusiveRelays,
             subscriptionId: subscriptionId,
             closeOnEose: shouldCloseOnEose,
-            sorted: sorted,
             includeRelayUpdates: includeRelayUpdates,
             transform: transform
         )

@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 @preconcurrency import NDKSwiftCore
+import NDKSwiftUI
 
 struct OutboxStatsView: View {
     @Environment(ChirpState.self) private var state
@@ -60,7 +61,7 @@ struct OutboxStatsView: View {
                             NavigationLink {
                                 OutboxItemDetailView(item: item, ndk: state.ndk)
                             } label: {
-                                TrackedUserRow(item: item)
+                                TrackedUserRow(ndk: state.ndk, item: item)
                             }
                         }
                     }
@@ -154,37 +155,47 @@ private struct SourceBadge: View {
 // MARK: - Tracked User Row
 
 private struct TrackedUserRow: View {
+    let ndk: NDK
     let item: NDKOutboxItem
 
+    @State private var profile: NDKProfile?
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(formatPubkey(item.pubkey))
-                    .font(.system(.body, design: .monospaced))
-                    .lineLimit(1)
+        HStack(spacing: 12) {
+            NDKUIProfilePicture(ndk: ndk, pubkey: item.pubkey, size: 40)
 
-                Spacer()
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(profile?.displayName ?? formatPubkey(item.pubkey))
+                        .font(.body.weight(.medium))
+                        .lineLimit(1)
 
-                SourceBadge(source: item.source)
-            }
+                    Spacer()
 
-            HStack(spacing: 16) {
-                Label("\(item.readRelays.count) read", systemImage: "arrow.down.circle")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    SourceBadge(source: item.source)
+                }
 
-                Label("\(item.writeRelays.count) write", systemImage: "arrow.up.circle")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 16) {
+                    Label("\(item.readRelays.count) read", systemImage: "arrow.down.circle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
 
-                Spacer()
+                    Label("\(item.writeRelays.count) write", systemImage: "arrow.up.circle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
 
-                Text(formatRelativeDate(item.fetchedAt))
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    Spacer()
+
+                    Text(formatRelativeDate(item.fetchedAt))
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
             }
         }
         .padding(.vertical, 4)
+        .task {
+            profile = ndk.profile(for: item.pubkey)
+        }
     }
 
     private func formatPubkey(_ key: String) -> String {
@@ -206,16 +217,27 @@ struct OutboxItemDetailView: View {
 
     @State private var relayScores: [String: Double] = [:]
     @State private var isLoadingScores = true
+    @State private var profile: NDKProfile?
 
     var body: some View {
         List {
             // User Section
             Section("User") {
-                HStack {
-                    Text(item.pubkey)
-                        .font(.system(.caption, design: .monospaced))
-                        .lineLimit(2)
+                HStack(spacing: 12) {
+                    NDKUIProfilePicture(ndk: ndk, pubkey: item.pubkey, size: 50)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(profile?.displayName ?? formatPubkey(item.pubkey))
+                            .font(.headline)
+                        if let nip05 = profile?.nip05 {
+                            Text(nip05)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
                     Spacer()
+
                     Button {
                         UIPasteboard.general.string = item.pubkey
                     } label: {
@@ -269,8 +291,13 @@ struct OutboxItemDetailView: View {
         .navigationTitle("User Details")
         .navigationBarTitleDisplayMode(.inline)
         .task {
+            profile = ndk.profile(for: item.pubkey)
             await loadRelayScores()
         }
+    }
+
+    private func formatPubkey(_ key: String) -> String {
+        String(key.prefix(8)) + "..."
     }
 
     private func loadRelayScores() async {
@@ -394,17 +421,6 @@ private struct RelayInfoRow: View {
             return .orange
         } else {
             return .red
-        }
-    }
-}
-
-extension RelayListSource: CustomStringConvertible {
-    public var description: String {
-        switch self {
-        case .nip65: return "NIP-65"
-        case .contactList: return "Contact List"
-        case .manual: return "Manual"
-        case .unknown: return "Unknown"
         }
     }
 }

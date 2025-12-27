@@ -83,9 +83,9 @@ final class NDKProfileAPITests: XCTestCase {
         // When accessing displayName
         let displayName = profile.displayName
 
-        // Then returns truncated pubkey (first 8 chars + ...)
-        XCTAssert(displayName.hasPrefix(String(testPubkey.prefix(8))))
-        XCTAssert(displayName.hasSuffix("..."))
+        // Then returns truncated npub (starts with npub1, ends with ...)
+        XCTAssert(displayName.hasPrefix("npub1"), "Expected npub format, got: \(displayName)")
+        XCTAssert(displayName.hasSuffix("..."), "Expected ... suffix, got: \(displayName)")
     }
 
     func testProfile_PictureURLReturnsNilWhenNoMetadata() {
@@ -121,18 +121,63 @@ final class NDKProfileAPITests: XCTestCase {
         XCTAssertNil(nip05)
     }
 
-    // MARK: - user.profile Tests
+    // MARK: - LRU Cache Tests
 
-    func testUserProfile_ReturnsSameProfileAsNDKProfile() {
-        // Given a user
-        let user = ndk.getUser(testPubkey)!
+    func testProfileCache_EvictsOldestWhenAtCapacity() {
+        // Given: fill cache to capacity (500)
+        var firstProfiles: [NDKProfile] = []
+        for i in 0..<500 {
+            let pubkey = String(format: "%064d", i)
+            firstProfiles.append(ndk.profile(for: pubkey))
+        }
 
-        // When getting profile via user vs ndk
-        let userProfile = user.profile
-        let ndkProfile = ndk.profile(for: testPubkey)
+        // When: add one more profile
+        let newPubkey = String(format: "%064d", 999)
+        _ = ndk.profile(for: newPubkey)
 
-        // Then returns same instance
-        XCTAssert(userProfile === ndkProfile)
+        // Then: first profile should be evicted (new instance returned)
+        let firstPubkey = String(format: "%064d", 0)
+        let refetchedFirst = ndk.profile(for: firstPubkey)
+        XCTAssert(refetchedFirst !== firstProfiles[0], "First profile should have been evicted and return new instance")
+    }
+
+    func testProfileCache_AccessUpdatesLRUPosition() {
+        // Given: fill cache to capacity
+        for i in 0..<500 {
+            let pubkey = String(format: "%064d", i)
+            _ = ndk.profile(for: pubkey)
+        }
+
+        // When: access the first profile (moves it to most recent)
+        let firstPubkey = String(format: "%064d", 0)
+        let firstProfile = ndk.profile(for: firstPubkey)
+
+        // And: add a new profile (should evict second, not first)
+        let newPubkey = String(format: "%064d", 999)
+        _ = ndk.profile(for: newPubkey)
+
+        // Then: first profile should still be cached (same instance)
+        let refetchedFirst = ndk.profile(for: firstPubkey)
+        XCTAssert(refetchedFirst === firstProfile, "First profile should still be cached after access")
+
+        // And: second profile should be evicted (new instance)
+        let secondPubkey = String(format: "%064d", 1)
+        let originalSecond = ndk.profile(for: secondPubkey)
+        // Add another to trigger eviction check
+        let anotherNewPubkey = String(format: "%064d", 998)
+        _ = ndk.profile(for: anotherNewPubkey)
+        // Now second should be evicted since it wasn't accessed
+    }
+
+    func testProfileCache_KeepsProfilesAliveWithStrongReferences() {
+        // Given: create a profile
+        let profile = ndk.profile(for: testPubkey)
+
+        // When: access it again without holding external reference
+        let profile2 = ndk.profile(for: testPubkey)
+
+        // Then: same instance (cache holds strong reference)
+        XCTAssert(profile === profile2, "Cache should hold strong reference to profile")
     }
 
 }

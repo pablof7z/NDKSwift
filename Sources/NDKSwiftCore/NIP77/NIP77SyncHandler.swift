@@ -258,17 +258,12 @@ public actor NIP77SyncHandler {
         let reqMessage = "[\"REQ\",\"sub\",{\"ids\":[\(ids.map { "\"\($0)\"" }.joined(separator: ","))]}]"
         var totalBytes = reqMessage.count
 
-        // Fetch events using regular REQ/EVENT protocol
-        // Use NDKSubscription for fetching missing events
-        let dataSource = NDKSubscription(
-            ndk: ndk,
+        // Fetch events until EOSE (sync operations need all events)
+        let events = await ndk.fetchEvents(
             filter: filter,
-            maxAge: 0, // Always fetch fresh for sync
-            cachePolicy: .networkOnly // Skip cache for sync operations
+            cachePolicy: .networkOnly, // Skip cache for sync operations
+            timeout: NetworkConstants.timeoutDataCollectionSync
         )
-
-        // Collect all events (sync operations need all events)
-        let events = await dataSource.collect(timeout: NetworkConstants.timeoutDataCollectionSync) // Longer timeout for sync operations
 
         // Store events in cache and estimate bandwidth
         for event in events {

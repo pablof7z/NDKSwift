@@ -105,7 +105,7 @@ public struct RelayMetadata: Codable, Equatable, Sendable {
 }
 
 /// Source of relay list information
-public enum RelayListSource: String, Codable, Sendable {
+public enum RelayListSource: String, Codable, Sendable, CustomStringConvertible {
     /// NIP-65 relay list (kind 10002)
     case nip65
 
@@ -117,4 +117,13 @@ public enum RelayListSource: String, Codable, Sendable {
 
     /// Unknown source
     case unknown
+
+    public var description: String {
+        switch self {
+        case .nip65: return "NIP-65"
+        case .contactList: return "Contact List"
+        case .manual: return "Manual"
+        case .unknown: return "Unknown"
+        }
+    }
 }

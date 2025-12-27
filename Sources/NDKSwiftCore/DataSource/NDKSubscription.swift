@@ -1,5 +1,4 @@
 import Foundation
-import Observation
 
 /// Defines how the cache should be used for data requests
 public enum CachePolicy: Sendable {
@@ -25,21 +24,13 @@ public enum RelayUpdate: Sendable {
     case subscriptionActivated(relay: String, kinds: [Int], authorCount: Int)
 }
 
-/// Primary API for declarative data access in NDKSwift
-/// Automatically manages subscriptions, caching, and lifecycle
+/// Pure streaming subscription - no accumulation
+/// Use NDKFeed for UI accumulation of events
 ///
 /// Thread Safety: This class uses internal actor isolation via `SubscriptionStateManager`
 /// to protect mutable state. All mutable properties (filter, task, requirementHandle) are
 /// accessed through the actor, ensuring thread-safe operations.
-@Observable
-public final class NDKSubscription<T: Sendable>: @unchecked Sendable {
-    /// Automatically deduplicated and sorted (by default) accumulator of events
-    public var data: [T] {
-        sortedData.map { $0.event }
-    }
-
-    private var sortedData: [(event: T, timestamp: Timestamp)] = []
-
+public final class NDKSubscription<T: Sendable>: Sendable {
     /// AsyncStream for consuming event batches as they arrive
     /// Batches are yielded directly from cache (bulk) or network (single-element)
     public let events: AsyncStream<[T]>
@@ -61,7 +52,6 @@ public final class NDKSubscription<T: Sendable>: @unchecked Sendable {
     private let groupableDelayType: NDKSubscriptionDelayType?
     private let correlationId: String
     private let subscriptionId: String?
-    private let sorted: Bool
 
     /// Actor-protected mutable state for thread safety
     private let stateManager: SubscriptionStateManager
@@ -154,7 +144,6 @@ public final class NDKSubscription<T: Sendable>: @unchecked Sendable {
         exclusiveRelays: Bool = false,
         subscriptionId: String? = nil,
         closeOnEose: Bool = false,
-        sorted: Bool = true,
         includeRelayUpdates: Bool = false
     ) where T == NDKEvent {
         self.init(
@@ -166,7 +155,6 @@ public final class NDKSubscription<T: Sendable>: @unchecked Sendable {
             exclusiveRelays: exclusiveRelays,
             subscriptionId: subscriptionId,
             closeOnEose: closeOnEose,
-            sorted: sorted,
             includeRelayUpdates: includeRelayUpdates,
             transform: { @Sendable in $0 }
         )
@@ -182,7 +170,6 @@ public final class NDKSubscription<T: Sendable>: @unchecked Sendable {
     ///   - cachePolicy: Defines how the cache should be used for this request
     ///   - relays: Optional set of specific relay URLs to query
     ///   - subscriptionId: Optional custom subscription ID to use (for debugging/tracing)
-    ///   - sorted: Whether to automatically sort events by created_at (default: true)
     ///   - includeRelayUpdates: Whether to include relay-level updates stream (default: false)
     ///   - transform: Optional transform to convert NDKEvent to custom type
     public init(
@@ -194,7 +181,6 @@ public final class NDKSubscription<T: Sendable>: @unchecked Sendable {
         exclusiveRelays: Bool = false,
         subscriptionId: String? = nil,
         closeOnEose: Bool = false,
-        sorted: Bool = true,
         includeRelayUpdates: Bool = false,
         transform: @escaping @Sendable (NDKEvent) -> T?
     ) {
@@ -206,14 +192,13 @@ public final class NDKSubscription<T: Sendable>: @unchecked Sendable {
         self.relays = relays
         self.exclusiveRelays = exclusiveRelays
         self.closeOnEose = closeOnEose
-        self.sorted = sorted
         groupable = true
         groupableDelay = nil
         groupableDelayType = nil
         correlationId = IDGenerator.randomId(length: 8)
         self.subscriptionId = subscriptionId
 
-        NDKLogger.log(.trace, category: .subscription, "NDKSubscription init - filter: \(filter), maxAge: \(maxAge), cachePolicy: \(cachePolicy), sorted: \(sorted), includeRelayUpdates: \(includeRelayUpdates)", correlationId: correlationId)
+        NDKLogger.log(.trace, category: .subscription, "NDKSubscription init - filter: \(filter), maxAge: \(maxAge), cachePolicy: \(cachePolicy), includeRelayUpdates: \(includeRelayUpdates)", correlationId: correlationId)
 
         // Set up the AsyncStream for event batches
         var continuation: AsyncStream<[T]>.Continuation!
@@ -248,14 +233,12 @@ public final class NDKSubscription<T: Sendable>: @unchecked Sendable {
     ///   - ndk: The NDK instance
     ///   - filter: The NDKFilter describing the data requirement
     ///   - options: Subscription configuration options
-    ///   - sorted: Whether to automatically sort events by created_at (default: true)
     ///   - includeRelayUpdates: Whether to include relay-level updates stream (default: false)
     ///   - transform: Optional transform to convert NDKEvent to custom type
     public init(
         ndk: NDK,
         filter: NDKFilter,
         options: NDKSubscriptionOptions,
-        sorted: Bool = true,
         includeRelayUpdates: Bool = false,
         transform: @escaping @Sendable (NDKEvent) -> T? = { $0 as? T }
     ) {
@@ -267,14 +250,13 @@ public final class NDKSubscription<T: Sendable>: @unchecked Sendable {
         relays = options.relays
         exclusiveRelays = options.exclusiveRelays
         closeOnEose = options.closeOnEose ?? false
-        self.sorted = sorted
         groupable = options.groupable
         groupableDelay = options.groupableDelay
         groupableDelayType = options.groupableDelayType
         correlationId = IDGenerator.randomId(length: 8)
         subscriptionId = options.subscriptionId
 
-        NDKLogger.log(.trace, category: .subscription, "NDKSubscription init with options - filter: \(filter), maxAge: \(maxAge), cachePolicy: \(cachePolicy), sorted: \(sorted), includeRelayUpdates: \(includeRelayUpdates)", correlationId: correlationId)
+        NDKLogger.log(.trace, category: .subscription, "NDKSubscription init with options - filter: \(filter), maxAge: \(maxAge), cachePolicy: \(cachePolicy), includeRelayUpdates: \(includeRelayUpdates)", correlationId: correlationId)
 
         // Set up the AsyncStream for event batches
         var continuation: AsyncStream<[T]>.Continuation!
@@ -360,10 +342,9 @@ public final class NDKSubscription<T: Sendable>: @unchecked Sendable {
 
     // MARK: - Event Handling
 
-    /// Handle a batch of events
-    /// Updates data array directly - automatically deduplicates and sorts (if enabled)
+    /// Handle a batch of events - deduplicate and forward to stream
     private func handleEvents(_ events: [NDKEvent]) async {
-        var newTransformed: [(event: T, timestamp: Timestamp)] = []
+        var newTransformed: [T] = []
 
         for event in events {
             // Check if we've already processed this event (thread-safe via actor)
@@ -372,28 +353,16 @@ public final class NDKSubscription<T: Sendable>: @unchecked Sendable {
             await processedEventIds.insert(event.id)
 
             if let transformed = transform(event) {
-                newTransformed.append((event: transformed, timestamp: event.createdAt))
+                newTransformed.append(transformed)
             } else {
-                NDKLogger.log(.debug, category: .subscription, "[NDKSubscription] Transform failed - event not added to data - id: \(event.id.prefix(10)), correlationId: \(correlationId)")
+                NDKLogger.log(.debug, category: .subscription, "[NDKSubscription] Transform failed - event not forwarded - id: \(event.id.prefix(10)), correlationId: \(correlationId)")
             }
         }
 
         guard !newTransformed.isEmpty else { return }
 
-        // Yield batch to AsyncStream (for programmatic consumers)
-        eventsContinuation.yield(newTransformed.map { $0.event })
-
-        // Update data array with automatic sorting
-        if sorted {
-            // Insert in sorted order by timestamp
-            for item in newTransformed {
-                let insertIndex = sortedData.firstIndex { $0.timestamp < item.timestamp } ?? sortedData.endIndex
-                sortedData.insert(item, at: insertIndex)
-            }
-        } else {
-            // Just append
-            sortedData.append(contentsOf: newTransformed)
-        }
+        // Yield batch to AsyncStream
+        eventsContinuation.yield(newTransformed)
     }
 
     /// Handle relay-level updates (EOSE, subscription status, etc)
@@ -407,10 +376,9 @@ public final class NDKSubscription<T: Sendable>: @unchecked Sendable {
         }
     }
 
-    /// Manually refresh the data
+    /// Manually refresh the subscription
     public func refresh() async {
-        NDKLogger.log(.info, category: .subscription, "Refreshing data source", correlationId: correlationId)
-        sortedData.removeAll()
+        NDKLogger.log(.info, category: .subscription, "Refreshing subscription", correlationId: correlationId)
         await processedEventIds.clear()
 
         if let handle = await stateManager.getRequirementHandle() {
@@ -423,90 +391,7 @@ public final class NDKSubscription<T: Sendable>: @unchecked Sendable {
         await startObserving()
     }
 
-    // MARK: - One-Shot Query Conveniences
-
-    /// Collect all events until timeout (convenience for one-shot queries)
-    /// - Parameters:
-    ///   - timeout: Maximum time to wait (default: 10 seconds)
-    ///   - limit: Maximum number of events to collect (nil = unlimited)
-    /// - Returns: Array of collected events
-    ///
-    /// Note: This is a convenience method for request-response patterns.
-    /// For ongoing subscriptions, use the `events` or `data` streams directly.
-    public func collect(timeout: TimeInterval = 10.0, limit: Int? = nil) async -> [T] {
-        var collected: [T] = []
-
-        let timeoutTask = Task {
-            try await Task.sleep(nanoseconds: UInt64(timeout * Double(TimeConstants.nanosecondsPerSecond)))
-        }
-
-        for await batch in events {
-            collected.append(contentsOf: batch)
-            if let limit = limit, collected.count >= limit {
-                break
-            }
-            if timeoutTask.isCancelled {
-                break
-            }
-        }
-
-        timeoutTask.cancel()
-        return collected
-    }
-
-    /// Wait for the first event to arrive (convenience for one-shot queries)
-    /// - Parameters:
-    ///   - timeout: Maximum time to wait (default: 10 seconds)
-    /// - Returns: The first event, or nil if timeout
-    ///
-    /// Note: This is a convenience method for request-response patterns.
-    /// For ongoing subscriptions, use the `events` or `data` streams directly.
-    public func first(timeout: TimeInterval = NetworkConstants.timeoutRelayInfo) async -> T? {
-        // If we already have data, return the first item
-        if let firstItem = data.first {
-            return firstItem
-        }
-
-        let timeoutTask = Task {
-            try await Task.sleep(nanoseconds: UInt64(timeout * Double(TimeConstants.nanosecondsPerSecond)))
-        }
-
-        for await batch in events {
-            if let first = batch.first {
-                timeoutTask.cancel()
-                return first
-            }
-            if timeoutTask.isCancelled {
-                return nil
-            }
-        }
-
-        timeoutTask.cancel()
-        return nil
-    }
-
-    // MARK: - Private Helper Methods
-
-    /// Fetch events from cache
-    private func fetchFromCache() async -> [NDKEvent]? {
-        // Check if data is already available from existing load
-        if !sortedData.isEmpty {
-            return sortedData.compactMap { $0.event as? NDKEvent }
-        }
-        return nil
-    }
-
-    /// Process cached events as a batch
-    private func processCachedEvents(_ events: [NDKEvent]) async {
-        await handleEvents(events)
-    }
-
-    /// Process fetched events as a batch
-    private func processFetchedEvents(_ events: [NDKEvent]) async {
-        await handleEvents(events)
-    }
-
-    /// Update the filter for this data source
+    /// Update the filter for this subscription
     /// - Parameter newFilter: The new filter to apply
     /// - Note: This method cancels the current subscription and starts a new one
     ///
@@ -527,59 +412,75 @@ public final class NDKSubscription<T: Sendable>: @unchecked Sendable {
         // Clear processed events (thread-safe via actor)
         await processedEventIds.clear()
 
-        // Clear current data
-        sortedData.removeAll()
-
         // Remove old requirement if exists
         await stateManager.cancelRequirement()
 
-        // Start new task with updated filter
-        let manager = stateManager
-        let newTask = Task { [weak self] in
-            guard let self = self else { return }
-            await self.fetchAndSubscribe(filter: newFilter)
-        }
-        await manager.setTask(newTask)
+        // Start new observation with updated filter
+        await startObserving()
     }
+}
 
-    /// Helper method to fetch and subscribe with a given filter
-    private func fetchAndSubscribe(filter: NDKFilter) async {
-        switch cachePolicy {
-        case .cacheOnly:
-            if let cachedEvents = await fetchFromCache() {
-                await processCachedEvents(cachedEvents)
-            }
+// MARK: - EOSE-based collection helper
 
-        case .cacheWithNetwork:
-            if let cachedEvents = await fetchFromCache() {
-                await processCachedEvents(cachedEvents)
-            }
+public extension NDK {
+    /// Collect events until EOSE is received from relays
+    /// This is the proper way to fetch initial data - waits for relay EOSE signal, not arbitrary timeout
+    /// - Parameters:
+    ///   - filter: The filter for events
+    ///   - maxAge: Maximum age for cached data
+    ///   - cachePolicy: Cache policy to use
+    ///   - relays: Optional specific relays to query
+    ///   - exclusiveRelays: If true, only use specified relays
+    ///   - timeout: Fallback timeout in case relays don't send EOSE
+    /// - Returns: Array of events received before EOSE
+    func fetchEvents(
+        filter: NDKFilter,
+        maxAge: TimeInterval = 0,
+        cachePolicy: CachePolicy = .cacheWithNetwork,
+        relays: Set<RelayURL>? = nil,
+        exclusiveRelays: Bool = false,
+        timeout: TimeInterval = 10.0
+    ) async -> [NDKEvent] {
+        var collected: [NDKEvent] = []
 
-            // For cache with network, always subscribe for continuous updates
-            await subscribeToEvents(filter: filter)
-
-        case .networkOnly:
-            // For network only, subscribe for events
-            await subscribeToEvents(filter: filter)
-        }
-    }
-
-    /// Subscribe to events with the given filter
-    private func subscribeToEvents(filter: NDKFilter) async {
         let subscription = NDKSubscription<NDKEvent>(
-            ndk: ndk,
+            ndk: self,
             filter: filter,
-            maxAge: 0,
+            maxAge: maxAge,
             cachePolicy: cachePolicy,
             relays: relays,
-            subscriptionId: subscriptionId,
-            sorted: sorted,
-            includeRelayUpdates: relayUpdatesContinuation != nil
+            exclusiveRelays: exclusiveRelays,
+            includeRelayUpdates: true
         )
 
-        // Process event batches from the nested subscription
-        for await batch in subscription.events {
-            await handleEvents(batch)
+        // Use a task group to race between event collection and EOSE/timeout
+        await withTaskGroup(of: Void.self) { group in
+            // Task to collect events
+            group.addTask {
+                for await batch in subscription.events {
+                    collected.append(contentsOf: batch)
+                }
+            }
+
+            // Task to wait for EOSE or timeout
+            group.addTask {
+                guard let relayUpdates = subscription.relayUpdates else {
+                    try? await Task.sleep(nanoseconds: UInt64(timeout * Double(TimeConstants.nanosecondsPerSecond)))
+                    return
+                }
+
+                for await update in relayUpdates {
+                    if case .aggregatedEose = update {
+                        return
+                    }
+                }
+            }
+
+            // Wait for EOSE task to complete, then cancel the collection task
+            await group.next()
+            group.cancelAll()
         }
+
+        return collected
     }
 }

@@ -256,10 +256,11 @@ public actor NDKBunkerSigner: NDKSigner {
         }
 
         // Ensure relays are added and connected
+        // Use outbox origin to avoid polluting app relay list - these are bunker-specific relays
         if !relayURLs.isEmpty {
             NDKLogger.log(.info, category: .auth, "\(logPrefix) Connecting to bunker relays: \(relayURLs)")
             for relayUrl in relayURLs {
-                let relay = await ndk.addRelay(relayUrl)
+                let relay = await ndk.addRelay(relayUrl, origin: .outbox(authorPubkey: ""))
 
                 // Connect to the relay if not already connected
                 if await relay.connectionState != .connected {

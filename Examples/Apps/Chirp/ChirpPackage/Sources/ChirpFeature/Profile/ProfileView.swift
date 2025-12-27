@@ -4,7 +4,6 @@ import NDKSwiftUI
 
 public struct ProfileView: View {
     @Environment(ChirpState.self) private var state
-    @State private var subscription: NDKSubscription<NDKEvent>?
     @State private var allEvents: [NDKEvent] = []
     @State private var selectedTab: ProfileTab = .posts
 
@@ -111,36 +110,32 @@ public struct ProfileView: View {
 
     @ViewBuilder
     private func postsContent(pubkey: String) -> some View {
-        // Show content immediately - no loading state
-        // Posts will stream in as they arrive
         LazyVStack(spacing: 0) {
             if allEvents.isEmpty {
-                // Show empty state inline, not as a blocker
                 Text("No posts yet")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .frame(minHeight: 100)
             } else {
                 ForEach(allEvents, id: \.id) { event in
-                    FeedPostRow(ndk: state.ndk, event: event)
+                    NavigationLink(value: event) {
+                        FeedPostRow(ndk: state.ndk, event: event)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
         .padding(.bottom, 100)
-        .task {
-            if subscription == nil {
-                createSubscription(pubkey: pubkey)
-            }
+        .navigationDestination(for: NDKEvent.self) { event in
+            ThreadView(event: event)
         }
-        .onChange(of: subscription?.data) { _, newData in
-            if let newData = newData {
-                mergeEvents(from: newData)
-            }
+        .task {
+            await streamEvents(pubkey: pubkey)
         }
     }
 
-    private func createSubscription(pubkey: String) {
-        subscription = state.ndk.subscribe(
+    private func streamEvents(pubkey: String) async {
+        let subscription = state.ndk.subscribe(
             filter: NDKFilter(
                 authors: [pubkey],
                 kinds: [1],
@@ -149,15 +144,17 @@ public struct ProfileView: View {
             cachePolicy: .cacheWithNetwork,
             subscriptionId: "profile-posts"
         )
-    }
 
-    private func mergeEvents(from newData: [NDKEvent]) {
-        let existingIds = Set(allEvents.map { $0.id })
-        let newEvents = newData.filter { !existingIds.contains($0.id) }
-
-        if !newEvents.isEmpty {
-            withAnimation(.spring(response: 0.3)) {
-                allEvents = (allEvents + newEvents).sorted { $0.createdAt > $1.createdAt }
+        var existingIds = Set<String>()
+        for await batch in subscription.events {
+            let newEvents = batch.filter { !existingIds.contains($0.id) }
+            if !newEvents.isEmpty {
+                for event in newEvents {
+                    existingIds.insert(event.id)
+                }
+                withAnimation(.spring(response: 0.3)) {
+                    allEvents = (allEvents + newEvents).sorted { $0.createdAt > $1.createdAt }
+                }
             }
         }
     }

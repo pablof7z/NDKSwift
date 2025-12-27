@@ -274,17 +274,14 @@ public extension NDK {
     func fetchRelayList(for pubkey: PublicKey) async throws -> NDKRelayList? {
         let filter = NDKFilter(authors: [pubkey], kinds: [EventKind.relayList])
 
-        // Use NDKSubscription with long maxAge for relay lists
-        let dataSource = NDKSubscription(
-            ndk: self,
+        // Fetch events until EOSE and use the most recent
+        let events = await fetchEvents(
             filter: filter,
-            maxAge: TimeConstants.day // 24 hours - relay lists rarely change
+            maxAge: TimeConstants.day, // 24 hours - relay lists rarely change
+            timeout: NetworkConstants.timeoutDataCollectionMedium
         )
-
-        // Collect all relay list events and use the most recent
-        let events = await dataSource.collect(timeout: NetworkConstants.timeoutDataCollectionMedium)
         guard let event = events.mostRecent else { return nil }
-        return NDKRelayList.fromEvent(event)
+        return NDKRelayList.fromEvent(event, ndk: self)
     }
 
     /// Fetch the relay list for the current user
@@ -297,6 +294,9 @@ public extension NDK {
     /// Publish a relay list
     func publishRelayList(_ relayList: NDKRelayList) async throws {
         _ = try requireSigner()
+
+        // Ensure the relay list has a reference to this NDK instance for signing
+        relayList.ndk = self
 
         try await relayList.sign()
         let event = relayList.toNDKEvent()

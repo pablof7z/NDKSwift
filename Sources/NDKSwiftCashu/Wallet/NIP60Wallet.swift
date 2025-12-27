@@ -1408,15 +1408,12 @@ public actor NIP60Wallet: NDKPaymentProvider {
             kinds: [EventKind.cashuWalletBackup]
         )
 
-        let dataSource = NDKSubscription(
-            ndk: ndk,
+        // Fetch events until EOSE
+        let backupEvents = await ndk.fetchEvents(
             filter: backupFilter,
-            maxAge: 0,
             cachePolicy: .networkOnly,
-            subscriptionId: "nip60-check-backup"
+            timeout: 10.0
         )
-
-        let backupEvents = await dataSource.collect()
         return !backupEvents.isEmpty
     }
 

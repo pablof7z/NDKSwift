@@ -7,6 +7,9 @@ struct FeaturedFollowPackCard: View {
     let ndk: NDK
     let pack: FollowPack
 
+    // Store profile reference so SwiftUI holds it and observes changes
+    @State private var profile: NDKProfile?
+
     var body: some View {
         ZStack(alignment: .bottom) {
             // Background - image or gradient fallback
@@ -29,6 +32,9 @@ struct FeaturedFollowPackCard: View {
         }
         .frame(width: 280, height: 180)
         .clipShape(RoundedRectangle(cornerRadius: 20))
+        .task {
+            profile = ndk.profile(for: pack.creatorPubkey)
+        }
     }
 
     // MARK: - Background
@@ -144,7 +150,7 @@ struct FeaturedFollowPackCard: View {
             HStack(spacing: 4) {
                 Text("by")
                     .foregroundStyle(.white.opacity(0.7))
-                Text(ndk.profile(for: pack.creatorPubkey).displayName)
+                Text(profile?.displayName ?? "...")
                     .foregroundStyle(.white.opacity(0.7))
             }
             .font(.system(size: 14))

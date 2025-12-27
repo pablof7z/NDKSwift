@@ -98,11 +98,10 @@ final class NDKListTests: XCTestCase {
 
     // MARK: - Item Management Tests
 
-    func testAddUserItem() async throws {
+    func testAddPubkeyItem() async throws {
         let list = NDKList(ndk: ndk, kind: EventKind.muteList)
-        let user = NDKUser(pubkey: "test-pubkey", ndk: ndk)
 
-        try await list.addItem(user)
+        try await list.addPubkey("test-pubkey")
 
         XCTAssertEqual(list.allItems.count, 1)
         XCTAssertTrue(list.contains("test-pubkey"))
@@ -172,9 +171,8 @@ final class NDKListTests: XCTestCase {
 
     func testAddItemWithMark() async throws {
         let list = NDKList(ndk: ndk, kind: EventKind.bookmarkList)
-        let user = NDKUser(pubkey: "test-pubkey", ndk: ndk)
 
-        try await list.addItem(user, mark: "favorite")
+        try await list.addPubkey("test-pubkey", mark: "favorite")
 
         let tag = list.publicItems.first
         XCTAssertEqual(tag, ["p", "test-pubkey", "favorite"])
@@ -184,11 +182,11 @@ final class NDKListTests: XCTestCase {
         let list = NDKList(ndk: ndk, kind: EventKind.bookmarkList)
 
         // Add items at bottom (default)
-        try await list.addItem(NDKUser(pubkey: "user1", ndk: ndk))
-        try await list.addItem(NDKUser(pubkey: "user2", ndk: ndk))
+        try await list.addPubkey("user1")
+        try await list.addPubkey("user2")
 
         // Add item at top
-        try await list.addItem(NDKUser(pubkey: "user3", ndk: ndk), position: .top)
+        try await list.addPubkey("user3", position: .top)
 
         let pubkeys = list.publicItems.compactMap { tag in
             tag.count > 1 && tag[0] == "p" ? tag[1] : nil
@@ -199,10 +197,9 @@ final class NDKListTests: XCTestCase {
 
     func testAddDuplicateItem() async throws {
         let list = NDKList(ndk: ndk, kind: EventKind.muteList)
-        let user = NDKUser(pubkey: "test-pubkey", ndk: ndk)
 
-        try await list.addItem(user)
-        try await list.addItem(user) // Should not add duplicate
+        try await list.addPubkey("test-pubkey")
+        try await list.addPubkey("test-pubkey") // Should not add duplicate
 
         XCTAssertEqual(list.allItems.count, 1)
     }
@@ -213,9 +210,9 @@ final class NDKListTests: XCTestCase {
         let list = NDKList(ndk: ndk, kind: EventKind.muteList)
 
         // Add multiple items
-        try await list.addItem(NDKUser(pubkey: "user1", ndk: ndk))
-        try await list.addItem(NDKUser(pubkey: "user2", ndk: ndk))
-        try await list.addItem(NDKUser(pubkey: "user3", ndk: ndk))
+        try await list.addPubkey("user1")
+        try await list.addPubkey("user2")
+        try await list.addPubkey("user3")
 
         XCTAssertEqual(list.allItems.count, 3)
 
@@ -232,9 +229,9 @@ final class NDKListTests: XCTestCase {
         let list = NDKList(ndk: ndk, kind: EventKind.bookmarkList)
 
         // Add items
-        try await list.addItem(NDKUser(pubkey: "user1", ndk: ndk))
-        try await list.addItem(NDKUser(pubkey: "user2", ndk: ndk))
-        try await list.addItem(NDKUser(pubkey: "user3", ndk: ndk))
+        try await list.addPubkey("user1")
+        try await list.addPubkey("user2")
+        try await list.addPubkey("user3")
 
         // Remove middle item
         try await list.removeItem(at: 1, encrypted: false)
@@ -279,8 +276,8 @@ final class NDKListTests: XCTestCase {
         let list = NDKList(ndk: ndk, kind: EventKind.bookmarkList)
 
         // Add various types of items
-        try await list.addItem(NDKUser(pubkey: "user1", ndk: ndk))
-        try await list.addItem(NDKUser(pubkey: "user2", ndk: ndk))
+        try await list.addPubkey("user1")
+        try await list.addPubkey("user2")
 
         let event1 = NDKEvent(id: "event1", pubkey: "author", createdAt: 0, kind: 1, tags: [], content: "", sig: "")
         let event2 = NDKEvent(id: "event2", pubkey: "author", createdAt: 0, kind: 1, tags: [], content: "", sig: "")
@@ -302,9 +299,9 @@ final class NDKListTests: XCTestCase {
     func testFiltersForItems() async throws {
         let list = NDKList(ndk: ndk, kind: EventKind.bookmarkList)
 
-        // Add users (should create profile filter)
-        try await list.addItem(NDKUser(pubkey: "user1", ndk: ndk))
-        try await list.addItem(NDKUser(pubkey: "user2", ndk: ndk))
+        // Add pubkeys (should create profile filter)
+        try await list.addPubkey("user1")
+        try await list.addPubkey("user2")
 
         // Add events (should create event filter)
         let event1 = NDKEvent(id: "event1", pubkey: "author", createdAt: 0, kind: 1, tags: [], content: "", sig: "")
@@ -399,7 +396,7 @@ final class NDKListTests: XCTestCase {
         list.signature = "test-signature"
         list.title = "My Bookmarks"
 
-        try await list.addItem(NDKUser(pubkey: "user1", ndk: ndk))
+        try await list.addPubkey("user1")
 
         let event = list.toNDKEvent()
 

@@ -589,6 +589,12 @@ public extension NDKList {
         try await addItem(item, mark: mark, encrypted: encrypted, position: position)
     }
 
+    /// Add a pubkey to this list
+    func addPubkey(_ pubkey: String, mark: String? = nil, encrypted: Bool = false, position: ListPosition = .bottom) async throws {
+        let item = NDKStringListItem(tagType: NostrConstants.TagName.pubkey, value: pubkey)
+        try await addItem(item, mark: mark, encrypted: encrypted, position: position)
+    }
+
     /// Get all hashtags in this list
     var hashtags: [String] {
         return allItems.compactMap { tag in

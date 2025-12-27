@@ -268,21 +268,23 @@ private class ReactionState: ObservableObject {
             cachePolicy: .cacheWithNetwork
         )
 
-        // Process reaction events
+        // Accumulate reactions locally
+        var allReactions: [String: NDKEvent] = [:] // id -> event
+        let userPubkey = try? await ndk.signer?.pubkey
+
+        // Process reaction events as they stream in
         for await batch in dataSource.events {
-            for _ in batch {
-                await updateReactionState(from: dataSource.data, ndk: ndk)
+            for event in batch {
+                allReactions[event.id] = event
             }
+            updateReactionState(from: Array(allReactions.values), userPubkey: userPubkey)
         }
     }
 
-    private func updateReactionState(from events: [NDKEvent], ndk: NDK) async {
+    private func updateReactionState(from events: [NDKEvent], userPubkey: String?) {
         var totalCount = 0
         var userReacted = false
         var userReactionEventId: String?
-
-        // Get current user's pubkey
-        let userPubkey = try? await ndk.signer?.pubkey
 
         // Process all reaction events matching our emoji
         for event in events where event.content == reaction {

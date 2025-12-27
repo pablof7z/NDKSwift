@@ -45,10 +45,11 @@ public extension NDK {
         let startTime = Date()
 
         // Get or create relay connection
+        // Use outbox origin to avoid polluting app relay list - these are sync-specific relays
         var relay = await pool.getRelay(for: relayURL)
         if relay == nil {
             // Use addRelay to ensure auto-connect happens
-            relay = await addRelay(relayURL)
+            relay = await addRelay(relayURL, origin: .outbox(authorPubkey: ""))
         }
 
         guard relay != nil else {

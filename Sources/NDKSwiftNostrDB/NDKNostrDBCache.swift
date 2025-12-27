@@ -523,9 +523,33 @@ public actor NDKNostrDBCache: NDKCache {
                                     continuation.yield(userMetadata)
                                 }
                             }
-                        case .events:
-                            // Batch events - not used in this context
-                            continue
+                        case .events(let noteKeys):
+                            // Batch events - find the most recent kind 0 event
+                            var latestMetadata: NDKUserMetadata?
+                            var latestTimestamp: Timestamp = 0
+                            for noteKey in noteKeys {
+                                if let txn = nostrDB.lookup_note_by_key(noteKey),
+                                   let note = txn.unsafeUnownedValue {
+                                    // Only process kind 0 events
+                                    guard note.kind == 0 else { continue }
+                                    let timestamp = Timestamp(note.created_at)
+                                    if timestamp > latestTimestamp {
+                                        if let data = note.content.data(using: .utf8),
+                                           let metadata = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                                            latestTimestamp = timestamp
+                                            latestMetadata = NDKUserMetadata(
+                                                pubkey: pubkey,
+                                                parsedMetadata: metadata,
+                                                updatedAt: timestamp,
+                                                eventId: self.dataToHex(note.id.id)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            if let metadata = latestMetadata {
+                                continuation.yield(metadata)
+                            }
                         }
                     }
 

@@ -10,16 +10,22 @@ public class NDKSessionData {
     /// NDK instance
     private weak var ndk: NDK?
 
-    /// Follow list state
-    public private(set) var followListState: DataState<Set<String>> = .loading
+    /// Contact list state (kind:3)
+    public private(set) var contactListState: DataState<NDKContactList> = .loading
 
-    /// Computed follow list
-    public var followList: Set<String> {
-        followListState.data ?? []
+    /// Computed contact list
+    public var contactList: NDKContactList? {
+        contactListState.data
     }
 
-    /// Latest follow list event ID for delta detection
-    private var latestFollowListEventId: String?
+    /// Computed follow list (pubkeys only, for fast lookups)
+    public var followList: Set<String> {
+        guard let contactList = contactList else { return [] }
+        return Set(contactList.contactPubkeys)
+    }
+
+    /// Latest contact list event ID for delta detection
+    private var latestContactListEventId: String?
 
     /// Mute list state
     public private(set) var muteListState: DataState<Set<String>> = .loading
@@ -73,7 +79,7 @@ public class NDKSessionData {
             switch requirement {
             case .followList:
                 // Only load if not already available
-                if !followListState.isAvailable {
+                if !contactListState.isAvailable {
                     kinds.insert(EventKind.contacts)
                     needsFollowList = true
                 }
@@ -91,8 +97,8 @@ public class NDKSessionData {
                 }
             case .webOfTrust:
                 // WOT is lazy-loaded on first access
-                // But we need follow list first
-                if !followListState.isAvailable {
+                // But we need contact list first
+                if !contactListState.isAvailable {
                     kinds.insert(EventKind.contacts)
                     needsFollowList = true
                 }
@@ -209,25 +215,26 @@ public class NDKSessionData {
 
     private func processFollowListEvent(_ event: NDKEvent, fromCache: Bool) {
         // Check for delta by event ID
-        guard event.id != latestFollowListEventId else {
-            NDKLogger.log(.debug, category: .subscription, "⏭️ Skipping duplicate follow list event - id: \(event.id)")
+        guard event.id != latestContactListEventId else {
+            NDKLogger.log(.debug, category: .subscription, "⏭️ Skipping duplicate contact list event - id: \(event.id)")
             return
         }
 
-        let follows = extractFollows(from: event)
+        // Use NDKContactList to properly parse the contact list
+        let newContactList = NDKContactList.fromEvent(event, ndk: ndk)
 
         // Update state based on whether this is initial load or update
-        if latestFollowListEventId == nil {
-            NDKLogger.log(.info, category: .subscription, "✅ Follow list loaded - \(follows.count) follows, fromCache: \(fromCache)")
-            followListState = .ready(follows, fromCache: fromCache)
+        if latestContactListEventId == nil {
+            NDKLogger.log(.info, category: .subscription, "✅ Contact list loaded - \(newContactList.contactCount) contacts, fromCache: \(fromCache)")
+            contactListState = .ready(newContactList, fromCache: fromCache)
         } else {
-            if case let .ready(current, _) = followListState {
-                NDKLogger.log(.info, category: .subscription, "🔄 Follow list updating - from \(current.count) to \(follows.count) follows")
-                followListState = .updating(current: current, changes: follows)
+            if case let .ready(current, _) = contactListState {
+                NDKLogger.log(.info, category: .subscription, "🔄 Contact list updating - from \(current.contactCount) to \(newContactList.contactCount) contacts")
+                contactListState = .updating(current: current, changes: newContactList)
             }
         }
 
-        latestFollowListEventId = event.id
+        latestContactListEventId = event.id
 
         // Trigger subscription updates if this is a change
         if !fromCache {
@@ -237,19 +244,7 @@ public class NDKSessionData {
         }
 
         // Update to ready state after processing
-        followListState = .ready(follows, fromCache: fromCache)
-    }
-
-    private func extractFollows(from event: NDKEvent) -> Set<String> {
-        var follows = Set<String>()
-
-        for tag in event.tags {
-            if tag.count >= 2 && tag[0] == "p" {
-                follows.insert(tag[1])
-            }
-        }
-
-        return follows
+        contactListState = .ready(newContactList, fromCache: fromCache)
     }
 
     // MARK: - Mute List Management
@@ -363,23 +358,18 @@ public class NDKSessionData {
             kinds: [EventKind.contacts]
         )
 
-        // Use data source to fetch events from outbox relays only
-        let subscriptionId = "session_wot_\(pubkey.prefix(8))"
-        let dataSource = NDKSubscription<NDKEvent>(
-            ndk: ndk,
+        // Fetch events from discovery relays until EOSE
+        let events = await ndk.fetchEvents(
             filter: filter,
             maxAge: 5 * TimeConstants.minute, // 5 minute cache
             relays: ndk.discoveryConfig.discoveryRelays,
             exclusiveRelays: true, // Only use the specified discovery relays
-            subscriptionId: subscriptionId
+            timeout: NetworkConstants.timeoutDataCollectionLong
         )
-
-        // Collect events
-        let events = await dataSource.collect(timeout: NetworkConstants.timeoutDataCollectionLong)
         if !events.isEmpty {
             for event in events {
-                let followsOfFollow = extractFollows(from: event)
-                for pubkey in followsOfFollow {
+                let theirContactList = NDKContactList.fromEvent(event)
+                for pubkey in theirContactList.contactPubkeys {
                     if pubkey != self.pubkey { // Don't count self
                         // Prevent overflow by checking current value
                         let currentScore = scores[pubkey, default: 0]

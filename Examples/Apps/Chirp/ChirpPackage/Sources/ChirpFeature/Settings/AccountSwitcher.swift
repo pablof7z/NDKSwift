@@ -84,6 +84,9 @@ struct AccountRow: View {
     let isActive: Bool
     let onSwitch: () -> Void
 
+    // Store profile reference so SwiftUI holds it and observes changes
+    @State private var profile: NDKProfile?
+
     var body: some View {
         Button {
             onSwitch()
@@ -98,7 +101,7 @@ struct AccountRow: View {
 
                 // Display name and pubkey
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(state.ndk.profile(for: session.pubkey).displayName)
+                    Text(profile?.displayName ?? "...")
                         .font(.body)
                         .foregroundStyle(.primary)
 
@@ -116,6 +119,9 @@ struct AccountRow: View {
                 }
             }
             .contentShape(Rectangle())
+        }
+        .task {
+            profile = state.ndk.profile(for: session.pubkey)
         }
         .buttonStyle(.plain)
     }

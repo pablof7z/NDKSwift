@@ -43,7 +43,11 @@ public struct NDKContactEntry {
 
 /// Specialized list for managing contacts/follows (NIP-02, kind 3)
 /// Provides contact management with petnames and relay hints
-public class NDKContactList: NDKList {
+public class NDKContactList: NDKList, Equatable {
+    public static func == (lhs: NDKContactList, rhs: NDKContactList) -> Bool {
+        lhs.id == rhs.id
+    }
+
     /// Contact list kind (3)
     public static let kind = EventKind.contacts
 
@@ -241,67 +245,3 @@ public class NDKContactList: NDKList {
 
 }
 
-// MARK: - Integration with NDK
-
-public extension NDK {
-    /// Fetch the contact list for a specific pubkey
-    func fetchContactList(for pubkey: PublicKey) async throws -> NDKContactList? {
-        let filter = NDKFilter(authors: [pubkey], kinds: [EventKind.contacts])
-
-        // Use NDKSubscription with reasonable maxAge for contact lists
-        let dataSource = NDKSubscription(
-            ndk: self,
-            filter: filter,
-            maxAge: 10 * TimeConstants.minute // 10 minutes - contact lists don't change frequently
-        )
-
-        // Collect all contact list events and use the most recent
-        let events = await dataSource.collect(timeout: NetworkConstants.timeoutDataCollectionMedium)
-        guard let event = events.mostRecent else { return nil }
-        return NDKContactList.fromEvent(event, ndk: self)
-    }
-
-    /// Fetch the contact list for the current user
-    func fetchContactList() async throws -> NDKContactList? {
-        guard let signer else { return nil }
-        let pubkey = try await signer.pubkey
-        return try await fetchContactList(for: pubkey)
-    }
-
-    /// Publish a contact list
-    func publishContactList(_ contactList: NDKContactList) async throws {
-        guard signer != nil else {
-            throw NDKError.notConfigured("signer")
-        }
-
-        try await contactList.sign()
-        let event = contactList.toNDKEvent()
-        _ = try await publish(event)
-    }
-
-    /// Follow a pubkey (add to contact list)
-    func follow(_ pubkey: PublicKey) async throws {
-        let contactList = try await fetchContactList() ?? NDKContactList(ndk: self)
-        contactList.addContact(pubkey: pubkey)
-        try await publishContactList(contactList)
-    }
-
-    /// Unfollow a pubkey (remove from contact list)
-    func unfollow(_ pubkey: PublicKey) async throws {
-        guard let contactList = try await fetchContactList() else { return }
-        contactList.removeContact(pubkey: pubkey)
-        try await publishContactList(contactList)
-    }
-
-    /// Check if currently following a pubkey
-    func isFollowing(_ pubkey: PublicKey) async throws -> Bool {
-        guard let contactList = try await fetchContactList() else { return false }
-        return contactList.isFollowing(pubkey)
-    }
-
-    /// Get the list of pubkeys that a user follows
-    func following(for pubkey: PublicKey) async throws -> [PublicKey] {
-        guard let contactList = try await fetchContactList(for: pubkey) else { return [] }
-        return contactList.contactPubkeys
-    }
-}

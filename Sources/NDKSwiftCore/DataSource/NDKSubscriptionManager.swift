@@ -419,11 +419,15 @@ actor NDKSubscriptionManager {
             // Connect to selected relays that aren't already connected
             for relayURL in selectedRelays {
                 if await ndk.pool.getRelay(for: relayURL) == nil {
-                    NDKLogger.log(.info, category: .subscription,
-                                  "🔌 Adding and connecting to discovered relay: \(relayURL)")
                     let originAuthor = relevantAuthors.first ?? "unknown"
+                    let kindsStr = filter.kinds?.map { "\($0)" }.joined(separator: ",") ?? "all"
+                    let reason = "discovered relay for \(relevantAuthors.count) authors, requirement '\(requirement.subscriptionId)' kinds [\(kindsStr)]"
+
+                    NDKLogger.log(.info, category: .subscription,
+                                  "🔌 Adding discovered relay: \(relayURL) | \(reason)")
+
                     // Use ndk.addRelay instead of pool.addRelay to ensure auto-connect happens
-                    await ndk.addRelay(relayURL, origin: .outbox(authorPubkey: originAuthor))
+                    await ndk.addRelay(relayURL, origin: .outbox(authorPubkey: originAuthor), reason: reason)
                 }
             }
 

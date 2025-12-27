@@ -7,6 +7,9 @@ struct RelaySetCard: View {
     let ndk: NDK
     let relaySet: RelaySet
 
+    // Store profile reference so SwiftUI holds it and observes changes
+    @State private var profile: NDKProfile?
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Icon
@@ -22,7 +25,7 @@ struct RelaySetCard: View {
             HStack(spacing: 2) {
                 Text("by")
                     .foregroundStyle(.secondary)
-                Text(ndk.profile(for: relaySet.creatorPubkey).displayName)
+                Text(profile?.displayName ?? "...")
                     .foregroundStyle(.secondary)
             }
             .font(.system(size: 13))
@@ -37,6 +40,9 @@ struct RelaySetCard: View {
         .padding(16)
         .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        .task {
+            profile = ndk.profile(for: relaySet.creatorPubkey)
+        }
     }
 
     private var iconView: some View {

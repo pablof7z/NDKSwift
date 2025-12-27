@@ -294,8 +294,12 @@ public actor NDKPool {
     // MARK: - Relay Management
 
     /// Add a relay to the pool
+    /// - Parameters:
+    ///   - url: The relay URL to add
+    ///   - origin: The origin of this relay (why it's being added)
+    ///   - reason: Optional human-readable reason for debugging (e.g., "subscription for kinds 1,6")
     @discardableResult
-    public func addRelay(_ url: RelayURL, origin: NDKRelayOrigin = .appRelays) async -> NDKRelay {
+    public func addRelay(_ url: RelayURL, origin: NDKRelayOrigin = .appRelays, reason: String? = nil) async -> NDKRelay {
         let normalizedUrl = url.normalizedRelayURL
 
         // Start telemetry span
@@ -352,8 +356,9 @@ public actor NDKPool {
         case .discovery: originStr = "discovery"
         case let .outbox(pubkey): originStr = "outbox(\(pubkey.prefix(8)))"
         }
-        NDKLogger.log(.debug, category: .relay,
-                      "📊 Pool: added relay \(normalizedUrl) (origin: \(originStr)) - pool size now: \(relayMap.count)")
+        let reasonStr = reason.map { " | reason: \($0)" } ?? ""
+        NDKLogger.log(.info, category: .relay,
+                      "📊 Pool: ADDING relay \(normalizedUrl) | origin: \(originStr)\(reasonStr) | pool size: \(relayMap.count)")
 
         // Log warning if pool is growing too large
         if relayMap.count > 50 {
@@ -705,6 +710,7 @@ public actor NDKPool {
     /// - Parameters:
     ///   - urls: The relay URLs to prepare
     ///   - autoConnect: Whether to automatically connect to disconnected relays (default: false)
+    ///   - origin: The origin to use when adding new relays (default: .outbox with empty pubkey)
     ///
     /// - Returns: Array of prepared relay instances
     ///
@@ -721,13 +727,15 @@ public actor NDKPool {
     ///     autoConnect: true
     /// )
     /// ```
-    public func prepareRelays(_ urls: [String], autoConnect: Bool = false) async -> [NDKRelay] {
+    public func prepareRelays(_ urls: [String], autoConnect: Bool = false, origin: NDKRelayOrigin? = nil) async -> [NDKRelay] {
         NDKLogger.log(.debug, category: .relay, "🔧 Preparing \(urls.count) relays, autoConnect: \(autoConnect)")
         var preparedRelays: [NDKRelay] = []
 
         // First, ensure all relays exist in the pool
+        // Use provided origin or default to outbox (not appRelays) to avoid polluting app relay list
+        let relayOrigin = origin ?? .outbox(authorPubkey: "")
         for url in urls {
-            let relay = await addRelay(url)
+            let relay = await addRelay(url, origin: relayOrigin)
             preparedRelays.append(relay)
         }
 

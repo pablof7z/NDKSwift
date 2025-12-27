@@ -1,14 +1,15 @@
 import SwiftUI
+import UIKit
 import NDKSwiftCore
 import NDKSwiftUI
 
 public struct FeedView: View {
     @Environment(ChirpState.self) private var state
-    @State private var subscription: NDKSubscription<NDKEvent>?
     @State private var hasNewPosts = false
     @State private var isScrolledFromTop = false
     @State private var initialLoadTimestamp: Int64?
     @State private var allEvents: [NDKEvent] = []
+    @State private var streamTask: Task<Void, Never>?
     @Namespace private var animation
 
     public init() {}
@@ -18,9 +19,7 @@ public struct FeedView: View {
             if let followList = state.ndk.sessionData?.followList, !followList.isEmpty {
                 feedContent
                     .task {
-                        if subscription == nil {
-                            createSubscription(followList: followList)
-                        }
+                        await streamEvents(followList: followList)
                     }
             } else if state.ndk.sessionData == nil {
                 emptyFeedContent
@@ -29,20 +28,13 @@ public struct FeedView: View {
             }
         }
         .navigationTitle("Feed")
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    if let subscription = subscription {
-                        Task { await subscription.refresh() }
-                    }
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                }
-            }
-        }
+        .navigationBarTitleDisplayMode(.inline)
         .onChange(of: state.ndk.sessionData?.followList) { _, newFollowList in
             if let newFollowList = newFollowList, !newFollowList.isEmpty {
-                createSubscription(followList: newFollowList)
+                streamTask?.cancel()
+                streamTask = Task {
+                    await streamEvents(followList: newFollowList)
+                }
             }
         }
     }
@@ -87,15 +79,9 @@ public struct FeedView: View {
                     ThreadView(event: event)
                 }
                 .refreshable {
-                    if let subscription = subscription {
-                        await subscription.refresh()
-                    }
-                }
-                .onChange(of: subscription?.data) { _, newData in
-                    if let newData = newData {
-                        withAnimation(.spring(response: 0.3)) {
-                            mergeEvents(from: newData)
-                        }
+                    streamTask?.cancel()
+                    if let followList = state.ndk.sessionData?.followList {
+                        await streamEvents(followList: followList)
                     }
                 }
                 .onChange(of: allEvents.count) { oldCount, newCount in
@@ -136,8 +122,10 @@ public struct FeedView: View {
 
     // MARK: - Subscription Management
 
-    private func createSubscription(followList: Set<String>) {
-        subscription = state.ndk.subscribe(
+    private func streamEvents(followList: Set<String>) async {
+        initialLoadTimestamp = Int64(Date().timeIntervalSince1970)
+
+        let subscription = state.ndk.subscribe(
             filter: NDKFilter(
                 authors: Array(followList),
                 kinds: [1],
@@ -146,7 +134,19 @@ public struct FeedView: View {
             cachePolicy: .cacheWithNetwork,
             subscriptionId: "feed"
         )
-        initialLoadTimestamp = Int64(Date().timeIntervalSince1970)
+
+        var existingIds = Set(allEvents.map { $0.id })
+        for await batch in subscription.events {
+            let newEvents = batch.filter { !existingIds.contains($0.id) }
+            if !newEvents.isEmpty {
+                for event in newEvents {
+                    existingIds.insert(event.id)
+                }
+                withAnimation(.spring(response: 0.3)) {
+                    allEvents = (allEvents + newEvents).sorted { $0.createdAt > $1.createdAt }
+                }
+            }
+        }
     }
 
     private func trackScrollPosition(event: NDKEvent, data: [NDKEvent]) {
@@ -177,42 +177,29 @@ public struct FeedView: View {
         }
     }
 
-    private func mergeEvents(from newData: [NDKEvent]) {
-        let existingIds = Set(allEvents.map { $0.id })
-        let newEvents = newData.filter { !existingIds.contains($0.id) }
-
-        if !newEvents.isEmpty {
-            allEvents = (allEvents + newEvents).sorted { $0.createdAt > $1.createdAt }
-        }
-    }
-
     private func loadOlderPosts(followList: Set<String>, data: [NDKEvent]) {
         guard let oldestEvent = data.last else { return }
 
-        let olderSubscription = state.ndk.subscribe(
-            filter: NDKFilter(
-                authors: Array(followList),
-                kinds: [1],
-                until: oldestEvent.createdAt,
-                limit: 50
-            ),
-            cachePolicy: .cacheWithNetwork,
-            subscriptionId: "feed-older-\(UUID().uuidString)",
-            closeOnEose: true
-        )
+        let ndk = state.ndk
+        Task { @MainActor in
+            let olderEvents = await ndk.fetchEvents(
+                filter: NDKFilter(
+                    authors: Array(followList),
+                    kinds: [1],
+                    until: oldestEvent.createdAt,
+                    limit: 50
+                ),
+                cachePolicy: .cacheWithNetwork,
+                timeout: 10.0
+            )
 
-        Task {
-            for await events in olderSubscription.events {
-                await MainActor.run {
-                    let existingIds = Set(allEvents.map { $0.id })
-                    let newEvents = events.filter { !existingIds.contains($0.id) }
+            let existingIds = Set(allEvents.map { $0.id })
+            let newEvents = olderEvents.filter { !existingIds.contains($0.id) }
 
-                    if !newEvents.isEmpty {
-                        withAnimation {
-                            allEvents.append(contentsOf: newEvents)
-                            allEvents.sort { $0.createdAt > $1.createdAt }
-                        }
-                    }
+            if !newEvents.isEmpty {
+                withAnimation {
+                    allEvents.append(contentsOf: newEvents)
+                    allEvents.sort { $0.createdAt > $1.createdAt }
                 }
             }
         }
@@ -224,6 +211,9 @@ public struct FeedView: View {
 struct FeedPostRow: View {
     let ndk: NDK
     let event: NDKEvent
+
+    // Store profile reference so SwiftUI holds it and observes changes
+    @State private var profile: NDKProfile?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -239,7 +229,7 @@ struct FeedPostRow: View {
                     // Name and time row
                     HStack(spacing: 4) {
                         NavigationLink(destination: ProfileView(pubkey: event.pubkey)) {
-                            Text(ndk.profile(for: event.pubkey).displayName)
+                            Text(profile?.displayName ?? "...")
                                 .font(.subheadline.weight(.semibold))
                                 .lineLimit(1)
                         }
@@ -273,6 +263,10 @@ struct FeedPostRow: View {
             // Divider
             Divider()
         }
+        .task {
+            // Load profile and hold reference so SwiftUI observes changes
+            profile = ndk.profile(for: event.pubkey)
+        }
     }
 
     private var actionBar: some View {
@@ -285,9 +279,25 @@ struct FeedPostRow: View {
             Spacer()
             actionButton(icon: "bolt", count: nil)
             Spacer()
-            actionButton(icon: "square.and.arrow.up", count: nil)
+            moreMenu
         }
         .frame(maxWidth: 300, alignment: .leading)
+    }
+
+    private var moreMenu: some View {
+        Menu {
+            Button {
+                if let bech32 = try? Bech32.note(from: event.id) {
+                    UIPasteboard.general.string = bech32
+                }
+            } label: {
+                Label("Copy Note ID", systemImage: "doc.on.doc")
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
     }
 
     private func actionButton(icon: String, count: Int?) -> some View {
@@ -318,6 +328,9 @@ struct FeedPostCard: View {
     let ndk: NDK
     let event: NDKEvent
 
+    // Store profile reference so SwiftUI holds it and observes changes
+    @State private var profile: NDKProfile?
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Header with avatar and name
@@ -329,7 +342,7 @@ struct FeedPostCard: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     NavigationLink(destination: ProfileView(pubkey: event.pubkey)) {
-                        Text(ndk.profile(for: event.pubkey).displayName)
+                        Text(profile?.displayName ?? "...")
                             .font(.subheadline.weight(.semibold))
                             .lineLimit(1)
                     }
@@ -353,6 +366,10 @@ struct FeedPostCard: View {
         .padding()
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        .task {
+            // Load profile and hold reference so SwiftUI observes changes
+            profile = ndk.profile(for: event.pubkey)
+        }
     }
 }
 

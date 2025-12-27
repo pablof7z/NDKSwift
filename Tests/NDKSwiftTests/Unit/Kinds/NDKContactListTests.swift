@@ -73,19 +73,6 @@ final class NDKContactListTests: XCTestCase {
         XCTAssertEqual(entry?.petname, "Alice")
     }
 
-    func testAddContactByUser() {
-        let contactList = NDKContactList(ndk: ndk)
-        let user = NDKUser(pubkey: "pubkey1", ndk: ndk)
-
-        contactList.addContact(user: user, relayURL: "wss://relay.com", petname: "Bob")
-        XCTAssertEqual(contactList.contactCount, 1)
-        XCTAssertTrue(contactList.isFollowing(user))
-
-        let entry = contactList.contactEntry(for: user)
-        XCTAssertNotNil(entry)
-        XCTAssertEqual(entry?.petname, "Bob")
-    }
-
     func testRemoveContact() {
         let contactList = NDKContactList(ndk: ndk)
 
@@ -100,9 +87,8 @@ final class NDKContactListTests: XCTestCase {
         XCTAssertFalse(contactList.isFollowing("pubkey1"))
         XCTAssertTrue(contactList.isFollowing("pubkey2"))
 
-        // Remove by user
-        let user = NDKUser(pubkey: "pubkey2", ndk: ndk)
-        contactList.removeContact(user: user)
+        // Remove second contact
+        contactList.removeContact(pubkey: "pubkey2")
         XCTAssertEqual(contactList.contactCount, 0)
     }
 
@@ -123,10 +109,9 @@ final class NDKContactListTests: XCTestCase {
         contactList.updatePetname(for: "pubkey1", petname: nil)
         XCTAssertNil(contactList.petname(for: "pubkey1"))
 
-        // Test with user object
-        let user = NDKUser(pubkey: "pubkey1", ndk: ndk)
+        // Test petname retrieval
         contactList.updatePetname(for: "pubkey1", petname: "Alice Final")
-        XCTAssertEqual(contactList.petname(for: user), "Alice Final")
+        XCTAssertEqual(contactList.petname(for: "pubkey1"), "Alice Final")
     }
 
     // MARK: - Relay URL Tests
@@ -163,8 +148,7 @@ final class NDKContactListTests: XCTestCase {
 
         // Test contact queries
         XCTAssertEqual(contactList.contactPubkeys.sorted(), ["pubkey1", "pubkey2", "pubkey3", "pubkey4"])
-        let users = contactList.contactUsers()
-        XCTAssertEqual(users.count, 4)
+        XCTAssertEqual(contactList.contacts.count, 4)
 
         // Test filtered queries
         let withPetnames = contactList.contactsWithPetnames
@@ -235,19 +219,6 @@ final class NDKContactListTests: XCTestCase {
         XCTAssertEqual(contactList.contactPubkeys.sorted(), pubkeys.sorted())
     }
 
-    func testCreateFromUsers() {
-        let users = [
-            NDKUser(pubkey: "pubkey1", ndk: ndk),
-            NDKUser(pubkey: "pubkey2", ndk: ndk),
-            NDKUser(pubkey: "pubkey3", ndk: ndk),
-        ]
-        let contactList = NDKContactList.from(users: users, ndk: ndk)
-
-        XCTAssertEqual(contactList.contactCount, 3)
-        XCTAssertTrue(contactList.isFollowing(users[0]))
-        XCTAssertTrue(contactList.isFollowing(users[1]))
-        XCTAssertTrue(contactList.isFollowing(users[2]))
-    }
 
     // MARK: - Timestamp Update Tests
 

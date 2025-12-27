@@ -79,7 +79,7 @@ public extension NDK {
                 }
 
                 NDKLogger.log(.debug, category: .subscription, "🔍 [ReactiveFilter] Using session data for pubkey: \(sessionData.pubkey.prefix(8))...")
-                NDKLogger.log(.info, category: .subscription, "🔍 [ReactiveFilter] Session data state - follows: \(sessionData.followList.count), mutes: \(sessionData.muteList.count), followListState: \(sessionData.followListState)")
+                NDKLogger.log(.info, category: .subscription, "🔍 [ReactiveFilter] Session data state - follows: \(sessionData.followList.count), mutes: \(sessionData.muteList.count), contactListState: \(sessionData.contactListState)")
 
                 // Ensure required dependencies are loaded
                 var requiredData = reactiveFilter.dependencies
@@ -89,7 +89,7 @@ public extension NDK {
                 await sessionData.load(requiredData)
 
                 // Log the state after loading
-                NDKLogger.log(.info, category: .subscription, "🔍 [ReactiveFilter] After load - follows: \(sessionData.followList.count), followListState: \(sessionData.followListState)")
+                NDKLogger.log(.info, category: .subscription, "🔍 [ReactiveFilter] After load - follows: \(sessionData.followList.count), contactListState: \(sessionData.contactListState)")
 
                 // Build initial filter
                 let filter = reactiveFilter.builder(sessionData)

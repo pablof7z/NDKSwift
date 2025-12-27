@@ -98,8 +98,9 @@ public actor NDKNWCWallet: NDKPaymentProvider {
                 let nwcRelayURLs = connectionURI.normalizedRelayURLs()
                 NDKLogger.log(.debug, category: .wallet, "\(logPrefix) Connecting to NWC relays: \(nwcRelayURLs)")
 
+                // Use outbox origin to avoid polluting app relay list - these are NWC-specific relays
                 for relayURL in nwcRelayURLs {
-                    let relay = await ndk.addRelay(relayURL)
+                    let relay = await ndk.addRelay(relayURL, origin: .outbox(authorPubkey: ""))
 
                     // Wait for relay to connect (up to 5 seconds)
                     let startTime = Date()

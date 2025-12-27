@@ -147,7 +147,7 @@ func XCTAssertCacheEventCount(
 
 // MARK: - Subscription Assertions
 
-/// Asserts a data source receives events
+/// Asserts a data source receives events by streaming from the events AsyncStream
 func XCTAssertDataSourceReceivesEvents<T>(
     _ dataSource: NDKSubscription<T>,
     minimumCount: Int = 1,
@@ -155,17 +155,21 @@ func XCTAssertDataSourceReceivesEvents<T>(
     file: StaticString = #filePath,
     line: UInt = #line
 ) async throws {
+    var receivedCount = 0
     let deadline = Date().addingTimeInterval(timeout)
 
-    while Date() < deadline {
-        if dataSource.data.count >= minimumCount {
+    for await batch in dataSource.events {
+        receivedCount += batch.count
+        if receivedCount >= minimumCount {
             return // Success
         }
-        try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+        if Date() > deadline {
+            break
+        }
     }
 
     XCTFail(
-        "Data source received only \(dataSource.data.count) items, expected at least \(minimumCount)",
+        "Data source received only \(receivedCount) items, expected at least \(minimumCount)",
         file: file,
         line: line
     )
