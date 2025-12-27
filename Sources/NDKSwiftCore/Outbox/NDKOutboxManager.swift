@@ -303,7 +303,10 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
     ///
     /// This method breaks down a multi-author filter into relay-specific filters,
     /// ensuring each relay only receives queries for authors who actually use it.
-    /// This significantly reduces network overhead and improves query performance.
+    /// It optimizes relay selection by:
+    /// - Prioritizing already-connected relays
+    /// - Limiting to a small number of relays per author (typically 2)
+    /// - Finding relay intersections to minimize total connections
     ///
     /// - Parameter filter: The filter to analyze and optimize.
     /// - Returns: `OutboxFilterStrategy` containing:
@@ -336,76 +339,44 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
 
         NDKLogger.log(.info, category: .outbox, "📡 Building outbox strategy for \(authors.count) authors")
 
-        var filtersByRelay: [RelayURL: NDKFilter] = [:]
-        var unknownAuthors = Set<String>()
+        // Use the relay selector's optimized relay combination algorithm
+        // This prioritizes connected relays and limits relays per author
+        let relayToPubkeys = await selector.chooseRelayCombinationForPubkeys(
+            authors,
+            type: .read,
+            relaysPerAuthor: OutboxConstants.relaysPerAuthorForFetching
+        )
+
+        // Identify unknown authors (those not in any relay mapping)
+        let coveredAuthors = Set(relayToPubkeys.values.flatMap { $0 })
+        let unknownAuthors = Set(authors).subtracting(coveredAuthors)
         var authorsToDiscover = Set<String>()
 
-        // Group authors by their relays
-        var relayToAuthors: [RelayURL: Set<String>] = [:]
-
-        for author in authors {
-            // Get cached relay info synchronously (non-blocking)
-            // Note: Invalid relays (ws://, localhost) are already filtered at track() time
-            if let item = await getRelaysSyncFor(pubkey: author, type: .both) {
-                let readRelays = item.readRelays
-                if !readRelays.isEmpty {
-                    NDKLogger.log(.trace, category: .outbox, "✅ Found \(readRelays.count) read relays for \(author.prefix(8))")
-                    for relay in readRelays {
-                        relayToAuthors[relay.url, default: []].insert(author)
-                    }
-                } else if !item.writeRelays.isEmpty {
-                    // Fall back to write relays if no read relays
-                    NDKLogger.log(.trace, category: .outbox, "📝 Using \(item.writeRelays.count) write relays for \(author.prefix(8)) (no read relays)")
-                    for relayInfo in item.writeRelays {
-                        relayToAuthors[relayInfo.url, default: []].insert(author)
-                    }
-                } else {
-                    // Has relay info but no relays - treat as unknown
-                    NDKLogger.log(.debug, category: .outbox, "⚠️ Author \(author.prefix(8)) has relay info but no relays")
-                    unknownAuthors.insert(author)
-                }
-            } else {
-                // No relay info cached
-                NDKLogger.log(.debug, category: .outbox, "❓ No relay info cached for \(author.prefix(8))")
-                unknownAuthors.insert(author)
-
-                // Check if we should look them up (don't mark as looked up here - that happens when discovery is triggered)
-                if await lookupTracker.shouldLookup(author) {
-                    authorsToDiscover.insert(author)
-                }
+        // Check which unknown authors we should discover
+        for author in unknownAuthors {
+            if await lookupTracker.shouldLookup(author) {
+                authorsToDiscover.insert(author)
             }
         }
 
         NDKLogger.log(.info, category: .outbox, "📊 Relay mapping: \(unknownAuthors.count) unknown authors, \(authorsToDiscover.count) to discover")
 
-        // Log current state of relayToAuthors before adding unknown authors
-        if !relayToAuthors.isEmpty {
-            NDKLogger.log(.debug, category: .outbox, "📋 Current relayToAuthors mapping before adding unknown authors:")
-            for (relay, authors) in relayToAuthors {
-                NDKLogger.log(.debug, category: .outbox, "  - \(relay): \(authors.count) authors")
-            }
-        }
-
-        // NOTE: Unknown authors are NOT added to relayToAuthors here!
-        // They are kept separate in `unknownAuthors` and handled by applyOutboxStrategy
-        // which routes them to fallback relays with `isFallback: true`.
-        // This ensures fallback relay coverage doesn't count toward author-specific coverage.
-        if !unknownAuthors.isEmpty {
-            NDKLogger.log(.debug, category: .outbox, "📋 \(unknownAuthors.count) unknown authors will use fallback relays (not added to filtersByRelay)")
-        }
-
-        // Create relay-specific filters
-        NDKLogger.log(.debug, category: .outbox, "📝 Creating filters from relayToAuthors mapping with \(relayToAuthors.count) entries")
-        for (relay, relayAuthors) in relayToAuthors {
-            NDKLogger.log(.debug, category: .outbox, "  - Relay \(relay): \(relayAuthors.count) authors")
+        // Convert relayToPubkeys map to filtersByRelay
+        var filtersByRelay: [RelayURL: NDKFilter] = [:]
+        for (relay, relayAuthors) in relayToPubkeys {
             var relayFilter = filter
-            relayFilter.authors = Array(relayAuthors)
+            relayFilter.authors = relayAuthors
             filtersByRelay[relay] = relayFilter
         }
 
-        NDKLogger.log(.info, category: .outbox, "✅ Created \(filtersByRelay.count) relay-specific filters")
-        for (relay, _) in filtersByRelay {
-            NDKLogger.log(.debug, category: .outbox, "  - Filter for relay: \(relay)")
+        // Log summary
+        let totalAuthorsInFilters = Set(relayToPubkeys.values.flatMap { $0 }).count
+        NDKLogger.log(.info, category: .outbox, "✅ Created \(filtersByRelay.count) relay-specific filters covering \(totalAuthorsInFilters) authors")
+
+        if !filtersByRelay.isEmpty {
+            // Log relay distribution
+            let avgAuthorsPerRelay = Double(relayToPubkeys.values.map { $0.count }.reduce(0, +)) / Double(filtersByRelay.count)
+            NDKLogger.log(.debug, category: .outbox, "📊 Avg authors per relay: \(String(format: "%.1f", avgAuthorsPerRelay))")
         }
 
         return OutboxFilterStrategy(
