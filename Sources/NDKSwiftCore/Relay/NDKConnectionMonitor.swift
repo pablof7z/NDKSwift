@@ -187,13 +187,12 @@ public actor NDKConnectionMonitor {
     }
 
     deinit {
-        Task { [observers] in
-            #if canImport(UIKit) || canImport(AppKit)
-            let center = NotificationCenter.default
-            for observer in observers {
-                center.removeObserver(observer)
-            }
-            #endif
+        // Actor deinit runs on actor executor in Swift 5.9+, can access isolated state directly
+        #if canImport(UIKit) || canImport(AppKit)
+        let center = NotificationCenter.default
+        for observer in observers {
+            center.removeObserver(observer)
         }
+        #endif
     }
 }
