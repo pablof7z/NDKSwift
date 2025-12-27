@@ -6,7 +6,6 @@ public struct ExploreView: View {
     @Environment(ChirpState.self) private var state
     @State private var packs: [FollowPack] = []
     @State private var relaySets: [RelaySet] = []
-    @State private var trendingHashtags: [TrendingHashtag] = []
     @State private var searchText = ""
 
     /// Fallback pubkey for discovering content when user has no follows
@@ -21,9 +20,6 @@ public struct ExploreView: View {
                 searchBar
                     .padding(.horizontal, 16)
                     .padding(.bottom, 20)
-
-                // Trending Hashtags
-                hashtagsSection
 
                 // Featured Follow Packs (horizontal)
                 featuredPacksSection
@@ -58,34 +54,6 @@ public struct ExploreView: View {
         .padding(12)
         .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-
-    // MARK: - Hashtags Section
-
-    private var hashtagsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionHeader(icon: "#", iconGradient: .green, title: "Trending Hashtags", showSeeAll: true)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(trendingHashtags) { hashtag in
-                        NavigationLink(destination: hashtagFeedDestination(hashtag.hashtag)) {
-                            HashtagPill(hashtag: hashtag.hashtag, noteCount: hashtag.noteCount)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 16)
-            }
-        }
-        .padding(.bottom, 24)
-    }
-
-    @ViewBuilder
-    private func hashtagFeedDestination(_ hashtag: String) -> some View {
-        // Placeholder - can be expanded to a full hashtag feed view
-        Text("#\(hashtag) Feed")
-            .navigationTitle("#\(hashtag)")
     }
 
     // MARK: - Featured Packs Section
@@ -208,16 +176,10 @@ public struct ExploreView: View {
     }
 
     private enum IconGradient {
-        case green, orange, blue
+        case orange, blue
 
         var gradient: LinearGradient {
             switch self {
-            case .green:
-                return LinearGradient(
-                    colors: [Color(red: 0.19, green: 0.82, blue: 0.35), Color(red: 0, green: 0.78, blue: 0.75)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
             case .orange:
                 return LinearGradient(
                     colors: [Color(red: 1, green: 0.42, blue: 0.42), Color(red: 1, green: 0.56, blue: 0.33)],
@@ -253,9 +215,8 @@ public struct ExploreView: View {
         // Load all content types concurrently
         async let packsTask: Void = discoverPacks()
         async let relaysTask: Void = discoverRelaySets()
-        async let hashtagsTask: Void = loadTrendingHashtags()
 
-        _ = await (packsTask, relaysTask, hashtagsTask)
+        _ = await (packsTask, relaysTask)
     }
 
     private func discoverPacks() async {
@@ -331,20 +292,6 @@ public struct ExploreView: View {
                     .prefix(10)
                     .map { $0 }
             }
-        }
-    }
-
-    private func loadTrendingHashtags() async {
-        // For now, use static trending hashtags
-        // This can be expanded to fetch from a NIP-50 search relay
-        await MainActor.run {
-            trendingHashtags = [
-                TrendingHashtag(hashtag: "bitcoin", noteCount: 12400),
-                TrendingHashtag(hashtag: "nostr", noteCount: 8700),
-                TrendingHashtag(hashtag: "zaps", noteCount: 3200),
-                TrendingHashtag(hashtag: "plebchain", noteCount: 1800),
-                TrendingHashtag(hashtag: "asknostr", noteCount: 956)
-            ]
         }
     }
 
