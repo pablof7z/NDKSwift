@@ -50,16 +50,19 @@ public struct ChirpRootView: View {
     }
 
     private var splashView: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
+        GeometryReader { geometry in
+            ZStack {
+                Color.black.ignoresSafeArea()
 
-            Image(systemName: "bird.fill")
-                .font(.system(size: 60, weight: .light))
-                .foregroundStyle(.white)
-                .scaleEffect(logoScale)
-                .opacity(logoOpacity)
-                .drawingGroup()
+                Image(systemName: "bird.fill")
+                    .font(.system(size: 60, weight: .light))
+                    .foregroundStyle(.white)
+                    .scaleEffect(logoScale)
+                    .opacity(logoOpacity)
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+            }
         }
+        .ignoresSafeArea()
         .preferredColorScheme(.dark)
         .onAppear {
             startSplashAnimation()
