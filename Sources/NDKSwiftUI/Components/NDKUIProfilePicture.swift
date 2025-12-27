@@ -37,6 +37,9 @@ public struct NDKUIProfilePicture: View {
     private let borderWidth: CGFloat
     private var tapAction: (() -> Void)?
 
+    // Store profile reference so SwiftUI holds it and observes changes
+    @State private var profile: NDKProfile?
+
     // MARK: - Initialization
 
     /// Initialize with NDK instance and public key
@@ -66,18 +69,16 @@ public struct NDKUIProfilePicture: View {
     // MARK: - Body
 
     public var body: some View {
-        let profile = ndk.profile(for: pubkey)
-
         Group {
-            if let pictureURL = profile.pictureURL {
+            if let pictureURL = profile?.pictureURL {
                 KFImage(pictureURL)
                     .resizable()
-                    .placeholder { placeholderView(for: profile) }
+                    .placeholder { placeholderView }
                     .aspectRatio(contentMode: .fill)
                     .frame(width: size, height: size)
                     .clipShape(RoundedRectangle(cornerRadius: effectiveCornerRadius))
             } else {
-                placeholderView(for: profile)
+                placeholderView
             }
         }
         .overlay(
@@ -86,17 +87,21 @@ public struct NDKUIProfilePicture: View {
                 .stroke(borderColor ?? Color.clear, lineWidth: borderWidth)
         )
         .modifier(TapGestureModifier(tapAction: tapAction))
-        .accessibilityLabel("Profile picture for \(profile.displayName)")
+        .accessibilityLabel("Profile picture for \(profile?.displayName ?? "user")")
+        .task {
+            // Load profile and hold reference so SwiftUI observes changes
+            profile = ndk.profile(for: pubkey)
+        }
     }
 
     // MARK: - Private Views
 
-    private func placeholderView(for profile: NDKProfile) -> some View {
+    private var placeholderView: some View {
         RoundedRectangle(cornerRadius: effectiveCornerRadius)
             .fill(Color.ndkGray5)
             .frame(width: size, height: size)
             .overlay(
-                Text(profile.displayName.prefix(1).uppercased())
+                Text((profile?.displayName ?? "?").prefix(1).uppercased())
                     .font(.system(size: size * 0.4, weight: .medium))
                     .foregroundStyle(.secondary)
             )

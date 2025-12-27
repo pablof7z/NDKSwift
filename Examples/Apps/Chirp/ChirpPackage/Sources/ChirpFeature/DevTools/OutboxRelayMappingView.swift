@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 @preconcurrency import NDKSwiftCore
+import NDKSwiftUI
 
 struct OutboxRelayMappingView: View {
     @Environment(ChirpState.self) private var state
@@ -378,12 +379,14 @@ private struct RelayMappingDetailView: View {
 // MARK: - Author Row
 
 private struct AuthorRow: View {
+    @Environment(ChirpState.self) private var state
     let pubkey: String
 
     var body: some View {
-        HStack {
-            Text(formatPubkey(pubkey))
-                .font(.system(.body, design: .monospaced))
+        HStack(spacing: 10) {
+            NDKUIProfilePicture(ndk: state.ndk, pubkey: pubkey, size: 32)
+
+            Text(state.ndk.profile(for: pubkey).displayName)
                 .lineLimit(1)
 
             Spacer()
@@ -396,10 +399,6 @@ private struct AuthorRow: View {
                     .foregroundStyle(.secondary)
             }
         }
-    }
-
-    private func formatPubkey(_ key: String) -> String {
-        String(key.prefix(8)) + "..." + String(key.suffix(8))
     }
 }
 

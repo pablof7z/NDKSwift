@@ -66,6 +66,19 @@ struct LoginView: View {
                             )
                         }
                         .buttonStyle(.plain)
+
+                        NavigationLink {
+                            ReadOnlyLoginView(isAddingAccount: isAddingAccount)
+                        } label: {
+                            LoginOptionCard(
+                                icon: "eye",
+                                iconColor: .purple,
+                                title: "Read-only",
+                                description: "View with npub (no signing)",
+                                badge: nil
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
                     .padding(.horizontal)
 
@@ -263,7 +276,145 @@ struct PrivateKeyLoginView: View {
 
         do {
             let signer = try NDKPrivateKeySigner.from(userInput: privateKeyInput)
-            try await state.authManager.addSession(signer)
+            _ = try await state.authManager.addSession(signer)
+            if isAddingAccount {
+                dismiss()
+            } else {
+                state.handleSuccessfulLogin()
+            }
+        } catch {
+            withAnimation {
+                errorMessage = error.localizedDescription
+            }
+        }
+
+        isLoggingIn = false
+    }
+}
+
+// MARK: - Read-Only Login
+
+struct ReadOnlyLoginView: View {
+    @Environment(ChirpState.self) private var state
+    @Environment(\.dismiss) private var dismiss
+
+    var isAddingAccount: Bool = false
+
+    @State private var pubkeyInput = ""
+    @State private var isLoggingIn = false
+    @State private var errorMessage: String?
+    @FocusState private var isInputFocused: Bool
+
+    var body: some View {
+        ZStack {
+            Color.clear.background(.ultraThinMaterial)
+                .ignoresSafeArea()
+
+            ScrollView {
+                VStack(spacing: 32) {
+                    // Icon Header
+                    VStack(spacing: 16) {
+                        Image(systemName: "eye")
+                            .font(.system(size: 48))
+                            .foregroundStyle(.purple)
+                            .padding(24)
+                            .background(.purple.opacity(0.15), in: Circle())
+
+                        Text("Enter a Public Key")
+                            .font(.title2.bold())
+
+                        Text("Browse Nostr in read-only mode without signing capabilities")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.top, 32)
+
+                    // Input Field
+                    VStack(alignment: .leading, spacing: 12) {
+                        TextField("npub1... or hex pubkey", text: $pubkeyInput)
+                            .textFieldStyle(.plain)
+                            .font(.body.monospaced())
+                            .padding()
+                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(isInputFocused ? Color.purple : .white.opacity(0.1), lineWidth: 1)
+                            }
+                            .autocapitalization(.none)
+                            .autocorrectionDisabled()
+                            .disabled(isLoggingIn)
+                            .focused($isInputFocused)
+
+                        Text("You can view profiles and feeds but cannot post or interact")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal)
+
+                    // Error Message
+                    if let error = errorMessage {
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.circle.fill")
+                            Text(error)
+                        }
+                        .font(.subheadline)
+                        .foregroundStyle(.red)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
+                        .padding(.horizontal)
+                    }
+
+                    // Login Button
+                    Button {
+                        Task { await login() }
+                    } label: {
+                        HStack {
+                            if isLoggingIn {
+                                ProgressView()
+                                    .tint(.black)
+                            } else {
+                                Text("Continue")
+                                Image(systemName: "arrow.right")
+                            }
+                        }
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 12))
+                    }
+                    .disabled(pubkeyInput.isEmpty || isLoggingIn)
+                    .padding(.horizontal)
+
+                    Spacer(minLength: 48)
+                }
+            }
+        }
+        .navigationTitle("Read-only")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func login() async {
+        isLoggingIn = true
+        errorMessage = nil
+
+        do {
+            let trimmed = pubkeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
+            let pubkey: String
+
+            if trimmed.hasPrefix("npub1") {
+                // Decode npub to hex
+                let decoded = try Bech32.decode(trimmed)
+                pubkey = decoded.data.map { String(format: "%02x", $0) }.joined()
+            } else if HexValidator.isValid32ByteHex(trimmed) {
+                pubkey = trimmed
+            } else {
+                throw NSError(domain: "LoginError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid public key format. Enter an npub or 64-character hex key."])
+            }
+
+            _ = try await state.authManager.addSession(pubkey: pubkey)
             if isAddingAccount {
                 dismiss()
             } else {
@@ -310,6 +461,7 @@ enum KnownSigner: CaseIterable {
         }
     }
 
+    @MainActor
     static func detect() -> KnownSigner? {
         for signer in KnownSigner.allCases {
             let urlString = "\(signer.urlScheme)://"
@@ -586,7 +738,7 @@ struct RemoteSignerLoginView: View {
 
         do {
             _ = try await signer.connect()
-            try await state.authManager.addSession(signer)
+            _ = try await state.authManager.addSession(signer)
             await MainActor.run {
                 isWaitingForConnection = false
                 if isAddingAccount {
@@ -621,7 +773,7 @@ struct RemoteSignerLoginView: View {
             do {
                 let signer = try await NDKBunkerSigner.bunker(ndk: ndk, connectionToken: trimmed)
                 _ = try await signer.connect()
-                try await state.authManager.addSession(signer)
+                _ = try await state.authManager.addSession(signer)
                 await MainActor.run {
                     bunkerInput = ""
                     if isAddingAccount {

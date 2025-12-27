@@ -348,12 +348,8 @@ public final class NDKMetaSubscription {
         guard !filters.isEmpty else { return }
 
         for filter in filters {
-            let subscription = ndk.subscribe(
-                filter: filter,
-                closeOnEose: true
-            )
-
-            let fetchedEvents = await subscription.collect(timeout: 5.0)
+            // Fetch events until EOSE
+            let fetchedEvents = await ndk.fetchEvents(filter: filter, timeout: 5.0)
 
             for event in fetchedEvents {
                 let tagAddr = event.tagAddress

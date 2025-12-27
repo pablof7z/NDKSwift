@@ -58,7 +58,7 @@ public class NDKRelayListManager {
         }
 
         // Add to NDK
-        _ = await ndk.addRelay(url)
+        _ = await ndk.addRelay(url, reason: "user added relay")
 
         // Update relay list event
         await updateRelayList()
@@ -90,7 +90,7 @@ public class NDKRelayListManager {
 
         // Add default relays
         for relayURL in defaultRelays {
-            _ = await ndk.addRelay(relayURL)
+            _ = await ndk.addRelay(relayURL, reason: "default relay after reset")
         }
 
         // Update relay list event
@@ -147,12 +147,12 @@ public class NDKRelayListManager {
 
         // Connect to all relays in the list
         for entry in relayList.relayEntries {
-            _ = await ndk.addRelay(entry.relay.url)
+            _ = await ndk.addRelay(entry.relay.url, reason: "from user's kind:10002 relay list")
         }
 
         // Also connect to any locally added relays
         for url in getUserAddedRelays() {
-            _ = await ndk.addRelay(url)
+            _ = await ndk.addRelay(url, reason: "locally stored user-added relay")
         }
     }
 
@@ -160,7 +160,7 @@ public class NDKRelayListManager {
         // Connect to default relays and any user-added ones
         let allRelays = Set(defaultRelays + getUserAddedRelays())
         for url in allRelays {
-            _ = await ndk.addRelay(url)
+            _ = await ndk.addRelay(url, reason: "local default/user-added relay (no signer)")
         }
     }
 

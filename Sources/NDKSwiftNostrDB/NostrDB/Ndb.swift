@@ -582,11 +582,17 @@ class Ndb: @unchecked Sendable {
     private func profile_flatbuf_to_record(ptr: UnsafeMutableRawPointer, size: Int, key _: UInt64) -> NdbCachedProfile? {
         do {
             var buf = ByteBuffer(assumingMemoryBound: ptr, capacity: size)
-            let rec: NdbProfile = try getDebugCheckedRoot(byteBuffer: &buf)
-            return NdbCachedProfile(profile: rec, lastFetch: Date(), receivedAt: Date())
+            // nostrdb returns NdbProfileRecord which wraps NdbProfile
+            let record: NdbProfileRecord = try getDebugCheckedRoot(byteBuffer: &buf)
+            guard let profile = record.profile else { return nil }
+            return NdbCachedProfile(
+                profile: profile,
+                lastFetch: Date(),
+                receivedAt: Date(timeIntervalSince1970: TimeInterval(record.receivedAt))
+            )
         } catch {
             #if DEBUG
-                print("UNUSUAL: \(error)")
+                print("UNUSUAL: profile_flatbuf_to_record error: \(error)")
             #endif
             return nil
         }

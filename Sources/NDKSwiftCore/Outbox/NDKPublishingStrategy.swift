@@ -172,7 +172,7 @@ actor NDKPublishingStrategy {
             }
 
             // Get or establish connection
-            guard let relay = await getOrConnectRelay(url: relayURL) else {
+            guard let relay = await getOrConnectRelay(url: relayURL, authorPubkey: item.event.pubkey, eventKind: item.event.kind, eventId: item.event.id) else {
                 await item.updateRelayStatus(relayURL, status: .failed(.connectionFailed))
                 await ranker.updateRelayPerformance(relayURL, success: false)
                 return
@@ -268,7 +268,7 @@ actor NDKPublishingStrategy {
         return false
     }
 
-    private func getOrConnectRelay(url: String) async -> NDKRelay? {
+    private func getOrConnectRelay(url: String, authorPubkey: String, eventKind: Kind, eventId: String) async -> NDKRelay? {
         let normalizedUrl = URLNormalizer.tryNormalizeRelayUrl(url) ?? url
 
         // First check if already connected
@@ -276,8 +276,13 @@ actor NDKPublishingStrategy {
             return relay
         }
 
-        // Add relay via NDK to ensure auto-connect happens
-        return await ndk.addRelay(normalizedUrl)
+        // Add relay via NDK with outbox origin (NOT appRelays)
+        // This relay was discovered through the outbox model for publishing,
+        // so it should not pollute the app relays list
+        let reason = "publishing kind \(eventKind) event \(eventId.prefix(8))"
+        NDKLogger.log(.info, category: .outbox,
+                      "🔌 Adding relay for publishing: \(normalizedUrl) | \(reason)")
+        return await ndk.addRelay(normalizedUrl, origin: .outbox(authorPubkey: authorPubkey), reason: reason)
     }
 
     private func updateOverallStatus(for item: OutboxItem) async {

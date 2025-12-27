@@ -10,6 +10,8 @@ public final class ChirpState {
     public private(set) var authManager: NDKAuthManager
     public var initState: InitializationState = .loading
 
+    private static let appRelaysKey = "com.ndkswift.Chirp.appRelays"
+
     public enum InitializationState: Equatable {
         case loading
         case error(Error)
@@ -38,10 +40,12 @@ public final class ChirpState {
     public static func create() async throws -> ChirpState {
         let cache = try await NDKNostrDBCache(path: nil)
 
-        // Create NDK with cache and no initial relays
-        // Relays will be discovered via NIP-65 and configured via outbox
+        // Load saved app relays
+        let savedRelays = loadSavedAppRelays()
+
+        // Create NDK with cache and saved relays
         let ndk = NDK(
-            relayURLs: [],
+            relayURLs: savedRelays,
             cache: cache,
             debugMode: true,
             telemetryConfig: TelemetrySettings.makeConfig()
@@ -109,5 +113,33 @@ public final class ChirpState {
 
         // Return to login screen
         initState = .needsLogin
+    }
+
+    // MARK: - App Relay Persistence
+
+    /// Load saved app relay URLs from UserDefaults
+    public static func loadSavedAppRelays() -> [String] {
+        UserDefaults.standard.stringArray(forKey: appRelaysKey) ?? []
+    }
+
+    /// Save app relay URLs to UserDefaults
+    public static func saveAppRelays(_ urls: [String]) {
+        UserDefaults.standard.set(urls, forKey: appRelaysKey)
+    }
+
+    /// Add a relay URL to saved app relays
+    public static func addSavedAppRelay(_ url: String) {
+        var relays = loadSavedAppRelays()
+        if !relays.contains(url) {
+            relays.append(url)
+            saveAppRelays(relays)
+        }
+    }
+
+    /// Remove a relay URL from saved app relays
+    public static func removeSavedAppRelay(_ url: String) {
+        var relays = loadSavedAppRelays()
+        relays.removeAll { $0 == url }
+        saveAppRelays(relays)
     }
 }

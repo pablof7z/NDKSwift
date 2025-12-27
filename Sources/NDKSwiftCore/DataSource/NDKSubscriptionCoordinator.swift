@@ -166,10 +166,12 @@ actor InternalSubscriptionManager {
         }
 
         // Try fingerprint-based routing for relay-specific IDs
+        // Only route to subscriptions that are actually registered for this relay
         if let fingerprint = relayIdToFingerprint[subscriptionId],
            let subscriptions = fingerprintSubscriptions[fingerprint] {
-            NDKLogger.log(.trace, category: .subscription, "🔀 Routing via fingerprint: \(subscriptionId) → \(fingerprint) (\(subscriptions.count) subscriptions)")
-            for subscription in subscriptions {
+            let subscriptionsOnThisRelay = relayToSubscriptions[relay.url] ?? []
+            NDKLogger.log(.trace, category: .subscription, "🔀 Routing via fingerprint: \(subscriptionId) → \(fingerprint) (filtering to \(subscriptionsOnThisRelay.count) subscriptions on \(relay.url))")
+            for subscription in subscriptions where subscriptionsOnThisRelay.contains(subscription) {
                 if !deliveredTo.contains(subscription.id) {
                     await subscription.handleEvent(event, from: relay)
                     deliveredTo.insert(subscription.id)
@@ -190,11 +192,13 @@ actor InternalSubscriptionManager {
             return
         }
 
-        // NEW: Try fingerprint-based routing for relay-specific IDs
+        // Try fingerprint-based routing for relay-specific IDs
+        // Only route to subscriptions that are actually registered for this relay
         if let fingerprint = relayIdToFingerprint[subscriptionId],
            let subscriptions = fingerprintSubscriptions[fingerprint] {
-            NDKLogger.log(.trace, category: .subscription, "🔀 Routing EOSE via fingerprint: \(subscriptionId) → \(fingerprint)")
-            for subscription in subscriptions {
+            let subscriptionsOnThisRelay = relayToSubscriptions[relay.url] ?? []
+            NDKLogger.log(.trace, category: .subscription, "🔀 Routing EOSE via fingerprint: \(subscriptionId) → \(fingerprint) (filtering to \(subscriptionsOnThisRelay.count) subscriptions on \(relay.url))")
+            for subscription in subscriptions where subscriptionsOnThisRelay.contains(subscription) {
                 await subscription.handleEOSE(from: relay)
             }
             return
@@ -337,6 +341,7 @@ actor NDKSubscriptionCoordinator: Hashable {
     // Callbacks for NDKSubscriptionRequirement
     private var onEvent: ((NDKEvent, NDKRelay) async -> Void)?
     private var onEOSE: ((NDKRelay) async -> Void)?
+    private var onRelayAdded: ((RelayURL) async -> Void)?
 
     /// Set the event handler callback
     func setOnEvent(_ handler: @escaping (NDKEvent, NDKRelay) async -> Void) {
@@ -346,6 +351,11 @@ actor NDKSubscriptionCoordinator: Hashable {
     /// Set the EOSE handler callback
     func setOnEOSE(_ handler: @escaping (NDKRelay) async -> Void) {
         onEOSE = handler
+    }
+
+    /// Set the relay added callback (called when subscription is replayed to a new relay)
+    func setOnRelayAdded(_ handler: @escaping (RelayURL) async -> Void) {
+        onRelayAdded = handler
     }
 
     // Track which relays we actually sent REQ to
@@ -426,8 +436,9 @@ actor NDKSubscriptionCoordinator: Hashable {
     }
 
     /// Mark a relay as active (used when replay succeeds)
-    func markRelayAsActive(_ relayUrl: String) {
+    func markRelayAsActive(_ relayUrl: String) async {
         activeRelays.insert(relayUrl)
+        await onRelayAdded?(relayUrl)
     }
 
     /// Handle incoming event

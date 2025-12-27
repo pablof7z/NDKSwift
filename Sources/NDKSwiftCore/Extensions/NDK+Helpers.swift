@@ -5,7 +5,7 @@ public extension NDK {
     /// - Throws: NDKError.notConfigured if no signer is available
     func requireSigner() throws -> NDKSigner {
         guard let signer = signer else {
-            throw NDKError.notConfigured(ErrorMessageConstants.Messages.noSignerConfigured)
+            throw NDKError.notConfigured("Signer")
         }
         return signer
     }
@@ -22,7 +22,7 @@ public extension NDKDependent {
     /// - Throws: NDKError.notConfigured if NDK is not available
     func requireNDK() throws -> NDK {
         guard let ndk = ndk else {
-            throw NDKError.notConfigured(ErrorMessageConstants.Messages.noNDKConfigured)
+            throw NDKError.notConfigured("NDK")
         }
         return ndk
     }

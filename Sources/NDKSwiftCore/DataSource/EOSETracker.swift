@@ -39,6 +39,14 @@ actor EOSETracker {
                       "🎯 [\(subscriptionId)] EOSETracker expecting EOSE from \(relays.count) relays")
     }
 
+    /// Add a relay to the expected set (called when subscription is replayed to a new relay)
+    func addExpectedRelay(_ relay: RelayURL) {
+        guard !expectedRelays.contains(relay) else { return }
+        expectedRelays.insert(relay)
+        NDKLogger.log(.debug, category: .subscription,
+                      "📡 [\(subscriptionId)] Added relay to expected set: \(relay) (now expecting \(expectedRelays.count) relays)")
+    }
+
     /// Track that a relay has sent EOSE
     func trackEOSE(from relay: RelayURL) {
         guard expectedRelays.contains(relay) else {

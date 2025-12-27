@@ -77,6 +77,9 @@ struct AppRelaysView: View {
 
         _ = await state.ndk.addRelay(cleanUrl)
 
+        // Persist to UserDefaults
+        ChirpState.addSavedAppRelay(cleanUrl)
+
         isLoading = false
         showingAddSheet = false
         newRelayURL = ""
@@ -87,6 +90,8 @@ struct AppRelaysView: View {
         Task {
             for url in relaysToDelete {
                 await state.ndk.removeRelay(url)
+                // Remove from UserDefaults
+                ChirpState.removeSavedAppRelay(url)
             }
         }
     }

@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NDKSwift Subscription Flow</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/dagre-d3@0.6.4/dist/dagre-d3.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0f0f14;
+            color: #e0e0e0;
+            overflow: hidden;
+        }
+
+        #app {
+            display: flex;
+            height: 100vh;
+        }
+
+        #graph-container {
+            flex: 1;
+            position: relative;
+        }
+
+        #sidebar {
+            width: 450px;
+            background: #16161d;
+            border-left: 1px solid #2a2a35;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        h1 {
+            font-size: 1.3rem;
+            color: #a78bfa;
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 0.85rem;
+            margin-bottom: 20px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .btn {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: all 0.15s;
+        }
+
+        .btn-primary {
+            background: #7c3aed;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #6d28d9;
+        }
+
+        .btn-primary.playing {
+            background: #059669;
+        }
+
+        .btn-secondary {
+            background: #2a2a35;
+            color: #ccc;
+        }
+
+        .btn-secondary:hover {
+            background: #3a3a45;
+        }
+
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            font-size: 0.85rem;
+            color: #888;
+        }
+
+        .speed-control input {
+            width: 100px;
+            accent-color: #7c3aed;
+        }
+
+        .step-display {
+            background: #1e1e28;
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+
+        .step-display .step-num {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            background: #7c3aed;
+            border-radius: 50%;
+            font-weight: 700;
+            font-size: 0.85rem;
+            margin-right: 10px;
+        }
+
+        .step-display .step-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .step-display .step-desc {
+            color: #999;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .progress-bar {
+            height: 4px;
+            background: #2a2a35;
+            border-radius: 2px;
+            margin-top: 12px;
+        }
+
+        .progress-bar .fill {
+            height: 100%;
+            background: linear-gradient(90deg, #7c3aed, #a78bfa);
+            border-radius: 2px;
+            transition: width 0.3s;
+        }
+
+        .info-panel {
+            background: #1e1e28;
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .info-panel h2 {
+            font-size: 1.1rem;
+            color: #a78bfa;
+            margin-bottom: 8px;
+        }
+
+        .info-panel .path {
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 0.75rem;
+            color: #666;
+            margin-bottom: 12px;
+        }
+
+        .info-panel .desc {
+            font-size: 0.9rem;
+            color: #ccc;
+            line-height: 1.7;
+            margin-bottom: 16px;
+            text-align: justify;
+        }
+
+        .info-panel pre {
+            background: #0d0d12;
+            border-radius: 6px;
+            padding: 12px;
+            font-size: 0.8rem;
+            overflow-x: auto;
+            margin-bottom: 12px;
+        }
+
+        .info-panel .kw { color: #ff7b72; }
+        .info-panel .type { color: #79c0ff; }
+        .info-panel .str { color: #a5d6ff; }
+        .info-panel .cmt { color: #6e7681; }
+        .info-panel .fn { color: #d2a8ff; }
+
+        .info-panel ul {
+            list-style: none;
+        }
+
+        .info-panel li {
+            padding: 10px 0;
+            padding-left: 24px;
+            position: relative;
+            font-size: 0.85rem;
+            color: #bbb;
+            border-bottom: 1px solid #2a2a35;
+            line-height: 1.5;
+        }
+
+        .info-panel li:last-child {
+            border-bottom: none;
+        }
+
+        .info-panel li::before {
+            content: '→';
+            position: absolute;
+            left: 0;
+            color: #7c3aed;
+            font-weight: bold;
+        }
+
+        .info-panel li b {
+            color: #a78bfa;
+            font-weight: 600;
+        }
+
+        .info-panel code {
+            background: #2a2a35;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 0.8rem;
+            color: #a78bfa;
+        }
+
+        /* Graph styles */
+        .node rect {
+            stroke-width: 2px;
+            rx: 8;
+            ry: 8;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .node.active rect {
+            stroke-width: 4px;
+            filter: drop-shadow(0 0 12px currentColor);
+        }
+
+        .node.highlighted rect {
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { filter: drop-shadow(0 0 5px currentColor); }
+            50% { filter: drop-shadow(0 0 20px currentColor); }
+        }
+
+        .node text {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            pointer-events: none;
+        }
+
+        .node .icon {
+            font-size: 20px;
+        }
+
+        .node .label {
+            font-size: 12px;
+            font-weight: 600;
+            fill: #fff;
+        }
+
+        .node .sublabel {
+            font-size: 10px;
+            fill: #999;
+        }
+
+        .edgePath path {
+            stroke: #4a4a55;
+            stroke-width: 2px;
+            fill: none;
+        }
+
+        .edgePath.active path {
+            stroke: #7c3aed;
+            stroke-width: 3px;
+        }
+
+        .edgePath marker path {
+            fill: #4a4a55;
+        }
+
+        .edgePath.active marker path {
+            fill: #7c3aed;
+        }
+
+        .edgeLabel {
+            font-size: 10px;
+            fill: #666;
+        }
+
+        /* Packet animation */
+        .packet {
+            pointer-events: none;
+        }
+
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 16px;
+            padding: 12px;
+            background: #1e1e28;
+            border-radius: 8px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.75rem;
+            color: #888;
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div id="graph-container">
+            <svg id="graph"></svg>
+        </div>
+        <div id="sidebar">
+            <h1>NDKSwift Subscriptions</h1>
+            <p class="subtitle">Interactive data flow visualization</p>
+
+            <div class="controls">
+                <button class="btn btn-primary" id="playBtn" onclick="togglePlay()">▶ Play</button>
+                <button class="btn btn-secondary" onclick="resetAll()">↻ Reset</button>
+                <button class="btn btn-secondary" onclick="zoomFit()">⊡ Fit</button>
+            </div>
+
+            <div class="speed-control">
+                <span>Speed:</span>
+                <input type="range" id="speed" min="0.5" max="3" step="0.25" value="1">
+                <span id="speedVal">1x</span>
+            </div>
+
+            <div class="legend">
+                <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div>Public API</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div>Manager</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>Coordinator</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>Relay</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#8b5cf6"></div>Cache</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#ec4899"></div>Outbox</div>
+            </div>
+
+            <div class="step-display">
+                <div class="step-title">
+                    <span class="step-num" id="stepNum">0</span>
+                    <span id="stepTitle">Click Play to start</span>
+                </div>
+                <div class="step-desc" id="stepDesc">
+                    Watch data flow from your app through NDKSwift to the relay and back.
+                </div>
+                <div class="progress-bar">
+                    <div class="fill" id="progress" style="width:0%"></div>
+                </div>
+            </div>
+
+            <div class="info-panel" id="infoPanel">
+                <h2 id="infoTitle">👋 Welcome to NDKSwift Subscriptions</h2>
+                <div class="path" id="infoPath"></div>
+                <div class="desc" id="infoDesc">
+                    This visualization shows how data flows through NDKSwift when your app creates a subscription. Click any node to see detailed information about that module - what it receives, what it produces, and what its responsibilities are. Press Play to watch an animated walkthrough of the entire subscription lifecycle, from your app requesting data all the way to events arriving from Nostr relays.
+                </div>
+                <pre id="infoCode" style="display:none"></pre>
+                <ul id="infoPoints" style="display:none"></ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // =============================================
+    // CONFIGURATION
+    // =============================================
+
+    const colors = {
+        'api': '#10b981',
+        'manager': '#3b82f6',
+        'coord': '#f59e0b',
+        'relay': '#ef4444',
+        'cache': '#8b5cf6',
+        'outbox': '#ec4899'
+    };
+
+    const nodes = [
+        { id: 'app', label: 'Your App', sub: 'SwiftUI', type: 'api', icon: '📱' },
+        { id: 'ndk', label: 'NDK', sub: 'Entry Point', type: 'api', icon: '🔌' },
+        { id: 'sub', label: 'NDKSubscription', sub: '@Observable', type: 'api', icon: '📡' },
+        { id: 'cache', label: 'NDKCache', sub: 'Protocol', type: 'cache', icon: '💾' },
+        { id: 'mgr', label: 'SubscriptionMgr', sub: 'Actor', type: 'manager', icon: '📋' },
+        { id: 'outbox', label: 'OutboxManager', sub: 'NIP-65', type: 'outbox', icon: '📤' },
+        { id: 'req', label: 'Requirement', sub: 'Dedup', type: 'coord', icon: '📊' },
+        { id: 'internal', label: 'InternalMgr', sub: 'Router', type: 'coord', icon: '🔀' },
+        { id: 'coord', label: 'Coordinator', sub: 'Per-Relay', type: 'coord', icon: '🎯' },
+        { id: 'pool', label: 'NDKPool', sub: 'Actor', type: 'relay', icon: '🏊' },
+        { id: 'rsm', label: 'RelaySubMgr', sub: 'Grouping', type: 'relay', icon: '📦' },
+        { id: 'rsub', label: 'RelaySubscription', sub: 'Batching', type: 'relay', icon: '📎' },
+        { id: 'relay', label: 'NDKRelay', sub: '@Observable', type: 'relay', icon: '🔗' },
+        { id: 'conn', label: 'Connection', sub: 'WebSocket', type: 'relay', icon: '🌐' },
+        { id: 'ext', label: 'Nostr Relay', sub: 'External', type: 'relay', icon: '⚡' }
+    ];
+
+    const edges = [
+        { from: 'app', to: 'ndk', label: 'subscribe()' },
+        { from: 'ndk', to: 'sub', label: 'creates' },
+        { from: 'sub', to: 'cache', label: 'check' },
+        { from: 'sub', to: 'mgr', label: 'register' },
+        { from: 'mgr', to: 'req', label: 'create' },
+        { from: 'mgr', to: 'outbox', label: 'strategy' },
+        { from: 'req', to: 'internal', label: 'register' },
+        { from: 'req', to: 'coord', label: 'per relay' },
+        { from: 'coord', to: 'pool', label: 'get relay' },
+        { from: 'coord', to: 'rsm', label: 'add' },
+        { from: 'rsm', to: 'rsub', label: 'group' },
+        { from: 'rsub', to: 'relay', label: 'execute' },
+        { from: 'relay', to: 'conn', label: 'send' },
+        { from: 'conn', to: 'ext', label: 'REQ →' },
+        { from: 'ext', to: 'conn', label: '← EVENT', back: true },
+        { from: 'conn', to: 'relay', label: 'parse', back: true },
+        { from: 'relay', to: 'internal', label: 'route', back: true },
+        { from: 'internal', to: 'coord', label: 'dispatch', back: true },
+        { from: 'coord', to: 'req', label: 'event', back: true },
+        { from: 'req', to: 'cache', label: 'store', back: true },
+        { from: 'req', to: 'sub', label: 'emit', back: true },
+        { from: 'sub', to: 'app', label: 'yield', back: true }
+    ];
+
+    const steps = [
+        { title: 'App Subscribes', desc: 'Your SwiftUI app calls ndk.subscribe() with a filter describing what Nostr events it wants (kinds, authors, tags, etc.)', nodes: ['app'], edges: [0] },
+        { title: 'Subscription Created', desc: 'NDK creates an NDKSubscription object with an AsyncStream. A fingerprint hash is generated from the filter for deduplication.', nodes: ['ndk', 'sub'], edges: [1] },
+        { title: 'Cache Check', desc: 'Before hitting the network, the cache is checked based on cachePolicy. If fresh data exists, it\'s delivered immediately.', nodes: ['sub', 'cache'], edges: [2] },
+        { title: 'Register Requirement', desc: 'SubscriptionManager looks up or creates a Requirement for this fingerprint. Multiple subscriptions with the same fingerprint share one Requirement.', nodes: ['sub', 'mgr', 'req'], edges: [3, 4] },
+        { title: 'Outbox Strategy', desc: 'OutboxManager applies NIP-65: it looks up each author\'s preferred relays and creates per-author relay routing strategies.', nodes: ['mgr', 'outbox'], edges: [5] },
+        { title: 'Create Coordinators', desc: 'A Coordinator is created for each target relay. Each registers with InternalManager to enable event routing back.', nodes: ['req', 'internal', 'coord'], edges: [6, 7] },
+        { title: 'Relay Routing', desc: 'Coordinator gets its NDKRelay from the pool and registers with that relay\'s SubscriptionManager for grouping.', nodes: ['coord', 'pool', 'rsm'], edges: [8, 9] },
+        { title: 'Subscription Grouping', desc: 'RelaySubMgr groups subscriptions by fingerprint. Similar subscriptions wait up to 100ms to batch together before execution.', nodes: ['rsm', 'rsub'], edges: [10] },
+        { title: 'Execute REQ', desc: 'RelaySubscription compiles and merges filters, generates a subscription ID, registers routing BEFORE sending, then executes.', nodes: ['rsub', 'relay'], edges: [11] },
+        { title: 'Send to Network', desc: 'Connection serializes and sends the REQ message over WebSocket to the external Nostr relay server.', nodes: ['relay', 'conn', 'ext'], edges: [12, 13] },
+        { title: 'Events Received', desc: 'The external relay streams back matching EVENT messages tagged with the subscription ID. Each event is parsed by Connection.', nodes: ['ext', 'conn'], edges: [14] },
+        { title: 'Event Routing', desc: 'Events flow through NDKRelay to InternalManager, which uses the subscription ID to find the correct fingerprint and coordinators.', nodes: ['conn', 'relay', 'internal'], edges: [15, 16] },
+        { title: 'Deduplication', desc: 'Coordinators forward events to Requirements. The Requirement checks seenEventIds and only delivers each event once.', nodes: ['internal', 'coord', 'req'], edges: [17, 18] },
+        { title: 'Deliver to App', desc: 'Deduplicated events are stored in cache and emitted through the AsyncStream to your app\'s for-await loop.', nodes: ['req', 'cache', 'sub', 'app'], edges: [19, 20, 21] }
+    ];
+
+    const moduleInfo = {
+        app: {
+            title: '📱 Your App',
+            path: 'SwiftUI View',
+            desc: 'Your SwiftUI application is the starting point of every subscription. When your app needs Nostr data (events, profiles, notes, etc.), it creates a subscription by calling ndk.subscribe() with a filter describing what data is needed. The subscription returns an AsyncStream that your app iterates over using for-await syntax. As events arrive from the network, they flow through this stream and your UI can react to them. Your app can also observe the "eosed" property to know when all historical events have been received, allowing you to distinguish between cached/historical data and real-time updates.',
+            points: [
+                '<b>Receives:</b> An AsyncStream of events that match your filter',
+                '<b>Produces:</b> NDKFilter objects describing desired data',
+                '<b>Responsibilities:</b> Define what data is needed, consume events reactively, update UI based on events and EOSE state'
+            ]
+        },
+        ndk: {
+            title: '🔌 NDK',
+            path: 'Core/NDK.swift',
+            desc: 'NDK is the main entry point and orchestrator of the entire subscription system. When you call subscribe(), NDK creates an NDKSubscription object, configures it with the provided options (cache policy, relay hints, grouping preferences), and hands it off to the internal subscription machinery. NDK also owns the relay pool (NDKPool), the cache, the OutboxManager for NIP-65 relay selection, and the internal subscription manager that routes events. Think of NDK as the facade that hides the complexity of the subscription system behind a simple API.',
+            points: [
+                '<b>Receives:</b> Subscription requests with filters and options from your app',
+                '<b>Produces:</b> NDKSubscription objects with event streams',
+                '<b>Responsibilities:</b> Create subscriptions, manage the relay pool, own the cache and OutboxManager, coordinate all internal components'
+            ]
+        },
+        sub: {
+            title: '📡 NDKSubscription',
+            path: 'DataSource/NDKSubscription.swift',
+            desc: 'NDKSubscription is the public-facing subscription object your app interacts with. It is marked @Observable so SwiftUI can react to changes. Internally, it wraps an AsyncStream that delivers batches of events as they arrive. The subscription generates a "fingerprint" from its filter - a hash that uniquely identifies what data is being requested. This fingerprint is crucial for deduplication: if multiple parts of your app request the same data, they share the same underlying network subscription. The subscription also tracks EOSE (End of Stored Events) state, letting your app know when historical events have all been delivered and only real-time events will follow.',
+            points: [
+                '<b>Receives:</b> Filter configuration at creation time, events from Requirements',
+                '<b>Produces:</b> AsyncStream of event batches, observable eosed state, filter fingerprint',
+                '<b>Responsibilities:</b> Provide reactive event stream, track EOSE state, generate fingerprint for deduplication'
+            ]
+        },
+        cache: {
+            title: '💾 NDKCache',
+            path: 'Cache/NDKCache.swift',
+            desc: 'NDKCache is a protocol that defines how events are stored and retrieved locally. Before any network request is made, the cache is consulted based on the subscription\'s cache policy. If matching events exist in cache and are fresh enough (within maxAge), they are delivered immediately to your app. This provides instant UI population while network requests may still be in flight. When events arrive from the network, they are also stored in the cache for future use. The cache supports various implementations - in-memory, SQLite, or custom. It also tracks "cache freshness" to decide whether cached data is still valid or needs network refresh.',
+            points: [
+                '<b>Receives:</b> Query requests with filters, events to store from network',
+                '<b>Produces:</b> Cached events matching filters, freshness information',
+                '<b>Responsibilities:</b> Store and retrieve events locally, track cache freshness, provide instant data before network'
+            ]
+        },
+        mgr: {
+            title: '📋 SubscriptionManager',
+            path: 'DataSource/NDKSubscriptionManager.swift',
+            desc: 'NDKSubscriptionManager is an actor that orchestrates all active subscriptions. Its primary job is to group subscriptions by their fingerprint - if two subscriptions request the same data, they should share network resources. For each unique fingerprint, it creates an NDKSubscriptionRequirement that handles the actual data fetching. The manager also integrates with the OutboxManager to determine the optimal relay strategy. Additionally, it listens for relay discoveries (when the OutboxManager finds new relays for authors) and can dynamically add subscriptions to newly discovered relays. This is how NIP-65 outbox model works at runtime.',
+            points: [
+                '<b>Receives:</b> Subscription registration requests, relay discovery notifications',
+                '<b>Produces:</b> NDKSubscriptionRequirement objects for unique fingerprints',
+                '<b>Responsibilities:</b> Group subscriptions by fingerprint, create Requirements, apply relay strategies, handle dynamic relay discovery'
+            ]
+        },
+        outbox: {
+            title: '📤 OutboxManager',
+            path: 'Outbox/NDKOutboxManager.swift',
+            desc: 'OutboxManager implements the NIP-65 "outbox model" which optimizes relay selection per author. Instead of querying all relays for all authors, it determines which relays each author prefers (from their kind:10002 relay list events) and routes queries accordingly. When you request events from multiple authors, OutboxManager splits the filter into per-author sub-filters, each targeting that author\'s preferred relays. It maintains both memory and database caches of relay preferences, with negative cache entries for authors without relay info. The manager picks the 2 best relays per author (configurable) and provides a RelayDiscoveries stream that notifies when new relay preferences are discovered, allowing subscriptions to expand to newly-discovered relays.',
+            points: [
+                '<b>Receives:</b> Filters containing author pubkeys',
+                '<b>Produces:</b> OutboxFilterStrategy with per-author relay mappings, RelayDiscoveries stream',
+                '<b>Responsibilities:</b> Cache and lookup NIP-65 relay preferences, split filters by author→relay, select optimal relays per author, notify of relay discoveries'
+            ]
+        },
+        req: {
+            title: '📊 Requirement',
+            path: 'DataSource/NDKSubscriptionRequirement.swift',
+            desc: 'NDKSubscriptionRequirement is a core actor that manages a single data requirement (one filter fingerprint). Multiple subscriptions with the same fingerprint share one Requirement. Its critical job is DEDUPLICATION: it maintains a Set of seen event IDs (seenEventIds) so that when the same event arrives from multiple relays, it\'s only delivered once to observers. It manages an array of observers (AsyncStream continuations) that receive events. The Requirement tracks per-relay subscriptions, per-relay EOSE state via EOSETracker, and handles the relay coverage strategy (which relays to query). It also tracks "author coverage" for the outbox model - ensuring each author\'s events are fetched from at least some of their preferred relays.',
+            points: [
+                '<b>Receives:</b> Events from coordinators, EOSE notifications per relay',
+                '<b>Produces:</b> Deduplicated events to all observers, aggregated EOSE state',
+                '<b>Responsibilities:</b> Deduplicate events across relays, track EOSE per relay, manage observer subscriptions, track author relay coverage'
+            ]
+        },
+        internal: {
+            title: '🔀 InternalManager',
+            path: 'DataSource/NDKSubscriptionCoordinator.swift',
+            desc: 'InternalSubscriptionManager is the central event router. When events arrive from relays, they come tagged with a subscription ID that was generated by the relay-level components. The InternalManager maintains mappings to route these events correctly: relayIdToFingerprint maps subscription IDs to filter fingerprints, and fingerprintSubscriptions maps fingerprints to the actual NDKSubscriptionCoordinator objects. CRITICALLY, these mappings must be registered BEFORE the REQ is sent to the relay - otherwise events could arrive before routing is set up, causing them to be lost. The InternalManager also tracks relays per subscription (relayToSubscriptions) for O(1) lookup when a relay reconnects and needs to replay subscriptions.',
+            points: [
+                '<b>Receives:</b> Events with subscription IDs from relays, registration requests from coordinators',
+                '<b>Produces:</b> Routed events to correct coordinators, replay triggers on reconnection',
+                '<b>Responsibilities:</b> Map subscription IDs to fingerprints, route events to coordinators, handle relay reconnection replay'
+            ]
+        },
+        coord: {
+            title: '🎯 Coordinator',
+            path: 'DataSource/NDKSubscriptionCoordinator.swift',
+            desc: 'NDKSubscriptionCoordinator is an actor that handles subscription logic for ONE specific relay within a Requirement. There\'s one Coordinator per relay per Requirement. It has its own ID and fingerprint, knows its target relay, and tracks whether it has received EOSE from that relay. Coordinators can be "groupable" (eligible for batching with other similar subscriptions) with configurable delays. When events arrive via the InternalManager, the Coordinator forwards them to its parent Requirement. When EOSE arrives, it notifies the Requirement so it can track which relays have finished sending historical events. The Coordinator also has callbacks (onEvent, onEOSE) for custom handling.',
+            points: [
+                '<b>Receives:</b> Events and EOSE from InternalManager for its specific relay',
+                '<b>Produces:</b> Forwarded events to Requirement, EOSE notifications',
+                '<b>Responsibilities:</b> Handle per-relay subscription logic, track per-relay EOSE, forward events to Requirement, support grouping configuration'
+            ]
+        },
+        pool: {
+            title: '🏊 NDKPool',
+            path: 'Relay/NDKPool.swift',
+            desc: 'NDKPool is an actor that manages the collection of all NDKRelay objects. It\'s responsible for URL normalization (ensuring wss://relay.example.com and wss://relay.example.com/ are treated as the same relay), creating NDKRelay instances, and managing their lifecycle. When you call pool.add(url:), it creates or returns an existing relay. When you call pool.connect(), it connects all added relays. The pool provides a relayChanges AsyncStream that notifies when relays are added, connected, or disconnected - this is how other components react to relay availability changes. The pool also handles auto-connect behavior for relays added after connect() was called.',
+            points: [
+                '<b>Receives:</b> Relay URLs to add, connect/disconnect commands',
+                '<b>Produces:</b> NDKRelay instances, relayChanges notification stream',
+                '<b>Responsibilities:</b> Manage relay instances, normalize URLs, handle connect/disconnect lifecycle, notify of relay changes'
+            ]
+        },
+        rsm: {
+            title: '📦 RelaySubMgr',
+            path: 'Relay/NDKRelaySubscriptionManager.swift',
+            desc: 'NDKRelaySubscriptionManager is an actor that lives on each NDKRelay and handles subscription grouping for that specific relay. When coordinators register subscriptions, this manager groups them by fingerprint into NDKRelaySubscription objects. For groupable subscriptions, it applies a batching delay (default 100ms with "atMost" semantics) - this allows multiple subscriptions created in quick succession to be combined into a single REQ message. Non-groupable subscriptions execute immediately. The manager maintains a subscriptionIdToGroup mapping to route incoming events and EOSE to the correct group. It also handles relay disconnection (canceling pending groups) and reconnection (re-executing active groups).',
+            points: [
+                '<b>Receives:</b> Coordinator subscriptions to add, events/EOSE to route',
+                '<b>Produces:</b> NDKRelaySubscription groups, routed events to groups',
+                '<b>Responsibilities:</b> Group subscriptions by fingerprint, apply batching delays, route events to groups, handle disconnect/reconnect'
+            ]
+        },
+        rsub: {
+            title: '📎 RelaySubscription',
+            path: 'Relay/NDKRelaySubscription.swift',
+            desc: 'NDKRelaySubscription is an actor that represents a group of subscriptions being sent as a SINGLE REQ to a relay. Multiple coordinators with compatible filters are merged into one group. The key method is compileFilters() which intelligently merges filters: filters WITHOUT limits are merged together (combining authors, kinds, etc.), while filters WITH limits are kept separate (since limits have per-filter semantics). When executed, it generates a subscription ID, CRITICALLY registers this ID with InternalManager BEFORE sending the REQ (to avoid race conditions where events arrive before routing is set up), then sends the REQ. Events and EOSE are dispatched to ALL subscriptions in the group. Status transitions: initial → pending → waiting → running → closed.',
+            points: [
+                '<b>Receives:</b> Coordinator subscriptions with filters, events/EOSE from relay',
+                '<b>Produces:</b> Compiled merged filters, REQ messages, dispatched events to all grouped subscriptions',
+                '<b>Responsibilities:</b> Merge compatible filters, generate subscription IDs, register routing BEFORE REQ, dispatch events to group members'
+            ]
+        },
+        relay: {
+            title: '🔗 NDKRelay',
+            path: 'Models/NDKRelay.swift',
+            desc: 'NDKRelay represents a single Nostr relay connection. It\'s marked @Observable so SwiftUI can react to connection state changes. Each relay owns an NDKRelayConnection for WebSocket communication and an NDKRelaySubscriptionManager for subscription grouping. The relay handles NIP-42 authentication challenges, tracks active subscriptions, and provides methods to send subscription requests and close them. When events arrive from the connection, the relay routes them through its subscription manager. The relay also handles reconnection logic and can replay subscriptions when the connection is restored. Connection state (connected, disconnected, connecting) is observable for UI updates.',
+            points: [
+                '<b>Receives:</b> Subscription requests from RelaySubscription, WebSocket messages from Connection',
+                '<b>Produces:</b> REQ/CLOSE messages to Connection, routed events to SubscriptionManager, observable state',
+                '<b>Responsibilities:</b> Manage single relay connection, handle NIP-42 auth, track subscriptions, route events, provide observable state for UI'
+            ]
+        },
+        conn: {
+            title: '🌐 Connection',
+            path: 'Relay/NDKRelayConnection.swift',
+            desc: 'NDKRelayConnection is an actor that manages the actual WebSocket connection to a relay. It uses URLSessionWebSocketTask for the underlying transport. The connection handles message serialization (converting NostrMessage objects to JSON arrays) and parsing (converting incoming JSON to typed message objects like EVENT, EOSE, NOTICE, AUTH, etc.). It implements exponential backoff for reconnection attempts, starting at 1 second and increasing up to a maximum delay. The connection provides methods to send messages and a receive loop that continuously reads from the WebSocket and dispatches parsed messages to the relay. It also handles connection lifecycle events (open, close, error).',
+            points: [
+                '<b>Receives:</b> NostrMessage objects to send, WebSocket connection events',
+                '<b>Produces:</b> Parsed NostrMessage objects (EVENT, EOSE, etc.), connection state changes',
+                '<b>Responsibilities:</b> Manage WebSocket lifecycle, serialize/parse messages, implement reconnection backoff, deliver parsed messages to relay'
+            ]
+        },
+        ext: {
+            title: '⚡ Nostr Relay',
+            path: 'External Server',
+            desc: 'External Nostr relays are servers implementing the NIP-01 protocol. They receive REQ messages containing subscription IDs and filters, then stream back matching EVENT messages. Each event is tagged with the subscription ID so clients know which subscription it belongs to. After all stored (historical) events are sent, the relay sends an EOSE (End of Stored Events) message, signaling that only real-time events will follow. The relay may also send CLOSED messages if it rejects or terminates a subscription (with a reason), NOTICE messages for server announcements, and AUTH challenges for NIP-42 authentication. The subscription remains open until the client sends a CLOSE message.',
+            points: [
+                '<b>Receives:</b> REQ (subscription), CLOSE (unsubscribe), EVENT (publish), AUTH (authentication)',
+                '<b>Produces:</b> EVENT (matching events), EOSE (end of stored events), CLOSED (subscription terminated), NOTICE, AUTH challenge',
+                '<b>Responsibilities:</b> Store and index events, match filters, stream events to subscribers, handle authentication'
+            ]
+        }
+    };
+
+    // =============================================
+    // STATE
+    // =============================================
+
+    let svg, g, graph, render;
+    let playing = false;
+    let currentStep = -1;
+    let speed = 1;
+    let zoom;
+
+    // =============================================
+    // INITIALIZATION
+    // =============================================
+
+    function init() {
+        const container = document.getElementById('graph-container');
+        const width = container.clientWidth;
+        const height = container.clientHeight;
+
+        svg = d3.select('#graph')
+            .attr('width', width)
+            .attr('height', height);
+
+        // Add arrow markers
+        const defs = svg.append('defs');
+
+        // Normal arrow
+        defs.append('marker')
+            .attr('id', 'arrow')
+            .attr('viewBox', '0 -5 10 10')
+            .attr('refX', 10)
+            .attr('refY', 0)
+            .attr('markerWidth', 8)
+            .attr('markerHeight', 8)
+            .attr('orient', 'auto')
+            .append('path')
+            .attr('d', 'M0,-4L10,0L0,4')
+            .attr('fill', '#4a4a55');
+
+        // Active arrow
+        defs.append('marker')
+            .attr('id', 'arrow-active')
+            .attr('viewBox', '0 -5 10 10')
+            .attr('refX', 10)
+            .attr('refY', 0)
+            .attr('markerWidth', 8)
+            .attr('markerHeight', 8)
+            .attr('orient', 'auto')
+            .append('path')
+            .attr('d', 'M0,-4L10,0L0,4')
+            .attr('fill', '#7c3aed');
+
+        // Glow filter
+        const glow = defs.append('filter')
+            .attr('id', 'glow')
+            .attr('x', '-50%').attr('y', '-50%')
+            .attr('width', '200%').attr('height', '200%');
+        glow.append('feGaussianBlur').attr('stdDeviation', '3').attr('result', 'blur');
+        glow.append('feMerge').html('<feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/>');
+
+        // Zoom
+        zoom = d3.zoom()
+            .scaleExtent([0.3, 2])
+            .on('zoom', e => g.attr('transform', e.transform));
+        svg.call(zoom);
+
+        g = svg.append('g');
+
+        createGraph();
+        setupEvents();
+    }
+
+    function createGraph() {
+        graph = new dagreD3.graphlib.Graph().setGraph({
+            rankdir: 'TB',
+            nodesep: 50,
+            ranksep: 70,
+            marginx: 20,
+            marginy: 20
+        });
+
+        // Add nodes
+        nodes.forEach(n => {
+            graph.setNode(n.id, {
+                label: '',
+                width: 130,
+                height: 55,
+                data: n
+            });
+        });
+
+        // Add edges
+        edges.forEach((e, i) => {
+            graph.setEdge(e.from, e.to, {
+                label: e.label,
+                curve: d3.curveBasis,
+                data: { index: i, back: e.back }
+            });
+        });
+
+        // Create renderer
+        render = new dagreD3.render();
+
+        // Customize node rendering
+        render.shapes().custom = function(parent, bbox, node) {
+            const data = node.data;
+            const color = colors[data.type];
+
+            const rect = parent.insert('rect', ':first-child')
+                .attr('x', -bbox.width / 2)
+                .attr('y', -bbox.height / 2)
+                .attr('width', bbox.width)
+                .attr('height', bbox.height)
+                .attr('fill', d3.color(color).darker(1.5))
+                .attr('stroke', color);
+
+            parent.append('text')
+                .attr('class', 'icon')
+                .attr('x', -bbox.width / 2 + 12)
+                .attr('y', 0)
+                .attr('dy', '0.35em')
+                .text(data.icon);
+
+            parent.append('text')
+                .attr('class', 'label')
+                .attr('x', -bbox.width / 2 + 36)
+                .attr('y', -8)
+                .text(data.label);
+
+            parent.append('text')
+                .attr('class', 'sublabel')
+                .attr('x', -bbox.width / 2 + 36)
+                .attr('y', 10)
+                .text(data.sub);
+
+            node.intersect = function(point) {
+                return dagreD3.intersect.rect(node, point);
+            };
+
+            return rect;
+        };
+
+        nodes.forEach(n => {
+            graph.node(n.id).shape = 'custom';
+        });
+
+        // Render
+        render(g, graph);
+
+        // Style edges
+        g.selectAll('.edgePath path')
+            .attr('marker-end', 'url(#arrow)');
+
+        // Add click handlers
+        g.selectAll('.node').on('click', function(e, id) {
+            showInfo(id);
+            highlightNode(id);
+        });
+
+        // Fit
+        setTimeout(zoomFit, 100);
+    }
+
+    function setupEvents() {
+        document.getElementById('speed').addEventListener('input', e => {
+            speed = parseFloat(e.target.value);
+            document.getElementById('speedVal').textContent = speed + 'x';
+        });
+
+        window.addEventListener('resize', () => {
+            const container = document.getElementById('graph-container');
+            svg.attr('width', container.clientWidth).attr('height', container.clientHeight);
+        });
+    }
+
+    // =============================================
+    // ANIMATION
+    // =============================================
+
+    async function togglePlay() {
+        if (playing) {
+            playing = false;
+            document.getElementById('playBtn').textContent = '▶ Play';
+            document.getElementById('playBtn').classList.remove('playing');
+        } else {
+            playing = true;
+            document.getElementById('playBtn').textContent = '⏸ Pause';
+            document.getElementById('playBtn').classList.add('playing');
+            await runAnimation();
+        }
+    }
+
+    async function runAnimation() {
+        for (let i = 0; i < steps.length && playing; i++) {
+            await animateStep(i);
+        }
+        if (playing) {
+            playing = false;
+            document.getElementById('playBtn').textContent = '▶ Play';
+            document.getElementById('playBtn').classList.remove('playing');
+        }
+    }
+
+    async function animateStep(idx) {
+        currentStep = idx;
+        const step = steps[idx];
+
+        // Update UI
+        document.getElementById('stepNum').textContent = idx + 1;
+        document.getElementById('stepTitle').textContent = step.title;
+        document.getElementById('stepDesc').textContent = step.desc;
+        document.getElementById('progress').style.width = ((idx + 1) / steps.length * 100) + '%';
+
+        // Highlight nodes
+        g.selectAll('.node').classed('highlighted', false).classed('active', false);
+        step.nodes.forEach(id => {
+            g.select(`.node[data-id="${id}"]`).classed('highlighted', true);
+        });
+
+        // Highlight edges
+        g.selectAll('.edgePath').classed('active', false);
+        g.selectAll('.edgePath path').attr('marker-end', 'url(#arrow)');
+
+        // Animate packets along edges
+        for (const edgeIdx of step.edges) {
+            const edge = edges[edgeIdx];
+            await animatePacket(edge.from, edge.to, edge.back);
+        }
+
+        await sleep(1000 / speed);
+    }
+
+    async function animatePacket(fromId, toId, isBack) {
+        const fromNode = graph.node(fromId);
+        const toNode = graph.node(toId);
+
+        if (!fromNode || !toNode) return;
+
+        // Find the edge path
+        const edgePaths = g.selectAll('.edgePath').nodes();
+        let pathEl = null;
+
+        for (const ep of edgePaths) {
+            const d = d3.select(ep);
+            const pathData = graph.edge(fromId, toId);
+            if (pathData) {
+                // Find matching edge
+                const edges = graph.edges();
+                for (const e of edges) {
+                    if (e.v === fromId && e.w === toId) {
+                        pathEl = g.select(`.edgePath[data-from="${fromId}"][data-to="${toId}"] path`).node() ||
+                                 d.select('path').node();
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Highlight the edge
+        g.selectAll('.edgePath').each(function() {
+            const path = d3.select(this).select('path');
+            const d = path.attr('d');
+            // Check if this edge connects our nodes (approximate)
+            const edge = graph.edge(fromId, toId);
+            if (edge) {
+                d3.select(this).classed('active', true);
+                path.attr('marker-end', 'url(#arrow-active)');
+            }
+        });
+
+        // Create packet
+        const packet = g.append('circle')
+            .attr('class', 'packet')
+            .attr('r', 6)
+            .attr('cx', fromNode.x)
+            .attr('cy', fromNode.y)
+            .attr('fill', isBack ? '#7c3aed' : '#3b82f6')
+            .style('filter', 'url(#glow)');
+
+        // Animate
+        await new Promise(resolve => {
+            packet.transition()
+                .duration(600 / speed)
+                .ease(d3.easeQuadInOut)
+                .attr('cx', toNode.x)
+                .attr('cy', toNode.y)
+                .on('end', () => {
+                    packet.remove();
+                    resolve();
+                });
+        });
+    }
+
+    function highlightNode(id) {
+        g.selectAll('.node').classed('active', false);
+        g.selectAll(`.node`).each(function() {
+            const nodeId = d3.select(this).attr('data-id') ||
+                           graph.nodes().find(n => {
+                               const node = graph.node(n);
+                               const bbox = this.getBBox();
+                               return Math.abs(node.x - (bbox.x + bbox.width/2)) < 10;
+                           });
+        });
+    }
+
+    function showInfo(id) {
+        const info = moduleInfo[id];
+        if (!info) return;
+
+        document.getElementById('infoTitle').textContent = info.title;
+        document.getElementById('infoPath').textContent = info.path;
+        document.getElementById('infoDesc').textContent = info.desc;
+
+        // Always hide code block - we use rich text descriptions instead
+        document.getElementById('infoCode').style.display = 'none';
+
+        const pointsEl = document.getElementById('infoPoints');
+        if (info.points) {
+            pointsEl.innerHTML = info.points.map(p => `<li>${p}</li>`).join('');
+            pointsEl.style.display = 'block';
+        } else {
+            pointsEl.style.display = 'none';
+        }
+    }
+
+    // =============================================
+    // CONTROLS
+    // =============================================
+
+    function resetAll() {
+        playing = false;
+        currentStep = -1;
+        document.getElementById('playBtn').textContent = '▶ Play';
+        document.getElementById('playBtn').classList.remove('playing');
+        document.getElementById('stepNum').textContent = '0';
+        document.getElementById('stepTitle').textContent = 'Click Play to start';
+        document.getElementById('stepDesc').textContent = 'Watch data flow from your app through NDKSwift to the relay and back.';
+        document.getElementById('progress').style.width = '0%';
+
+        // Reset info panel to welcome state
+        document.getElementById('infoTitle').textContent = '👋 Welcome to NDKSwift Subscriptions';
+        document.getElementById('infoPath').textContent = '';
+        document.getElementById('infoDesc').textContent = 'This visualization shows how data flows through NDKSwift when your app creates a subscription. Click any node to see detailed information about that module - what it receives, what it produces, and what its responsibilities are. Press Play to watch an animated walkthrough of the entire subscription lifecycle.';
+        document.getElementById('infoCode').style.display = 'none';
+        document.getElementById('infoPoints').style.display = 'none';
+
+        g.selectAll('.node').classed('highlighted', false).classed('active', false);
+        g.selectAll('.edgePath').classed('active', false);
+        g.selectAll('.edgePath path').attr('marker-end', 'url(#arrow)');
+        g.selectAll('.packet').remove();
+    }
+
+    function zoomFit() {
+        const bounds = g.node().getBBox();
+        const container = document.getElementById('graph-container');
+        const width = container.clientWidth;
+        const height = container.clientHeight;
+
+        const scale = 0.85 / Math.max(bounds.width / width, bounds.height / height);
+        const tx = width / 2 - scale * (bounds.x + bounds.width / 2);
+        const ty = height / 2 - scale * (bounds.y + bounds.height / 2);
+
+        svg.transition().duration(500)
+            .call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));
+    }
+
+    function sleep(ms) {
+        return new Promise(r => setTimeout(r, ms));
+    }
+
+    // =============================================
+    // START
+    // =============================================
+
+    document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

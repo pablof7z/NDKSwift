@@ -160,9 +160,8 @@ public struct NDKUIReplyIndicator: View {
         defer { isLoading = false }
 
         let filter = NDKFilter(ids: [eventId])
-        let subscription = ndk.subscribe(filter: filter, cachePolicy: .cacheWithNetwork)
-
-        replyToEvent = await subscription.first()
+        let events = await ndk.fetchEvents(filter: filter, cachePolicy: .cacheWithNetwork, timeout: 5.0)
+        replyToEvent = events.first
     }
 }
 

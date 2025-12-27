@@ -9,7 +9,8 @@ public struct ProfileHeaderView: View {
 
     @State private var isNip05Verified: Bool = false
     @State private var isVerifying: Bool = false
-    @State private var isFollowLoading: Bool = false
+    // Store profile reference so SwiftUI holds it and observes changes
+    @State private var profile: NDKProfile?
 
     public init(ndk: NDK, pubkey: String) {
         self.ndk = ndk
@@ -20,28 +21,26 @@ public struct ProfileHeaderView: View {
         state.ndk.sessionData?.pubkey == pubkey
     }
 
-    private var isFollowing: Bool {
-        state.ndk.sessionData?.followList.contains(pubkey) ?? false
-    }
-
     public var body: some View {
-        let profile = ndk.profile(for: pubkey)
-
         VStack(spacing: 0) {
             // Banner
-            bannerSection(profile: profile)
+            bannerSection
 
             // Profile Info
-            profileInfoSection(profile: profile)
+            profileInfoSection
+        }
+        .task {
+            // Load profile and hold reference so SwiftUI observes changes
+            profile = ndk.profile(for: pubkey)
         }
     }
 
     // MARK: - Banner Section
 
-    private func bannerSection(profile: NDKProfile) -> some View {
+    private var bannerSection: some View {
         ZStack(alignment: .bottomLeading) {
             // Banner Image
-            if let bannerURL = profile.bannerURL {
+            if let bannerURL = profile?.bannerURL {
                 AsyncImage(url: bannerURL) { phase in
                     switch phase {
                     case .success(let image):
@@ -71,7 +70,7 @@ public struct ProfileHeaderView: View {
 
     // MARK: - Profile Info Section
 
-    private func profileInfoSection(profile: NDKProfile) -> some View {
+    private var profileInfoSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Avatar row with name and follow button
             HStack(alignment: .top, spacing: 12) {
@@ -85,11 +84,11 @@ public struct ProfileHeaderView: View {
 
                 // Name and handle
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(ndk.profile(for: pubkey).displayName)
+                    Text(profile?.displayName ?? "...")
                         .font(.title3.weight(.bold))
 
                     HStack(spacing: 4) {
-                        if let nip05 = profile.nip05, !nip05.isEmpty {
+                        if let nip05 = profile?.nip05, !nip05.isEmpty {
                             Text(nip05)
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
@@ -106,7 +105,7 @@ public struct ProfileHeaderView: View {
                         }
                     }
                     .task {
-                        if let nip05 = profile.nip05, !nip05.isEmpty {
+                        if let nip05 = profile?.nip05, !nip05.isEmpty {
                             await verifyNip05(nip05: nip05)
                         }
                     }
@@ -116,15 +115,15 @@ public struct ProfileHeaderView: View {
 
                 // Follow button (only show if not own profile)
                 if !isOwnProfile {
-                    followButton
+                    NDKUIFollowButton(ndk: state.ndk, pubkey: pubkey, style: .compact)
                         .padding(.top, 4)
                 }
             }
             .padding(.top, 8)
 
             // Bio
-            if !profile.about.isEmpty {
-                Text(profile.about)
+            if let about = profile?.about, !about.isEmpty {
+                Text(about)
                     .font(.subheadline)
                     .foregroundStyle(.primary)
                     .lineLimit(4)
@@ -133,7 +132,7 @@ public struct ProfileHeaderView: View {
             }
 
             // Lightning address
-            if let lud16 = profile.lud16, !lud16.isEmpty {
+            if let lud16 = profile?.lud16, !lud16.isEmpty {
                 HStack(spacing: 4) {
                     Image(systemName: "bolt.fill")
                         .font(.caption)
@@ -145,48 +144,6 @@ public struct ProfileHeaderView: View {
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 16)
-    }
-
-    // MARK: - Follow Button
-
-    private var followButton: some View {
-        Button {
-            toggleFollow()
-        } label: {
-            Group {
-                if isFollowLoading {
-                    ProgressView()
-                        .tint(isFollowing ? Color.primary : Color.white)
-                } else {
-                    Text(isFollowing ? "Following" : "Follow")
-                }
-            }
-            .font(.subheadline.weight(.semibold))
-            .frame(width: 100, height: 34)
-            .foregroundStyle(isFollowing ? Color.primary : Color.white)
-            .background(isFollowing ? Color(.secondarySystemBackground) : .blue)
-            .clipShape(Capsule())
-            .overlay {
-                Capsule()
-                    .stroke(isFollowing ? Color(.separator) : .clear, lineWidth: 1)
-            }
-        }
-        .disabled(isFollowLoading)
-    }
-
-    private func toggleFollow() {
-        guard !isFollowLoading else { return }
-        isFollowLoading = true
-
-        let ndk = state.ndk
-        let shouldUnfollow = isFollowing
-        let targetPubkey = pubkey
-
-        Task {
-            // TODO: Implement follow/unfollow - methods don't exist on NDK yet
-            print("Follow/unfollow not implemented: shouldUnfollow=\(shouldUnfollow), pubkey=\(targetPubkey)")
-            await MainActor.run { isFollowLoading = false }
-        }
     }
 
     // MARK: - Helpers

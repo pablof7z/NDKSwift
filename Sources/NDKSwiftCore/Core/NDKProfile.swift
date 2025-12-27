@@ -84,9 +84,11 @@ public final class NDKProfile {
 
             // Consume subscription events in background (they go to cache automatically)
             Task {
-                for await _ in subscription.events {
+                for await batch in subscription.events {
                     guard !cancellation.isCancelled else { break }
-                    // Events are cached automatically, cache observation handles the rest
+                    // Events are consumed to keep the subscription active
+                    // They are automatically saved to cache by NDKSubscriptionRequirement
+                    _ = batch
                 }
             }
 
@@ -96,15 +98,14 @@ public final class NDKProfile {
                     guard !cancellation.isCancelled else { break }
                     guard let self else { break }
 
-                    await MainActor.run {
-                        // Only update if metadata actually changed to avoid triggering unnecessary observation
-                        if self.metadata?.eventId != metadata?.eventId {
+                    if let metadata = metadata {
+                        await MainActor.run {
                             self.metadata = metadata
                         }
                     }
                 }
             } catch {
-                NDKLogger.log(.warning, category: .general, "Profile observation error for \(pubkey.prefix(8)): \(error)")
+                // Stream ended or error occurred
             }
         }
     }

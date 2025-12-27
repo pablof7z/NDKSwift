@@ -6,6 +6,9 @@ struct FollowPackRowView: View {
     let ndk: NDK
     let pack: FollowPack
 
+    // Store profile reference so SwiftUI holds it and observes changes
+    @State private var profile: NDKProfile?
+
     var body: some View {
         HStack(spacing: 12) {
             // Pack image or gradient
@@ -23,7 +26,7 @@ struct FollowPackRowView: View {
                     Text("\(pack.memberCount) accounts")
                     Text("·")
                     Text("by")
-                    Text(ndk.profile(for: pack.creatorPubkey).displayName)
+                    Text(profile?.displayName ?? "...")
                 }
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -42,6 +45,9 @@ struct FollowPackRowView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .contentShape(Rectangle())
+        .task {
+            profile = ndk.profile(for: pack.creatorPubkey)
+        }
     }
 
     // MARK: - Components

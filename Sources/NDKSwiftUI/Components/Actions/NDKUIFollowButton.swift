@@ -267,7 +267,7 @@ public struct NDKUIFollowButton: View {
 
 // MARK: - FollowState
 
-/// Observable state for managing follow relationships and contact list updates
+/// Observable state for managing follow relationships using session data
 @MainActor
 private class FollowState: ObservableObject {
     @Published var isFollowing: Bool = false
@@ -275,8 +275,6 @@ private class FollowState: ObservableObject {
     @Published var error: Error?
 
     private let targetPubkey: String
-    private var currentContactList: [String] = []
-    private var currentContactListEvent: NDKEvent?
     private var observationTask: Task<Void, Never>?
 
     init(targetPubkey: String) {
@@ -291,52 +289,31 @@ private class FollowState: ObservableObject {
         // Cancel existing observation
         observationTask?.cancel()
 
-        guard let signer = ndk.signer,
-              let userPubkey = try? await signer.pubkey else { return }
+        // Initial state from session data
+        updateFromSessionData(ndk: ndk)
 
+        // Observe session data changes via withObservationTracking
         observationTask = Task { [weak self] in
-            await self?.observeContactList(ndk: ndk, userPubkey: userPubkey)
-        }
-    }
-
-    private func observeContactList(ndk: NDK, userPubkey: String) async {
-        // Create filter for user's contact list (kind:3)
-        let filter = NDKFilter(
-            authors: [userPubkey],
-            kinds: [EventKind.contacts]
-        )
-
-        let dataSource = ndk.subscribe(
-            filter: filter,
-            maxAge: 0, // Real-time
-            cachePolicy: .cacheWithNetwork
-        )
-
-        // Process contact list events
-        for await batch in dataSource.events {
-            for _ in batch {
-                await updateFollowState(from: dataSource.data)
+            guard let self = self else { return }
+            while !Task.isCancelled {
+                await withCheckedContinuation { continuation in
+                    withObservationTracking {
+                        // Access the observable property to track it
+                        _ = ndk.sessionData?.contactList
+                    } onChange: {
+                        continuation.resume()
+                    }
+                }
+                // Update state when contact list changes
+                await MainActor.run {
+                    self.updateFromSessionData(ndk: ndk)
+                }
             }
         }
     }
 
-    private func updateFollowState(from events: [NDKEvent]) async {
-        // Get the most recent contact list event
-        let sortedEvents = events.sorted { $0.createdAt > $1.createdAt }
-        guard let latestEvent = sortedEvents.first else { return }
-
-        // Parse contact list
-        var contacts: [String] = []
-        for tag in latestEvent.tags {
-            if tag.count >= 2 && tag[0] == "p" {
-                contacts.append(tag[1])
-            }
-        }
-
-        // Update state
-        currentContactList = contacts
-        currentContactListEvent = latestEvent
-        isFollowing = contacts.contains(targetPubkey)
+    private func updateFromSessionData(ndk: NDK) {
+        isFollowing = ndk.sessionData?.contactList?.isFollowing(targetPubkey) ?? false
     }
 
     func toggleFollow(ndk: NDK) async {
@@ -348,28 +325,20 @@ private class FollowState: ObservableObject {
     }
 
     func followUser(ndk: NDK) async {
-        guard let signer = ndk.signer else { return }
+        guard ndk.signer != nil else { return }
 
         isLoading = true
         error = nil
         defer { isLoading = false }
 
         do {
-            // Add to contact list
-            var newContactList = currentContactList
-            if !newContactList.contains(targetPubkey) {
-                newContactList.append(targetPubkey)
-            }
+            // Get or create contact list from session data
+            let contactList = ndk.sessionData?.contactList ?? NDKContactList(ndk: ndk)
+            contactList.addContact(pubkey: targetPubkey)
 
-            // Create new contact list event
-            let contactListEvent = try await buildContactListEvent(
-                ndk: ndk,
-                signer: signer,
-                contacts: newContactList
-            )
-
-            // Publish the updated contact list
-            _ = try await ndk.publish(contactListEvent)
+            // Sign and publish
+            try await contactList.sign()
+            _ = try await ndk.publish(contactList.toNDKEvent())
 
         } catch {
             self.error = error
@@ -378,56 +347,25 @@ private class FollowState: ObservableObject {
     }
 
     func unfollowUser(ndk: NDK) async {
-        guard let signer = ndk.signer else { return }
+        guard ndk.signer != nil else { return }
 
         isLoading = true
         error = nil
         defer { isLoading = false }
 
         do {
-            // Remove from contact list
-            let newContactList = currentContactList.filter { $0 != targetPubkey }
+            // Get contact list from session data
+            guard let contactList = ndk.sessionData?.contactList else { return }
+            contactList.removeContact(pubkey: targetPubkey)
 
-            // Create new contact list event
-            let contactListEvent = try await buildContactListEvent(
-                ndk: ndk,
-                signer: signer,
-                contacts: newContactList
-            )
-
-            // Publish the updated contact list
-            _ = try await ndk.publish(contactListEvent)
+            // Sign and publish
+            try await contactList.sign()
+            _ = try await ndk.publish(contactList.toNDKEvent())
 
         } catch {
             self.error = error
             NDKLogger.log(.error, category: .general, "Failed to unfollow user: \(error)")
         }
-    }
-
-    private func buildContactListEvent(
-        ndk: NDK,
-        signer: NDKSigner,
-        contacts: [String]
-    ) async throws -> NDKEvent {
-        let eventBuilder = NDKEventBuilder(ndk: ndk)
-            .kind(EventKind.contacts) // Contact list
-            .content(currentContactListEvent?.content ?? "") // Preserve existing content
-
-        // Add contact tags
-        for contact in contacts {
-            eventBuilder.tag(["p", contact])
-        }
-
-        // Preserve other non-p tags from the current contact list
-        if let currentEvent = currentContactListEvent {
-            for tag in currentEvent.tags {
-                if tag.count >= 1 && tag[0] != "p" {
-                    eventBuilder.tag(tag)
-                }
-            }
-        }
-
-        return try await eventBuilder.build(signer: signer)
     }
 }
 

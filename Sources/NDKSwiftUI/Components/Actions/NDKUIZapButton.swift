@@ -368,20 +368,22 @@ private class ZapState: ObservableObject {
             cachePolicy: .cacheWithNetwork
         )
 
-        // Process zap events
+        // Accumulate zaps locally
+        var allZaps: [String: NDKEvent] = [:] // id -> event
+        let userPubkey = try? await ndk.signer?.pubkey
+
+        // Process zap events as they stream in
         for await batch in dataSource.events {
-            for _ in batch {
-                await updateZapState(from: dataSource.data, ndk: ndk)
+            for event in batch {
+                allZaps[event.id] = event
             }
+            await updateZapState(from: Array(allZaps.values), userPubkey: userPubkey)
         }
     }
 
-    private func updateZapState(from events: [NDKEvent], ndk: NDK) async {
+    private func updateZapState(from events: [NDKEvent], userPubkey: String?) async {
         var totalAmount = 0
         var userZapped = false
-
-        // Get current user's pubkey
-        let userPubkey = try? await ndk.signer?.pubkey
 
         // Process all zap receipt events
         for event in events {

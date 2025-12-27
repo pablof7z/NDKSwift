@@ -211,11 +211,10 @@ extension XCTestCase {
         // Create a filter for the published event
         let filter = NDKFilter(ids: [event.id])
 
-        // Wait for the event to be retrievable using the new observe API
+        // Wait for the event to be retrievable using fetchEvents
         await assertEventually(timeout: timeout, file: file, line: line) {
-            let dataSource = ndk.subscribe(filter: filter, maxAge: 0)
-            let firstEvent = await dataSource.first(timeout: 1.0)
-            return firstEvent != nil
+            let events = await ndk.fetchEvents(filter: filter, timeout: 1.0)
+            return !events.isEmpty
         }
     }
 

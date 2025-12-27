@@ -13,6 +13,9 @@ struct DeveloperToolsView: View {
     @State private var signerPubkey: String?
     @State private var cachePath: String?
     @State private var isLoading = true
+    @State private var showDeleteConfirmation = false
+    @State private var isDeleting = false
+    @State private var deleteError: String?
 
     var body: some View {
         List {
@@ -59,17 +62,6 @@ struct DeveloperToolsView: View {
 
             // Network Tools
             Section("Network") {
-                NavigationLink {
-                    RelayDashboardView()
-                } label: {
-                    ToolRow(
-                        icon: "antenna.radiowaves.left.and.right",
-                        title: "Relay Monitor",
-                        subtitle: "Connection states and message counts",
-                        color: .green
-                    )
-                }
-
                 NavigationLink {
                     SubscriptionsView()
                 } label: {
@@ -157,6 +149,26 @@ struct DeveloperToolsView: View {
                 }
             }
 
+            // Danger Zone
+            Section {
+                Button(role: .destructive) {
+                    showDeleteConfirmation = true
+                } label: {
+                    HStack {
+                        Label("Delete NostrDB Cache", systemImage: "trash")
+                        if isDeleting {
+                            Spacer()
+                            ProgressView()
+                        }
+                    }
+                }
+                .disabled(isDeleting)
+            } header: {
+                Text("Danger Zone")
+            } footer: {
+                Text("Permanently deletes all cached events. The app will need to re-fetch data from relays.")
+            }
+
             // Info Section
             if let path = cachePath {
                 Section("Info") {
@@ -176,6 +188,44 @@ struct DeveloperToolsView: View {
         .refreshable {
             await refreshStats()
         }
+        .confirmationDialog(
+            "Delete NostrDB Cache?",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Cache", role: .destructive) {
+                Task { await deleteCache() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will permanently delete all cached events (\(formatBytes(databaseSize))). The app will need to re-fetch data from relays.")
+        }
+        .alert("Error Deleting Cache", isPresented: .init(
+            get: { deleteError != nil },
+            set: { if !$0 { deleteError = nil } }
+        )) {
+            Button("OK") { deleteError = nil }
+        } message: {
+            if let error = deleteError {
+                Text(error)
+            }
+        }
+    }
+
+    private func deleteCache() async {
+        guard let cache = state.ndk.cache as? NDKNostrDBCache else {
+            deleteError = "Cache is not a NostrDB cache"
+            return
+        }
+
+        isDeleting = true
+        do {
+            try await cache.clearPersisted()
+            await refreshStats()
+        } catch {
+            deleteError = error.localizedDescription
+        }
+        isDeleting = false
     }
 
     private func refreshStats() async {

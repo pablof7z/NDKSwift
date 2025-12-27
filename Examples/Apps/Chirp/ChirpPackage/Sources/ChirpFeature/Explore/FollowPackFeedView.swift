@@ -6,7 +6,6 @@ struct FollowPackFeedView: View {
     @Environment(ChirpState.self) private var state
     let pack: FollowPack
 
-    @State private var subscription: NDKSubscription<NDKEvent>?
     @State private var allEvents: [NDKEvent] = []
     @Environment(\.dismiss) private var dismiss
 
@@ -40,12 +39,7 @@ struct FollowPackFeedView: View {
             }
         }
         .task {
-            createSubscription()
-        }
-        .onChange(of: subscription?.data) { _, newData in
-            if let newData = newData {
-                mergeEvents(from: newData)
-            }
+            await streamEvents()
         }
     }
 
@@ -61,15 +55,7 @@ struct FollowPackFeedView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 16) {
                     ForEach(pack.pubkeys.prefix(20), id: \.self) { pubkey in
-                        VStack(spacing: 6) {
-                            NDKUIProfilePicture(ndk: state.ndk, pubkey: pubkey, size: 48)
-
-                            Text(state.ndk.profile(for: pubkey).displayName)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                                .frame(maxWidth: 60)
-                        }
+                        MemberAvatarView(ndk: state.ndk, pubkey: pubkey)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -97,10 +83,10 @@ struct FollowPackFeedView: View {
 
     // MARK: - Subscription
 
-    private func createSubscription() {
+    private func streamEvents() async {
         guard !pack.pubkeys.isEmpty else { return }
 
-        subscription = state.ndk.subscribe(
+        let subscription = state.ndk.subscribe(
             filter: NDKFilter(
                 authors: pack.pubkeys,
                 kinds: [1],
@@ -109,16 +95,43 @@ struct FollowPackFeedView: View {
             cachePolicy: .cacheWithNetwork,
             subscriptionId: "pack-feed-\(pack.id)"
         )
-    }
 
-    private func mergeEvents(from newData: [NDKEvent]) {
-        let existingIds = Set(allEvents.map { $0.id })
-        let newEvents = newData.filter { !existingIds.contains($0.id) }
-
-        if !newEvents.isEmpty {
-            withAnimation(.spring(response: 0.3)) {
-                allEvents = (allEvents + newEvents).sorted { $0.createdAt > $1.createdAt }
+        var existingIds = Set<String>()
+        for await batch in subscription.events {
+            let newEvents = batch.filter { !existingIds.contains($0.id) }
+            if !newEvents.isEmpty {
+                for event in newEvents {
+                    existingIds.insert(event.id)
+                }
+                withAnimation(.spring(response: 0.3)) {
+                    allEvents = (allEvents + newEvents).sorted { $0.createdAt > $1.createdAt }
+                }
             }
+        }
+    }
+}
+
+// MARK: - Member Avatar View
+
+private struct MemberAvatarView: View {
+    let ndk: NDK
+    let pubkey: String
+
+    // Store profile reference so SwiftUI holds it and observes changes
+    @State private var profile: NDKProfile?
+
+    var body: some View {
+        VStack(spacing: 6) {
+            NDKUIProfilePicture(ndk: ndk, pubkey: pubkey, size: 48)
+
+            Text(profile?.displayName ?? "...")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .frame(maxWidth: 60)
+        }
+        .task {
+            profile = ndk.profile(for: pubkey)
         }
     }
 }

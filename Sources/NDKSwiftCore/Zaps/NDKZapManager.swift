@@ -76,6 +76,7 @@ public actor NDKZapManager: ZapManaging {
         }
 
         // Create a new fetch task
+        let ndkRef = ndk
         let task = Task<RecipientZapInfo, Never> {
             // Create a combined filter for all event types we need
             var filter = NDKFilter()
@@ -85,35 +86,30 @@ public actor NDKZapManager: ZapManaging {
                 EventKind.nutzapPreferences  // kind:10019 - nutzap preferences
             ]
 
-            // Create data source and collect until EOSE
-            let dataSource = NDKSubscription(
-                ndk: ndk,
+            // Fetch events until EOSE
+            let events = await ndkRef.fetchEvents(
                 filter: filter,
-                maxAge: maxAge
+                maxAge: maxAge,
+                timeout: NetworkConstants.timeoutDataCollectionLong
             )
 
-            // Collect all events with a reasonable timeout
-            let events = await dataSource.collect(timeout: NetworkConstants.timeoutDataCollectionLong)
-
             // Create RecipientZapInfo from fetched events
-            let info = await RecipientZapInfo.from(
+            return await RecipientZapInfo.from(
                 pubkey: pubkey,
                 events: events
             )
-
-            // Cache the result
-            recipientInfoCache[pubkey] = info
-
-            // Clean up the task reference
-            fetchTasks.removeValue(forKey: pubkey)
-
-            return info
         }
 
         // Store the task to prevent duplicate fetches
         fetchTasks[pubkey] = task
 
-        return await task.value
+        let info = await task.value
+
+        // Cache the result and clean up
+        recipientInfoCache[pubkey] = info
+        fetchTasks.removeValue(forKey: pubkey)
+
+        return info
     }
 
     /// Clear cached recipient info

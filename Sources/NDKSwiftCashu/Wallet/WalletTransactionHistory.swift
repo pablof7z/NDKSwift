@@ -652,17 +652,14 @@ public actor WalletTransactionHistory {
                 // Try to get nutzap details
                 let filter = NDKFilter(ids: [redeemedId])
                 let relayUrls = relays.isEmpty ? nil : Set(relays)
-                let dataSource = NDKSubscription(
-                    ndk: ndk,
+
+                // Fetch events until EOSE
+                let events = await ndk.fetchEvents(
                     filter: filter,
-                    maxAge: 0,
                     cachePolicy: .cacheWithNetwork,
                     relays: relayUrls,
-                    subscriptionId: "nutzap-lookup-\(redeemedId)"
+                    timeout: NetworkConstants.timeoutDataCollectionShort
                 )
-
-                // Collect all nutzap events and use the first one (there should only be one per ID)
-                let events = await dataSource.collect(timeout: NetworkConstants.timeoutDataCollectionShort)
                 if let nutzapEvent = events.first {
                     nutzapData = NutzapData(
                         senderPubkey: nutzapEvent.pubkey,

@@ -117,6 +117,10 @@ actor NDKSubscriptionRequirement {
                 await self?.handleEOSE(from: relay)
             }
 
+            await internalSubscription.setOnRelayAdded { [weak self] relayUrl in
+                await self?.handleRelayAdded(relayUrl)
+            }
+
             // Start the subscription
             await internalSubscription.start()
         } else {
@@ -273,14 +277,22 @@ actor NDKSubscriptionRequirement {
 
         // If relay doesn't exist in pool, add and connect to it
         if relay == nil {
-            NDKLogger.log(.info, category: .subscription,
-                          "🔌 Relay not in pool, adding and connecting: \(relayURL)")
             // Determine the correct origin - fallbacks use appRelays, otherwise track the author
             let origin: NDKRelayOrigin = isFallback
                 ? .appRelays
                 : .outbox(authorPubkey: filter.authors?.first ?? "unknown")
+
+            // Build descriptive reason for logging
+            let kindsStr = filter.kinds?.map { "\($0)" }.joined(separator: ",") ?? "all"
+            let authorsCount = filter.authors?.count ?? 0
+            let fallbackStr = isFallback ? " (fallback)" : ""
+            let reason = "subscription '\(subscriptionId)' for kinds [\(kindsStr)], \(authorsCount) authors\(fallbackStr)"
+
+            NDKLogger.log(.info, category: .subscription,
+                          "🔌 Relay not in pool, adding: \(relayURL) | \(reason)")
+
             // Use ndk.addRelay to ensure auto-connect happens
-            relay = await ndk.addRelay(relayURL, origin: origin)
+            relay = await ndk.addRelay(relayURL, origin: origin, reason: reason)
         }
 
         guard let relay = relay else {
@@ -403,6 +415,11 @@ actor NDKSubscriptionRequirement {
                 await cancel()
             }
         }
+    }
+
+    /// Handle when a new relay is added to the subscription (e.g., via replay)
+    private func handleRelayAdded(_ relayUrl: RelayURL) async {
+        await eoseTracker.addExpectedRelay(relayUrl)
     }
 
     /// Get the observer count for this requirement

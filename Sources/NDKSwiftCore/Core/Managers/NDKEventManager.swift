@@ -153,7 +153,12 @@ public actor NDKEventManager {
         }
 
         // Prepare relays for publishing (add to pool and start connecting)
-        let targetRelays = await ndk.pool.prepareRelays(Array(relayURLs), autoConnect: true)
+        // Use outbox origin to avoid polluting app relay list
+        let targetRelays = await ndk.pool.prepareRelays(
+            Array(relayURLs),
+            autoConnect: true,
+            origin: .outbox(authorPubkey: event.pubkey)
+        )
 
         // Publish to relays
         var publishedRelays = Set<NDKRelay>()
