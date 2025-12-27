@@ -6,18 +6,21 @@ import NDKSwiftCore
 public struct ChirpRootView: View {
     @State private var state: ChirpState?
     @State private var initError: Error?
+    @State private var logoScale: CGFloat = 0.3
+    @State private var logoOpacity: CGFloat = 0
+    @State private var splashBackgroundOpacity: CGFloat = 1.0
 
     public init() {}
 
     public var body: some View {
-        Group {
-            if let state = state {
-                stateBasedContent(state)
-            } else if let error = initError {
-                errorView(error)
-            } else {
-                loadingView
-            }
+        ZStack {
+            // Content layer (always rendered behind splash)
+            contentView
+
+            // Splash overlay - uses opacity instead of conditional removal
+            splashView
+                .opacity(splashBackgroundOpacity)
+                .allowsHitTesting(splashBackgroundOpacity > 0)
         }
         .task {
             await initializeState()
@@ -25,43 +28,59 @@ public struct ChirpRootView: View {
     }
 
     @ViewBuilder
-    private func stateBasedContent(_ state: ChirpState) -> some View {
-        switch state.initState {
-        case .loading:
-            loadingView
-
-        case .error(let error):
+    private var contentView: some View {
+        if let state = state {
+            switch state.initState {
+            case .loading:
+                Color.black.ignoresSafeArea()
+            case .error(let error):
+                errorView(error)
+            case .needsLogin:
+                WelcomeView()
+                    .environment(state)
+            case .ready:
+                MainTabView()
+                    .environment(state)
+            }
+        } else if let error = initError {
             errorView(error)
-
-        case .needsLogin:
-            WelcomeView()
-                .environment(state)
-
-        case .ready:
-            MainTabView()
-                .environment(state)
+        } else {
+            Color.black.ignoresSafeArea()
         }
     }
 
-    private var loadingView: some View {
+    private var splashView: some View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            VStack(spacing: 24) {
-                Image(systemName: "bird.fill")
-                    .font(.system(size: 48, weight: .light))
-                    .foregroundStyle(.white)
-                    .symbolEffect(.pulse)
-
-                ProgressView()
-                    .tint(.white.opacity(0.6))
-
-                Text("Initializing...")
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.5))
-            }
+            Image(systemName: "bird.fill")
+                .font(.system(size: 60, weight: .light))
+                .foregroundStyle(.white)
+                .scaleEffect(logoScale)
+                .opacity(logoOpacity)
+                .drawingGroup()
         }
         .preferredColorScheme(.dark)
+        .onAppear {
+            startSplashAnimation()
+        }
+    }
+
+    private func startSplashAnimation() {
+        // Phase 1: Logo springs into view
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+            logoScale = 1.0
+            logoOpacity = 1.0
+        }
+
+        // Phase 2: Logo zooms toward user while splash fades
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            withAnimation(.easeOut(duration: 0.3)) {
+                logoScale = 12.0
+                logoOpacity = 0
+                splashBackgroundOpacity = 0
+            }
+        }
     }
 
     private func errorView(_ error: Error) -> some View {
