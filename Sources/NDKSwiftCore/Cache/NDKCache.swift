@@ -312,6 +312,19 @@ public protocol NDKCache: Actor {
     /// Record a domain verification attempt (for rate limiting)
     /// - Parameter domain: The domain that was attempted
     func recordDomainVerificationAttempt(_ domain: String) async
+
+    // MARK: - Profile Search
+
+    /// Search profiles by name/displayName
+    ///
+    /// This method searches cached profiles using name and displayName matching.
+    /// NostrDB-based caches use a dedicated profile search index for fast lookups.
+    ///
+    /// - Parameters:
+    ///   - query: Search query string (matches name or displayName prefix)
+    ///   - limit: Maximum number of results to return
+    /// - Returns: Array of pubkeys matching the query
+    func searchProfiles(_ query: String, limit: Int) async -> [String]
 }
 
 // MARK: - Optional Protocol Extensions
@@ -521,6 +534,15 @@ public extension NDKCache {
     /// Default implementation that does nothing
     func recordDomainVerificationAttempt(_: String) async {
         // Default implementation - cache implementations should override
+    }
+
+    // MARK: - Default Profile Search Implementation
+
+    /// Default implementation that returns empty array
+    func searchProfiles(_: String, limit _: Int) async -> [String] {
+        // Default implementation - cache implementations should override
+        // NostrDB-based caches provide efficient profile search indexing
+        return []
     }
 
     // MARK: - Default Profile Metadata Implementation

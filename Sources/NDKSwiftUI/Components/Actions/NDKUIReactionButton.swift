@@ -40,7 +40,7 @@ public struct NDKUIReactionButton: View {
     private let animateChanges: Bool
     private var onReactionChanged: ((Bool) -> Void)?
 
-    @StateObject private var reactionState: ReactionState
+    @StateObject private var reactionState: ReactionButtonState
 
     // MARK: - Supporting Types
 
@@ -76,7 +76,7 @@ public struct NDKUIReactionButton: View {
         self.animateChanges = animateChanges
 
         // Initialize reaction state
-        _reactionState = StateObject(wrappedValue: ReactionState(
+        _reactionState = StateObject(wrappedValue: ReactionButtonState(
             eventId: event.id,
             reaction: reaction
         ))
@@ -223,11 +223,11 @@ public struct NDKUIReactionButton: View {
     }
 }
 
-// MARK: - ReactionState
+// MARK: - ReactionButtonState
 
-/// Observable state for managing reaction data and interactions
+/// Observable state for managing reaction data and interactions in NDKUIReactionButton
 @MainActor
-private class ReactionState: ObservableObject {
+private class ReactionButtonState: ObservableObject {
     @Published var isReacted: Bool = false
     @Published var count: Int = 0
     @Published var isLoading: Bool = false

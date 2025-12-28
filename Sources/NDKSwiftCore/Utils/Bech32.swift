@@ -144,17 +144,20 @@ public enum Bech32 {
 public extension Bech32 {
     /// Check if a string is a valid bech32 format
     static func isBech32(_ string: String) -> Bool {
+        // Bech32 is case-insensitive, so lowercase for validation
+        let lowercased = string.lowercased()
+
         // Must contain separator '1'
-        guard let separatorIndex = string.lastIndex(of: "1") else {
+        guard let separatorIndex = lowercased.lastIndex(of: "1") else {
             return false
         }
 
         // HRP must not be empty
-        let hrp = String(string[..<separatorIndex])
+        let hrp = String(lowercased[..<separatorIndex])
         guard !hrp.isEmpty else { return false }
 
         // Data part must not be empty
-        let dataString = String(string[string.index(after: separatorIndex)...])
+        let dataString = String(lowercased[lowercased.index(after: separatorIndex)...])
         guard !dataString.isEmpty else { return false }
 
         // Check if all characters after separator are in bech32 charset
