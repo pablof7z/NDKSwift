@@ -8,6 +8,7 @@ import NDKSwiftNostrDB
 public final class ChirpState {
     public private(set) var ndk: NDK
     public private(set) var authManager: NDKAuthManager
+    public let feedSourcesManager = SavedFeedSourcesManager()
     public var initState: InitializationState = .loading
 
     private static let appRelaysKey = "com.ndkswift.Chirp.appRelays"

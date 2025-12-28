@@ -14,29 +14,54 @@ public struct FeedView: View {
     @State private var replyToEvent: NDKEvent?
     @Namespace private var animation
 
+    private var activeSource: FeedSource {
+        get { state.feedSourcesManager.activeSource }
+        nonmutating set { state.feedSourcesManager.activeSource = newValue }
+    }
+
     public init() {}
 
     public var body: some View {
         Group {
-            if let followList = state.ndk.sessionData?.followList, !followList.isEmpty {
+            switch activeSource {
+            case .follows:
+                if let followList = state.ndk.sessionData?.followList, !followList.isEmpty {
+                    feedContent
+                        .task {
+                            await streamEvents()
+                        }
+                } else if state.ndk.sessionData == nil {
+                    emptyFeedContent
+                } else {
+                    noFollowsState
+                }
+            case .pack, .relay:
                 feedContent
                     .task {
-                        await streamEvents(followList: followList)
+                        await streamEvents()
                     }
-            } else if state.ndk.sessionData == nil {
-                emptyFeedContent
-            } else {
-                noFollowsState
             }
         }
-        .navigationTitle("Feed")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                feedSourcePicker
+            }
+        }
         .onChange(of: state.ndk.sessionData?.followList) { _, newFollowList in
-            if let newFollowList = newFollowList, !newFollowList.isEmpty {
+            if case .follows = activeSource, let newFollowList = newFollowList, !newFollowList.isEmpty {
                 streamTask?.cancel()
                 streamTask = Task {
-                    await streamEvents(followList: newFollowList)
+                    await streamEvents()
                 }
+            }
+        }
+        .onChange(of: activeSource) { _, _ in
+            streamTask?.cancel()
+            allEvents = []
+            hasNewPosts = false
+            streamTask = Task {
+                await streamEvents()
             }
         }
         .sheet(isPresented: $showReplyComposer) {
@@ -60,6 +85,50 @@ public struct FeedView: View {
         }
     }
 
+    // MARK: - Feed Source Picker
+
+    private var feedSourcePicker: some View {
+        Menu {
+            Button {
+                activeSource = .follows
+            } label: {
+                Label("Feed", systemImage: "house")
+            }
+
+            if !state.feedSourcesManager.savedPacks.isEmpty {
+                Section("Follow Packs") {
+                    ForEach(state.feedSourcesManager.savedPacks) { pack in
+                        Button {
+                            activeSource = .pack(pack)
+                        } label: {
+                            Label(pack.name, systemImage: "person.3")
+                        }
+                    }
+                }
+            }
+
+            if !state.feedSourcesManager.savedRelays.isEmpty {
+                Section("Relays") {
+                    ForEach(state.feedSourcesManager.savedRelays) { relay in
+                        Button {
+                            activeSource = .relay(relay)
+                        } label: {
+                            Label(relay.displayName, systemImage: "antenna.radiowaves.left.and.right")
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(activeSource.displayName)
+                    .font(.headline)
+                Image(systemName: "chevron.down")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
     // MARK: - Feed Content
 
     private var feedContent: some View {
@@ -80,7 +149,7 @@ public struct FeedView: View {
                             .id(event.id)
                             .onAppear {
                                 trackScrollPosition(event: event, data: allEvents)
-                                loadMoreIfNeeded(event: event, data: allEvents, followList: state.ndk.sessionData?.followList)
+                                loadMoreIfNeeded(event: event, data: allEvents)
                             }
                         }
                     }
@@ -90,9 +159,8 @@ public struct FeedView: View {
                 }
                 .refreshable {
                     streamTask?.cancel()
-                    if let followList = state.ndk.sessionData?.followList {
-                        await streamEvents(followList: followList)
-                    }
+                    allEvents = []
+                    await streamEvents()
                 }
                 .onChange(of: allEvents.count) { oldCount, newCount in
                     detectNewPosts(oldCount: oldCount, newCount: newCount, data: allEvents)
@@ -150,18 +218,51 @@ public struct FeedView: View {
 
     // MARK: - Subscription Management
 
-    private func streamEvents(followList: Set<String>) async {
+    private func streamEvents() async {
         initialLoadTimestamp = Int64(Date().timeIntervalSince1970)
 
-        let subscription = state.ndk.subscribe(
-            filter: NDKFilter(
-                authors: Array(followList),
-                kinds: [1],
-                limit: 10
-            ),
-            cachePolicy: .cacheWithNetwork,
-            subscriptionId: "feed"
-        )
+        let subscription: NDKSubscription<NDKEvent>
+        let subscriptionId: String
+
+        switch activeSource {
+        case .follows:
+            guard let followList = state.ndk.sessionData?.followList, !followList.isEmpty else { return }
+            subscriptionId = "feed-follows"
+            subscription = state.ndk.subscribe(
+                filter: NDKFilter(
+                    authors: Array(followList),
+                    kinds: [1],
+                    limit: 10
+                ),
+                cachePolicy: .cacheWithNetwork,
+                subscriptionId: subscriptionId
+            )
+
+        case .pack(let pack):
+            subscriptionId = "feed-pack-\(pack.id)"
+            subscription = state.ndk.subscribe(
+                filter: NDKFilter(
+                    authors: pack.pubkeys,
+                    kinds: [1],
+                    limit: 10
+                ),
+                cachePolicy: .cacheWithNetwork,
+                subscriptionId: subscriptionId
+            )
+
+        case .relay(let relay):
+            subscriptionId = "feed-relay-\(relay.url)"
+            subscription = state.ndk.subscribe(
+                filter: NDKFilter(
+                    kinds: [1],
+                    limit: 50
+                ),
+                cachePolicy: .networkOnly,
+                relays: Set([relay.url]),
+                exclusiveRelays: true,
+                subscriptionId: subscriptionId
+            )
+        }
 
         var existingIds = Set(allEvents.map { $0.id })
         for await batch in subscription.events {
@@ -194,35 +295,76 @@ public struct FeedView: View {
         }
     }
 
-    private func loadMoreIfNeeded(event: NDKEvent, data: [NDKEvent], followList: Set<String>?) {
-        guard let followList = followList else { return }
-
+    private func loadMoreIfNeeded(event: NDKEvent, data: [NDKEvent]) {
         let thresholdIndex = data.index(data.endIndex, offsetBy: -5, limitedBy: data.startIndex) ?? data.startIndex
 
         if let eventIndex = data.firstIndex(where: { $0.id == event.id }),
            eventIndex >= thresholdIndex {
-            loadOlderPosts(followList: followList, data: data)
+            loadOlderPosts(data: data)
         }
     }
 
-    private func loadOlderPosts(followList: Set<String>, data: [NDKEvent]) {
+    private func loadOlderPosts(data: [NDKEvent]) {
         guard let oldestEvent = data.last else { return }
 
         let ndk = state.ndk
+        let source = activeSource
+
         Task { @MainActor in
-            let olderEvents = await ndk.fetchEvents(
-                filter: NDKFilter(
+            let filter: NDKFilter
+            let relays: Set<String>?
+            let exclusiveRelays: Bool
+
+            switch source {
+            case .follows:
+                guard let followList = ndk.sessionData?.followList else { return }
+                filter = NDKFilter(
                     authors: Array(followList),
                     kinds: [1],
                     until: oldestEvent.createdAt,
                     limit: 10
-                ),
-                cachePolicy: .cacheWithNetwork,
-                timeout: 10.0
+                )
+                relays = nil
+                exclusiveRelays = false
+
+            case .pack(let pack):
+                filter = NDKFilter(
+                    authors: pack.pubkeys,
+                    kinds: [1],
+                    until: oldestEvent.createdAt,
+                    limit: 10
+                )
+                relays = nil
+                exclusiveRelays = false
+
+            case .relay(let relay):
+                filter = NDKFilter(
+                    kinds: [1],
+                    until: oldestEvent.createdAt,
+                    limit: 50
+                )
+                relays = Set([relay.url])
+                exclusiveRelays = true
+            }
+
+            let subscription = ndk.subscribe(
+                filter: filter,
+                cachePolicy: exclusiveRelays ? .networkOnly : .cacheWithNetwork,
+                relays: relays,
+                exclusiveRelays: exclusiveRelays,
+                subscriptionId: "load-older-\(UUID().uuidString)"
             )
 
+            var loadedEvents: [NDKEvent] = []
+            for await batch in subscription.events {
+                loadedEvents.append(contentsOf: batch)
+                if loadedEvents.count >= (exclusiveRelays ? 50 : 10) {
+                    break
+                }
+            }
+
             let existingIds = Set(allEvents.map { $0.id })
-            let newEvents = olderEvents.filter { !existingIds.contains($0.id) }
+            let newEvents = loadedEvents.filter { !existingIds.contains($0.id) }
 
             if !newEvents.isEmpty {
                 withAnimation {

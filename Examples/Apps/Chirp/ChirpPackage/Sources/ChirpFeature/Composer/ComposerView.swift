@@ -69,6 +69,7 @@ public struct ComposerView: View {
             }
             .navigationTitle(replyToEvent != nil ? "Reply" : "New Post")
             .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden(true)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {

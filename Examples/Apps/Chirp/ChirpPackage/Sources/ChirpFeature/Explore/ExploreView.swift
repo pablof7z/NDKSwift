@@ -12,7 +12,7 @@ enum SearchFilter: String, CaseIterable {
 public struct ExploreView: View {
     @Environment(ChirpState.self) private var state
     @State private var packs: [FollowPack] = []
-    @State private var relaySets: [RelaySet] = []
+    @State private var rankedRelays: [RankedRelay] = []
     @State private var searchText = ""
     @State private var searchFilter: SearchFilter = .all
     @State private var searchDataSource: NDKUnifiedSearchDataSource?
@@ -157,8 +157,8 @@ public struct ExploreView: View {
                 // Featured Follow Packs (horizontal)
                 featuredPacksSection
 
-                // Relay Sets (horizontal)
-                relaySetsSection
+                // Ranked Relays from kind 10012 relay feeds (horizontal)
+                rankedRelaysSection
 
                 // All Follow Packs (vertical list)
                 allPacksSection
@@ -365,19 +365,19 @@ public struct ExploreView: View {
         Array(filteredPacks.prefix(5))
     }
 
-    // MARK: - Relay Sets Section
+    // MARK: - Ranked Relays Section (from kind 10012 relay feeds)
 
-    private var relaySetsSection: some View {
+    private var rankedRelaysSection: some View {
         Group {
-            if !relaySets.isEmpty {
+            if !rankedRelays.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
-                    sectionHeader(icon: "📡", iconGradient: .blue, title: "Relay Sets", showSeeAll: true)
+                    sectionHeader(icon: "📡", iconGradient: .blue, title: "Popular Relays", showSeeAll: true)
 
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 12) {
-                            ForEach(relaySets) { relaySet in
-                                NavigationLink(destination: relaySetDetailDestination(relaySet)) {
-                                    RelaySetCard(ndk: state.ndk, relaySet: relaySet)
+                            ForEach(rankedRelays) { relay in
+                                NavigationLink(destination: rankedRelayDetailDestination(relay)) {
+                                    RankedRelayCard(relay: relay)
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -391,24 +391,8 @@ public struct ExploreView: View {
     }
 
     @ViewBuilder
-    private func relaySetDetailDestination(_ relaySet: RelaySet) -> some View {
-        // Placeholder - can be expanded to show relay set details
-        List {
-            Section("Relays") {
-                ForEach(relaySet.relays, id: \.url) { relay in
-                    VStack(alignment: .leading) {
-                        Text(relay.url)
-                            .font(.body)
-                        if let marker = relay.marker {
-                            Text(marker)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            }
-        }
-        .navigationTitle(relaySet.name)
+    private func rankedRelayDetailDestination(_ relay: RankedRelay) -> some View {
+        RelayFeedView(relay: relay)
     }
 
     // MARK: - All Packs Section
@@ -493,7 +477,7 @@ public struct ExploreView: View {
     private func loadContent() async {
         // Load all content types concurrently
         async let packsTask: Void = discoverPacks()
-        async let relaysTask: Void = discoverRelaySets()
+        async let relaysTask: Void = discoverRelayFeeds()
 
         _ = await (packsTask, relaysTask)
     }
@@ -537,44 +521,102 @@ public struct ExploreView: View {
         }
     }
 
-    private func discoverRelaySets() async {
-        // Get pubkeys to fetch relay sets from
+    /// Discover relays from kind 10012 relay feed events
+    private func discoverRelayFeeds() async {
+        // Get pubkeys to fetch relay feeds from
         let pubkeysToQuery = getNetworkPubkeys()
-
         guard !pubkeysToQuery.isEmpty else { return }
 
+        let aggregator = RelayFeedAggregator()
+
+        // Fetch kind 10012 events from follows
         let subscription = state.ndk.subscribe(
             filter: NDKFilter(
                 authors: pubkeysToQuery,
-                kinds: [30002],
-                limit: 30
+                kinds: [10012],
+                limit: 100
             ),
             cachePolicy: .cacheWithNetwork,
-            subscriptionId: "relay-set-discovery",
+            subscriptionId: "relay-feed-discovery",
             closeOnEose: true
         )
 
-        var discovered: [String: RelaySet] = [:]
-
         for await batch in subscription.events {
             for event in batch {
-                guard let relaySet = RelaySet(event: event) else { continue }
-                guard relaySet.relayCount > 0 else { continue }
-
-                // Use event id as key to avoid duplicates
-                discovered[event.id] = relaySet
+                await aggregator.addRelaysFromEvent(event)
             }
+
+            // Update UI with current rankings
+            var currentRankings = await aggregator.getRankedRelays()
+            currentRankings = Array(currentRankings.prefix(15))
 
             await MainActor.run {
-                relaySets = discovered.values
-                    .sorted { $0.relayCount > $1.relayCount }
-                    .prefix(10)
-                    .map { $0 }
+                rankedRelays = currentRankings
             }
+        }
+
+        // After fetching all events, fetch NIP-11 info for top relays
+        let topRelays = await aggregator.getRankedRelays().prefix(10)
+        var relaysWithNIP11 = await fetchNIP11Info(for: Array(topRelays))
+
+        // Sort with NIP-11 availability as secondary criterion
+        relaysWithNIP11.sort { lhs, rhs in
+            // Primary: appearance count
+            if lhs.appearanceCount != rhs.appearanceCount {
+                return lhs.appearanceCount > rhs.appearanceCount
+            }
+            // Secondary: NIP-11 availability
+            if lhs.hasNIP11Info != rhs.hasNIP11Info {
+                return lhs.hasNIP11Info
+            }
+            return lhs.url < rhs.url
+        }
+
+        await MainActor.run {
+            rankedRelays = relaysWithNIP11
         }
     }
 
-    /// Returns pubkeys to query for relay sets - user's follows or fallback
+    /// Fetch NIP-11 information for relays
+    private func fetchNIP11Info(for relays: [RankedRelay]) async -> [RankedRelay] {
+        await withTaskGroup(of: (Int, NDKRelayInformation?).self) { group in
+            for (index, relay) in relays.enumerated() {
+                group.addTask {
+                    let info = await self.fetchRelayInfo(url: relay.url)
+                    return (index, info)
+                }
+            }
+
+            var results = relays
+            for await (index, info) in group {
+                results[index].nip11Info = info
+            }
+            return results
+        }
+    }
+
+    /// Fetch NIP-11 relay info from a single relay
+    private func fetchRelayInfo(url: String) async -> NDKRelayInformation? {
+        guard let relayURL = URL(string: url) else { return nil }
+
+        // Convert WebSocket URL to HTTP for NIP-11
+        guard let httpURL = URLNormalizer.convertWebSocketToHTTP(relayURL) else {
+            return nil
+        }
+
+        do {
+            var request = URLRequest(url: httpURL)
+            request.setValue("application/nostr+json", forHTTPHeaderField: "Accept")
+            request.timeoutInterval = 5.0
+
+            let (data, _) = try await URLSession.shared.data(for: request)
+            return try JSONDecoder().decode(NDKRelayInformation.self, from: data)
+        } catch {
+            return nil
+        }
+    }
+
+    /// Returns pubkeys to query for relay feeds - user's follows or fallback
     private func getNetworkPubkeys() -> [String] {
         if let followList = state.ndk.sessionData?.followList, !followList.isEmpty {
             return Array(followList.prefix(50))
