@@ -114,6 +114,15 @@ struct RelayDashboardView: View {
 
     private var sortedRelays: [NDKRelay] {
         relays.sorted { relay1, relay2 in
+            // Sort by first delivery count (highest first)
+            let firstDelivery1 = relayStates[relay1.url]?.stats.coverageStats?.firstDeliveryCount ?? 0
+            let firstDelivery2 = relayStates[relay2.url]?.stats.coverageStats?.firstDeliveryCount ?? 0
+
+            if firstDelivery1 != firstDelivery2 {
+                return firstDelivery1 > firstDelivery2
+            }
+
+            // Then by connection status
             let state1 = relayStates[relay1.url]?.connectionState
             let state2 = relayStates[relay2.url]?.connectionState
 
@@ -175,6 +184,17 @@ private struct RelayMonitorRowView: View {
 
     var body: some View {
         HStack(spacing: 12) {
+            // First delivery count badge
+            VStack {
+                Text("\(state?.stats.coverageStats?.firstDeliveryCount ?? 0)")
+                    .font(.system(.title3, design: .rounded).bold())
+                    .foregroundStyle(firstDeliveryCount > 0 ? .primary : .secondary)
+                Text("1st")
+                    .font(.system(.caption2))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(width: 44)
+
             // Evil relay indicator or status circle
             if state?.stats.isEvil == true {
                 Image(systemName: "exclamationmark.triangle.fill")
@@ -225,6 +245,10 @@ private struct RelayMonitorRowView: View {
                 .foregroundStyle(.tertiary)
         }
         .padding(.vertical, 4)
+    }
+
+    private var firstDeliveryCount: Int {
+        state?.stats.coverageStats?.firstDeliveryCount ?? 0
     }
 
     private var statusColor: Color {
