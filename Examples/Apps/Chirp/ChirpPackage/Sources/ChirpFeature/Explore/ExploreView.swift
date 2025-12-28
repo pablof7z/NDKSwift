@@ -2,11 +2,20 @@ import SwiftUI
 import NDKSwiftCore
 import NDKSwiftUI
 
+/// Filter for search results
+enum SearchFilter: String, CaseIterable {
+    case all = "All"
+    case profiles = "Profiles"
+    case notes = "Notes"
+}
+
 public struct ExploreView: View {
     @Environment(ChirpState.self) private var state
     @State private var packs: [FollowPack] = []
     @State private var relaySets: [RelaySet] = []
+    @State private var topProfiles: [String] = []
     @State private var searchText = ""
+    @State private var searchFilter: SearchFilter = .all
     @State private var searchDataSource: NDKUnifiedSearchDataSource?
     @FocusState private var isSearchFocused: Bool
 
@@ -34,6 +43,7 @@ public struct ExploreView: View {
             }
         }
         .navigationTitle("Explore")
+        .navigationBarTitleDisplayMode(.large)
         .task {
             searchDataSource = NDKUnifiedSearchDataSource(ndk: state.ndk)
             await loadContent()
@@ -68,33 +78,61 @@ public struct ExploreView: View {
     // MARK: - Search Bar
 
     private var searchBar: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
+        VStack(spacing: 8) {
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
 
-            TextField("Search notes, users, hashtags...", text: $searchText)
-                .textFieldStyle(.plain)
-                .autocapitalization(.none)
-                .disableAutocorrection(true)
-                .focused($isSearchFocused)
-                .submitLabel(submitLabel)
-                .onSubmit {
-                    handleSearchSubmit()
+                TextField("Search notes, users, hashtags...", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .autocapitalization(.none)
+                    .disableAutocorrection(true)
+                    .focused($isSearchFocused)
+                    .submitLabel(submitLabel)
+                    .onSubmit {
+                        handleSearchSubmit()
+                    }
+
+                if !searchText.isEmpty {
+                    Button {
+                        searchText = ""
+                        searchDataSource?.clear()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
                 }
+            }
+            .padding(12)
+            .background(Color(.secondarySystemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
 
-            if !searchText.isEmpty {
-                Button {
-                    searchText = ""
-                    searchDataSource?.clear()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
+            // Filter chips - only show when searching
+            if !searchText.isEmpty && shouldShowFilterChips {
+                HStack(spacing: 8) {
+                    ForEach(SearchFilter.allCases, id: \.self) { filter in
+                        FilterChip(
+                            title: filter.rawValue,
+                            isSelected: searchFilter == filter
+                        ) {
+                            searchFilter = filter
+                        }
+                    }
+                    Spacer()
                 }
             }
         }
-        .padding(12)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    /// Show filter chips only for text searches (not for hashtag, npub, etc.)
+    private var shouldShowFilterChips: Bool {
+        guard let inputType = searchDataSource?.inputType else { return false }
+        switch inputType {
+        case .text, .profileOnly:
+            return true
+        default:
+            return false
+        }
     }
 
     private var submitLabel: SubmitLabel {
@@ -117,6 +155,9 @@ public struct ExploreView: View {
     private var exploreContent: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
+                // Top Profiles (horizontal)
+                topProfilesSection
+
                 // Featured Follow Packs (horizontal)
                 featuredPacksSection
 
@@ -261,10 +302,13 @@ public struct ExploreView: View {
     // MARK: - Combined Results View
 
     private func combinedResultsView(dataSource: NDKUnifiedSearchDataSource) -> some View {
-        ScrollView {
+        let showProfiles = searchFilter == .all || searchFilter == .profiles
+        let showNotes = searchFilter == .all || searchFilter == .notes
+
+        return ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
                 // Profile results - stream in as they arrive
-                if !dataSource.profilePubkeys.isEmpty {
+                if showProfiles && !dataSource.profilePubkeys.isEmpty {
                     Text("Profiles")
                         .font(.headline)
                         .foregroundStyle(.secondary)
@@ -272,7 +316,7 @@ public struct ExploreView: View {
                         .padding(.top, 16)
                         .padding(.bottom, 8)
 
-                    ForEach(dataSource.profilePubkeys, id: \.self) { pubkey in
+                    ForEach(Array(dataSource.profilePubkeys.prefix(10)), id: \.self) { pubkey in
                         NavigationLink(value: pubkey) {
                             ProfileSearchResultRow(ndk: state.ndk, pubkey: pubkey)
                         }
@@ -281,7 +325,7 @@ public struct ExploreView: View {
                 }
 
                 // Event results (only for text search) - stream in as they arrive
-                if case .text = dataSource.inputType, !dataSource.events.isEmpty {
+                if showNotes, case .text = dataSource.inputType, !dataSource.events.isEmpty {
                     Text("Notes")
                         .font(.headline)
                         .foregroundStyle(.secondary)
@@ -296,6 +340,31 @@ public struct ExploreView: View {
                         .buttonStyle(.plain)
                     }
                 }
+            }
+        }
+    }
+
+    // MARK: - Top Profiles Section
+
+    private var topProfilesSection: some View {
+        Group {
+            if !topProfiles.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    sectionHeader(icon: "⭐", iconGradient: .purple, title: "People to Follow", showSeeAll: false)
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(topProfiles, id: \.self) { pubkey in
+                                NavigationLink(value: pubkey) {
+                                    TopProfileCard(ndk: state.ndk, pubkey: pubkey)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                    }
+                }
+                .padding(.bottom, 24)
             }
         }
     }
@@ -420,7 +489,7 @@ public struct ExploreView: View {
     }
 
     private enum IconGradient {
-        case orange, blue
+        case orange, blue, purple
 
         var gradient: LinearGradient {
             switch self {
@@ -433,6 +502,12 @@ public struct ExploreView: View {
             case .blue:
                 return LinearGradient(
                     colors: [Color(red: 0.04, green: 0.52, blue: 1), Color(red: 0.37, green: 0.36, blue: 0.9)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            case .purple:
+                return LinearGradient(
+                    colors: [Color(red: 0.58, green: 0.35, blue: 0.94), Color(red: 0.85, green: 0.44, blue: 0.84)],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
@@ -454,8 +529,9 @@ public struct ExploreView: View {
         // Load all content types concurrently
         async let packsTask: Void = discoverPacks()
         async let relaysTask: Void = discoverRelaySets()
+        async let profilesTask: Void = discoverTopProfiles()
 
-        _ = await (packsTask, relaysTask)
+        _ = await (packsTask, relaysTask, profilesTask)
     }
 
     private func discoverPacks() async {
@@ -544,6 +620,59 @@ public struct ExploreView: View {
         // For now, just return the fallback pubkey itself
         return [fallbackPubkey]
     }
+
+    /// Discover top profiles to show in explore section
+    /// Uses follows-of-follows (2nd degree connections) to find interesting profiles
+    private func discoverTopProfiles() async {
+        // Get the current user's follows
+        let userFollows = Set(state.ndk.sessionData?.followList ?? [])
+
+        // Get pubkeys to query for their follows
+        let pubkeysToQuery = getNetworkPubkeys()
+
+        guard !pubkeysToQuery.isEmpty else { return }
+
+        // Fetch contact lists from follows
+        let subscription = state.ndk.subscribe(
+            filter: NDKFilter(
+                authors: Array(pubkeysToQuery.prefix(20)),
+                kinds: [3],
+                limit: 20
+            ),
+            cachePolicy: .cacheWithNetwork,
+            subscriptionId: "profile-discovery",
+            closeOnEose: true
+        )
+
+        var pubkeyScores: [String: Int] = [:]
+
+        for await batch in subscription.events {
+            for event in batch {
+                // Extract followed pubkeys from 'p' tags
+                let followedPubkeys = event.tags
+                    .filter { $0.first == "p" && $0.count > 1 && $0[1].count == 64 }
+                    .map { $0[1] }
+
+                for pubkey in followedPubkeys {
+                    // Skip the current user and people they already follow
+                    guard pubkey != state.ndk.sessionData?.pubkey else { continue }
+                    guard !userFollows.contains(pubkey) else { continue }
+
+                    pubkeyScores[pubkey, default: 0] += 1
+                }
+            }
+        }
+
+        // Sort by score and take top 10
+        let topPubkeys = pubkeyScores
+            .sorted { $0.value > $1.value }
+            .prefix(10)
+            .map { $0.key }
+
+        await MainActor.run {
+            topProfiles = topPubkeys
+        }
+    }
 }
 
 // MARK: - Event Navigation Helper
@@ -609,5 +738,82 @@ private struct EventNavigationHelper: View {
         }
 
         isLoading = false
+    }
+}
+
+// MARK: - Filter Chip
+
+/// A selectable chip for filtering search results
+private struct FilterChip: View {
+    let title: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.subheadline)
+                .fontWeight(isSelected ? .semibold : .regular)
+                .foregroundStyle(isSelected ? .white : .primary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(isSelected ? Color.accentColor : Color(.secondarySystemBackground))
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Top Profile Card
+
+/// A compact card showing a profile for the explore section
+private struct TopProfileCard: View {
+    let ndk: NDK
+    let pubkey: String
+
+    @State private var profile: NDKProfile?
+
+    private var isFollowing: Bool {
+        ndk.sessionData?.contactList?.isFollowing(pubkey) ?? false
+    }
+
+    var body: some View {
+        VStack(spacing: 8) {
+            // Avatar
+            NDKUIProfilePicture(ndk: ndk, pubkey: pubkey, size: 64)
+                .overlay(alignment: .bottomTrailing) {
+                    if isFollowing {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 18))
+                            .foregroundStyle(.white, .green)
+                            .offset(x: 4, y: 4)
+                    }
+                }
+
+            // Name
+            Text(profile?.displayName ?? shortenedPubkey)
+                .font(.caption)
+                .fontWeight(.medium)
+                .lineLimit(1)
+                .frame(width: 80)
+
+            // NIP-05 or secondary info
+            if let nip05 = profile?.metadata?.nip05 {
+                Text(nip05.split(separator: "@").first.map(String.init) ?? nip05)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .frame(width: 80)
+            }
+        }
+        .frame(width: 90)
+        .padding(.vertical, 8)
+        .task {
+            profile = ndk.profile(for: pubkey)
+        }
+    }
+
+    private var shortenedPubkey: String {
+        "\(pubkey.prefix(6))..."
     }
 }

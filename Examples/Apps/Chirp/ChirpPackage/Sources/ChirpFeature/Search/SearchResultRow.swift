@@ -11,6 +11,10 @@ struct ProfileSearchResultRow: View {
 
     @State private var profile: NDKProfile?
 
+    private var isFollowing: Bool {
+        ndk.sessionData?.contactList?.isFollowing(pubkey) ?? false
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             // Avatar
@@ -18,10 +22,23 @@ struct ProfileSearchResultRow: View {
 
             // Profile info
             VStack(alignment: .leading, spacing: 4) {
-                // Display name
-                Text(profile?.displayName ?? shortenedPubkey)
-                    .font(.body.weight(.semibold))
-                    .lineLimit(1)
+                // Display name with following indicator
+                HStack(spacing: 6) {
+                    Text(profile?.displayName ?? shortenedPubkey)
+                        .font(.body.weight(.semibold))
+                        .lineLimit(1)
+
+                    if isFollowing {
+                        Text("Following")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color(.secondarySystemBackground))
+                            .clipShape(Capsule())
+                    }
+                }
 
                 // NIP-05 or shortened pubkey
                 if let nip05 = profile?.metadata?.nip05, !nip05.isEmpty {

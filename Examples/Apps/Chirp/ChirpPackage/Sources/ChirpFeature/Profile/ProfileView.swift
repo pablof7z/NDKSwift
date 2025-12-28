@@ -37,7 +37,7 @@ public struct ProfileView: View {
             }
         }
         .navigationTitle("Profile")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(.large)
     }
 
     @ViewBuilder

@@ -159,6 +159,7 @@ struct SettingsView: View {
             }
         }
         .navigationTitle("Settings")
+        .navigationBarTitleDisplayMode(.large)
         .task {
             if walletState == nil {
                 walletState = WalletState(ndk: state.ndk)

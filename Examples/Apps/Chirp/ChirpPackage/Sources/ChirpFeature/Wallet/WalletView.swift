@@ -24,6 +24,7 @@ struct WalletView: View {
             }
         }
         .navigationTitle("Wallet")
+        .navigationBarTitleDisplayMode(.large)
         .task {
             await initializeWallet()
         }
