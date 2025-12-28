@@ -146,6 +146,13 @@ public actor NDKSignatureVerificationSampler {
         self.delegate = delegate
     }
 
+    /// Quick check if event was already verified (fast path)
+    /// - Parameter eventId: The event ID to check
+    /// - Returns: true if the event has been verified previously
+    public func isEventVerified(_ eventId: EventID) async -> Bool {
+        return await cache.hasVerifiedEvent(eventId: eventId)
+    }
+
     // MARK: - Private Methods
 
     /// Determine if we should verify an event based on sampling

@@ -219,6 +219,12 @@ public final class NDK {
         return sampler
     }()
 
+    /// Relay coverage tracker for intelligent relay selection
+    @ObservationIgnored
+    lazy var relayCoverageTracker: NDKRelayCoverageTracker = {
+        NDKRelayCoverageTracker()
+    }()
+
     /// Data requirement manager for declarative data access
     @ObservationIgnored
     lazy var dataRequirementManager: NDKSubscriptionManager = {
@@ -751,14 +757,53 @@ public final class NDK {
         NDKLogger.log(.trace, category: .subscription,
                       "🌐 [NDK] Processing event \(event.id.prefix(8))... for subscription '\(subscriptionId)' from relay \(relay.url)")
 
+        // SIGNATURE VERIFICATION: Check signature if not already verified
+        let alreadyVerified = await signatureVerificationSampler.isEventVerified(event.id)
+
+        if !alreadyVerified {
+            // Get current signature stats for this relay
+            guard let ndkRelay = relay as? NDKRelay else {
+                NDKLogger.log(.warning, category: .event, "⚠️ Relay is not NDKRelay type - skipping signature verification")
+                return
+            }
+
+            var signatureStats = await ndkRelay.getSignatureStats()
+
+            // Verify the event signature
+            let verificationResult = await signatureVerificationSampler.verifyEvent(
+                event,
+                from: relay,
+                stats: &signatureStats
+            )
+
+            // Update relay's signature stats
+            await ndkRelay.updateSignatureStats { $0 = signatureStats }
+
+            // If signature is invalid, mark relay as evil and REJECT the event
+            if verificationResult == .invalid {
+                NDKLogger.log(.error, category: .security,
+                              "🚨 [SECURITY] Invalid signature detected from relay \(relay.url) for event \(event.id) - REJECTING EVENT")
+                await ndkRelay.markAsEvil(eventId: event.id)
+                return
+            }
+
+            NDKLogger.log(.trace, category: .security,
+                          "✅ [SECURITY] Signature verification result: \(verificationResult) for event \(event.id)")
+        }
+
         // Track that we've seen this event on this relay
         // If this is the first time we see this event, also set it as the source relay
         let seenRelays = await eventTracker.getSeenOnRelays(eventId: event.id)
-        if seenRelays.isEmpty {
+        let isFirstDelivery = seenRelays.isEmpty
+
+        if isFirstDelivery {
             await eventTracker.setSourceRelay(eventId: event.id, relay: relay.url)
         } else {
             await eventTracker.markSeen(eventId: event.id, relay: relay.url)
         }
+
+        // RELAY COVERAGE TRACKING: Record this delivery for coverage statistics
+        await relayCoverageTracker.recordDelivery(eventId: event.id, relayUrl: relay.url)
 
         // Process event through cache for observation
         do {

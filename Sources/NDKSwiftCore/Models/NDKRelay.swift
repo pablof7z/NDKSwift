@@ -94,6 +94,14 @@ public struct NDKRelayStats: Sendable, Equatable {
     /// Signature verification statistics
     public var signatureStats: NDKRelaySignatureStats = .init()
 
+    /// Evil relay detection
+    public var isEvil: Bool = false
+    public var evilDetectedAt: Date?
+    public var evilEventId: String?
+
+    /// Relay coverage statistics (populated from NDKRelayCoverageTracker)
+    public var coverageStats: RelayCoverageStats?
+
     public init(
         connectedAt: Date? = nil,
         lastMessageAt: Date? = nil,
@@ -105,7 +113,11 @@ public struct NDKRelayStats: Sendable, Equatable {
         latency: TimeInterval? = nil,
         connectionAttempts: Int = 0,
         successfulConnections: Int = 0,
-        signatureStats: NDKRelaySignatureStats = .init()
+        signatureStats: NDKRelaySignatureStats = .init(),
+        isEvil: Bool = false,
+        evilDetectedAt: Date? = nil,
+        evilEventId: String? = nil,
+        coverageStats: RelayCoverageStats? = nil
     ) {
         self.connectedAt = connectedAt
         self.lastMessageAt = lastMessageAt
@@ -118,6 +130,10 @@ public struct NDKRelayStats: Sendable, Equatable {
         self.connectionAttempts = connectionAttempts
         self.successfulConnections = successfulConnections
         self.signatureStats = signatureStats
+        self.isEvil = isEvil
+        self.evilDetectedAt = evilDetectedAt
+        self.evilEventId = evilEventId
+        self.coverageStats = coverageStats
     }
 }
 
@@ -293,6 +309,15 @@ actor RelayStateActor {
 
     func getSignatureStats() -> NDKRelaySignatureStats {
         return stats.signatureStats
+    }
+
+    // MARK: - Evil Relay Detection
+
+    func markAsEvil(eventId: String) {
+        stats.isEvil = true
+        stats.evilDetectedAt = Date()
+        stats.evilEventId = eventId
+        notifyFullStateObservers()
     }
 
     // MARK: - Relay Information
@@ -1063,6 +1088,14 @@ public extension NDKRelay {
         return await stateActor.getSignatureStats()
     }
 
+    // MARK: - Evil Relay Detection
+
+    /// Mark this relay as evil due to invalid signature
+    /// - Parameter eventId: The event ID that had an invalid signature
+    func markAsEvil(eventId: String) async {
+        await stateActor.markAsEvil(eventId: eventId)
+    }
+
     // MARK: - Subscription Management
 
     /// Get currently active subscriptions on this relay
@@ -1290,6 +1323,21 @@ extension NDKRelay {
                 return message
             }
             return nil
+        }
+
+        /// Whether the relay has been marked as evil (sent invalid signatures)
+        public var isEvil: Bool {
+            stats.isEvil
+        }
+
+        /// When evil behavior was detected
+        public var evilDetectedAt: Date? {
+            stats.evilDetectedAt
+        }
+
+        /// Event ID that triggered evil detection
+        public var evilEventId: String? {
+            stats.evilEventId
         }
 
         /// Background task that observes relay state changes.
