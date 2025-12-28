@@ -255,6 +255,9 @@ private struct RelayDetailView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var isReconnecting = false
+    @State private var verificationEnabled: Bool = true
+    @State private var useCustomRatio: Bool = false
+    @State private var customRatio: Double = 1.0
 
     var body: some View {
         List {
@@ -368,7 +371,52 @@ private struct RelayDetailView: View {
 
             // Signature verification section
             if let sigStats = state?.stats.signatureStats {
-                Section("Signature Verification") {
+                Section {
+                    Toggle("Verify Signatures", isOn: $verificationEnabled)
+                        .onChange(of: verificationEnabled) { _, newValue in
+                            Task {
+                                await relay.setSignatureVerificationEnabled(newValue)
+                            }
+                        }
+
+                    if verificationEnabled {
+                        Toggle("Custom Sampling Rate", isOn: $useCustomRatio)
+                            .onChange(of: useCustomRatio) { _, newValue in
+                                Task {
+                                    if newValue {
+                                        await relay.setSignatureValidationRatio(customRatio)
+                                    } else {
+                                        await relay.setSignatureValidationRatio(nil)
+                                    }
+                                }
+                            }
+
+                        if useCustomRatio {
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text("Sampling Rate")
+                                    Spacer()
+                                    Text(String(format: "%.0f%%", customRatio * 100))
+                                        .font(.system(.body, design: .monospaced))
+                                        .foregroundStyle(.secondary)
+                                }
+                                Slider(value: $customRatio, in: 0...1, step: 0.1)
+                                    .onChange(of: customRatio) { _, newValue in
+                                        Task {
+                                            await relay.setSignatureValidationRatio(newValue)
+                                        }
+                                    }
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Signature Verification")
+                } footer: {
+                    Text("Higher sampling rates verify more signatures but use more CPU. 100% verifies everything.")
+                        .font(.caption2)
+                }
+
+                Section("Verification Statistics") {
                     LabeledContent("Validated") {
                         Text("\(sigStats.validatedCount)")
                             .font(.system(.body, design: .monospaced))
@@ -381,8 +429,8 @@ private struct RelayDetailView: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    LabeledContent("Validation Ratio") {
-                        Text(String(format: "%.0f%%", sigStats.currentValidationRatio * 100))
+                    LabeledContent("Effective Ratio") {
+                        Text(String(format: "%.0f%%", sigStats.effectiveValidationRatio * 100))
                             .font(.system(.body, design: .monospaced))
                     }
                 }
@@ -531,6 +579,14 @@ private struct RelayDetailView: View {
                 Button("Done") {
                     dismiss()
                 }
+            }
+        }
+        .onAppear {
+            // Initialize state from current relay settings
+            if let sigStats = state?.stats.signatureStats {
+                verificationEnabled = sigStats.verificationEnabled
+                useCustomRatio = sigStats.targetValidationRatio != nil
+                customRatio = sigStats.targetValidationRatio ?? sigStats.currentValidationRatio
             }
         }
     }
