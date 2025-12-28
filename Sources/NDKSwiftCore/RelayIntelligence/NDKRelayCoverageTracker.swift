@@ -49,6 +49,16 @@ public actor NDKRelayCoverageTracker {
         self.maxTrackedEvents = maxTrackedEvents
     }
 
+    /// Normalize relay URL for consistent dictionary lookups
+    /// Removes trailing slash and lowercases for consistent matching
+    private func normalizeURL(_ url: RelayURL) -> RelayURL {
+        var normalized = url.lowercased()
+        while normalized.hasSuffix("/") {
+            normalized.removeLast()
+        }
+        return normalized
+    }
+
     /// Record an event delivery from a relay
     /// - Parameters:
     ///   - eventId: The event ID
@@ -56,9 +66,11 @@ public actor NDKRelayCoverageTracker {
     /// - Returns: true if this was the first delivery, false if duplicate
     @discardableResult
     public func recordDelivery(eventId: EventID, relayUrl: RelayURL) -> Bool {
+        let normalizedUrl = normalizeURL(relayUrl)
+
         // Initialize stats for this relay if needed
-        if relayStats[relayUrl] == nil {
-            relayStats[relayUrl] = RelayCoverageStats()
+        if relayStats[normalizedUrl] == nil {
+            relayStats[normalizedUrl] = RelayCoverageStats()
         }
 
         // Check if this is the first delivery
@@ -66,11 +78,11 @@ public actor NDKRelayCoverageTracker {
 
         if isFirstDelivery {
             // Record this relay as the first to deliver this event
-            eventFirstDelivery[eventId] = relayUrl
+            eventFirstDelivery[eventId] = normalizedUrl
             eventTrackingOrder.append(eventId)
 
             // Increment first delivery count
-            relayStats[relayUrl]?.firstDeliveryCount += 1
+            relayStats[normalizedUrl]?.firstDeliveryCount += 1
 
             // Evict oldest if we've exceeded the max
             if eventTrackingOrder.count > maxTrackedEvents {
@@ -81,11 +93,11 @@ public actor NDKRelayCoverageTracker {
             }
         } else {
             // This is a duplicate delivery
-            relayStats[relayUrl]?.duplicateDeliveryCount += 1
+            relayStats[normalizedUrl]?.duplicateDeliveryCount += 1
         }
 
         // Always increment total count
-        relayStats[relayUrl]?.totalEventsCount += 1
+        relayStats[normalizedUrl]?.totalEventsCount += 1
 
         return isFirstDelivery
     }
@@ -94,7 +106,8 @@ public actor NDKRelayCoverageTracker {
     /// - Parameter relayUrl: The relay URL
     /// - Returns: Coverage statistics, or default stats if relay not tracked
     public func getStats(for relayUrl: RelayURL) -> RelayCoverageStats {
-        return relayStats[relayUrl] ?? RelayCoverageStats()
+        let normalizedUrl = normalizeURL(relayUrl)
+        return relayStats[normalizedUrl] ?? RelayCoverageStats()
     }
 
     /// Get coverage statistics for all relays
@@ -121,7 +134,8 @@ public actor NDKRelayCoverageTracker {
     /// Clear tracking data for a specific relay
     /// - Parameter relayUrl: The relay URL to clear
     public func clearRelay(_ relayUrl: RelayURL) {
-        relayStats.removeValue(forKey: relayUrl)
+        let normalizedUrl = normalizeURL(relayUrl)
+        relayStats.removeValue(forKey: normalizedUrl)
         // Note: We don't remove from eventFirstDelivery as that would affect other relays' stats
     }
 

@@ -5,7 +5,7 @@ import Foundation
 
 /// Delegate for relay connection events
 public protocol NDKRelayConnectionDelegate: AnyObject, Sendable {
-    func relayConnection(_ connection: NDKRelayConnection, didReceiveMessage message: NostrMessage)
+    func relayConnection(_ connection: NDKRelayConnection, didReceiveMessage message: NostrMessage, byteCount: Int)
     func relayConnectionDidConnect(_ connection: NDKRelayConnection)
     func relayConnectionDidDisconnect(_ connection: NDKRelayConnection, error: Error?)
 }
@@ -430,6 +430,8 @@ public actor NDKRelayConnection {
             return
         }
 
+        let byteCount = json.utf8.count
+
         do {
             let message = try NostrMessage.parse(from: json)
 
@@ -450,7 +452,7 @@ public actor NDKRelayConnection {
             }
 
             await notifyDelegate { delegate in
-                delegate.relayConnection(self, didReceiveMessage: message)
+                delegate.relayConnection(self, didReceiveMessage: message, byteCount: byteCount)
             }
         } catch {
             // Log parsing error

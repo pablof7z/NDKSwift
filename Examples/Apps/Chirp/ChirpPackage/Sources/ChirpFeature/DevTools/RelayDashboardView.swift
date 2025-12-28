@@ -96,7 +96,18 @@ struct RelayDashboardView: View {
                 Task {
                     for await newState in relay.stateStream {
                         await MainActor.run {
-                            relayStates[relay.url] = newState
+                            // Preserve coverageStats when updating from relay state stream
+                            var updatedStats = newState.stats
+                            if let existingCoverage = relayStates[relay.url]?.stats.coverageStats {
+                                updatedStats.coverageStats = existingCoverage
+                            }
+                            let updatedState = NDKRelay.State(
+                                connectionState: newState.connectionState,
+                                stats: updatedStats,
+                                info: newState.info,
+                                activeSubscriptions: newState.activeSubscriptions
+                            )
+                            relayStates[relay.url] = updatedState
                         }
                     }
                 }
@@ -147,8 +158,12 @@ struct RelayDashboardView: View {
 
     private func loadRelayStates() async {
         let ndk = state.ndk
-        relays = await ndk.relays
-        for relay in relays {
+        let allRelays = await ndk.relays
+
+        // Build all states first, then update UI atomically
+        var newRelayStates: [RelayURL: NDKRelay.State] = [:]
+
+        for relay in allRelays {
             var stats = await relay.stats
             // Populate coverage statistics from the tracker
             let coverageStats = await ndk.relayCoverageTracker.getStats(for: relay.url)
@@ -160,9 +175,13 @@ struct RelayDashboardView: View {
                 info: await relay.info,
                 activeSubscriptions: await relay.activeSubscriptions
             )
-            await MainActor.run {
-                relayStates[relay.url] = relayState
-            }
+            newRelayStates[relay.url] = relayState
+        }
+
+        // Update both atomically to avoid race condition
+        await MainActor.run {
+            relays = allRelays
+            relayStates = newRelayStates
         }
     }
 
@@ -184,17 +203,6 @@ private struct RelayMonitorRowView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // First delivery count badge
-            VStack {
-                Text("\(state?.stats.coverageStats?.firstDeliveryCount ?? 0)")
-                    .font(.system(.title3, design: .rounded).bold())
-                    .foregroundStyle(firstDeliveryCount > 0 ? .primary : .secondary)
-                Text("1st")
-                    .font(.system(.caption2))
-                    .foregroundStyle(.secondary)
-            }
-            .frame(width: 44)
-
             // Evil relay indicator or status circle
             if state?.stats.isEvil == true {
                 Image(systemName: "exclamationmark.triangle.fill")
@@ -239,6 +247,13 @@ private struct RelayMonitorRowView: View {
             }
 
             Spacer()
+
+            // Unique events count (events this relay delivered first)
+            if firstDeliveryCount > 0 {
+                Text("\(firstDeliveryCount)")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
 
             Image(systemName: "chevron.right")
                 .font(.caption)

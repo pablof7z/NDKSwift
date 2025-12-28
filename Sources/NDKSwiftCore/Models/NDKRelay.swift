@@ -804,27 +804,6 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
         }
     }
 
-    /// Handle received message
-    private func handleMessage(_ message: String) async {
-        await stateActor.updateStats {
-            $0.messagesReceived += 1
-            $0.bytesReceived += message.count
-            $0.lastMessageAt = Date()
-            $0.lastActivityAt = Date()
-        }
-
-        // Parse and route message
-        do {
-            let nostrMessage = try NostrMessage.parse(from: message)
-            await routeMessage(nostrMessage)
-        } catch {
-            // Log parsing error but don't crash
-            if await ndk?.debugMode == true {
-                NDKLogger.log(.warning, category: .relay, "Failed to parse message from \(url): \(error)")
-            }
-        }
-    }
-
     /// Route parsed message to appropriate handlers
     private func routeMessage(_ message: NostrMessage) async {
         switch message {
@@ -1039,15 +1018,20 @@ extension NDKRelay: NDKRelayConnectionDelegate {
         }
     }
 
-    public func relayConnection(_: NDKRelayConnection, didReceiveMessage message: NostrMessage) {
+    public func relayConnection(_: NDKRelayConnection, didReceiveMessage message: NostrMessage, byteCount: Int) {
         Task { [weak self] in
             guard let self = self else { return }
-            await self.handleNostrMessage(message)
+            await self.handleNostrMessage(message, byteCount: byteCount)
         }
     }
 
-    private func handleNostrMessage(_ message: NostrMessage) async {
-        await stateActor.updateStats { $0.messagesReceived += 1 }
+    private func handleNostrMessage(_ message: NostrMessage, byteCount: Int) async {
+        await stateActor.updateStats {
+            $0.messagesReceived += 1
+            $0.bytesReceived += byteCount
+            $0.lastMessageAt = Date()
+            $0.lastActivityAt = Date()
+        }
 
         // Use the same routing as routeMessage to avoid duplication
         await routeMessage(message)
