@@ -13,7 +13,6 @@ public struct ExploreView: View {
     @Environment(ChirpState.self) private var state
     @State private var packs: [FollowPack] = []
     @State private var relaySets: [RelaySet] = []
-    @State private var topProfiles: [String] = []
     @State private var searchText = ""
     @State private var searchFilter: SearchFilter = .all
     @State private var searchDataSource: NDKUnifiedSearchDataSource?
@@ -155,9 +154,6 @@ public struct ExploreView: View {
     private var exploreContent: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
-                // Top Profiles (horizontal)
-                topProfilesSection
-
                 // Featured Follow Packs (horizontal)
                 featuredPacksSection
 
@@ -344,31 +340,6 @@ public struct ExploreView: View {
         }
     }
 
-    // MARK: - Top Profiles Section
-
-    private var topProfilesSection: some View {
-        Group {
-            if !topProfiles.isEmpty {
-                VStack(alignment: .leading, spacing: 12) {
-                    sectionHeader(icon: "⭐", iconGradient: .purple, title: "People to Follow", showSeeAll: false)
-
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            ForEach(topProfiles, id: \.self) { pubkey in
-                                NavigationLink(value: pubkey) {
-                                    TopProfileCard(ndk: state.ndk, pubkey: pubkey)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                    }
-                }
-                .padding(.bottom, 24)
-            }
-        }
-    }
-
     // MARK: - Featured Packs Section
 
     private var featuredPacksSection: some View {
@@ -489,7 +460,7 @@ public struct ExploreView: View {
     }
 
     private enum IconGradient {
-        case orange, blue, purple
+        case orange, blue
 
         var gradient: LinearGradient {
             switch self {
@@ -502,12 +473,6 @@ public struct ExploreView: View {
             case .blue:
                 return LinearGradient(
                     colors: [Color(red: 0.04, green: 0.52, blue: 1), Color(red: 0.37, green: 0.36, blue: 0.9)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            case .purple:
-                return LinearGradient(
-                    colors: [Color(red: 0.58, green: 0.35, blue: 0.94), Color(red: 0.85, green: 0.44, blue: 0.84)],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
@@ -529,9 +494,8 @@ public struct ExploreView: View {
         // Load all content types concurrently
         async let packsTask: Void = discoverPacks()
         async let relaysTask: Void = discoverRelaySets()
-        async let profilesTask: Void = discoverTopProfiles()
 
-        _ = await (packsTask, relaysTask, profilesTask)
+        _ = await (packsTask, relaysTask)
     }
 
     private func discoverPacks() async {
@@ -619,59 +583,6 @@ public struct ExploreView: View {
         // Fallback: use the entry point pubkey's follows
         // For now, just return the fallback pubkey itself
         return [fallbackPubkey]
-    }
-
-    /// Discover top profiles to show in explore section
-    /// Uses follows-of-follows (2nd degree connections) to find interesting profiles
-    private func discoverTopProfiles() async {
-        // Get the current user's follows
-        let userFollows = Set(state.ndk.sessionData?.followList ?? [])
-
-        // Get pubkeys to query for their follows
-        let pubkeysToQuery = getNetworkPubkeys()
-
-        guard !pubkeysToQuery.isEmpty else { return }
-
-        // Fetch contact lists from follows
-        let subscription = state.ndk.subscribe(
-            filter: NDKFilter(
-                authors: Array(pubkeysToQuery.prefix(20)),
-                kinds: [3],
-                limit: 20
-            ),
-            cachePolicy: .cacheWithNetwork,
-            subscriptionId: "profile-discovery",
-            closeOnEose: true
-        )
-
-        var pubkeyScores: [String: Int] = [:]
-
-        for await batch in subscription.events {
-            for event in batch {
-                // Extract followed pubkeys from 'p' tags
-                let followedPubkeys = event.tags
-                    .filter { $0.first == "p" && $0.count > 1 && $0[1].count == 64 }
-                    .map { $0[1] }
-
-                for pubkey in followedPubkeys {
-                    // Skip the current user and people they already follow
-                    guard pubkey != state.ndk.sessionData?.pubkey else { continue }
-                    guard !userFollows.contains(pubkey) else { continue }
-
-                    pubkeyScores[pubkey, default: 0] += 1
-                }
-            }
-        }
-
-        // Sort by score and take top 10
-        let topPubkeys = pubkeyScores
-            .sorted { $0.value > $1.value }
-            .prefix(10)
-            .map { $0.key }
-
-        await MainActor.run {
-            topProfiles = topPubkeys
-        }
     }
 }
 
@@ -764,56 +675,3 @@ private struct FilterChip: View {
     }
 }
 
-// MARK: - Top Profile Card
-
-/// A compact card showing a profile for the explore section
-private struct TopProfileCard: View {
-    let ndk: NDK
-    let pubkey: String
-
-    @State private var profile: NDKProfile?
-
-    private var isFollowing: Bool {
-        ndk.sessionData?.contactList?.isFollowing(pubkey) ?? false
-    }
-
-    var body: some View {
-        VStack(spacing: 8) {
-            // Avatar
-            NDKUIProfilePicture(ndk: ndk, pubkey: pubkey, size: 64)
-                .overlay(alignment: .bottomTrailing) {
-                    if isFollowing {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 18))
-                            .foregroundStyle(.white, .green)
-                            .offset(x: 4, y: 4)
-                    }
-                }
-
-            // Name
-            Text(profile?.displayName ?? shortenedPubkey)
-                .font(.caption)
-                .fontWeight(.medium)
-                .lineLimit(1)
-                .frame(width: 80)
-
-            // NIP-05 or secondary info
-            if let nip05 = profile?.metadata?.nip05 {
-                Text(nip05.split(separator: "@").first.map(String.init) ?? nip05)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .frame(width: 80)
-            }
-        }
-        .frame(width: 90)
-        .padding(.vertical, 8)
-        .task {
-            profile = ndk.profile(for: pubkey)
-        }
-    }
-
-    private var shortenedPubkey: String {
-        "\(pubkey.prefix(6))..."
-    }
-}
