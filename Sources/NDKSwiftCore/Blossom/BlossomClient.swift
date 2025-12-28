@@ -189,7 +189,7 @@ public actor BlossomClient {
             if let maxSize = descriptor?.maxUploadSize {
                 throw NDKError.fileTooLarge(maxSize: maxSize)
             }
-            throw NDKError.unsupportedMimeType(finalMimeType)
+            throw NDKError.unsupportedMimeType(finalMimeType ?? "unknown")
 
         case HTTPStatusCode.unauthorized:
             throw NDKError.unauthorized(relay: serverURL, message: ErrorMessageConstants.Messages.blossomAuthorizationFailed)
