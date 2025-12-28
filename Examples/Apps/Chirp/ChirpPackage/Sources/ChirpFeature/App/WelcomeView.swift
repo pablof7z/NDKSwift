@@ -8,79 +8,69 @@ struct WelcomeView: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        ZStack {
-            // Simple dark background
-            Color.black.ignoresSafeArea()
+        VStack(spacing: 0) {
+            Spacer()
 
-            VStack(spacing: 0) {
-                Spacer()
+            // Clean branding
+            VStack(spacing: 24) {
+                Image(systemName: "bird.fill")
+                    .font(.system(size: 64, weight: .light))
+                    .foregroundStyle(.primary)
 
-                // Clean branding
-                VStack(spacing: 24) {
-                    Image(systemName: "bird.fill")
-                        .font(.system(size: 64, weight: .light))
-                        .foregroundStyle(.white)
+                VStack(spacing: 8) {
+                    Text("Chirp")
+                        .font(.system(size: 40, weight: .semibold, design: .default))
 
-                    VStack(spacing: 8) {
-                        Text("Chirp")
-                            .font(.system(size: 40, weight: .semibold, design: .default))
-                            .foregroundStyle(.white)
+                    Text("The decentralized social network")
+                        .font(.system(size: 17, weight: .regular))
+                        .foregroundStyle(.secondary)
+                }
+            }
 
-                        Text("The decentralized social network")
-                            .font(.system(size: 17, weight: .regular))
-                            .foregroundStyle(.white.opacity(0.5))
-                    }
+            Spacer()
+            Spacer()
+
+            // Action Buttons
+            VStack(spacing: 12) {
+                if let error = errorMessage {
+                    Text(error)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
                 }
 
-                Spacer()
-                Spacer()
-
-                // Action Buttons
-                VStack(spacing: 12) {
-                    if let error = errorMessage {
-                        Text(error)
-                            .font(.footnote)
-                            .foregroundStyle(.red)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
-                    }
-
-                    Button {
-                        Task { await createAccount() }
-                    } label: {
-                        HStack(spacing: 6) {
-                            if isCreatingAccount {
-                                ProgressView()
-                                    .tint(.black)
-                            } else {
-                                Text("Create Account")
-                            }
+                Button {
+                    Task { await createAccount() }
+                } label: {
+                    HStack(spacing: 6) {
+                        if isCreatingAccount {
+                            ProgressView()
+                        } else {
+                            Text("Create Account")
                         }
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(.black)
+                    }
+                    .font(.system(size: 17, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(isCreatingAccount)
+
+                Button {
+                    showingLoginSheet = true
+                } label: {
+                    Text("Sign In")
+                        .font(.system(size: 17, weight: .medium))
                         .frame(maxWidth: .infinity)
                         .frame(height: 50)
-                        .background(.white, in: RoundedRectangle(cornerRadius: 12))
-                    }
-                    .disabled(isCreatingAccount)
-
-                    Button {
-                        showingLoginSheet = true
-                    } label: {
-                        Text("Sign In")
-                            .font(.system(size: 17, weight: .medium))
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .background(.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
-                    }
-                    .disabled(isCreatingAccount)
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 32)
+                .buttonStyle(.bordered)
+                .disabled(isCreatingAccount)
             }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 32)
         }
-        .preferredColorScheme(.dark)
         .sheet(isPresented: $showingLoginSheet) {
             NavigationStack {
                 LoginView()

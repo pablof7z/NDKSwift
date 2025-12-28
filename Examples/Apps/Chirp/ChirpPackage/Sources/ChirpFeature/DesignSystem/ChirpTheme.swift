@@ -32,25 +32,51 @@ extension View {
     func glassCard(cornerRadius: CGFloat = 20, padding: CGFloat = 16) -> some View {
         modifier(GlassBackground(cornerRadius: cornerRadius, padding: padding))
     }
+
+    /// Applies a floating glass effect suitable for FABs and floating buttons
+    @ViewBuilder
+    func glassFloatingButton() -> some View {
+        if #available(iOS 26.0, macOS 26.0, *) {
+            self.glassEffect(.regular.interactive(), in: Circle())
+        } else {
+            self.background {
+                Circle()
+                    .fill(.ultraThinMaterial)
+                    .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
+            }
+        }
+    }
+
+    /// Applies a capsule glass effect for pill-shaped floating buttons
+    @ViewBuilder
+    func glassPill() -> some View {
+        if #available(iOS 26.0, macOS 26.0, *) {
+            self.glassEffect(.regular.interactive(), in: Capsule())
+        } else {
+            self.background(.ultraThinMaterial, in: Capsule())
+                .shadow(color: .black.opacity(0.1), radius: 6, x: 0, y: 3)
+        }
+    }
 }
 
 // MARK: - Gradient Backgrounds
 
 struct ChirpGradients {
+    // Clean, solid blue - modern and professional
     static let primary = LinearGradient(
-        colors: [Color.blue, Color.purple],
+        colors: [Color(red: 0.11, green: 0.63, blue: 0.95)],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
 
     static let accent = LinearGradient(
-        colors: [Color.orange, Color.pink],
+        colors: [Color(red: 0.11, green: 0.63, blue: 0.95)],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
 
     static let subtle = LinearGradient(
-        colors: [Color.blue.opacity(0.6), Color.purple.opacity(0.4)],
+        colors: [Color(red: 0.11, green: 0.63, blue: 0.95).opacity(0.8)],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )

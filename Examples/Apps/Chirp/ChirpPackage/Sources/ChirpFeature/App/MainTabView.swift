@@ -32,7 +32,7 @@ public struct ChirpRootView: View {
         if let state = state {
             switch state.initState {
             case .loading:
-                Color.black.ignoresSafeArea()
+                Color(.systemBackground).ignoresSafeArea()
             case .error(let error):
                 errorView(error)
             case .needsLogin:
@@ -45,25 +45,24 @@ public struct ChirpRootView: View {
         } else if let error = initError {
             errorView(error)
         } else {
-            Color.black.ignoresSafeArea()
+            Color(.systemBackground).ignoresSafeArea()
         }
     }
 
     private var splashView: some View {
         GeometryReader { geometry in
             ZStack {
-                Color.black.ignoresSafeArea()
+                Color(.systemBackground).ignoresSafeArea()
 
                 Image(systemName: "bird.fill")
                     .font(.system(size: 60, weight: .light))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .scaleEffect(logoScale)
                     .opacity(logoOpacity)
                     .frame(width: geometry.size.width, height: geometry.size.height)
             }
         }
         .ignoresSafeArea()
-        .preferredColorScheme(.dark)
         .onAppear {
             startSplashAnimation()
         }
@@ -87,35 +86,27 @@ public struct ChirpRootView: View {
     }
 
     private func errorView(_ error: Error) -> some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
+        VStack(spacing: 24) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 48))
+                .foregroundStyle(.orange)
 
-            VStack(spacing: 24) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 48))
-                    .foregroundStyle(.orange)
+            Text("Something went wrong")
+                .font(.title2.bold())
 
-                Text("Something went wrong")
-                    .font(.title2.bold())
-                    .foregroundStyle(.white)
+            Text(error.localizedDescription)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
 
-                Text(error.localizedDescription)
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.5))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
-
-                Button("Retry") {
-                    Task { await initializeState() }
-                }
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(.black)
-                .frame(maxWidth: 200)
-                .frame(height: 50)
-                .background(.white, in: RoundedRectangle(cornerRadius: 12))
+            Button("Retry") {
+                Task { await initializeState() }
             }
+            .buttonStyle(.borderedProminent)
         }
-        .preferredColorScheme(.dark)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemBackground).ignoresSafeArea())
     }
 
     private func initializeState() async {
@@ -139,72 +130,116 @@ public struct ChirpRootView: View {
 
 public struct MainTabView: View {
     @Environment(ChirpState.self) private var state
-    @State private var selectedTab: Tab = .feed
+    @State private var selectedTab: AppTab = .feed
     @State private var hasCheckedFollows = false
+    @State private var showComposer = false
 
-    enum Tab: Int {
-        case feed = 0
-        case explore = 1
-        case wallet = 2
-        case profile = 3
-        case settings = 4
+    enum AppTab: String, CaseIterable {
+        case feed
+        case explore
+        case wallet
+        case profile
+        case settings
     }
 
     public init() {}
 
     public var body: some View {
-        TabView(selection: $selectedTab) {
-            NavigationStack {
-                FeedView()
-            }
-            .tag(Tab.feed)
-            .tabItem {
-                Label("Feed", systemImage: "house.fill")
-            }
+        ZStack(alignment: .bottomTrailing) {
+            TabView(selection: $selectedTab) {
+                NavigationStack {
+                    FeedView()
+                }
+                .tag(AppTab.feed)
+                .tabItem { Label("Feed", systemImage: "house.fill") }
 
-            NavigationStack {
-                ExploreView()
-            }
-            .tag(Tab.explore)
-            .tabItem {
-                Label("Explore", systemImage: "magnifyingglass")
-            }
+                NavigationStack {
+                    ExploreView()
+                }
+                .tag(AppTab.explore)
+                .tabItem { Label("Explore", systemImage: "magnifyingglass") }
 
-            NavigationStack {
-                WalletView()
-            }
-            .tag(Tab.wallet)
-            .tabItem {
-                Label("Wallet", systemImage: "wallet.bifold.fill")
-            }
+                NavigationStack {
+                    WalletView()
+                }
+                .tag(AppTab.wallet)
+                .tabItem { Label("Wallet", systemImage: "wallet.bifold.fill") }
 
-            NavigationStack {
-                ProfileView()
-            }
-            .tag(Tab.profile)
-            .tabItem {
-                Label("Profile", systemImage: "person.fill")
-            }
+                NavigationStack {
+                    ProfileView()
+                }
+                .tag(AppTab.profile)
+                .tabItem { Label("Profile", systemImage: "person.fill") }
 
-            NavigationStack {
-                SettingsView()
+                NavigationStack {
+                    SettingsView()
+                }
+                .tag(AppTab.settings)
+                .tabItem { Label("Settings", systemImage: "gearshape.fill") }
             }
-            .tag(Tab.settings)
-            .tabItem {
-                Label("Settings", systemImage: "gearshape.fill")
-            }
-        }
-        .tint(.blue)
-        .onAppear {
-            // Default to Explore if user has no follows
-            if !hasCheckedFollows {
-                hasCheckedFollows = true
-                if let followList = state.ndk.sessionData?.followList, followList.isEmpty {
-                    selectedTab = .explore
-                } else if state.ndk.sessionData?.followList == nil {
-                    selectedTab = .explore
+            .onAppear {
+                // Default to Explore if user has no follows
+                if !hasCheckedFollows {
+                    hasCheckedFollows = true
+                    if let followList = state.ndk.sessionData?.followList, followList.isEmpty {
+                        selectedTab = .explore
+                    } else if state.ndk.sessionData?.followList == nil {
+                        selectedTab = .explore
+                    }
                 }
             }
+
+            // FAB Button for composing new posts (only on Feed tab)
+            if state.authManager.isAuthenticated && selectedTab == .feed {
+                fabButton
+                    .padding(.trailing, 20)
+                    .padding(.bottom, 90)
+            }
         }
+        .sheet(isPresented: $showComposer) {
+            ComposerView(ndk: state.ndk)
+        }
+    }
+
+    // MARK: - FAB Button
+
+    private var fabButton: some View {
+        Button {
+            showComposer = true
+        } label: {
+            fabLabel
+        }
+        .buttonStyle(FABButtonStyle())
+    }
+
+    @ViewBuilder
+    private var fabLabel: some View {
+        if #available(iOS 26.0, macOS 26.0, *) {
+            Image(systemName: "plus")
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(.tint)
+                .frame(width: 56, height: 56)
+                .glassEffect(.regular.interactive(), in: Circle())
+        } else {
+            Image(systemName: "plus")
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(width: 56, height: 56)
+                .background {
+                    Circle()
+                        .fill(ChirpGradients.primary)
+                }
+                .shadow(color: .blue.opacity(0.4), radius: 8, x: 0, y: 4)
+        }
+    }
+}
+
+// MARK: - FAB Button Style
+
+private struct FABButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.9 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: configuration.isPressed)
     }
 }

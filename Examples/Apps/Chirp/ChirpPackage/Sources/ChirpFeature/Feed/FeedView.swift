@@ -10,6 +10,8 @@ public struct FeedView: View {
     @State private var initialLoadTimestamp: Int64?
     @State private var allEvents: [NDKEvent] = []
     @State private var streamTask: Task<Void, Never>?
+    @State private var showReplyComposer = false
+    @State private var replyToEvent: NDKEvent?
     @Namespace private var animation
 
     public init() {}
@@ -28,7 +30,7 @@ public struct FeedView: View {
             }
         }
         .navigationTitle("Feed")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(.large)
         .onChange(of: state.ndk.sessionData?.followList) { _, newFollowList in
             if let newFollowList = newFollowList, !newFollowList.isEmpty {
                 streamTask?.cancel()
@@ -36,6 +38,9 @@ public struct FeedView: View {
                     await streamEvents(followList: newFollowList)
                 }
             }
+        }
+        .sheet(isPresented: $showReplyComposer) {
+            ComposerView(ndk: state.ndk, replyTo: replyToEvent)
         }
     }
 
@@ -63,10 +68,15 @@ public struct FeedView: View {
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         ForEach(allEvents, id: \.id) { event in
-                            NavigationLink(value: event) {
-                                FeedPostRow(ndk: state.ndk, event: event)
-                            }
-                            .buttonStyle(.plain)
+                            FeedPostRow(
+                                ndk: state.ndk,
+                                event: event,
+                                navigateToThread: event,
+                                onReply: { eventToReply in
+                                    replyToEvent = eventToReply
+                                    showReplyComposer = true
+                                }
+                            )
                             .id(event.id)
                             .onAppear {
                                 trackScrollPosition(event: event, data: allEvents)
@@ -107,6 +117,24 @@ public struct FeedView: View {
                 }
             }
         } label: {
+            newPostsLabel
+        }
+    }
+
+    @ViewBuilder
+    private var newPostsLabel: some View {
+        if #available(iOS 26.0, macOS 26.0, *) {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.up")
+                    .font(.caption.weight(.semibold))
+                Text("New posts")
+                    .font(.subheadline.weight(.medium))
+            }
+            .foregroundStyle(.tint)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .glassEffect(.regular.interactive(), in: Capsule())
+        } else {
             HStack(spacing: 6) {
                 Image(systemName: "arrow.up")
                     .font(.caption.weight(.semibold))
@@ -211,6 +239,8 @@ public struct FeedView: View {
 struct FeedPostRow: View {
     let ndk: NDK
     let event: NDKEvent
+    var navigateToThread: NDKEvent?
+    var onReply: ((NDKEvent) -> Void)?
 
     // Store profile reference so SwiftUI holds it and observes changes
     @State private var profile: NDKProfile?
@@ -250,11 +280,19 @@ struct FeedPostRow: View {
                     // Reply indicator
                     NDKUIReplyIndicator(ndk: ndk, event: event)
 
-                    // Post content
-                    NDKRichText(content: event.content, tags: event.tags)
-                        .ndk(ndk)
+                    // Post content - tappable to navigate to thread
+                    if let threadEvent = navigateToThread {
+                        NavigationLink(value: threadEvent) {
+                            NDKRichText(content: event.content, tags: event.tags)
+                                .ndk(ndk)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        NDKRichText(content: event.content, tags: event.tags)
+                            .ndk(ndk)
+                    }
 
-                    // Action bar
+                    // Action bar - NOT inside NavigationLink
                     actionBar
                         .padding(.top, 8)
                 }
@@ -283,7 +321,7 @@ struct FeedPostRow: View {
 
     private var actionBar: some View {
         HStack(spacing: 0) {
-            actionButton(icon: "bubble.right", count: nil)
+            replyButton
             Spacer()
             repostButton
             Spacer()
@@ -294,6 +332,17 @@ struct FeedPostRow: View {
             moreMenu
         }
         .frame(maxWidth: 300, alignment: .leading)
+    }
+
+    private var replyButton: some View {
+        Button {
+            onReply?(event)
+        } label: {
+            Image(systemName: "bubble.right")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
     }
 
     private var repostButton: some View {
