@@ -53,12 +53,24 @@ public struct NDKRelaySignatureStats: Sendable, Equatable {
     /// Current validation ratio for this relay
     public private(set) var currentValidationRatio: Double = 1.0
 
+    /// User-configured target validation ratio for this relay (nil = use global default)
+    public var targetValidationRatio: Double?
+
+    /// Whether signature verification is enabled for this relay
+    public var verificationEnabled: Bool = true
+
     /// Public initializer
     public init() {}
 
     /// Total events processed
     public var totalEvents: Int {
         return validatedCount + nonValidatedCount
+    }
+
+    /// Effective validation ratio (uses target if set, otherwise current)
+    public var effectiveValidationRatio: Double {
+        if !verificationEnabled { return 0.0 }
+        return targetValidationRatio ?? currentValidationRatio
     }
 
     /// Add a validated event
@@ -74,6 +86,16 @@ public struct NDKRelaySignatureStats: Sendable, Equatable {
     /// Update the validation ratio
     mutating func updateValidationRatio(_ ratio: Double) {
         currentValidationRatio = ratio
+    }
+
+    /// Set the target validation ratio for this relay
+    public mutating func setTargetValidationRatio(_ ratio: Double?) {
+        targetValidationRatio = ratio
+    }
+
+    /// Enable or disable signature verification for this relay
+    public mutating func setVerificationEnabled(_ enabled: Bool) {
+        verificationEnabled = enabled
     }
 }
 

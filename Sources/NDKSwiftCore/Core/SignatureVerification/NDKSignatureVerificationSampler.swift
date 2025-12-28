@@ -157,7 +157,13 @@ public actor NDKSignatureVerificationSampler {
 
     /// Determine if we should verify an event based on sampling
     private func shouldVerifyEvent(relay _: RelayProtocol, stats: NDKRelaySignatureStats) -> Bool {
-        let ratio = stats.currentValidationRatio
+        // If verification is disabled for this relay, skip
+        if !stats.verificationEnabled {
+            return false
+        }
+
+        // Use effective ratio (per-relay target if set, otherwise current)
+        let ratio = stats.effectiveValidationRatio
 
         // Always verify if ratio is 1.0
         if ratio >= 1.0 {

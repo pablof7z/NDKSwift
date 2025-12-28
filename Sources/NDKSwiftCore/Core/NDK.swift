@@ -761,34 +761,33 @@ public final class NDK {
         let alreadyVerified = await signatureVerificationSampler.isEventVerified(event.id)
 
         if !alreadyVerified {
-            // Get current signature stats for this relay
-            guard let ndkRelay = relay as? NDKRelay else {
+            // Only verify if relay is NDKRelay - otherwise skip verification but continue processing
+            if let ndkRelay = relay as? NDKRelay {
+                var signatureStats = await ndkRelay.getSignatureStats()
+
+                // Verify the event signature
+                let verificationResult = await signatureVerificationSampler.verifyEvent(
+                    event,
+                    from: relay,
+                    stats: &signatureStats
+                )
+
+                // Update relay's signature stats
+                await ndkRelay.updateSignatureStats { $0 = signatureStats }
+
+                // If signature is invalid, mark relay as evil and REJECT the event
+                if verificationResult == .invalid {
+                    NDKLogger.log(.error, category: .security,
+                                  "🚨 [SECURITY] Invalid signature detected from relay \(relay.url) for event \(event.id) - REJECTING EVENT")
+                    await ndkRelay.markAsEvil(eventId: event.id)
+                    return
+                }
+
+                NDKLogger.log(.trace, category: .security,
+                              "✅ [SECURITY] Signature verification result: \(verificationResult) for event \(event.id)")
+            } else {
                 NDKLogger.log(.warning, category: .event, "⚠️ Relay is not NDKRelay type - skipping signature verification")
-                return
             }
-
-            var signatureStats = await ndkRelay.getSignatureStats()
-
-            // Verify the event signature
-            let verificationResult = await signatureVerificationSampler.verifyEvent(
-                event,
-                from: relay,
-                stats: &signatureStats
-            )
-
-            // Update relay's signature stats
-            await ndkRelay.updateSignatureStats { $0 = signatureStats }
-
-            // If signature is invalid, mark relay as evil and REJECT the event
-            if verificationResult == .invalid {
-                NDKLogger.log(.error, category: .security,
-                              "🚨 [SECURITY] Invalid signature detected from relay \(relay.url) for event \(event.id) - REJECTING EVENT")
-                await ndkRelay.markAsEvil(eventId: event.id)
-                return
-            }
-
-            NDKLogger.log(.trace, category: .security,
-                          "✅ [SECURITY] Signature verification result: \(verificationResult) for event \(event.id)")
         }
 
         // Track that we've seen this event on this relay

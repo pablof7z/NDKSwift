@@ -1096,6 +1096,20 @@ public extension NDKRelay {
         await stateActor.markAsEvil(eventId: eventId)
     }
 
+    // MARK: - Per-Relay Signature Configuration
+
+    /// Set the target validation ratio for this specific relay
+    /// - Parameter ratio: The validation ratio (0.0-1.0), or nil to use global default
+    func setSignatureValidationRatio(_ ratio: Double?) async {
+        await stateActor.updateSignatureStats { $0.setTargetValidationRatio(ratio) }
+    }
+
+    /// Enable or disable signature verification for this relay
+    /// - Parameter enabled: Whether to verify signatures from this relay
+    func setSignatureVerificationEnabled(_ enabled: Bool) async {
+        await stateActor.updateSignatureStats { $0.setVerificationEnabled(enabled) }
+    }
+
     // MARK: - Subscription Management
 
     /// Get currently active subscriptions on this relay
@@ -1338,6 +1352,21 @@ extension NDKRelay {
         /// Event ID that triggered evil detection
         public var evilEventId: String? {
             stats.evilEventId
+        }
+
+        /// Whether signature verification is enabled for this relay
+        public var signatureVerificationEnabled: Bool {
+            stats.signatureStats.verificationEnabled
+        }
+
+        /// User-configured target validation ratio (nil = use global default)
+        public var targetValidationRatio: Double? {
+            stats.signatureStats.targetValidationRatio
+        }
+
+        /// Effective validation ratio being used
+        public var effectiveValidationRatio: Double {
+            stats.signatureStats.effectiveValidationRatio
         }
 
         /// Background task that observes relay state changes.
