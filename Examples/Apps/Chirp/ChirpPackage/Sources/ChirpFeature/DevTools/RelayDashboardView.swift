@@ -140,9 +140,14 @@ struct RelayDashboardView: View {
         let ndk = state.ndk
         relays = await ndk.relays
         for relay in relays {
+            var stats = await relay.stats
+            // Populate coverage statistics from the tracker
+            let coverageStats = await ndk.relayCoverageTracker.getStats(for: relay.url)
+            stats.coverageStats = coverageStats
+
             let relayState = NDKRelay.State(
                 connectionState: await relay.connectionState,
-                stats: await relay.stats,
+                stats: stats,
                 info: await relay.info,
                 activeSubscriptions: await relay.activeSubscriptions
             )
@@ -170,14 +175,29 @@ private struct RelayMonitorRowView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Circle()
-                .fill(statusColor)
-                .frame(width: 10, height: 10)
+            // Evil relay indicator or status circle
+            if state?.stats.isEvil == true {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.red)
+                    .frame(width: 10, height: 10)
+            } else {
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 10, height: 10)
+            }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(relay.url)
-                    .font(.system(.body, design: .monospaced))
-                    .lineLimit(1)
+                HStack(spacing: 4) {
+                    Text(relay.url)
+                        .font(.system(.body, design: .monospaced))
+                        .lineLimit(1)
+
+                    if state?.stats.isEvil == true {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.red)
+                    }
+                }
 
                 HStack(spacing: 12) {
                     if let stats = state?.stats {
@@ -238,6 +258,45 @@ private struct RelayDetailView: View {
 
     var body: some View {
         List {
+            // Evil relay warning section
+            if state?.stats.isEvil == true {
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.red)
+                            Text("EVIL RELAY DETECTED")
+                                .font(.headline)
+                                .foregroundStyle(.red)
+                        }
+
+                        Text("This relay sent an event with an invalid signature and has been marked as malicious.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        if let evilEventId = state?.stats.evilEventId {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Event ID:")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                Text(evilEventId)
+                                    .font(.system(.caption2, design: .monospaced))
+                                    .foregroundStyle(.red)
+                            }
+                        }
+
+                        if let evilDetectedAt = state?.stats.evilDetectedAt {
+                            Text("Detected: \(formatDate(evilDetectedAt))")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                } header: {
+                    Text("Security Alert")
+                }
+            }
+
             // Connection section
             Section("Connection") {
                 LabeledContent("Status") {
@@ -327,6 +386,34 @@ private struct RelayDetailView: View {
                             .font(.system(.body, design: .monospaced))
                     }
                 }
+            }
+
+            // Coverage statistics section
+            if let coverageStats = state?.stats.coverageStats {
+                Section("Relay Coverage") {
+                    LabeledContent("First Deliveries") {
+                        HStack(spacing: 4) {
+                            Text("\(coverageStats.firstDeliveryCount)")
+                                .font(.system(.body, design: .monospaced))
+                                .foregroundStyle(.green)
+                            Text("(\(String(format: "%.1f%%", coverageStats.coverageRatio * 100)))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    LabeledContent("Duplicate Deliveries") {
+                        Text("\(coverageStats.duplicateDeliveryCount)")
+                            .font(.system(.body, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    LabeledContent("Total Events") {
+                        Text("\(coverageStats.totalEventsCount)")
+                            .font(.system(.body, design: .monospaced))
+                    }
+                }
+                .headerProminence(.increased)
             }
 
             // Relay info section (NIP-11)

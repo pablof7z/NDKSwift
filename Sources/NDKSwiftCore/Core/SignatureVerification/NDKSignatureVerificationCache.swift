@@ -10,8 +10,19 @@ actor NDKSignatureVerificationCache {
     /// Order of insertion for LRU eviction
     private var insertionOrder: [EventID] = []
 
+    /// Hit/miss tracking for statistics
+    private var cacheHits: Int = 0
+    private var cacheMisses: Int = 0
+
     public init(maxCacheSize: Int = 10000) {
         self.maxCacheSize = maxCacheSize
+    }
+
+    /// Fast check if an event has been verified (regardless of signature)
+    /// - Parameter eventId: The event ID to check
+    /// - Returns: true if the event has been verified previously
+    public func hasVerifiedEvent(eventId: EventID) -> Bool {
+        return verifiedSignatures[eventId] != nil
     }
 
     /// Check if an event signature has been verified
@@ -21,9 +32,16 @@ actor NDKSignatureVerificationCache {
     /// - Returns: true if the signature matches the cached verified signature
     public func isVerified(eventId: EventID, signature: Signature) -> Bool {
         guard let cachedSignature = verifiedSignatures[eventId] else {
+            cacheMisses += 1
             return false
         }
-        return cachedSignature == signature
+        if cachedSignature == signature {
+            cacheHits += 1
+            return true
+        } else {
+            cacheMisses += 1
+            return false
+        }
     }
 
     /// Add a verified signature to the cache
@@ -59,9 +77,10 @@ actor NDKSignatureVerificationCache {
     }
 
     /// Get cache statistics
-    public func getStats() -> (cacheSize: Int, hitRate: Double) {
+    public func getStats() -> (cacheSize: Int, hitRate: Double, hits: Int, misses: Int) {
         let cacheSize = verifiedSignatures.count
-        // Hit rate would need to be tracked with hit/miss counters
-        return (cacheSize, 0.0)
+        let totalAccesses = cacheHits + cacheMisses
+        let hitRate = totalAccesses > 0 ? Double(cacheHits) / Double(totalAccesses) : 0.0
+        return (cacheSize, hitRate, cacheHits, cacheMisses)
     }
 }
