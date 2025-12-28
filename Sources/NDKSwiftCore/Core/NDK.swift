@@ -221,7 +221,7 @@ public final class NDK {
 
     /// Relay coverage tracker for intelligent relay selection
     @ObservationIgnored
-    lazy var relayCoverageTracker: NDKRelayCoverageTracker = {
+    public lazy var relayCoverageTracker: NDKRelayCoverageTracker = {
         NDKRelayCoverageTracker()
     }()
 
