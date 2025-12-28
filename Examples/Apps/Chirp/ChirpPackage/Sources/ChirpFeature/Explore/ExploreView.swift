@@ -223,7 +223,7 @@ public struct ExploreView: View {
         let subscription = state.ndk.subscribe(
             filter: NDKFilter(
                 kinds: [39089, 39092],
-                limit: 50
+                limit: 10
             ),
             cachePolicy: .cacheWithNetwork,
             subscriptionId: "pack-discovery",

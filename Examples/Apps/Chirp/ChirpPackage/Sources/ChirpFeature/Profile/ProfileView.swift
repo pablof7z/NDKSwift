@@ -139,7 +139,7 @@ public struct ProfileView: View {
             filter: NDKFilter(
                 authors: [pubkey],
                 kinds: [1],
-                limit: 50
+                limit: 10
             ),
             cachePolicy: .cacheWithNetwork,
             subscriptionId: "profile-posts"

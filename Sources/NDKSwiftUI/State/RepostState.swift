@@ -88,7 +88,9 @@ public final class RepostState {
 
     /// Toggle repost state - creates a repost if not reposted, deletes if already reposted
     public func toggle() async throws {
+        print("[RepostState] toggle() - checking ndk.signer: \(ndk.signer == nil ? "nil" : "present")")
         guard ndk.signer != nil else {
+            print("[RepostState] ERROR: ndk.signer is nil - user needs to be logged in with signing capability")
             throw RepostError.noSigner
         }
 

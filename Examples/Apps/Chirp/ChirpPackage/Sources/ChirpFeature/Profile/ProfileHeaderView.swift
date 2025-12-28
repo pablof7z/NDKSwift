@@ -47,7 +47,7 @@ public struct ProfileHeaderView: View {
                         image
                             .resizable()
                             .aspectRatio(contentMode: .fill)
-                            .frame(height: 120)
+                            .frame(height: 180)
                             .clipped()
                     case .failure, .empty:
                         defaultBanner
@@ -59,13 +59,13 @@ public struct ProfileHeaderView: View {
                 defaultBanner
             }
         }
-        .frame(height: 120)
+        .frame(height: 180)
     }
 
     private var defaultBanner: some View {
         Rectangle()
             .fill(Color(.secondarySystemBackground))
-            .frame(height: 120)
+            .frame(height: 180)
     }
 
     // MARK: - Profile Info Section

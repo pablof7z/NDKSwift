@@ -10,6 +10,7 @@ enum ThreadPosition {
 }
 
 struct ThreadedPostRow: View {
+    @Environment(ChirpState.self) private var state
     let ndk: NDK
     let event: NDKEvent
     let position: ThreadPosition
@@ -19,6 +20,7 @@ struct ThreadedPostRow: View {
     // Store profile reference so SwiftUI holds it and observes changes
     @State private var profile: NDKProfile?
     @State private var repostState: RepostState?
+    @State private var showSigningRequiredAlert = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -114,6 +116,7 @@ struct ThreadedPostRow: View {
             profile = ndk.profile(for: event.pubkey)
 
             // Initialize and start repost state observation
+            print("[PostRow] Creating RepostState - ndk.signer: \(ndk.signer == nil ? "nil" : "present")")
             let state = RepostState(ndk: ndk, event: event)
             repostState = state
             await state.start()
@@ -122,12 +125,16 @@ struct ThreadedPostRow: View {
 
     private var repostButton: some View {
         Button {
-            Task {
-                do {
-                    try await repostState?.toggle()
-                } catch {
-                    print("Repost failed: \(error)")
+            if state.authManager.canSign {
+                Task {
+                    do {
+                        try await repostState?.toggle()
+                    } catch {
+                        print("Repost failed: \(error)")
+                    }
                 }
+            } else {
+                showSigningRequiredAlert = true
             }
         } label: {
             HStack(spacing: 4) {
@@ -141,6 +148,11 @@ struct ThreadedPostRow: View {
             .foregroundStyle(repostState?.hasReposted == true ? .green : .secondary)
         }
         .buttonStyle(.plain)
+        .alert("Signing Required", isPresented: $showSigningRequiredAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("You need to login with a signing-capable account to repost.")
+        }
     }
 
     private func actionButton(icon: String) -> some View {
@@ -178,6 +190,7 @@ struct ThreadedPostRow: View {
 // MARK: - Active Post View (Emphasized)
 
 struct ActivePostView: View {
+    @Environment(ChirpState.self) private var state
     let ndk: NDK
     let event: NDKEvent
     let hasConnectionAbove: Bool
@@ -186,17 +199,19 @@ struct ActivePostView: View {
     // Store profile reference so SwiftUI holds it and observes changes
     @State private var profile: NDKProfile?
     @State private var repostState: RepostState?
+    @State private var showSigningRequiredAlert = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: 12) {
-                // Avatar column
+                // Avatar column - offset to center 48px avatar on same line as 40px avatars
                 NavigationLink(destination: ProfileView(pubkey: event.pubkey)) {
                     NDKUIProfilePicture(ndk: ndk, pubkey: event.pubkey, size: 48)
                 }
                 .buttonStyle(.plain)
                 .padding(.top, 12)
-                .frame(width: 48, alignment: .top)
+                .frame(width: 40, alignment: .top)
+                .offset(x: -4)
 
                 // Content
                 VStack(alignment: .leading, spacing: 8) {
@@ -224,19 +239,17 @@ struct ActivePostView: View {
 
             Divider()
 
-            // Action bar
-            HStack(spacing: 0) {
-                actionButton(icon: "bubble.right", label: "Reply")
-                Spacer()
+            // Action bar - matches ThreadedPostRow layout
+            HStack(spacing: 24) {
+                actionButton(icon: "bubble.right")
                 repostButton
-                Spacer()
-                actionButton(icon: "heart", label: "Like")
-                Spacer()
-                actionButton(icon: "bolt", label: "Zap")
+                actionButton(icon: "heart")
+                actionButton(icon: "bolt")
                 Spacer()
                 moreMenu
             }
-            .padding(.horizontal, 16)
+            .padding(.leading, 68) // Align with content (16 padding + 40 avatar + 12 spacing)
+            .padding(.trailing, 16)
             .padding(.vertical, 12)
 
             Divider()
@@ -278,6 +291,7 @@ struct ActivePostView: View {
             profile = ndk.profile(for: event.pubkey)
 
             // Initialize and start repost state observation
+            print("[PostRow] Creating RepostState - ndk.signer: \(ndk.signer == nil ? "nil" : "present")")
             let state = RepostState(ndk: ndk, event: event)
             repostState = state
             await state.start()
@@ -286,36 +300,43 @@ struct ActivePostView: View {
 
     private var repostButton: some View {
         Button {
-            Task {
-                do {
-                    try await repostState?.toggle()
-                } catch {
-                    print("Repost failed: \(error)")
+            if state.authManager.canSign {
+                Task {
+                    do {
+                        try await repostState?.toggle()
+                    } catch {
+                        print("Repost failed: \(error)")
+                    }
                 }
+            } else {
+                showSigningRequiredAlert = true
             }
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: "arrow.2.squarepath")
                     .font(.subheadline)
-                Text(repostState?.count ?? 0 > 0 ? "\(repostState!.count)" : "Repost")
-                    .font(.subheadline)
+                if let count = repostState?.count, count > 0 {
+                    Text("\(count)")
+                        .font(.caption)
+                }
             }
             .foregroundStyle(repostState?.hasReposted == true ? .green : .secondary)
         }
         .buttonStyle(.plain)
+        .alert("Signing Required", isPresented: $showSigningRequiredAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("You need to login with a signing-capable account to repost.")
+        }
     }
 
-    private func actionButton(icon: String, label: String) -> some View {
+    private func actionButton(icon: String) -> some View {
         Button {
             // Actions not implemented yet
         } label: {
-            HStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.subheadline)
-                Text(label)
-                    .font(.subheadline)
-            }
-            .foregroundStyle(.secondary)
+            Image(systemName: icon)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
         }
         .buttonStyle(.plain)
     }
@@ -330,13 +351,9 @@ struct ActivePostView: View {
                 Label("Copy Note ID", systemImage: "doc.on.doc")
             }
         } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "ellipsis")
-                    .font(.subheadline)
-                Text("More")
-                    .font(.subheadline)
-            }
-            .foregroundStyle(.secondary)
+            Image(systemName: "ellipsis")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
         }
     }
 }

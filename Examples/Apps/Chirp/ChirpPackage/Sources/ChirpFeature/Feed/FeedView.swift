@@ -129,7 +129,7 @@ public struct FeedView: View {
             filter: NDKFilter(
                 authors: Array(followList),
                 kinds: [1],
-                limit: 50
+                limit: 10
             ),
             cachePolicy: .cacheWithNetwork,
             subscriptionId: "feed"
@@ -187,7 +187,7 @@ public struct FeedView: View {
                     authors: Array(followList),
                     kinds: [1],
                     until: oldestEvent.createdAt,
-                    limit: 50
+                    limit: 10
                 ),
                 cachePolicy: .cacheWithNetwork,
                 timeout: 10.0
@@ -214,6 +214,8 @@ struct FeedPostRow: View {
 
     // Store profile reference so SwiftUI holds it and observes changes
     @State private var profile: NDKProfile?
+    @State private var repostState: RepostState?
+    @State private var reactionState: ReactionState?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -266,6 +268,16 @@ struct FeedPostRow: View {
         .task {
             // Load profile and hold reference so SwiftUI observes changes
             profile = ndk.profile(for: event.pubkey)
+
+            // Initialize and start interaction state observation
+            let repost = RepostState(ndk: ndk, event: event)
+            repostState = repost
+            await repost.start()
+        }
+        .task {
+            let reaction = ReactionState(ndk: ndk, event: event)
+            reactionState = reaction
+            await reaction.start()
         }
     }
 
@@ -273,15 +285,61 @@ struct FeedPostRow: View {
         HStack(spacing: 0) {
             actionButton(icon: "bubble.right", count: nil)
             Spacer()
-            actionButton(icon: "arrow.2.squarepath", count: nil)
+            repostButton
             Spacer()
-            actionButton(icon: "heart", count: nil)
+            reactionButton
             Spacer()
             actionButton(icon: "bolt", count: nil)
             Spacer()
             moreMenu
         }
         .frame(maxWidth: 300, alignment: .leading)
+    }
+
+    private var repostButton: some View {
+        Button {
+            Task {
+                do {
+                    try await repostState?.toggle()
+                } catch {
+                    print("Repost failed: \(error)")
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "arrow.2.squarepath")
+                    .font(.subheadline)
+                if let count = repostState?.count, count > 0 {
+                    Text("\(count)")
+                        .font(.caption)
+                }
+            }
+            .foregroundStyle(repostState?.hasReposted == true ? .green : .secondary)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var reactionButton: some View {
+        Button {
+            Task {
+                do {
+                    try await reactionState?.toggle()
+                } catch {
+                    print("Reaction failed: \(error)")
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: reactionState?.hasReacted == true ? "heart.fill" : "heart")
+                    .font(.subheadline)
+                if let count = reactionState?.count, count > 0 {
+                    Text("\(count)")
+                        .font(.caption)
+                }
+            }
+            .foregroundStyle(reactionState?.hasReacted == true ? .red : .secondary)
+        }
+        .buttonStyle(.plain)
     }
 
     private var moreMenu: some View {
