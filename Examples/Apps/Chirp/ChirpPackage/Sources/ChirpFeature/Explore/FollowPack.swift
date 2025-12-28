@@ -2,18 +2,18 @@ import Foundation
 import NDKSwiftCore
 
 /// Represents a follow pack (kind 39089 or 39092) - a curated list of accounts
-struct FollowPack: Identifiable, Sendable {
-    let id: String
-    let event: NDKEvent
-    let name: String
-    let description: String?
-    let imageURL: URL?
-    let pubkeys: [String]
-    let creatorPubkey: String
+public struct FollowPack: Identifiable, Sendable {
+    public let id: String
+    public let event: NDKEvent
+    public let name: String
+    public let description: String?
+    public let imageURL: URL?
+    public let pubkeys: [String]
+    public let creatorPubkey: String
 
-    var memberCount: Int { pubkeys.count }
+    public var memberCount: Int { pubkeys.count }
 
-    init?(event: NDKEvent) {
+    public init?(event: NDKEvent) {
         // Only accept follow pack kinds
         guard event.kind == 39089 || event.kind == 39092 else { return nil }
 

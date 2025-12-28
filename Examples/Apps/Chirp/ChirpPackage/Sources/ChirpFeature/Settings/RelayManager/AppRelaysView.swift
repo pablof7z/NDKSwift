@@ -7,10 +7,11 @@ struct AppRelaysView: View {
     @State private var newRelayURL = ""
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var savedRelayURLs: [String] = []
 
     var body: some View {
         List {
-            if state.ndk.appRelays.isEmpty {
+            if savedRelayURLs.isEmpty {
                 ContentUnavailableView(
                     "No Relays",
                     systemImage: "antenna.radiowaves.left.and.right.slash",
@@ -18,8 +19,8 @@ struct AppRelaysView: View {
                 )
             } else {
                 Section {
-                    ForEach(state.ndk.appRelays, id: \.url) { relay in
-                        RelayRow(relay: relay)
+                    ForEach(savedRelayURLs, id: \.self) { url in
+                        AppRelayRow(url: url, ndk: state.ndk)
                     }
                     .onDelete(perform: deleteRelays)
                 }
@@ -29,12 +30,15 @@ struct AppRelaysView: View {
                         Text("Connected")
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Text("\(state.ndk.connectedAppRelayCount) / \(state.ndk.appRelays.count)")
+                        Text("\(connectedCount) / \(savedRelayURLs.count)")
                     }
                 }
             }
         }
         .navigationTitle("App Relays")
+        .onAppear {
+            loadSavedRelays()
+        }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
@@ -63,6 +67,20 @@ struct AppRelaysView: View {
         }
     }
 
+    private var connectedCount: Int {
+        savedRelayURLs.filter { url in
+            if let relay = state.ndk.appRelays.first(where: { $0.url == url }) {
+                let connState = relay.ui.connectionState
+                return connState == .connected || connState == .authenticated
+            }
+            return false
+        }.count
+    }
+
+    private func loadSavedRelays() {
+        savedRelayURLs = ChirpState.loadSavedAppRelays()
+    }
+
     private func addRelay(_ urlString: String) async {
         isLoading = true
         errorMessage = nil
@@ -75,10 +93,12 @@ struct AppRelaysView: View {
             return
         }
 
-        _ = await state.ndk.addRelay(cleanUrl)
-
-        // Persist to UserDefaults
+        // Persist to UserDefaults first
         ChirpState.addSavedAppRelay(cleanUrl)
+        loadSavedRelays()
+
+        // Then add to NDK pool
+        _ = await state.ndk.addRelay(cleanUrl)
 
         isLoading = false
         showingAddSheet = false
@@ -86,12 +106,17 @@ struct AppRelaysView: View {
     }
 
     private func deleteRelays(at offsets: IndexSet) {
-        let relaysToDelete = offsets.map { state.ndk.appRelays[$0].url }
+        let relaysToDelete = offsets.map { savedRelayURLs[$0] }
+        for url in relaysToDelete {
+            // Remove from UserDefaults first
+            ChirpState.removeSavedAppRelay(url)
+        }
+        loadSavedRelays()
+
+        // Then remove from NDK pool
         Task {
             for url in relaysToDelete {
                 await state.ndk.removeRelay(url)
-                // Remove from UserDefaults
-                ChirpState.removeSavedAppRelay(url)
             }
         }
     }
@@ -115,8 +140,13 @@ struct AppRelaysView: View {
     }
 }
 
-struct RelayRow: View {
-    let relay: NDKRelay
+struct AppRelayRow: View {
+    let url: String
+    let ndk: NDK
+
+    private var relay: NDKRelay? {
+        ndk.appRelays.first { $0.url == url }
+    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -125,14 +155,14 @@ struct RelayRow: View {
                 .frame(width: 10, height: 10)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(formatURL(relay.url))
+                Text(formatURL(url))
                     .font(.body)
 
                 Text(statusText)
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                if let error = relay.ui.lastError {
+                if let error = relay?.ui.lastError {
                     Text(error)
                         .font(.caption2)
                         .foregroundStyle(.red)
@@ -158,6 +188,9 @@ struct RelayRow: View {
     }
 
     private var statusColor: Color {
+        guard let relay = relay else {
+            return .gray
+        }
         switch relay.ui.connectionState {
         case .connected, .authenticated:
             return .green
@@ -173,6 +206,9 @@ struct RelayRow: View {
     }
 
     private var statusText: String {
+        guard let relay = relay else {
+            return "Not in pool"
+        }
         switch relay.ui.connectionState {
         case .connected:
             if let lastConnected = relay.ui.lastConnectedAt {

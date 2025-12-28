@@ -2,15 +2,15 @@ import SwiftUI
 import NDKSwiftCore
 import NDKSwiftUI
 
-struct FollowPackFeedView: View {
+struct RelayFeedView: View {
     @Environment(ChirpState.self) private var state
-    let pack: FollowPack
+    let relay: RankedRelay
 
     @State private var allEvents: [NDKEvent] = []
     @Environment(\.dismiss) private var dismiss
 
     private var isSaved: Bool {
-        state.feedSourcesManager.isPacked(pack.id)
+        state.feedSourcesManager.isRelaySaved(relay.url)
     }
 
     var body: some View {
@@ -53,8 +53,9 @@ struct FollowPackFeedView: View {
     private var bannerSection: some View {
         ZStack(alignment: .bottomLeading) {
             // Background image or gradient
-            if let imageURL = pack.imageURL {
-                AsyncImage(url: imageURL) { phase in
+            if let iconURLString = relay.iconURL,
+               let iconURL = URL(string: iconURLString) {
+                AsyncImage(url: iconURL) { phase in
                     switch phase {
                     case .success(let image):
                         image
@@ -75,51 +76,54 @@ struct FollowPackFeedView: View {
     }
 
     private var gradientFallback: some View {
-        LinearGradient(
-            colors: [.purple.opacity(0.8), .blue.opacity(0.6)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        ZStack {
+            LinearGradient(
+                colors: [.orange.opacity(0.8), .red.opacity(0.6)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            Image(systemName: "antenna.radiowaves.left.and.right")
+                .font(.system(size: 64, weight: .light))
+                .foregroundStyle(.white.opacity(0.3))
+        }
     }
 
     // MARK: - Info Section
 
     private var infoSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Pack name
-            Text(pack.name)
+            // Relay name
+            Text(relay.displayName)
                 .font(.title2.bold())
 
             // Description if available
-            if let description = pack.description {
+            if let description = relay.description {
                 Text(description)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
 
-            // Members row
-            HStack(spacing: 8) {
-                // Stacked avatars
-                stackedAvatars
-
-                Text("\(pack.memberCount) accounts")
-                    .font(.subheadline)
+            // Stats row
+            HStack(spacing: 16) {
+                // Relay URL
+                Label(relay.url, systemImage: "link")
+                    .font(.caption)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
 
                 Spacer()
+
+                // Popularity indicator
+                if relay.appearanceCount > 0 {
+                    Label("\(relay.appearanceCount) users", systemImage: "person.2")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .padding(.horizontal, 16)
         .padding(.top, 16)
-    }
-
-    private var stackedAvatars: some View {
-        HStack(spacing: -10) {
-            ForEach(pack.pubkeys.prefix(5), id: \.self) { pubkey in
-                NDKUIProfilePicture(ndk: state.ndk, pubkey: pubkey, size: 28)
-                    .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 2))
-            }
-        }
     }
 
     // MARK: - Save Button
@@ -127,9 +131,9 @@ struct FollowPackFeedView: View {
     private var saveButton: some View {
         Button {
             if isSaved {
-                state.feedSourcesManager.removePack(id: pack.id)
+                state.feedSourcesManager.removeRelay(url: relay.url)
             } else {
-                state.feedSourcesManager.savePack(pack)
+                state.feedSourcesManager.saveRelay(relay)
             }
         } label: {
             Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
@@ -157,16 +161,15 @@ struct FollowPackFeedView: View {
     // MARK: - Subscription
 
     private func streamEvents() async {
-        guard !pack.pubkeys.isEmpty else { return }
-
         let subscription = state.ndk.subscribe(
             filter: NDKFilter(
-                authors: pack.pubkeys,
                 kinds: [1],
                 limit: 100
             ),
-            cachePolicy: .cacheWithNetwork,
-            subscriptionId: "pack-feed-\(pack.id)"
+            cachePolicy: .networkOnly,
+            relays: Set([relay.url]),
+            exclusiveRelays: true,
+            subscriptionId: "relay-feed-\(relay.url)"
         )
 
         var existingIds = Set<String>()
