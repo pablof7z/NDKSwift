@@ -656,6 +656,28 @@ public actor NDKNostrDBCache: NDKCache {
         return results
     }
 
+    // MARK: - Profile Search
+
+    /// Search profiles by name/displayName using nostrdb's profile search index
+    ///
+    /// This method uses nostrdb's native profile search capability which indexes
+    /// profile names and display names for fast prefix matching.
+    ///
+    /// - Parameters:
+    ///   - query: Search query string (matches name or displayName prefix)
+    ///   - limit: Maximum number of results (default: 20)
+    /// - Returns: Array of pubkeys matching the query
+    public func searchProfiles(_ query: String, limit: Int = 20) async -> [String] {
+        guard let nostrDB = nostrDB else { return [] }
+        guard !query.isEmpty else { return [] }
+
+        // Use nostrdb's native profile search
+        guard let txn = NdbTxn(ndb: nostrDB) else { return [] }
+
+        let pubkeys = nostrDB.search_profile(query, limit: limit, txn: txn)
+        return pubkeys.map { dataToHex($0.data) }
+    }
+
     // MARK: - Relay Source Tracking
 
     /// Process event with relay source tracking
