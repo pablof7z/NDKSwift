@@ -802,7 +802,8 @@ public final class NDK {
         }
 
         // RELAY COVERAGE TRACKING: Record this delivery for coverage statistics
-        await relayCoverageTracker.recordDelivery(eventId: event.id, relayUrl: relay.url)
+        let isFirst = await relayCoverageTracker.recordDelivery(eventId: event.id, relayUrl: relay.url)
+        NDKLogger.log(.debug, category: .relay, "📊 [COVERAGE] Recorded delivery for event \(event.id.prefix(8)) from \(relay.url) - first: \(isFirst)")
 
         // Process event through cache for observation
         do {
