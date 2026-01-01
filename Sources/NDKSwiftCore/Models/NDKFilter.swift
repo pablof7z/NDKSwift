@@ -529,3 +529,40 @@ extension NDKFilter: CustomStringConvertible {
         return "NDKFilter(\(parts.joined(separator: ", ")))"
     }
 }
+
+// MARK: - Factory Methods
+
+extension NDKFilter {
+    /// Creates a filter for events that tag/reference the given event.
+    /// Automatically uses #a for replaceable events and #e for regular events.
+    ///
+    /// Example:
+    /// ```swift
+    /// // Find all replies to an event
+    /// let filter = NDKFilter.tagging(event, kinds: [1, 1111], limit: 100)
+    /// ```
+    public static func tagging(
+        _ event: NDKEvent,
+        kinds: [Kind]? = nil,
+        authors: [PublicKey]? = nil,
+        since: Timestamp? = nil,
+        until: Timestamp? = nil,
+        limit: Int? = nil
+    ) -> NDKFilter {
+        var filter = NDKFilter(
+            authors: authors,
+            kinds: kinds,
+            since: since,
+            until: until,
+            limit: limit
+        )
+
+        if event.isReplaceable || event.isParameterizedReplaceable {
+            filter.addTagFilter("a", values: [event.tagAddress])
+        } else {
+            filter.addTagFilter("e", values: [event.id])
+        }
+
+        return filter
+    }
+}
