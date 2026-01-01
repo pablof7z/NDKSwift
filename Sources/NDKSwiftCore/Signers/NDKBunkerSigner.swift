@@ -568,12 +568,14 @@ public actor NDKBunkerSigner: NDKSigner {
     }
 
     public func serialize() async throws -> Data {
-        let payload: [String: Any] = try [
+        // Encode localSignerData as Base64 since JSON doesn't support raw Data
+        let localSignerData = try await localSigner.serialize()
+        let payload: [String: Any] = [
             "bunkerPubkey": bunkerPubkey ?? "",
             "userPubkey": userPubkey ?? "",
             "relayURLs": relayURLs,
             NostrConstants.JSONField.secret: secret ?? "",
-            "localSignerData": await localSigner.serialize(),
+            "localSignerDataBase64": localSignerData.base64EncodedString(),
             "connectionType": connectionType.rawValue
         ]
         return try NDKSignerSerialization.createContainer(type: Self.signerType, payload: payload)
@@ -591,7 +593,8 @@ public actor NDKBunkerSigner: NDKSigner {
               let userPubkey = payload["userPubkey"] as? String,
               let relayURLs = payload["relayURLs"] as? [String],
               let secret = payload[NostrConstants.JSONField.secret] as? String,
-              let localSignerData = payload["localSignerData"] as? Data,
+              let localSignerDataBase64 = payload["localSignerDataBase64"] as? String,
+              let localSignerData = Data(base64Encoded: localSignerDataBase64),
               let connectionTypeRaw = payload["connectionType"] as? String
         else {
             throw NDKSignerRegistryError.deserializationError(ErrorMessageConstants.missing(BunkerConstants.ErrorMessages.requiredDataMissing))

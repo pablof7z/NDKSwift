@@ -293,6 +293,11 @@ public class NDKAuthManager {
             // Deserialize the signer
             let signer = try await signerRegistry.createSigner(from: signerData, ndk: ndk)
 
+            // Reconnect bunker signers (NIP-46 requires active RPC connection)
+            if let bunkerSigner = signer as? NDKBunkerSigner {
+                try await bunkerSigner.connect()
+            }
+
             // Update state
             var updatedSession = session
             updatedSession.markAsActive()
