@@ -533,8 +533,9 @@ final class NDKEventTests: NDKTestCase {
 
     // MARK: - Tag Reference Tests
 
-    func testTagReferenceForParameterizedReplaceable() {
+    func testTagReferenceForParameterizedReplaceable() async {
         // Given
+        let ndk = createTestNDK()
         let pubkey = TestFixtures.Keys.alice.publicKey
         let event = EventTestFactory.createEvent(
             kind: 30000,
@@ -543,19 +544,20 @@ final class NDKEventTests: NDKTestCase {
         )
 
         // When
-        let tagRef = event.tagReference()
+        let tagRef = await event.tagReference(ndk: ndk)
 
         // Then
         XCTAssertEqual(tagRef.count, 5)
         XCTAssertEqual(tagRef[0], "a")
         XCTAssertEqual(tagRef[1], "30000:\(pubkey):identifier")
-        XCTAssertEqual(tagRef[2], "")
+        XCTAssertEqual(tagRef[2], "") // No relay hint since event wasn't received from a relay
         XCTAssertEqual(tagRef[3], "")
         XCTAssertEqual(tagRef[4], pubkey)
     }
 
-    func testTagReferenceForReplaceable() {
+    func testTagReferenceForReplaceable() async {
         // Given
+        let ndk = createTestNDK()
         let pubkey = TestFixtures.Keys.alice.publicKey
         let event = EventTestFactory.createEvent(
             kind: EventKind.metadata,
@@ -563,30 +565,53 @@ final class NDKEventTests: NDKTestCase {
         )
 
         // When
-        let tagRef = event.tagReference()
+        let tagRef = await event.tagReference(ndk: ndk)
 
         // Then
         XCTAssertEqual(tagRef.count, 5)
         XCTAssertEqual(tagRef[0], "a")
         XCTAssertEqual(tagRef[1], "0:\(pubkey):")
-        XCTAssertEqual(tagRef[2], "")
+        XCTAssertEqual(tagRef[2], "") // No relay hint since event wasn't received from a relay
         XCTAssertEqual(tagRef[3], "")
         XCTAssertEqual(tagRef[4], pubkey)
     }
 
-    func testTagReferenceForRegularEvent() {
+    func testTagReferenceForRegularEvent() async {
         // Given
+        let ndk = createTestNDK()
         let pubkey = TestFixtures.Keys.alice.publicKey
         let event = EventTestFactory.createEvent(kind: 1, pubkey: pubkey)
 
         // When
-        let tagRef = event.tagReference()
+        let tagRef = await event.tagReference(ndk: ndk)
 
         // Then
         XCTAssertEqual(tagRef.count, 5)
         XCTAssertEqual(tagRef[0], "e")
         XCTAssertEqual(tagRef[1], event.id)
-        XCTAssertEqual(tagRef[2], "")
+        XCTAssertEqual(tagRef[2], "") // No relay hint since event wasn't received from a relay
+        XCTAssertEqual(tagRef[3], "")
+        XCTAssertEqual(tagRef[4], pubkey)
+    }
+
+    func testTagReferenceIncludesRelayHint() async {
+        // Given
+        let ndk = createTestNDK()
+        let pubkey = TestFixtures.Keys.alice.publicKey
+        let event = EventTestFactory.createEvent(kind: 1, pubkey: pubkey)
+        let sourceRelay = "wss://relay.example.com"
+
+        // Simulate event being received from a relay
+        await ndk.eventTracker.setSourceRelay(eventId: event.id, relay: sourceRelay)
+
+        // When
+        let tagRef = await event.tagReference(ndk: ndk)
+
+        // Then
+        XCTAssertEqual(tagRef.count, 5)
+        XCTAssertEqual(tagRef[0], "e")
+        XCTAssertEqual(tagRef[1], event.id)
+        XCTAssertEqual(tagRef[2], sourceRelay) // Relay hint should be included
         XCTAssertEqual(tagRef[3], "")
         XCTAssertEqual(tagRef[4], pubkey)
     }

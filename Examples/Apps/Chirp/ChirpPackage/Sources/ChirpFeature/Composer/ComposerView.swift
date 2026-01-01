@@ -379,7 +379,7 @@ public struct ComposerView: View {
                 let builder: NDKEventBuilder
 
                 if let replyTo = replyTo {
-                    builder = NDKEventBuilder.reply(to: replyTo, ndk: ndk)
+                    builder = await NDKEventBuilder.reply(to: replyTo, ndk: ndk)
                         .content(contentText)
                 } else {
                     builder = NDKEventBuilder(ndk: ndk)
