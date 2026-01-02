@@ -181,7 +181,9 @@ public actor NDKBunkerSigner: NDKSigner {
         let parser = BunkerURLParser(urlString: urlString)
         let (bunkerPubkey, userPubkey, relays, secret) = parser.parse()
         self.bunkerPubkey = bunkerPubkey
-        self.userPubkey = userPubkey
+        // For bunker:// URLs, the host IS the user's pubkey per NIP-46 spec
+        // Use it as userPubkey if not explicitly provided in query params
+        self.userPubkey = userPubkey ?? bunkerPubkey
         relayURLs = relays
         self.secret = secret
     }
@@ -360,9 +362,15 @@ public actor NDKBunkerSigner: NDKSigner {
         }
 
         if response.result == "ack" {
-            // Now get the public key
-            let pubkey = try await getPublicKey()
-            userPubkey = pubkey
+            // Get the public key - use cached value from URL if available, otherwise fetch
+            let pubkey: String
+            if let existingPubkey = userPubkey {
+                pubkey = existingPubkey
+                NDKLogger.log(.debug, category: .auth, "\(logPrefix) Using pubkey from bunker URL: \(pubkey)")
+            } else {
+                pubkey = try await getPublicKey()
+                userPubkey = pubkey
+            }
             isConnected = true
 
             NDKLogger.log(.info, category: .auth, "\(logPrefix) Successfully connected as \(pubkey)")

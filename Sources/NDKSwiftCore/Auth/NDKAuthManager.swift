@@ -293,9 +293,17 @@ public class NDKAuthManager {
             // Deserialize the signer
             let signer = try await signerRegistry.createSigner(from: signerData, ndk: ndk)
 
-            // Reconnect bunker signers (NIP-46 requires active RPC connection)
+            // Reconnect bunker signers in background (don't block UI)
+            // NIP-46 requires active RPC connection but we can set up state first
             if let bunkerSigner = signer as? NDKBunkerSigner {
-                try await bunkerSigner.connect()
+                Task {
+                    do {
+                        try await bunkerSigner.connect()
+                        NDKLogger.log(.info, category: .auth, "Bunker signer reconnected successfully")
+                    } catch {
+                        NDKLogger.log(.error, category: .auth, "Failed to reconnect bunker signer: \(error)")
+                    }
+                }
             }
 
             // Update state
