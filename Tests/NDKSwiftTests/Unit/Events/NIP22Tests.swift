@@ -31,7 +31,7 @@ final class NIP22Tests: XCTestCase {
             .build()
 
         // Create a reply
-        let reply = NDKEventBuilder.reply(to: rootEvent, ndk: ndk)
+        let reply = await NDKEventBuilder.reply(to: rootEvent, ndk: ndk)
 
         // Should be kind 1
         XCTAssertEqual(reply.kind, EventKind.textNote)
@@ -60,7 +60,7 @@ final class NIP22Tests: XCTestCase {
             .build()
 
         // Create second reply
-        let reply2 = NDKEventBuilder.reply(to: reply1, ndk: ndk)
+        let reply2 = await NDKEventBuilder.reply(to: reply1, ndk: ndk)
 
         // Should be kind 1
         XCTAssertEqual(reply2.kind, EventKind.textNote)
@@ -96,7 +96,7 @@ final class NIP22Tests: XCTestCase {
             .build()
 
         // Create a comment
-        let comment = NDKEventBuilder.reply(to: article, ndk: ndk)
+        let comment = await NDKEventBuilder.reply(to: article, ndk: ndk)
 
         // Should be kind 1111
         XCTAssertEqual(comment.kind, EventKind.genericReply)
@@ -142,7 +142,7 @@ final class NIP22Tests: XCTestCase {
             .build()
 
         // Create a comment
-        let comment = NDKEventBuilder.reply(to: fileEvent, ndk: ndk)
+        let comment = await NDKEventBuilder.reply(to: fileEvent, ndk: ndk)
 
         // Should be kind 1111
         XCTAssertEqual(comment.kind, EventKind.genericReply)
@@ -172,7 +172,7 @@ final class NIP22Tests: XCTestCase {
             .build()
 
         // Create reply to comment
-        let comment2 = NDKEventBuilder.reply(to: comment1, ndk: ndk)
+        let comment2 = await NDKEventBuilder.reply(to: comment1, ndk: ndk)
 
         // Should be kind 1111
         XCTAssertEqual(comment2.kind, EventKind.genericReply)
@@ -217,7 +217,7 @@ final class NIP22Tests: XCTestCase {
             .build()
 
         // Create a comment
-        let comment = NDKEventBuilder.reply(to: metadata, ndk: ndk)
+        let comment = await NDKEventBuilder.reply(to: metadata, ndk: ndk)
 
         // Should be kind 1111
         XCTAssertEqual(comment.kind, EventKind.genericReply)
@@ -246,7 +246,7 @@ final class NIP22Tests: XCTestCase {
             .build()
 
         // Create reply by user 1
-        let comment2 = NDKEventBuilder.reply(to: comment1, ndk: ndk)
+        let comment2 = await NDKEventBuilder.reply(to: comment1, ndk: ndk)
 
         // Should have p tags for both users (but not duplicate self)
         let pTags = comment2.tags.filter { $0.first == "p" }

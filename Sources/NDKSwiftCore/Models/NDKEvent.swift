@@ -317,17 +317,21 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
     }
 
     /// Get the appropriate tag reference for this event
-    /// Returns a tag array suitable for referencing this event in other events
-    public func tagReference() -> Tag {
+    /// Returns a tag array suitable for referencing this event in other events.
+    /// Automatically includes relay hint from the event tracker when available.
+    /// - Parameters:
+    ///   - ndk: The NDK instance for looking up relay hints
+    ///   - marker: Optional NIP-10 marker (e.g., "root", "reply", "mention")
+    public func tagReference(ndk: NDK, marker: String? = nil) async -> Tag {
+        let relayHint = await ndk.eventTracker.getSourceRelay(eventId: id) ?? ""
+        let markerValue = marker ?? ""
+
         if isParameterizedReplaceable {
-            // Use 'a' tag for parameterized replaceable events
-            return ["a", tagAddress, "", "", pubkey]
+            return ["a", tagAddress, relayHint, markerValue, pubkey]
         } else if isReplaceable {
-            // Use 'a' tag for replaceable events
-            return ["a", tagAddress, "", "", pubkey]
+            return ["a", tagAddress, relayHint, markerValue, pubkey]
         } else {
-            // Use 'e' tag for regular events
-            return ["e", id, "", "", pubkey]
+            return ["e", id, relayHint, markerValue, pubkey]
         }
     }
 
