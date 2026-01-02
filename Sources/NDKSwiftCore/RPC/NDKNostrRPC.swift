@@ -61,6 +61,9 @@ public actor NDKNostrRPC {
     }
 
     func parseEvent(_ event: NDKEvent) async throws -> Any {
+        let pTags = event.tags.filter { $0.first == "p" }.map { $0.dropFirst().first ?? "?" }
+        NDKLogger.log(.debug, category: .auth, "Parsing event \(event.id.prefix(8))... created_at: \(event.createdAt), p-tags: \(pTags)")
+
         var decryptedContent: String
         do {
             decryptedContent = try await localSigner.decrypt(senderPubkey: event.pubkey, value: event.content, scheme: encryptionScheme)
@@ -70,6 +73,8 @@ public actor NDKNostrRPC {
             decryptedContent = try await localSigner.decrypt(senderPubkey: event.pubkey, value: event.content, scheme: otherScheme)
             encryptionScheme = otherScheme
         }
+
+        NDKLogger.log(.debug, category: .auth, "Event \(event.id.prefix(8))... decrypted: \(decryptedContent)")
 
         let json: [String: Any]
         do {
@@ -102,11 +107,20 @@ public actor NDKNostrRPC {
             )
 
             // Resume any waiting continuation
-            if let continuation = pendingRequests.removeValue(forKey: id) {
-                // Cancel associated timeout task
-                timeoutTasks[id]?.cancel()
-                timeoutTasks.removeValue(forKey: id)
-                continuation.resume(returning: response)
+            // Only resume immediately for SUCCESS responses
+            // For error responses, log but don't resume yet - a success might follow
+            if let continuation = pendingRequests[id] {
+                if error == nil || !result.isEmpty {
+                    // Success response - resume immediately
+                    pendingRequests.removeValue(forKey: id)
+                    timeoutTasks[id]?.cancel()
+                    timeoutTasks.removeValue(forKey: id)
+                    NDKLogger.log(.debug, category: .auth, "RPC success for \(id): \(result)")
+                    continuation.resume(returning: response)
+                } else {
+                    // Error response - log but keep waiting for potential success
+                    NDKLogger.log(.warning, category: .auth, "RPC received error for \(id): \(error ?? "unknown") - waiting for success response")
+                }
             }
 
             return response
@@ -129,12 +143,13 @@ public actor NDKNostrRPC {
         let encryptedContent = try await localSigner.encrypt(recipientPubkey: pubkey, value: requestString, scheme: encryptionScheme)
         NDKLogger.log(.debug, category: .auth, "Encrypted content using scheme: \(encryptionScheme)")
 
+        let localPubkey = try await localSigner.pubkey
         let event = try await NDKEventBuilder(ndk: ndk)
             .content(encryptedContent)
             .kind(EventKind.nostrConnect)
             .tags([[NostrConstants.TagName.pubkey, pubkey]])
             .build(signer: localSigner)
-        NDKLogger.log(.debug, category: .auth, "Created and signed event - id: \(event.id)")
+        NDKLogger.log(.debug, category: .auth, "Created event - id: \(event.id), from: \(localPubkey), to: \(pubkey)")
 
         // Prepare target relays
         let targetRelayUrls = relayURLs.setOrNil

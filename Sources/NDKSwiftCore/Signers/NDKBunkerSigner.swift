@@ -181,9 +181,7 @@ public actor NDKBunkerSigner: NDKSigner {
         let parser = BunkerURLParser(urlString: urlString)
         let (bunkerPubkey, userPubkey, relays, secret) = parser.parse()
         self.bunkerPubkey = bunkerPubkey
-        // For bunker:// URLs, the host IS the user's pubkey per NIP-46 spec
-        // Use it as userPubkey if not explicitly provided in query params
-        self.userPubkey = userPubkey ?? bunkerPubkey
+        self.userPubkey = userPubkey
         relayURLs = relays
         self.secret = secret
     }
@@ -300,10 +298,13 @@ public actor NDKBunkerSigner: NDKSigner {
 
         let localPubkey = try await localSigner.pubkey
 
-        let filter = NDKFilter(
+        // Use 'since' to filter out stale events from previous connection attempts
+        let now = Timestamp(Date().timeIntervalSince1970)
+        var filter = NDKFilter(
             kinds: [EventKind.nostrConnect], // NostrConnect kind
             tags: [NostrConstants.TagName.pubkey: [localPubkey]]
         )
+        filter.since = now
 
         // Create subscription with specific relays if available
         // Create data source for bunker communication
@@ -344,7 +345,7 @@ public actor NDKBunkerSigner: NDKSigner {
             throw NDKError.configurationError(BunkerConstants.ErrorMessages.pubkeyNotSet)
         }
 
-        // According to NIP-46, connect params are: [<remote-signer-pubkey>, <optional_secret>, <optional_requested_permissions>]
+        // NIP-46 connect params: [<remote-signer-pubkey>, <optional_secret>, <optional_permissions>]
         var params: [String] = [bunkerPubkey]
         if let secret = secret, !secret.isEmpty {
             params.append(secret)
@@ -362,15 +363,9 @@ public actor NDKBunkerSigner: NDKSigner {
         }
 
         if response.result == "ack" {
-            // Get the public key - use cached value from URL if available, otherwise fetch
-            let pubkey: String
-            if let existingPubkey = userPubkey {
-                pubkey = existingPubkey
-                NDKLogger.log(.debug, category: .auth, "\(logPrefix) Using pubkey from bunker URL: \(pubkey)")
-            } else {
-                pubkey = try await getPublicKey()
-                userPubkey = pubkey
-            }
+            // Get the user's public key from the remote signer
+            let pubkey = try await getPublicKey()
+            userPubkey = pubkey
             isConnected = true
 
             NDKLogger.log(.info, category: .auth, "\(logPrefix) Successfully connected as \(pubkey)")
