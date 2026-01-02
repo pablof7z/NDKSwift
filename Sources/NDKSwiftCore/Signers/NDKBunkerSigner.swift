@@ -603,10 +603,10 @@ public actor NDKBunkerSigner: NDKSigner {
             throw NDKSignerRegistryError.deserializationError(ErrorMessageConstants.missing(BunkerConstants.ErrorMessages.requiredDataMissing))
         }
 
-        // Deserialize local signer - localSignerData is a full SignerContainer, need to extract payload
-        let (_, localSignerPayload) = try NDKSignerSerialization.extractPayload(from: localSignerData)
-        let localSignerPayloadData = try JSONCoding.serialize(localSignerPayload)
-        let localSigner = try await NDKPrivateKeySigner.deserialize(localSignerPayloadData, ndk: ndk)
+        // Deserialize local signer through the registry (handles container extraction)
+        guard let localSigner = try await NDKSignerRegistry.shared.createSigner(from: localSignerData, ndk: ndk) as? NDKPrivateKeySigner else {
+            throw NDKSignerRegistryError.deserializationError("Failed to deserialize local signer as NDKPrivateKeySigner")
+        }
 
         // Create appropriate connection type
         let connectionType: ConnectionType
