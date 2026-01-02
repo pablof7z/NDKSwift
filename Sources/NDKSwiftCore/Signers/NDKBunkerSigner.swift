@@ -298,10 +298,13 @@ public actor NDKBunkerSigner: NDKSigner {
 
         let localPubkey = try await localSigner.pubkey
 
-        let filter = NDKFilter(
+        // Use 'since' to filter out stale events from previous connection attempts
+        let now = Timestamp(Date().timeIntervalSince1970)
+        var filter = NDKFilter(
             kinds: [EventKind.nostrConnect], // NostrConnect kind
             tags: [NostrConstants.TagName.pubkey: [localPubkey]]
         )
+        filter.since = now
 
         // Create subscription with specific relays if available
         // Create data source for bunker communication
@@ -342,7 +345,7 @@ public actor NDKBunkerSigner: NDKSigner {
             throw NDKError.configurationError(BunkerConstants.ErrorMessages.pubkeyNotSet)
         }
 
-        // According to NIP-46, connect params are: [<remote-signer-pubkey>, <optional_secret>, <optional_requested_permissions>]
+        // NIP-46 connect params: [<remote-signer-pubkey>, <optional_secret>, <optional_permissions>]
         var params: [String] = [bunkerPubkey]
         if let secret = secret, !secret.isEmpty {
             params.append(secret)
@@ -360,7 +363,7 @@ public actor NDKBunkerSigner: NDKSigner {
         }
 
         if response.result == "ack" {
-            // Now get the public key
+            // Get the user's public key from the remote signer
             let pubkey = try await getPublicKey()
             userPubkey = pubkey
             isConnected = true
@@ -568,12 +571,14 @@ public actor NDKBunkerSigner: NDKSigner {
     }
 
     public func serialize() async throws -> Data {
-        let payload: [String: Any] = try [
+        // Encode localSignerData as Base64 since JSON doesn't support raw Data
+        let localSignerData = try await localSigner.serialize()
+        let payload: [String: Any] = [
             "bunkerPubkey": bunkerPubkey ?? "",
             "userPubkey": userPubkey ?? "",
             "relayURLs": relayURLs,
             NostrConstants.JSONField.secret: secret ?? "",
-            "localSignerData": await localSigner.serialize(),
+            "localSignerDataBase64": localSignerData.base64EncodedString(),
             "connectionType": connectionType.rawValue
         ]
         return try NDKSignerSerialization.createContainer(type: Self.signerType, payload: payload)
@@ -591,14 +596,17 @@ public actor NDKBunkerSigner: NDKSigner {
               let userPubkey = payload["userPubkey"] as? String,
               let relayURLs = payload["relayURLs"] as? [String],
               let secret = payload[NostrConstants.JSONField.secret] as? String,
-              let localSignerData = payload["localSignerData"] as? Data,
+              let localSignerDataBase64 = payload["localSignerDataBase64"] as? String,
+              let localSignerData = Data(base64Encoded: localSignerDataBase64),
               let connectionTypeRaw = payload["connectionType"] as? String
         else {
             throw NDKSignerRegistryError.deserializationError(ErrorMessageConstants.missing(BunkerConstants.ErrorMessages.requiredDataMissing))
         }
 
-        // Deserialize local signer (it also expects just the payload data)
-        let localSigner = try await NDKPrivateKeySigner.deserialize(localSignerData, ndk: ndk)
+        // Deserialize local signer - localSignerData is a full SignerContainer, need to extract payload
+        let (_, localSignerPayload) = try NDKSignerSerialization.extractPayload(from: localSignerData)
+        let localSignerPayloadData = try JSONCoding.serialize(localSignerPayload)
+        let localSigner = try await NDKPrivateKeySigner.deserialize(localSignerPayloadData, ndk: ndk)
 
         // Create appropriate connection type
         let connectionType: ConnectionType

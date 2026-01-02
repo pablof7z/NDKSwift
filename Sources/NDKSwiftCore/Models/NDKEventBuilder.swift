@@ -104,7 +104,7 @@ public final class NDKEventBuilder: @unchecked Sendable {
     ///   - event: The event to reply to
     ///   - ndk: The NDK instance
     /// - Returns: An NDKEventBuilder configured for the reply
-    public static func reply(to event: NDKEvent, ndk: NDK) -> NDKEventBuilder {
+    public static func reply(to event: NDKEvent, ndk: NDK) async -> NDKEventBuilder {
         let builder = NDKEventBuilder(ndk: ndk)
 
         // For kind 1 events, use standard kind 1 replies
@@ -120,11 +120,11 @@ public final class NDKEventBuilder: @unchecked Sendable {
                     }
                 }
                 // Add reference to the event we're replying to
-                builder.tag([NostrConstants.TagName.event, event.id, "", NostrConstants.Marker.reply])
+                builder.tag(await event.tagReference(ndk: ndk, marker: NostrConstants.Marker.reply))
                 builder.tag([NostrConstants.TagName.pubkey, event.pubkey])
             } else {
                 // This is a root event, tag it as such
-                builder.tag([NostrConstants.TagName.event, event.id, "", NostrConstants.Marker.root])
+                builder.tag(await event.tagReference(ndk: ndk, marker: NostrConstants.Marker.root))
                 builder.tag([NostrConstants.TagName.pubkey, event.pubkey])
             }
         } else {
@@ -143,7 +143,7 @@ public final class NDKEventBuilder: @unchecked Sendable {
                 }
             } else {
                 // Parent is a root event - create new uppercase tags
-                let tagReference = event.tagReference()
+                let tagReference = await event.tagReference(ndk: ndk)
                 let uppercaseTag = [tagReference[0].uppercased()] + Array(tagReference.dropFirst())
                 builder.tag(uppercaseTag)
 
@@ -155,7 +155,7 @@ public final class NDKEventBuilder: @unchecked Sendable {
             }
 
             // Add lowercase tags for the direct parent
-            let parentReference = event.tagReference()
+            let parentReference = await event.tagReference(ndk: ndk)
             builder.tag(parentReference)
 
             // Add k tag for parent kind
