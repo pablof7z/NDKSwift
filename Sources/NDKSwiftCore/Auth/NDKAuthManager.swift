@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import LocalAuthentication
 import Observation
@@ -53,22 +54,22 @@ public class NDKAuthManager {
     // MARK: - Observable State
 
     /// Currently active session
-    public private(set) var activeSession: NDKSession? {
-        didSet {}
-    }
+    public private(set) var activeSession: NDKSession?
 
     /// All available sessions
-    public private(set) var availableSessions: [NDKSession] = [] {
-        didSet {}
-    }
+    public private(set) var availableSessions: [NDKSession] = []
 
     /// Current session state
-    public private(set) var sessionState: SessionState = .noSession {
-        didSet {}
-    }
+    public private(set) var sessionState: SessionState = .noSession
 
     /// Currently active signer (derived from active session)
     public private(set) var activeSigner: (any NDKSigner)?
+
+    /// Health status of the active signer
+    /// For bunker signers, this reflects the connection health.
+    /// For local signers (private key), this is always `.healthy`.
+    /// When no signer is active, this is `.unknown`.
+    public private(set) var activeSignerHealth: BunkerSignerHealth = .unknown
 
     /// Whether biometric authentication is available on this device
     public private(set) var biometricAuthAvailable = false
@@ -85,6 +86,9 @@ public class NDKAuthManager {
 
     /// Session restoration task to prevent multiple concurrent restorations
     private var restorationTask: Task<Void, Never>?
+
+    /// Subscription to the active signer's health publisher
+    private var healthSubscription: AnyCancellable?
 
     // MARK: - Session State
 
@@ -255,6 +259,7 @@ public class NDKAuthManager {
 
                 activeSession = updatedSession
                 activeSigner = nil
+                subscribeToSignerHealth(nil)
                 sessionState = .active
 
                 // Clear signer on NDK for read-only mode
@@ -324,6 +329,7 @@ public class NDKAuthManager {
 
             activeSession = updatedSession
             activeSigner = signer
+            subscribeToSignerHealth(signer)
             sessionState = .active
 
             // Set signer on NDK if available
@@ -447,6 +453,7 @@ public class NDKAuthManager {
         // Immediately activate this session to prevent flash of "Welcome Back"
         activeSession = session
         activeSigner = signer
+        subscribeToSignerHealth(signer)
         sessionState = .active
 
         // Set signer on NDK if available
@@ -507,6 +514,7 @@ public class NDKAuthManager {
         // Immediately activate this session
         activeSession = session
         activeSigner = nil // No signer for read-only
+        subscribeToSignerHealth(nil)
         sessionState = .active
 
         // Clear signer on NDK for read-only mode
@@ -531,6 +539,7 @@ public class NDKAuthManager {
 
             // Clear current active state
             activeSigner = nil
+            subscribeToSignerHealth(nil)
             ndk.signer = nil
         }
 
@@ -571,6 +580,7 @@ public class NDKAuthManager {
             // Already logged out
             activeSession = nil
             activeSigner = nil
+            subscribeToSignerHealth(nil)
             sessionState = .noSession
             ndk.signer = nil
             return
@@ -579,6 +589,7 @@ public class NDKAuthManager {
         // Clear state immediately for responsive UI
         activeSession = nil
         activeSigner = nil
+        subscribeToSignerHealth(nil)
         sessionState = .noSession
         ndk.signer = nil
 
@@ -606,6 +617,7 @@ public class NDKAuthManager {
             // Already logged out
             activeSession = nil
             activeSigner = nil
+            subscribeToSignerHealth(nil)
             sessionState = .noSession
             ndk.signer = nil
             return
@@ -614,6 +626,7 @@ public class NDKAuthManager {
         // Clear state immediately
         activeSession = nil
         activeSigner = nil
+        subscribeToSignerHealth(nil)
         sessionState = .noSession
         ndk.signer = nil
 
@@ -652,6 +665,7 @@ public class NDKAuthManager {
         availableSessions = []
         activeSession = nil
         activeSigner = nil
+        subscribeToSignerHealth(nil)
         sessionState = .noSession
         ndk.signer = nil
 
@@ -699,6 +713,31 @@ public class NDKAuthManager {
     private func saveSessionMetadata(_ session: NDKSession) async throws {
         let data = try JSONCoding.encode(session)
         try await keychainManager.storeSessionMetadata(identifier: session.id, data: data)
+    }
+
+    /// Subscribe to the health publisher of a signer
+    /// - Parameter signer: The signer to monitor (or nil to clear)
+    private func subscribeToSignerHealth(_ signer: (any NDKSigner)?) {
+        // Cancel any existing subscription
+        healthSubscription?.cancel()
+        healthSubscription = nil
+
+        guard let signer = signer else {
+            activeSignerHealth = .unknown
+            return
+        }
+
+        // For bunker signers, subscribe to their health publisher
+        if let bunkerSigner = signer as? NDKBunkerSigner {
+            healthSubscription = bunkerSigner.healthPublisher
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] health in
+                    self?.activeSignerHealth = health
+                }
+        } else {
+            // Local signers are always healthy
+            activeSignerHealth = .healthy
+        }
     }
 }
 

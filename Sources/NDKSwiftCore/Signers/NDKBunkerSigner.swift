@@ -4,6 +4,20 @@ import Foundation
 /// Log prefix constant for bunker signer related logging
 private let logPrefix = "[BunkerSigner]"
 
+/// Health status of a bunker signer connection
+public enum BunkerSignerHealth: Sendable, Equatable {
+    /// Never tried (just deserialized)
+    case unknown
+    /// Last RPC succeeded
+    case healthy
+    /// Timeout - bunker not responding
+    case unreachable
+    /// Access revoked or invalid
+    case unauthorized
+    /// Other error
+    case error(String)
+}
+
 /// Parser for NIP-46 bunker:// URLs
 /// Extracts connection parameters from bunker URLs for remote signing
 struct BunkerURLParser {
@@ -93,6 +107,42 @@ public actor NDKBunkerSigner: NDKSigner {
 
     /// Authentication URL emitted when user needs to authorize
     public let authUrlPublisher = PassthroughSubject<String, Never>()
+
+    /// Health status publisher for monitoring bunker connection health
+    /// Note: nonisolated(unsafe) is safe here because CurrentValueSubject is thread-safe
+    public nonisolated(unsafe) let healthPublisher = CurrentValueSubject<BunkerSignerHealth, Never>(.unknown)
+
+    /// Current health status of the bunker connection
+    public nonisolated var health: BunkerSignerHealth {
+        healthPublisher.value
+    }
+
+    // MARK: - Health Management
+
+    /// Updates health state based on an RPC operation result
+    private func updateHealthForSuccess() {
+        healthPublisher.send(.healthy)
+    }
+
+    /// Updates health state based on an error from an RPC operation
+    private func updateHealthForError(_ error: Error, responseError: String? = nil) {
+        // Check for timeout - indicates bunker is unreachable
+        if case NDKError.timeout(_, _) = error {
+            healthPublisher.send(.unreachable)
+            return
+        }
+
+        // Check for unauthorized in response error message
+        if let errorMessage = responseError?.lowercased(),
+           errorMessage.contains("unauthorized") || errorMessage.contains("not authorized") {
+            healthPublisher.send(.unauthorized)
+            return
+        }
+
+        // Other errors
+        let errorMessage = responseError ?? error.localizedDescription
+        healthPublisher.send(.error(errorMessage))
+    }
 
     /// Connection state
     private var isConnected = false
@@ -352,14 +402,22 @@ public actor NDKBunkerSigner: NDKSigner {
         }
 
         // Send connect request and wait for response
-        let response = try await rpcClient?.sendRequest(
-            to: bunkerPubkey,
-            method: "connect",
-            params: params
-        )
+        let response: NDKRPCResponse?
+        do {
+            response = try await rpcClient?.sendRequest(
+                to: bunkerPubkey,
+                method: "connect",
+                params: params
+            )
+        } catch {
+            updateHealthForError(error)
+            throw error
+        }
 
         guard let response = response else {
-            throw NDKError.connectionLost(relay: BunkerConstants.relayName, message: BunkerConstants.ErrorMessages.noResponseReceived)
+            let error = NDKError.connectionLost(relay: BunkerConstants.relayName, message: BunkerConstants.ErrorMessages.noResponseReceived)
+            updateHealthForError(error)
+            throw error
         }
 
         if response.result == "ack" {
@@ -367,11 +425,13 @@ public actor NDKBunkerSigner: NDKSigner {
             let pubkey = try await getPublicKey()
             userPubkey = pubkey
             isConnected = true
+            updateHealthForSuccess()
 
             NDKLogger.log(.info, category: .auth, "\(logPrefix) Successfully connected as \(pubkey)")
             return pubkey
         } else {
             let error = NDKError.networkError(for: BunkerConstants.relayName, operation: "connect", error: NSError(domain: BunkerConstants.errorDomain, code: -1, userInfo: [NSLocalizedDescriptionKey: response.error ?? ErrorMessageConstants.Messages.connectionFailed]))
+            updateHealthForError(error, responseError: response.error)
             throw error
         }
     }
@@ -415,10 +475,12 @@ public actor NDKBunkerSigner: NDKSigner {
                         let pubkey = try await getPublicKey()
                         self.userPubkey = pubkey
                         self.isConnected = true
+                        updateHealthForSuccess()
 
                         connectionContinuation?.resume(returning: pubkey)
                         connectionContinuation = nil
                     } catch {
+                        updateHealthForError(error)
                         connectionContinuation?.resume(throwing: error)
                         connectionContinuation = nil
                     }
@@ -457,21 +519,31 @@ public actor NDKBunkerSigner: NDKSigner {
 
     private func performSign(_ event: NDKEvent) async throws -> Signature {
         guard let bunkerPubkey = bunkerPubkey else {
-            throw NDKError.missingRequired(BunkerConstants.ErrorMessages.connectionRequired)
+            let error = NDKError.missingRequired(BunkerConstants.ErrorMessages.connectionRequired)
+            updateHealthForError(error)
+            throw error
         }
 
         let eventJson = try event.serialize()
 
-        let response = try await rpcClient?.sendRequest(
-            to: bunkerPubkey,
-            method: "sign_event",
-            params: [eventJson]
-        )
+        let response: NDKRPCResponse?
+        do {
+            response = try await rpcClient?.sendRequest(
+                to: bunkerPubkey,
+                method: "sign_event",
+                params: [eventJson]
+            )
+        } catch {
+            updateHealthForError(error)
+            throw error
+        }
 
         guard let response = response,
               response.error == nil
         else {
-            throw NDKError.failedTo("sign event", message: response?.error)
+            let error = NDKError.failedTo("sign event", message: response?.error)
+            updateHealthForError(error, responseError: response?.error)
+            throw error
         }
 
         let json: [String: Any]
@@ -479,14 +551,19 @@ public actor NDKBunkerSigner: NDKSigner {
             json = try JSONCoding.parseDictionary(from: response.result)
         } catch {
             NDKLogger.log(.error, category: .signer, "Failed to parse bunker sign response: \(error.localizedDescription)")
-            throw NDKError.failedTo("sign event", message: "Invalid response format")
+            let signError = NDKError.failedTo("sign event", message: "Invalid response format")
+            updateHealthForError(signError)
+            throw signError
         }
 
         guard let sig = json["sig"] as? String else {
             NDKLogger.log(.error, category: .signer, "Bunker response missing 'sig' field")
-            throw NDKError.failedTo("sign event", message: "Missing signature in response")
+            let signError = NDKError.failedTo("sign event", message: "Missing signature in response")
+            updateHealthForError(signError)
+            throw signError
         }
 
+        updateHealthForSuccess()
         return sig
     }
 
@@ -503,18 +580,27 @@ public actor NDKBunkerSigner: NDKSigner {
             throw NDKError.connectionLost(relay: BunkerConstants.relayName, message: ErrorMessageConstants.Messages.notConnected)
         }
 
-        let response = try await rpcClient?.sendRequest(
-            to: bunkerPubkey,
-            method: "get_public_key",
-            params: []
-        )
+        let response: NDKRPCResponse?
+        do {
+            response = try await rpcClient?.sendRequest(
+                to: bunkerPubkey,
+                method: "get_public_key",
+                params: []
+            )
+        } catch {
+            updateHealthForError(error)
+            throw error
+        }
 
         guard let response = response,
               response.error == nil
         else {
-            throw NDKError.cryptoOperation("get public key", nip: CryptoConstants.NIP.nip46, error: NSError(domain: BunkerConstants.errorDomain, code: -1, userInfo: [NSLocalizedDescriptionKey: response?.error ?? ErrorMessageConstants.failedTo("get public key")]))
+            let error = NDKError.cryptoOperation("get public key", nip: CryptoConstants.NIP.nip46, error: NSError(domain: BunkerConstants.errorDomain, code: -1, userInfo: [NSLocalizedDescriptionKey: response?.error ?? ErrorMessageConstants.failedTo("get public key")]))
+            updateHealthForError(error, responseError: response?.error)
+            throw error
         }
 
+        updateHealthForSuccess()
         return response.result
     }
 
@@ -523,18 +609,27 @@ public actor NDKBunkerSigner: NDKSigner {
             throw NDKError.connectionLost(relay: BunkerConstants.relayName, message: ErrorMessageConstants.Messages.notConnected)
         }
 
-        let response = try await rpcClient?.sendRequest(
-            to: bunkerPubkey,
-            method: method,
-            params: params
-        )
+        let response: NDKRPCResponse?
+        do {
+            response = try await rpcClient?.sendRequest(
+                to: bunkerPubkey,
+                method: method,
+                params: params
+            )
+        } catch {
+            updateHealthForError(error)
+            throw error
+        }
 
         guard let response = response,
               response.error == nil
         else {
-            throw NDKError.cryptoOperation(method, nip: CryptoConstants.NIP.nip46, error: NSError(domain: BunkerConstants.errorDomain, code: -1, userInfo: [NSLocalizedDescriptionKey: response?.error ?? errorMessage]))
+            let error = NDKError.cryptoOperation(method, nip: CryptoConstants.NIP.nip46, error: NSError(domain: BunkerConstants.errorDomain, code: -1, userInfo: [NSLocalizedDescriptionKey: response?.error ?? errorMessage]))
+            updateHealthForError(error, responseError: response?.error)
+            throw error
         }
 
+        updateHealthForSuccess()
         return response.result
     }
 
@@ -548,6 +643,19 @@ public actor NDKBunkerSigner: NDKSigner {
         return try await performCrypto(method: method, params: [senderPubkey, value], errorMessage: ErrorMessageConstants.Messages.decryptionFailed)
     }
 
+    // MARK: - State Restoration
+
+    /// Restores saved state after deserialization (for nostrConnect sessions)
+    internal func restoreState(bunkerPubkey: String?, userPubkey: String?) {
+        if let pubkey = bunkerPubkey, !pubkey.isEmpty {
+            self.bunkerPubkey = pubkey
+        }
+        if let pubkey = userPubkey, !pubkey.isEmpty {
+            self.userPubkey = pubkey
+            self.isConnected = true
+        }
+    }
+
     // MARK: - Cleanup
 
     public func disconnect() {
@@ -555,6 +663,7 @@ public actor NDKBunkerSigner: NDKSigner {
         subscriptionTask = nil
         rpcClient = nil
         isConnected = false
+        healthPublisher.send(.unknown)
     }
 
     deinit {
@@ -624,6 +733,13 @@ public actor NDKBunkerSigner: NDKSigner {
             throw NDKSignerRegistryError.deserializationError("Unknown connection type: \(connectionTypeRaw)")
         }
 
-        return try await NDKBunkerSigner(ndk: ndk, connectionType: connectionType, localSigner: localSigner)
+        let signer = try await NDKBunkerSigner(ndk: ndk, connectionType: connectionType, localSigner: localSigner)
+
+        // Restore state for nostrConnect sessions (bunkerPubkey and userPubkey are not set during init)
+        if connectionTypeRaw == "nostrConnect" {
+            await signer.restoreState(bunkerPubkey: bunkerPubkey, userPubkey: userPubkey)
+        }
+
+        return signer
     }
 }
