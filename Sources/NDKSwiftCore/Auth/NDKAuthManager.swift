@@ -550,6 +550,36 @@ public class NDKAuthManager {
         return session
     }
 
+    /// Update the signer for an existing session (e.g., after NIP-46 reconnection)
+    /// - Parameters:
+    ///   - session: The session to update
+    ///   - signer: The new signer to use for this session
+    public func updateSessionSigner(_ session: NDKSession, signer: any NDKSigner) async throws {
+        // Verify the pubkey matches
+        let signerPubkey = try await signer.pubkey
+        guard signerPubkey == session.pubkey else {
+            throw NDKAuthError.pubkeyMismatch
+        }
+
+        // Verify session exists
+        guard availableSessions.contains(where: { $0.id == session.id }) else {
+            throw NDKAuthError.sessionNotFound
+        }
+
+        // Serialize and save the new signer data
+        let signerData = try await signer.serialize()
+        try await keychainManager.storeSignerData(identifier: session.id, data: signerData)
+
+        // Update active state if this is the active session
+        if activeSession?.id == session.id {
+            activeSigner = signer
+            subscribeToSignerHealth(signer)
+            ndk.signer = signer
+        }
+
+        NDKLogger.log(.info, category: .auth, "Updated signer for session: \(session.pubkey)")
+    }
+
     /// Switch to a different session
     /// - Parameter session: The session to switch to
     public func switchToSession(_ session: NDKSession) async throws {
@@ -778,6 +808,7 @@ public enum NDKAuthError: LocalizedError {
     case invalidSession
     case sessionExpired
     case corruptedSessionData(sessionId: String)
+    case pubkeyMismatch
 
     public var errorDescription: String? {
         switch self {
@@ -797,6 +828,8 @@ public enum NDKAuthError: LocalizedError {
             return "Session has expired"
         case let .corruptedSessionData(sessionId):
             return "Session data is corrupted for session: \(sessionId)"
+        case .pubkeyMismatch:
+            return "Signer public key does not match session"
         }
     }
 }
@@ -810,7 +843,8 @@ extension NDKAuthError: Equatable {
              (.sessionNotFound, .sessionNotFound),
              (.biometricAuthenticationFailed, .biometricAuthenticationFailed),
              (.invalidSession, .invalidSession),
-             (.sessionExpired, .sessionExpired):
+             (.sessionExpired, .sessionExpired),
+             (.pubkeyMismatch, .pubkeyMismatch):
             return true
         case let (.signerCreationFailed(lhsError), .signerCreationFailed(rhsError)),
              let (.keychainError(lhsError), .keychainError(rhsError)):
