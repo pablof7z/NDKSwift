@@ -982,7 +982,16 @@ public final class NDKEventBuilder: @unchecked Sendable {
             sig: "" // Empty signature for signing
         )
 
-        return try await signer.sign(tempEvent)
+        do {
+            return try await signer.sign(tempEvent)
+        } catch {
+            // Emit failure to centralized publisher
+            ndk?.signingFailedPublisher.send(SigningFailure(
+                error: error,
+                signerType: String(describing: type(of: signer))
+            ))
+            throw error
+        }
     }
 
     // Media functionality moved to NDKEventBuilder+Media.swift
