@@ -125,6 +125,14 @@ public enum NDKAuthErrorHandler {
                 isRecoverable: false,
                 suggestedAction: .removeAccount
             )
+
+        case .pubkeyMismatch:
+            return ErrorInfo(
+                title: "Account Mismatch",
+                message: "The signer returned a different account. Please reconnect with the correct account.",
+                isRecoverable: true,
+                suggestedAction: .reauthenticate
+            )
         }
     }
 
