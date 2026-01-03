@@ -3,6 +3,20 @@ import Foundation
 import LocalAuthentication
 import Observation
 
+/// Represents a session validation failure (e.g., NIP-46 session expired)
+public struct SessionValidationFailure: Sendable {
+    /// The session that failed validation
+    public let session: NDKSession
+
+    /// The error that occurred during validation
+    public let error: Error
+
+    public init(session: NDKSession, error: Error) {
+        self.session = session
+        self.error = error
+    }
+}
+
 /// NDK Authentication Manager using modern @Observable pattern
 ///
 /// Provides comprehensive authentication and session management for NDK applications.
@@ -89,6 +103,10 @@ public class NDKAuthManager {
 
     /// Subscription to the active signer's health publisher
     private var healthSubscription: AnyCancellable?
+
+    /// Publisher for session validation failures (e.g., NIP-46 session expired)
+    /// Apps subscribe to this to show reconnect UI when a session needs re-authentication
+    public let sessionValidationFailedPublisher = PassthroughSubject<SessionValidationFailure, Never>()
 
     // MARK: - Session State
 
@@ -298,15 +316,22 @@ public class NDKAuthManager {
             // Deserialize the signer
             let signer = try await signerRegistry.createSigner(from: signerData, ndk: ndk)
 
-            // Reconnect bunker signers in background (don't block UI)
-            // NIP-46 requires active RPC connection but we can set up state first
+            // Reconnect and validate bunker signers in background (don't block UI)
+            // NIP-46 requires active RPC connection - validate session is still valid
             if let bunkerSigner = signer as? NDKBunkerSigner {
-                Task {
+                Task { [weak self, session] in
                     do {
                         try await bunkerSigner.connect()
-                        NDKLogger.log(.info, category: .auth, "Bunker signer reconnected successfully")
+                        // Validate session is still valid by requesting public key
+                        _ = try await bunkerSigner.getPublicKey()
+                        NDKLogger.log(.info, category: .auth, "Bunker signer reconnected and validated successfully")
                     } catch {
                         NDKLogger.log(.error, category: .auth, "Failed to reconnect bunker signer: \(error)")
+                        // Emit validation failure so UI can prompt user to reconnect
+                        self?.sessionValidationFailedPublisher.send(SessionValidationFailure(
+                            session: session,
+                            error: error
+                        ))
                     }
                 }
             }

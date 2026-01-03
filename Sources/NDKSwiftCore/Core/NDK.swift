@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import Observation
 
@@ -11,10 +12,29 @@ public protocol NDKAuthenticationDelegate: AnyObject, Sendable {
     func relay(_ relay: NDKRelay, requiresAuthenticationWithChallenge challenge: String) async -> Bool
 }
 
+/// Represents a signing operation failure
+public struct SigningFailure: Sendable {
+    /// The error that occurred during signing
+    public let error: Error
+
+    /// The type of signer that failed (e.g., "NDKBunkerSigner", "NDKPrivateKeySigner")
+    public let signerType: String
+
+    public init(error: Error, signerType: String) {
+        self.error = error
+        self.signerType = signerType
+    }
+}
+
 /// Main entry point for NDKSwift
 @Observable
 public final class NDK {
     // MARK: - Core Properties
+
+    /// Publisher for signing failures - apps subscribe once globally
+    /// Fires whenever any signing operation fails, allowing centralized error handling
+    @ObservationIgnored
+    public let signingFailedPublisher = PassthroughSubject<SigningFailure, Never>()
 
     /// Active signer for this NDK instance
     @ObservationIgnored
