@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 // MARK: - Span Buffer Actor
 
@@ -40,6 +41,7 @@ public final class NDKTracer: @unchecked Sendable {
     private let exporter: SpanExporter?
     private let spanBuffer: SpanBuffer
 
+    private let stateLock = OSAllocatedUnfairLock()
     private var exportTask: Task<Void, Never>?
     private var isShutdown = false
 
@@ -81,26 +83,30 @@ public final class NDKTracer: @unchecked Sendable {
 
     private func startSessionSpan() {
         let context = SpanContext.newRoot()
-        sessionContext = context
-        sessionSpan = NDKSpan(
+        let span = NDKSpan(
             name: "ndk.session",
             category: .lifecycle,
             context: context,
             tracer: self
         )
-        sessionSpan?.set("service.name", config.serviceName)
-        sessionSpan?.set("telemetry.sdk.name", "ndk-swift")
-        sessionSpan?.set("telemetry.sdk.language", "swift")
+        span.set("service.name", config.serviceName)
+        span.set("telemetry.sdk.name", "ndk-swift")
+        span.set("telemetry.sdk.language", "swift")
 
         // Add resource attributes
         for (key, value) in config.resourceAttributes {
-            sessionSpan?.set(key, value)
+            span.set(key, value)
+        }
+
+        stateLock.withLock {
+            sessionContext = context
+            sessionSpan = span
         }
     }
 
     /// Get the current session's trace ID
     public var sessionTraceId: TraceID? {
-        sessionContext?.traceId
+        stateLock.withLock { sessionContext?.traceId }
     }
 
     // MARK: - Span Creation
@@ -121,13 +127,18 @@ public final class NDKTracer: @unchecked Sendable {
             return NoOpSpan.instance
         }
 
+        let (shutdown, storedContext) = stateLock.withLock { (isShutdown, sessionContext) }
+        if shutdown {
+            return NoOpSpan.instance
+        }
+
         let context: SpanContext
         if let parent = parent {
             context = parent.newChild()
         } else if let taskLocalContext = Self.currentContext {
             // Use TaskLocal context if available
             context = taskLocalContext.newChild()
-        } else if let sessionContext = sessionContext {
+        } else if let sessionContext = storedContext {
             context = sessionContext.newChild()
         } else {
             context = SpanContext.newRoot()
@@ -194,11 +205,14 @@ public final class NDKTracer: @unchecked Sendable {
     // MARK: - Span Recording
 
     func recordSpan(_ span: RecordedSpan) {
-        guard !isShutdown else { return }
+        let shouldRecord = stateLock.withLock { !isShutdown }
+        guard shouldRecord else { return }
 
+        let buffer = spanBuffer
+        let spanExporter = exporter
         Task {
-            if let spansToExport = await spanBuffer.append(span) {
-                await exporter?.export(spansToExport)
+            if let spansToExport = await buffer.append(span) {
+                await spanExporter?.export(spansToExport)
             }
         }
     }
@@ -206,11 +220,13 @@ public final class NDKTracer: @unchecked Sendable {
     // MARK: - Export Loop
 
     private func startExportLoop() {
-        exportTask = Task { [weak self] in
+        let task = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: UInt64((self?.config.exportInterval ?? 5.0) * 1_000_000_000))
 
-                guard let self = self, !self.isShutdown else { break }
+                guard let self = self else { break }
+                let shutdown = self.stateLock.withLock { self.isShutdown }
+                guard !shutdown else { break }
 
                 let spansToExport = await self.spanBuffer.drain()
                 if !spansToExport.isEmpty {
@@ -218,21 +234,30 @@ public final class NDKTracer: @unchecked Sendable {
                 }
             }
         }
+        stateLock.withLock { exportTask = task }
     }
 
     // MARK: - Shutdown
 
     /// Flush remaining spans and shutdown the tracer
     public func shutdown() {
-        guard !isShutdown else { return }
-        isShutdown = true
+        let (sessionSpanToEnd, taskToCancel, shouldShutdown): (NDKSpan?, Task<Void, Never>?, Bool) = stateLock.withLock {
+            if isShutdown {
+                return (nil, nil, false)
+            }
+            isShutdown = true
+            let span = sessionSpan
+            let task = exportTask
+            sessionSpan = nil
+            sessionContext = nil
+            exportTask = nil
+            return (span, task, true)
+        }
+        guard shouldShutdown else { return }
 
         // End session span
-        sessionSpan?.end()
-        sessionSpan = nil
-
-        exportTask?.cancel()
-        exportTask = nil
+        sessionSpanToEnd?.end()
+        taskToCancel?.cancel()
 
         // Final flush - only if we have an exporter
         guard let exporter = exporter else { return }
