@@ -27,28 +27,9 @@ actor NDKRelaySelector {
     ) async -> RelaySelectionResult {
         let correlationId = event.id.prefix(8)
 
-        // Start telemetry span
-        let span = ndk.startSpan("relay.selection.publish", category: .relaySelection)
-        span.set(SpanAttributes.eventId, event.id)
-        span.set(SpanAttributes.eventKind, event.kind)
-        span.set(SpanAttributes.eventPubkey, event.pubkey)
-        defer { span.end() }
-
         // Collect author and p-tagged users separately per NIP-65
         let authorPubkey = event.pubkey
         let pTags = event.pTags
-        span.set(SpanAttributes.eventPTagCount, pTags.count)
-
-        // Track p-tag threshold decision
-        let useOutboxForPTags = pTags.count < ProtocolConstants.maxPTagsForOutboxModel
-        span.set("outbox.ptag_threshold_exceeded", !useOutboxForPTags)
-        if !useOutboxForPTags {
-            span.addEvent("ptag_threshold_exceeded", attributes: [
-                "ptag_count": .int(pTags.count),
-                "threshold": .int(ProtocolConstants.maxPTagsForOutboxModel),
-                SpanAttributes.decisionReason: .string("Too many p-tags, using author relays only")
-            ])
-        }
 
         // Start with author's write relays
         var relayToPubkeys = await chooseRelayCombinationForPublishingAuthors(
@@ -132,23 +113,13 @@ actor NDKRelaySelector {
 
         NDKLogger.log(.debug, category: .outbox, "📤 Selected \(selectedRelays.count) relays for publishing (author + \(pTags.count) p-tags)", correlationId: String(correlationId))
 
-        // Record final selection in span
-        span.set(SpanAttributes.relayCount, selectedRelays.count)
-        span.set(SpanAttributes.relayUrls, Array(selectedRelays))
-        span.set("missing_relay_pubkeys", missingRelayPubkeys.count)
-
         // Trigger discovery for missing relay info
         if !missingRelayPubkeys.isEmpty {
-            span.addEvent("relay_discovery_triggered", attributes: [
-                "missing_count": .int(missingRelayPubkeys.count)
-            ])
             NDKLogger.log(.info, category: .outbox, "🔍 Triggering relay discovery for \(missingRelayPubkeys.count) p-tagged users", correlationId: String(correlationId))
             await ndk.outbox.discoverRelaysInBackground(for: missingRelayPubkeys)
         }
 
         let method = determineSelectionMethod(selectedRelays)
-        span.set("selection_method", method.telemetryValue)
-        span.success()
 
         return RelaySelectionResult(
             relays: selectedRelays,
@@ -161,21 +132,6 @@ actor NDKRelaySelector {
     public func selectRelaysForFetching(
         filter: NDKFilter
     ) async -> RelaySelectionResult {
-        // Start telemetry span
-        let span = ndk.startSpan("relay.selection.fetch", category: .relaySelection)
-        defer { span.end() }
-
-        // Record filter info
-        if let authors = filter.authors {
-            span.set(SpanAttributes.filterAuthors, authors)
-        }
-        if let kinds = filter.kinds {
-            span.set(SpanAttributes.filterKinds, kinds.map { String($0) })
-        }
-        if let limit = filter.limit {
-            span.set(SpanAttributes.filterLimit, limit)
-        }
-
         // Collect all relevant pubkeys
         var allPubkeys: [String] = []
 
@@ -244,15 +200,7 @@ actor NDKRelaySelector {
 
         NDKLogger.log(.debug, category: .outbox, "🔍 Selected \(selectedRelays.count) relays for fetching from \(allPubkeys.count) authors")
 
-        // Record final selection
-        span.set(SpanAttributes.relayCount, selectedRelays.count)
-        span.set(SpanAttributes.relayUrls, Array(selectedRelays))
-        span.set("target_pubkeys_count", allPubkeys.count)
-        span.set("missing_relay_pubkeys", missingRelayPubkeys.count)
-
         let method = determineSelectionMethod(selectedRelays)
-        span.set("selection_method", method.telemetryValue)
-        span.success()
 
         return RelaySelectionResult(
             relays: selectedRelays,

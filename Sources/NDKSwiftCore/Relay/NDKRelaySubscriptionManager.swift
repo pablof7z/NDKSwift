@@ -26,22 +26,11 @@ actor NDKRelaySubscriptionManager {
     func addSubscription(_ subscription: NDKSubscriptionCoordinator, filters: [NDKFilter]) async {
         guard let relay = relay else { return }
 
-        // Start telemetry span
-        let ndk = await relay.ndk
-        let span = ndk?.startSpan("subscription.add", category: .subscriptionGrouping)
-        span?.set(SpanAttributes.relayUrl, relay.url)
-        span?.set(SpanAttributes.subscriptionGroupable, subscription.isGroupable)
-        span?.set(SpanAttributes.subscriptionCloseOnEose, subscription.closeOnEose)
-        defer { span?.end() }
-
         // Record subscription in metrics
         await NDKSubscriptionMetrics.recordSubscription(isGroupable: subscription.isGroupable)
 
         if !subscription.isGroupable {
             // Non-groupable subscriptions execute immediately
-            span?.set(SpanAttributes.decisionReason, "not_groupable")
-            span?.addEvent("immediate_execution", attributes: nil)
-
             let group = NDKRelaySubscription(
                 relay: relay,
                 fingerprint: UUID().uuidString,
@@ -50,36 +39,22 @@ actor NDKRelaySubscriptionManager {
             await group.addItem(subscription, filters: filters)
             subscriptionGroups[group.fingerprint] = group
             await group.execute()
-            span?.success()
         } else {
             // Calculate fingerprint for groupable subscriptions
             let fingerprint = NDKFilterGrouping.filterFingerprint(
                 filters,
                 closeOnEose: subscription.closeOnEose
             )
-            span?.set(SpanAttributes.subscriptionFingerprint, fingerprint)
 
             // Find existing group or create new one
             if let existingGroup = subscriptionGroups[fingerprint],
                await existingGroup.canAcceptNewItems() {
                 // Grouped with existing subscription!
-                let groupSize = await existingGroup.itemCount
-                span?.set(SpanAttributes.groupId, fingerprint)
-                span?.set(SpanAttributes.groupSize, groupSize + 1)
-                span?.set(SpanAttributes.groupMerged, true)
-                span?.addEvent("merged_with_existing_group", attributes: [
-                    "prior_group_size": .int(groupSize)
-                ])
-
                 await existingGroup.addItem(subscription, filters: filters)
                 // Record that this subscription was grouped
                 await NDKSubscriptionMetrics.recordGroupedSubscription()
-                span?.success()
             } else {
                 // Creating new group
-                span?.set(SpanAttributes.groupId, fingerprint)
-                span?.set(SpanAttributes.groupMerged, false)
-
                 let newGroup = NDKRelaySubscription(
                     relay: relay,
                     fingerprint: fingerprint,
@@ -89,20 +64,13 @@ actor NDKRelaySubscriptionManager {
                 subscriptionGroups[fingerprint] = newGroup
 
                 // Schedule execution with delay
-                // Note: These properties are nonisolated on NDKSubscriptionCoordinator
                 let delay = subscription.groupableDelay ?? 0.1
                 let delayType = subscription.groupableDelayType ?? .atMost
-                span?.set("grouping_delay_ms", delay * 1000)
-                span?.set("grouping_delay_type", delayType == .atMost ? "at_most" : "at_least")
-                span?.addEvent("scheduled_execution", attributes: [
-                    "delay_ms": .double(delay * 1000)
-                ])
 
                 await newGroup.scheduleExecution(
                     delay: delay,
                     delayType: delayType
                 )
-                span?.success()
             }
         }
     }

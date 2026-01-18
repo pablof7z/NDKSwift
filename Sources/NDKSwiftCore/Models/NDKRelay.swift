@@ -651,45 +651,26 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
             return
         }
 
-        // Start telemetry span for connection
-        let ndkRef = await stateActor.getNDK()
-        let span = ndkRef?.startSpan("relay.connection.establish", category: .relayConnection)
-        span?.set(SpanAttributes.relayUrl, url)
-        span?.set("prior_state", String(describing: currentState))
-
         await stateActor.updateConnectionState(.connecting)
 
         // Reset manual disconnection flag when explicitly connecting
         await stateActor.setManuallyDisconnected(false)
 
-        let stats = await stateActor.getStats()
-        span?.set(SpanAttributes.connectionAttempt, stats.connectionAttempts + 1)
-
         await stateActor.updateStats {
             $0.connectionAttempts += 1
         }
 
-        do {
-            let url = try URLUtils.validateURL(normalizedURL)
+        let url = try URLUtils.validateURL(normalizedURL)
 
-            let newConnection = NDKRelayConnection(url: url, config: config)
-            await stateActor.setConnection(newConnection)
-            await newConnection.setDelegate(self)
+        let newConnection = NDKRelayConnection(url: url, config: config)
+        await stateActor.setConnection(newConnection)
+        await newConnection.setDelegate(self)
 
-            if let conn = await stateActor.getConnection() {
-                try await conn.connect()
-                span?.success()
-            } else {
-                span?.setStatus(.error("Connection is nil"))
-                span?.end()
-                throw NDKError.failedTo("establish connection", message: "Connection is nil")
-            }
-        } catch {
-            span?.recordError(error)
-            span?.end()
-            throw error
+        if let conn = await stateActor.getConnection() {
+            try await conn.connect()
+        } else {
+            throw NDKError.failedTo("establish connection", message: "Connection is nil")
         }
-        span?.end()
     }
 
     /// Disconnect from the relay

@@ -36,6 +36,18 @@ public final class NDK {
     @ObservationIgnored
     public let signingFailedPublisher = PassthroughSubject<SigningFailure, Never>()
 
+    /// Last signing failure (observable for SwiftUI)
+    /// Set when any signing operation fails. Apps should use `.onChange(of:)` to react to this.
+    @MainActor
+    public internal(set) var lastSigningFailure: SigningFailure?
+
+    /// Clear the last signing failure
+    /// Call this after handling the failure
+    @MainActor
+    public func clearSigningFailure() {
+        lastSigningFailure = nil
+    }
+
     /// Active signer for this NDK instance
     @ObservationIgnored
     public var signer: NDKSigner?
@@ -121,16 +133,6 @@ public final class NDK {
     /// Connection reliability configuration
     @ObservationIgnored
     public let connectionConfig: NDKConnectionConfig
-
-    /// Telemetry configuration
-    @ObservationIgnored
-    public let telemetryConfig: NDKTelemetryConfig
-
-    /// Tracer for creating telemetry spans
-    @ObservationIgnored
-    public private(set) lazy var tracer: NDKTracer = {
-        NDKTracer(config: telemetryConfig)
-    }()
 
     /// Track pending auth events by event ID to relay (thread-safe via actor)
     @ObservationIgnored
@@ -232,11 +234,7 @@ public final class NDK {
     /// Signature verification sampler
     @ObservationIgnored
     private lazy var signatureVerificationSampler: NDKSignatureVerificationSampler = {
-        let sampler = NDKSignatureVerificationSampler(config: self.signatureVerificationConfig)
-        // Set tracer for telemetry - tracer is already initialized by this point
-        let tracerRef = self.tracer
-        Task { await sampler.setTracer(tracerRef) }
-        return sampler
+        NDKSignatureVerificationSampler(config: self.signatureVerificationConfig)
     }()
 
     /// Relay coverage tracker for intelligent relay selection
@@ -324,8 +322,7 @@ public final class NDK {
         outboxEnabled: Bool = true,
         discoveryConfig: NDKDiscoveryConfig = .default,
         clientTagConfig: NDKClientTagConfig? = nil,
-        connectionConfig: NDKConnectionConfig = .default,
-        telemetryConfig: NDKTelemetryConfig = .disabled
+        connectionConfig: NDKConnectionConfig = .default
     ) {
         self.signer = signer
         self.sessionData = sessionData
@@ -336,7 +333,6 @@ public final class NDK {
         self.discoveryConfig = discoveryConfig
         self.clientTagConfig = clientTagConfig
         self.connectionConfig = connectionConfig
-        self.telemetryConfig = telemetryConfig
 
         // All managers are now lazy-initialized on first access
         // This avoids initialization order issues with 'self'
