@@ -160,12 +160,10 @@ public enum NDKLogger {
 
     /// Log a message at the specified level - synchronous, no await needed
     public static func log(_ level: NDKLogLevel, category: NDKLogCategory, _ message: String) {
-        // Fast path: check level without lock
-        guard level.rawValue <= _level.rawValue else { return }
-
-        let (enabled, handler) = lock.withLock {
-            (_enabledCategories.contains(category), _handler)
+        let (currentLevel, enabled, handler) = lock.withLock {
+            (_level, _enabledCategories.contains(category), _handler)
         }
+        guard level.rawValue <= currentLevel.rawValue else { return }
         guard enabled else { return }
 
         // Primary: os.Logger

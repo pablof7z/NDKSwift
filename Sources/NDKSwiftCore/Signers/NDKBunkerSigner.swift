@@ -526,12 +526,19 @@ public actor NDKBunkerSigner: NDKSigner {
 
         let eventJson = try event.serialize()
 
+        // Use shorter timeout if we already know the signer is unhealthy - fail fast
+        let timeout: TimeInterval? = switch health {
+            case .unreachable, .unauthorized: NetworkConstants.timeoutBunkerSigningUnhealthy
+            default: nil // Use default timeout
+        }
+
         let response: NDKRPCResponse?
         do {
             response = try await rpcClient?.sendRequest(
                 to: bunkerPubkey,
                 method: "sign_event",
-                params: [eventJson]
+                params: [eventJson],
+                timeout: timeout
             )
         } catch {
             updateHealthForError(error)
@@ -580,12 +587,19 @@ public actor NDKBunkerSigner: NDKSigner {
             throw NDKError.connectionLost(relay: BunkerConstants.relayName, message: ErrorMessageConstants.Messages.notConnected)
         }
 
+        // Use shorter timeout if we already know the signer is unhealthy - fail fast
+        let timeout: TimeInterval? = switch health {
+            case .unreachable, .unauthorized: NetworkConstants.timeoutBunkerSigningUnhealthy
+            default: NetworkConstants.timeoutBunkerPing // Same as ping for key retrieval
+        }
+
         let response: NDKRPCResponse?
         do {
             response = try await rpcClient?.sendRequest(
                 to: bunkerPubkey,
                 method: "get_public_key",
-                params: []
+                params: [],
+                timeout: timeout
             )
         } catch {
             updateHealthForError(error)
@@ -609,12 +623,19 @@ public actor NDKBunkerSigner: NDKSigner {
             throw NDKError.connectionLost(relay: BunkerConstants.relayName, message: ErrorMessageConstants.Messages.notConnected)
         }
 
+        // Use shorter timeout if we already know the signer is unhealthy - fail fast
+        let timeout: TimeInterval? = switch health {
+            case .unreachable, .unauthorized: NetworkConstants.timeoutBunkerSigningUnhealthy
+            default: nil // Use default timeout
+        }
+
         let response: NDKRPCResponse?
         do {
             response = try await rpcClient?.sendRequest(
                 to: bunkerPubkey,
                 method: method,
-                params: params
+                params: params,
+                timeout: timeout
             )
         } catch {
             updateHealthForError(error)
@@ -641,6 +662,56 @@ public actor NDKBunkerSigner: NDKSigner {
     public func decrypt(senderPubkey: PublicKey, value: String, scheme: NDKEncryptionScheme) async throws -> String {
         let method = scheme == .nip04 ? "nip04_decrypt" : "nip44_decrypt"
         return try await performCrypto(method: method, params: [senderPubkey, value], errorMessage: ErrorMessageConstants.Messages.decryptionFailed)
+    }
+
+    // MARK: - Session Validation
+
+    /// Ping the remote signer to verify the session is still valid.
+    /// This sends an actual RPC request and waits for a response.
+    /// Throws if the signer is unreachable or the session has expired.
+    public func ping() async throws {
+        guard let bunkerPubkey = bunkerPubkey else {
+            throw NDKError.connectionLost(relay: BunkerConstants.relayName, message: ErrorMessageConstants.Messages.notConnected)
+        }
+
+        // Set up RPC client if needed (without full connect handshake)
+        if rpcClient == nil {
+            // Ensure relays are connected
+            for relayUrl in relayURLs {
+                let relay = await ndk.addRelay(relayUrl, origin: .outbox(authorPubkey: ""))
+                if await relay.connectionState != .connected {
+                    try? await relay.connect()
+                }
+            }
+
+            // Initialize RPC client
+            let client = NDKNostrRPC(ndk: ndk, localSigner: localSigner, relayURLs: relayURLs)
+            self.rpcClient = client
+
+            // Start listening for responses
+            try await startListening()
+        }
+
+        let response: NDKRPCResponse?
+        do {
+            response = try await rpcClient?.sendRequest(
+                to: bunkerPubkey,
+                method: "ping",
+                params: [],
+                timeout: NetworkConstants.timeoutBunkerPing
+            )
+        } catch {
+            updateHealthForError(error)
+            throw error
+        }
+
+        guard let response = response, response.error == nil else {
+            let error = NDKError.connectionLost(relay: BunkerConstants.relayName, message: response?.error ?? "Ping failed")
+            updateHealthForError(error, responseError: response?.error)
+            throw error
+        }
+
+        updateHealthForSuccess()
     }
 
     // MARK: - State Restoration

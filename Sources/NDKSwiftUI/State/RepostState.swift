@@ -158,31 +158,39 @@ public final class RepostState {
             closeOnEose: false
         )
 
-        // Track all repost events by ID to handle updates
-        var allReposts: [String: NDKEvent] = [:]
+        // Merge both subscriptions into a single stream using AsyncStream
+        let (stream, continuation) = AsyncStream<NDKEvent>.makeStream()
 
-        // Process both subscriptions concurrently
-        await withTaskGroup(of: Void.self) { group in
-            group.addTask { [weak self] in
-                for await batch in repostSubscription.events {
-                    guard let self else { return }
-                    for event in batch {
-                        allReposts[event.id] = event
+        // Forward events from both subscriptions to the merged stream
+        let forwardTask = Task {
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask {
+                    for await batch in repostSubscription.events {
+                        for event in batch {
+                            continuation.yield(event)
+                        }
                     }
-                    await self.updateState(from: Array(allReposts.values))
                 }
-            }
-
-            group.addTask { [weak self] in
-                for await batch in quoteSubscription.events {
-                    guard let self else { return }
-                    for event in batch {
-                        allReposts[event.id] = event
+                group.addTask {
+                    for await batch in quoteSubscription.events {
+                        for event in batch {
+                            continuation.yield(event)
+                        }
                     }
-                    await self.updateState(from: Array(allReposts.values))
                 }
+                await group.waitForAll()
+                continuation.finish()
             }
         }
+
+        // Single consumer - no concurrency, no races
+        var allReposts: [String: NDKEvent] = [:]
+        for await event in stream {
+            allReposts[event.id] = event
+            await updateState(from: Array(allReposts.values))
+        }
+
+        forwardTask.cancel()
     }
 
     private func updateState(from events: [NDKEvent]) async {

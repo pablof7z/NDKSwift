@@ -4,26 +4,52 @@ import Foundation
 public typealias NDKFilterFingerprint = String
 
 public extension NDKFilter {
-    /// Creates a fingerprint for a single filter (matching ndk-core logic)
-    /// Only includes property keys, except for since/until which include values
+    /// Creates a fingerprint for a single filter
+    ///
+    /// The fingerprint includes hashed values of filter fields to ensure that
+    /// filters with different values are correctly identified as distinct.
+    /// For example, `authors: ["alice"]` and `authors: ["bob"]` will have
+    /// different fingerprints.
+    ///
+    /// This is critical for subscription grouping - filters must only be grouped
+    /// when they have the exact same values, not just the same field presence.
     func toFingerprint() -> String {
-        var keys: [String] = []
+        var parts: [String] = []
 
-        // Add keys for each non-nil property
-        if ids != nil { keys.append(NostrConstants.JSONField.ids) }
-        if authors != nil { keys.append(NostrConstants.JSONField.authors) }
-        if kinds != nil { keys.append(NostrConstants.JSONField.kinds) }
+        // Include hashed values for each non-nil property to ensure
+        // filters with different values get different fingerprints
+        if let ids = ids {
+            let hash = ids.sorted().hashValue
+            parts.append("\(NostrConstants.JSONField.ids):\(hash)")
+        }
+        if let authors = authors {
+            let hash = authors.sorted().hashValue
+            parts.append("\(NostrConstants.JSONField.authors):\(hash)")
+        }
+        if let kinds = kinds {
+            let hash = kinds.sorted().hashValue
+            parts.append("\(NostrConstants.JSONField.kinds):\(hash)")
+        }
         if let since = since {
-            keys.append("\(NostrConstants.JSONField.since):\(since)") // Include value for time constraints
+            parts.append("\(NostrConstants.JSONField.since):\(since)")
         }
         if let until = until {
-            keys.append("\(NostrConstants.JSONField.until):\(until)") // Include value for time constraints
+            parts.append("\(NostrConstants.JSONField.until):\(until)")
         }
-        if tags != nil { keys.append(NostrConstants.JSONField.tags) }
-        if limit != nil { keys.append(NostrConstants.JSONField.limit) }
+        if let tags = tags {
+            // Create deterministic hash from sorted tag entries
+            let tagHash = tags.sorted { $0.key < $1.key }
+                .map { "\($0.key):\($0.value.sorted().hashValue)" }
+                .joined(separator: ",")
+                .hashValue
+            parts.append("\(NostrConstants.JSONField.tags):\(tagHash)")
+        }
+        if let limit = limit {
+            parts.append("\(NostrConstants.JSONField.limit):\(limit)")
+        }
 
         // Sort alphabetically and join with "-"
-        return keys.sorted().joined(separator: "-")
+        return parts.sorted().joined(separator: "-")
     }
 }
 

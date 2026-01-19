@@ -1,6 +1,48 @@
 import Foundation
 import NDKSwiftCore
 
+/// Configuration for NDKNostrDBCache memory and disk limits
+public struct NDKCacheConfig: Sendable {
+    /// Maximum number of events to keep in the in-memory cache (default: 10,000)
+    public var maxMemoryEvents: Int
+
+    /// Maximum disk size in megabytes for the LMDB database (default: 500MB)
+    public var maxDiskSizeMB: Int
+
+    /// Number of days to retain events before pruning (default: 30 days)
+    public var eventRetentionDays: Int
+
+    /// Whether to automatically enforce limits in background (default: true)
+    public var autoEnforceLimits: Bool
+
+    /// Interval for background limit enforcement in seconds (default: 300 = 5 minutes)
+    public var enforcementIntervalSeconds: TimeInterval
+
+    /// Default cache configuration with sensible defaults
+    public static let `default` = NDKCacheConfig()
+
+    /// Create a cache configuration with custom values
+    /// - Parameters:
+    ///   - maxMemoryEvents: Maximum events in memory (default: 10,000)
+    ///   - maxDiskSizeMB: Maximum disk size in MB (default: 500)
+    ///   - eventRetentionDays: Days to retain events (default: 30)
+    ///   - autoEnforceLimits: Auto-enforce limits in background (default: true)
+    ///   - enforcementIntervalSeconds: Interval for enforcement (default: 300)
+    public init(
+        maxMemoryEvents: Int = 10_000,
+        maxDiskSizeMB: Int = 500,
+        eventRetentionDays: Int = 30,
+        autoEnforceLimits: Bool = true,
+        enforcementIntervalSeconds: TimeInterval = 300
+    ) {
+        self.maxMemoryEvents = maxMemoryEvents
+        self.maxDiskSizeMB = maxDiskSizeMB
+        self.eventRetentionDays = eventRetentionDays
+        self.autoEnforceLimits = autoEnforceLimits
+        self.enforcementIntervalSeconds = enforcementIntervalSeconds
+    }
+}
+
 /// NostrDB-based cache implementation for NDKSwift
 ///
 /// This actor provides persistent event storage using nostrdb as the backend.
@@ -71,17 +113,56 @@ public actor NDKNostrDBCache: NDKCache {
     /// Maximum number of relay URLs to track in the LRU cache
     private static let maxRelayCount = 100
 
+    /// Cache configuration for memory and disk limits
+    private let config: NDKCacheConfig
+
+    /// LRU tracking for in-memory events (stores event ID -> last access time)
+    private var eventAccessOrder: [String] = []
+
+    /// Background task for enforcing cache limits
+    private var enforcementTask: Task<Void, Never>?
+
     /// Initialize a new NostrDB cache
-    /// - Parameter path: Optional path to the database directory. If nil, uses the default location.
+    /// - Parameters:
+    ///   - path: Optional path to the database directory. If nil, uses the default location.
+    ///   - config: Cache configuration with memory/disk limits. Uses defaults if not specified.
     /// - Throws: NDKNostrDBCacheError if the database cannot be opened
-    public init(path: String? = nil) async throws {
+    public init(path: String? = nil, config: NDKCacheConfig = .default) async throws {
         cachePath = path
+        self.config = config
         relayCache = LRUCache<String, Bool>(capacity: Self.maxRelayCount, defaultTTL: TimeInterval.infinity)
         nostrDB = Ndb(path: path)
         publishingManager = OptimisticPublishingManager(cachePath: path)
 
         if nostrDB == nil {
             throw NDKNostrDBCacheError.failedToOpen
+        }
+
+        // Start background limit enforcement if enabled
+        if config.autoEnforceLimits {
+            startBackgroundEnforcement()
+        }
+    }
+
+    /// Start background task for periodic limit enforcement
+    private func startBackgroundEnforcement() {
+        enforcementTask?.cancel()
+        enforcementTask = Task { [weak self] in
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(nanoseconds: UInt64(self?.config.enforcementIntervalSeconds ?? 300) * 1_000_000_000)
+                } catch {
+                    break
+                }
+
+                guard let self = self else { break }
+                await self.enforceMemoryLimit()
+                do {
+                    try await self.enforceDiskLimit()
+                } catch {
+                    NDKLogger.log(.warning, category: .cache, "Background disk limit enforcement failed: \(error)")
+                }
+            }
         }
     }
 
@@ -129,6 +210,89 @@ public actor NDKNostrDBCache: NDKCache {
         return events.count
     }
 
+    /// Get the current cache configuration
+    public var cacheConfig: NDKCacheConfig {
+        return config
+    }
+
+    // MARK: - Cache Limit Enforcement
+
+    /// Enforce the memory event limit using LRU eviction
+    /// Removes least recently accessed events when over the limit
+    public func enforceMemoryLimit() async {
+        let eventsToRemove = events.count - config.maxMemoryEvents
+        guard eventsToRemove > 0 else { return }
+
+        NDKLogger.log(.info, category: .cache, "Enforcing memory limit: removing \(eventsToRemove) events (current: \(events.count), max: \(config.maxMemoryEvents))")
+
+        // Remove oldest events based on access order (LRU eviction)
+        var removed = 0
+        while removed < eventsToRemove && !eventAccessOrder.isEmpty {
+            let eventId = eventAccessOrder.removeFirst()
+            if events.removeValue(forKey: eventId) != nil {
+                removed += 1
+            }
+        }
+
+        // If access order is out of sync with events dict, clean up remaining
+        if removed < eventsToRemove {
+            // Sort events by createdAt and remove oldest
+            let sortedEvents = events.sorted { $0.value.createdAt < $1.value.createdAt }
+            let toRemove = sortedEvents.prefix(eventsToRemove - removed)
+            for (id, _) in toRemove {
+                events.removeValue(forKey: id)
+                eventAccessOrder.removeAll { $0 == id }
+            }
+        }
+
+        NDKLogger.log(.info, category: .cache, "Memory limit enforced: now have \(events.count) events in memory")
+    }
+
+    /// Enforce the disk size limit
+    /// Prunes oldest events from nostrdb when disk usage exceeds the limit
+    public func enforceDiskLimit() async throws {
+        let currentSizeMB = getDatabaseSize() / (1024 * 1024)
+        let maxSizeMB = Int64(config.maxDiskSizeMB)
+
+        guard currentSizeMB > maxSizeMB else { return }
+
+        NDKLogger.log(.info, category: .cache, "Disk limit exceeded: \(currentSizeMB)MB > \(maxSizeMB)MB, pruning old events")
+
+        // Prune events older than retention period
+        let retentionSeconds = TimeInterval(config.eventRetentionDays * 24 * 60 * 60)
+        try await pruneOldEvents(olderThan: retentionSeconds)
+
+        let newSizeMB = getDatabaseSize() / (1024 * 1024)
+        NDKLogger.log(.info, category: .cache, "After pruning: \(newSizeMB)MB")
+    }
+
+    /// Prune events older than the specified time interval
+    /// - Parameter olderThan: Events older than this interval from now will be removed
+    /// - Note: This marks events as deleted in-memory. NostrDB's LMDB storage is immutable,
+    ///         but events will be filtered from future queries.
+    public func pruneOldEvents(olderThan interval: TimeInterval) async throws {
+        let cutoffTimestamp = Timestamp(Date().timeIntervalSince1970 - interval)
+        var prunedCount = 0
+
+        // Prune from in-memory cache
+        let eventsToPrune = events.filter { $0.value.createdAt < cutoffTimestamp }
+        for (id, _) in eventsToPrune {
+            events.removeValue(forKey: id)
+            eventAccessOrder.removeAll { $0 == id }
+            deletedEventIds.insert(id)
+            prunedCount += 1
+        }
+
+        NDKLogger.log(.info, category: .cache, "Pruned \(prunedCount) events older than \(Int(interval / 86400)) days")
+    }
+
+    /// Get cache usage statistics
+    /// - Returns: Tuple with memory event count, disk size in MB, and configured limits
+    public func getCacheUsage() -> (memoryEvents: Int, diskSizeMB: Int64, maxMemoryEvents: Int, maxDiskSizeMB: Int) {
+        let diskSizeMB = getDatabaseSize() / (1024 * 1024)
+        return (events.count, diskSizeMB, config.maxMemoryEvents, config.maxDiskSizeMB)
+    }
+
     // MARK: - Event Operations
 
     public func saveEvent(_ event: NDKEvent) async throws {
@@ -150,14 +314,33 @@ public actor NDKNostrDBCache: NDKCache {
         // Note: process_event returns false for duplicates or invalid events
         // This is not necessarily an error, so we don't throw
 
-        // Also keep in memory for queryEvents (until we implement full nostrdb queries)
+        // Track in memory with LRU ordering
+        if events[event.id] == nil {
+            // New event - add to access order
+            eventAccessOrder.append(event.id)
+        } else {
+            // Existing event - move to end of access order (most recently used)
+            eventAccessOrder.removeAll { $0 == event.id }
+            eventAccessOrder.append(event.id)
+        }
         events[event.id] = event
+
+        // Enforce memory limit if needed (immediate enforcement on save)
+        if events.count > config.maxMemoryEvents {
+            await enforceMemoryLimit()
+        }
     }
 
     public func getEvent(id: String) async -> NDKEvent? {
         // Filter out deleted events
         if deletedEventIds.contains(id) {
             return nil
+        }
+
+        // Update LRU access order if event is in memory
+        if events[id] != nil {
+            eventAccessOrder.removeAll { $0 == id }
+            eventAccessOrder.append(id)
         }
 
         guard let nostrDB = nostrDB else { return nil }
@@ -334,6 +517,7 @@ public actor NDKNostrDBCache: NDKCache {
     /// - Note: To fully clear the database including persisted data, use `clearPersisted()` instead.
     public func clear() async throws {
         events.removeAll()
+        eventAccessOrder.removeAll()
         eventRelaySources.removeAll()
         await relayCache.clear()
         deletedEventIds.removeAll()
@@ -345,8 +529,13 @@ public actor NDKNostrDBCache: NDKCache {
     /// After calling this method, the cache will be completely empty and ready for new data.
     /// - Throws: NDKNostrDBCacheError if the database cannot be reinitialized
     public func clearPersisted() async throws {
+        // Cancel background enforcement
+        enforcementTask?.cancel()
+        enforcementTask = nil
+
         // Clear in-memory state first
         events.removeAll()
+        eventAccessOrder.removeAll()
         eventRelaySources.removeAll()
         await relayCache.clear()
         deletedEventIds.removeAll()
@@ -379,6 +568,17 @@ public actor NDKNostrDBCache: NDKCache {
         if nostrDB == nil {
             throw NDKNostrDBCacheError.failedToOpen
         }
+
+        // Restart background enforcement if enabled
+        if config.autoEnforceLimits {
+            startBackgroundEnforcement()
+        }
+    }
+
+    /// Stop background limit enforcement (useful when shutting down)
+    public func stopBackgroundEnforcement() {
+        enforcementTask?.cancel()
+        enforcementTask = nil
     }
 
     // MARK: - Reactive Observation

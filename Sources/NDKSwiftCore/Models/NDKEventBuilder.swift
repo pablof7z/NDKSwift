@@ -985,11 +985,12 @@ public final class NDKEventBuilder: @unchecked Sendable {
         do {
             return try await signer.sign(tempEvent)
         } catch {
-            // Emit failure to centralized publisher
-            ndk?.signingFailedPublisher.send(SigningFailure(
-                error: error,
-                signerType: String(describing: type(of: signer))
-            ))
+            // Emit failure to centralized publisher and set observable property for SwiftUI
+            let failure = SigningFailure(error: error, signerType: String(describing: type(of: signer)))
+            ndk?.signingFailedPublisher.send(failure)
+            await MainActor.run { [weak ndk] in
+                ndk?.lastSigningFailure = failure
+            }
             throw error
         }
     }
