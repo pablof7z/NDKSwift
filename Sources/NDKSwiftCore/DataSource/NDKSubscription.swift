@@ -30,11 +30,27 @@ public enum RelayUpdate: Sendable {
 /// Thread Safety: This class uses internal actor isolation via `SubscriptionStateManager`
 /// to protect mutable state. All mutable properties (filter, task, requirementHandle) are
 /// accessed through the actor, ensuring thread-safe operations.
+///
+/// Consumer Tracking: When `closeOnEose` is false, the subscription tracks how many
+/// consumers are actively iterating the `events` stream. When all consumers stop
+/// iterating (e.g., when views are deallocated), the subscription automatically closes
+/// to prevent memory leaks and unnecessary network traffic.
 public final class NDKSubscription<T: Sendable>: Sendable {
     /// AsyncStream for consuming event batches as they arrive
     /// Batches are yielded directly from cache (bulk) or network (single-element)
-    public let events: AsyncStream<[T]>
+    ///
+    /// When you iterate this stream with `for await`, the subscription tracks
+    /// that you're consuming. When iteration stops (loop exits, task cancelled,
+    /// or view deallocated), the consumer count decreases. If all consumers
+    /// stop and `closeOnEose` is false, the subscription auto-closes.
+    public var events: AsyncStream<[T]> {
+        createTrackedEventStream()
+    }
     private let eventsContinuation: AsyncStream<[T]>.Continuation
+    private let internalEvents: AsyncStream<[T]>
+
+    /// Thread-safe consumer count tracker for auto-close functionality
+    private let consumerTracker: ConsumerTracker
 
     /// Relay-level updates (events, EOSE, closed) - opt-in via includeRelayUpdates parameter
     public let relayUpdates: AsyncStream<RelayUpdate>?
@@ -134,6 +150,72 @@ public final class NDKSubscription<T: Sendable>: Sendable {
         }
     }
 
+    /// Thread-safe consumer count tracker for auto-close when all consumers are gone
+    private final class ConsumerTracker: @unchecked Sendable {
+        private let lock = NSLock()
+        private var _count = 0
+        private let onAllConsumersGone: @Sendable () -> Void
+
+        init(onAllConsumersGone: @escaping @Sendable () -> Void) {
+            self.onAllConsumersGone = onAllConsumersGone
+        }
+
+        var count: Int {
+            lock.withLock { _count }
+        }
+
+        func increment() {
+            lock.withLock { _count += 1 }
+            NDKLogger.log(.trace, category: .subscription, "Consumer added, count: \(_count)")
+        }
+
+        func decrement() {
+            let shouldClose: Bool = lock.withLock {
+                _count = max(0, _count - 1)
+                return _count == 0
+            }
+            NDKLogger.log(.trace, category: .subscription, "Consumer removed, count: \(count)")
+            if shouldClose {
+                NDKLogger.log(.info, category: .subscription, "All consumers gone, triggering auto-close")
+                onAllConsumersGone()
+            }
+        }
+    }
+
+    /// Creates a tracked event stream that monitors consumer lifecycle
+    private func createTrackedEventStream() -> AsyncStream<[T]> {
+        // If closeOnEose is true, we don't need consumer tracking
+        // since the subscription will close automatically after EOSE
+        guard !closeOnEose else {
+            return internalEvents
+        }
+
+        let tracker = consumerTracker
+        let source = internalEvents
+
+        return AsyncStream { continuation in
+            tracker.increment()
+
+            continuation.onTermination = { @Sendable _ in
+                tracker.decrement()
+            }
+
+            // Forward events from the internal stream
+            let task = Task {
+                for await batch in source {
+                    guard !Task.isCancelled else { break }
+                    continuation.yield(batch)
+                }
+                continuation.finish()
+            }
+
+            continuation.onTermination = { @Sendable _ in
+                task.cancel()
+                tracker.decrement()
+            }
+        }
+    }
+
     /// Initialize a data source for NDKEvent objects
     public convenience init(
         ndk: NDK,
@@ -200,9 +282,24 @@ public final class NDKSubscription<T: Sendable>: Sendable {
 
         NDKLogger.log(.trace, category: .subscription, "NDKSubscription init - filter: \(filter), maxAge: \(maxAge), cachePolicy: \(cachePolicy), includeRelayUpdates: \(includeRelayUpdates)", correlationId: correlationId)
 
-        // Set up the AsyncStream for event batches
+        // Set up consumer tracker for auto-close functionality
+        // We need to capture these values before initializing consumerTracker
+        let manager = stateManager
+        let cancelHandle = cancellation
+        let corrId = correlationId
+        consumerTracker = ConsumerTracker { [weak manager] in
+            guard let manager = manager else { return }
+            guard !cancelHandle.isCancelled else { return }
+            NDKLogger.log(.info, category: .subscription, "Auto-closing subscription due to no consumers", correlationId: corrId)
+            Task {
+                await manager.cancelTask()
+                await manager.cancelRequirement()
+            }
+        }
+
+        // Set up the internal AsyncStream for event batches
         var continuation: AsyncStream<[T]>.Continuation!
-        events = AsyncStream { cont in
+        internalEvents = AsyncStream { cont in
             continuation = cont
         }
         eventsContinuation = continuation
@@ -219,8 +316,7 @@ public final class NDKSubscription<T: Sendable>: Sendable {
             relayUpdatesContinuation = nil
         }
 
-        // Start observing immediately
-        let manager = stateManager
+        // Start observing immediately (reuse manager captured above)
         let observeTask = Task { [weak self] in
             guard let self = self else { return }
             await self.startObserving()
@@ -258,9 +354,23 @@ public final class NDKSubscription<T: Sendable>: Sendable {
 
         NDKLogger.log(.trace, category: .subscription, "NDKSubscription init with options - filter: \(filter), maxAge: \(maxAge), cachePolicy: \(cachePolicy), includeRelayUpdates: \(includeRelayUpdates)", correlationId: correlationId)
 
-        // Set up the AsyncStream for event batches
+        // Set up consumer tracker for auto-close functionality
+        let manager = stateManager
+        let cancelHandle = cancellation
+        let corrId = correlationId
+        consumerTracker = ConsumerTracker { [weak manager] in
+            guard let manager = manager else { return }
+            guard !cancelHandle.isCancelled else { return }
+            NDKLogger.log(.info, category: .subscription, "Auto-closing subscription due to no consumers", correlationId: corrId)
+            Task {
+                await manager.cancelTask()
+                await manager.cancelRequirement()
+            }
+        }
+
+        // Set up the internal AsyncStream for event batches
         var continuation: AsyncStream<[T]>.Continuation!
-        events = AsyncStream { cont in
+        internalEvents = AsyncStream { cont in
             continuation = cont
         }
         eventsContinuation = continuation
@@ -277,8 +387,7 @@ public final class NDKSubscription<T: Sendable>: Sendable {
             relayUpdatesContinuation = nil
         }
 
-        // Start observing immediately
-        let manager = stateManager
+        // Start observing immediately (reuse manager captured above)
         let observeTask = Task { [weak self] in
             guard let self = self else { return }
             await self.startObserving()
@@ -389,6 +498,24 @@ public final class NDKSubscription<T: Sendable>: Sendable {
 
         NDKLogger.log(.trace, category: .subscription, "Restarting observation", correlationId: correlationId)
         await startObserving()
+    }
+
+    /// Manually close the subscription
+    /// This stops the subscription and releases all resources.
+    /// After calling this method, no more events will be received.
+    public func close() async {
+        NDKLogger.log(.info, category: .subscription, "Manually closing subscription", correlationId: correlationId)
+        cancellation.cancel()
+        eventsContinuation.finish()
+        relayUpdatesContinuation?.finish()
+        await stateManager.cancelTask()
+        await stateManager.cancelRequirement()
+    }
+
+    /// Current number of active consumers iterating the events stream
+    /// Useful for debugging memory issues related to subscription lifecycle
+    public var activeConsumerCount: Int {
+        consumerTracker.count
     }
 
     /// Update the filter for this subscription

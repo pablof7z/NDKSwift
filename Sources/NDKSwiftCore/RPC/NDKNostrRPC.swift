@@ -189,8 +189,9 @@ public actor NDKNostrRPC {
         }
     }
 
-    func sendRequest(to pubkey: String, method: String, params: [String]) async throws -> NDKRPCResponse {
+    func sendRequest(to pubkey: String, method: String, params: [String], timeout: TimeInterval? = nil) async throws -> NDKRPCResponse {
         let id = IDGenerator.randomId(length: 8)
+        let timeoutSeconds = UInt64(timeout ?? NetworkConstants.timeoutRPCRequest)
 
         return try await withCheckedThrowingContinuation { continuation in
             self.pendingRequests[id] = continuation
@@ -205,7 +206,7 @@ public actor NDKNostrRPC {
                     try await self.sendRequestInternal(to: pubkey, method: method, params: params, id: id)
 
                     // Set up timeout
-                    await self.setupTimeout(for: id, continuation: continuation)
+                    await self.setupTimeout(for: id, continuation: continuation, timeoutSeconds: timeoutSeconds)
                 } catch {
                     await self.cleanupRequest(id: id)
                     continuation.resume(throwing: error)

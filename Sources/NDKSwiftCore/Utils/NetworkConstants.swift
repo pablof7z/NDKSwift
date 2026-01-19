@@ -36,6 +36,10 @@ public enum NetworkConstants {
 
     // Ping/Health Check
     public static let timeoutPing: TimeInterval = 3.0
+    /// Bunker signer ping timeout - needs more time as it goes over relays
+    public static let timeoutBunkerPing: TimeInterval = 8.0
+    /// Bunker signing timeout when signer is known to be unhealthy - fail fast
+    public static let timeoutBunkerSigningUnhealthy: TimeInterval = 2.0
 
     // Cache Parameters
     /// TTL for tombstones (deletion markers) - prevents re-adding deleted items too soon

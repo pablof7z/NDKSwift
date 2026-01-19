@@ -85,6 +85,11 @@ public class NDKAuthManager {
     /// When no signer is active, this is `.unknown`.
     public private(set) var activeSignerHealth: BunkerSignerHealth = .unknown
 
+    /// Last session validation failure (observable for SwiftUI)
+    /// Set when a NIP-46 session fails to validate on restore.
+    /// Apps should use `.onChange(of:)` to react to this.
+    public private(set) var lastValidationFailure: SessionValidationFailure?
+
     /// Whether biometric authentication is available on this device
     public private(set) var biometricAuthAvailable = false
 
@@ -316,22 +321,21 @@ public class NDKAuthManager {
             // Deserialize the signer
             let signer = try await signerRegistry.createSigner(from: signerData, ndk: ndk)
 
-            // Reconnect and validate bunker signers in background (don't block UI)
-            // NIP-46 requires active RPC connection - validate session is still valid
+            // Validate bunker signers in background (don't block UI)
+            // NIP-46 requires active RPC connection - ping to verify session is still valid
             if let bunkerSigner = signer as? NDKBunkerSigner {
                 Task { [weak self, session] in
                     do {
-                        try await bunkerSigner.connect()
-                        // Validate session is still valid by requesting public key
-                        _ = try await bunkerSigner.getPublicKey()
-                        NDKLogger.log(.info, category: .auth, "Bunker signer reconnected and validated successfully")
+                        // ping() actually sends an RPC request to verify connection
+                        // (unlike connect() which returns cached state)
+                        try await bunkerSigner.ping()
+                        NDKLogger.log(.info, category: .auth, "Bunker signer validated successfully via ping")
                     } catch {
-                        NDKLogger.log(.error, category: .auth, "Failed to reconnect bunker signer: \(error)")
-                        // Emit validation failure so UI can prompt user to reconnect
-                        self?.sessionValidationFailedPublisher.send(SessionValidationFailure(
-                            session: session,
-                            error: error
-                        ))
+                        NDKLogger.log(.error, category: .auth, "Failed to validate bunker signer: \(error)")
+                        // Set observable property for SwiftUI and emit to publisher for Combine
+                        let failure = SessionValidationFailure(session: session, error: error)
+                        self?.lastValidationFailure = failure
+                        self?.sessionValidationFailedPublisher.send(failure)
                     }
                 }
             }
@@ -548,6 +552,12 @@ public class NDKAuthManager {
         NDKLogger.log(.info, category: .auth, "Created read-only session for pubkey: \(pubkey)")
 
         return session
+    }
+
+    /// Clear the last validation failure
+    /// Call this after successfully reconnecting a session
+    public func clearValidationFailure() {
+        lastValidationFailure = nil
     }
 
     /// Update the signer for an existing session (e.g., after NIP-46 reconnection)
