@@ -28,7 +28,7 @@ public struct NDKUIMarkdownView<
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: blockConfig.blockSpacing) {
+        LazyVStack(alignment: .leading, spacing: blockConfig.blockSpacing) {
             ForEach(Array(parsedBlocks.enumerated()), id: \.offset) { _, block in
                 renderBlock(block)
             }
