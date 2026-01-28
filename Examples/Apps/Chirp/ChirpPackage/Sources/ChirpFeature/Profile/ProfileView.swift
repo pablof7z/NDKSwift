@@ -36,8 +36,7 @@ public struct ProfileView: View {
                 )
             }
         }
-        .navigationTitle("Profile")
-        .navigationBarTitleDisplayMode(.large)
+        .toolbar(.hidden, for: .navigationBar)
     }
 
     @ViewBuilder
@@ -54,6 +53,7 @@ public struct ProfileView: View {
                 tabContent(pubkey: pubkey)
                     .padding(.top, 8)
             }
+            .clipped()
         }
         .ignoresSafeArea(edges: .top)
     }

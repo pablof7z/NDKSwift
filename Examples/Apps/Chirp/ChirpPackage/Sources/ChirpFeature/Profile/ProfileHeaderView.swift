@@ -44,10 +44,13 @@ public struct ProfileHeaderView: View {
                 AsyncImage(url: bannerURL) { phase in
                     switch phase {
                     case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
+                        Color.clear
                             .frame(height: 180)
+                            .overlay {
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                            }
                             .clipped()
                     case .failure, .empty:
                         defaultBanner
