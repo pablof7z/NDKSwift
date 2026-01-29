@@ -17,6 +17,7 @@ struct NdbStrIter: IteratorProtocol {
     let tag: NdbTagElem // stored for lifetime reasons
 
     mutating func next() -> CChar? {
+        guard str.str != nil else { return nil }
         let c = str.str[ind]
         if c != 0 {
             ind += 1
@@ -42,7 +43,7 @@ struct NdbTagElem: Sequence, Hashable, Equatable {
     func hash(into hasher: inout Hasher) {
         if str.flag == NDB_PACKED_ID {
             hasher.combine(bytes: UnsafeRawBufferPointer(start: str.id, count: 32))
-        } else {
+        } else if str.str != nil {
             hasher.combine(bytes: UnsafeRawBufferPointer(start: str.str, count: strlen(str.str)))
         }
     }
@@ -53,6 +54,8 @@ struct NdbTagElem: Sequence, Hashable, Equatable {
         } else if lhs.str.flag == NDB_PACKED_ID || rhs.str.flag == NDB_PACKED_ID {
             return false
         }
+
+        guard lhs.str.str != nil, rhs.str.str != nil else { return false }
 
         let l = strlen(lhs.str.str)
         let r = strlen(rhs.str.str)
@@ -76,24 +79,29 @@ struct NdbTagElem: Sequence, Hashable, Equatable {
         if str.flag == NDB_PACKED_ID {
             return false
         }
+        guard str.str != nil else { return true }
         return str.str[0] == 0
     }
 
     var count: Int {
         if str.flag == NDB_PACKED_ID {
             return 32
-        } else {
+        } else if str.str != nil {
             return strlen(str.str)
+        } else {
+            return 0
         }
     }
 
     var single_char: AsciiCharacter? {
+        guard str.str != nil else { return nil }
         let c = str.str[0]
         guard c != 0 && str.str[1] == 0 else { return nil }
         return AsciiCharacter(c)
     }
 
     func matches_char(_ c: AsciiCharacter) -> Bool {
+        guard str.str != nil else { return false }
         return str.str[0] == c.cchar && str.str[1] == 0
     }
 
@@ -110,6 +118,8 @@ struct NdbTagElem: Sequence, Hashable, Equatable {
            var decoded = hex_decode(s), decoded.count == 32 {
             return memcmp(&decoded, str.id, 32) == 0
         }
+
+        guard str.str != nil else { return false }
 
         // Ensure the Swift string's utf8 count matches the C string's length.
         guard (tag_len ?? strlen(str.str)) == s.utf8.count else {
@@ -136,6 +146,7 @@ struct NdbTagElem: Sequence, Hashable, Equatable {
         case .id:
             return nil
         case let .str(str):
+            guard str.str != nil else { return nil }
             var end_ptr = UnsafeMutablePointer<CChar>(nil as OpaquePointer?)
             let res = strtoull(str.str, &end_ptr, 10)
 
@@ -152,6 +163,7 @@ struct NdbTagElem: Sequence, Hashable, Equatable {
         case let .id(id):
             return hex_encode(id.id)
         case let .str(s):
+            guard s.str != nil else { return "" }
             return String(cString: s.str, encoding: .utf8) ?? ""
         }
     }
