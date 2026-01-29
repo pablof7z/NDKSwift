@@ -15,9 +15,20 @@ struct NdbStrIter: IteratorProtocol {
     var ind: Int
     let str: ndb_str
     let tag: NdbTagElem // stored for lifetime reasons
+    let isPackedId: Bool
 
     mutating func next() -> CChar? {
+        // For NDB_PACKED_ID, don't iterate raw bytes as C string
+        // as this can read past bounds - return nil to make iterator empty
+        guard !isPackedId else { return nil }
+
         guard str.str != nil else { return nil }
+
+        // Validate pointer accessibility if this is the first access
+        if ind == 0 {
+            guard str.str[0] >= 0 || str.str[0] < 0 else { return nil }
+        }
+
         let c = str.str[ind]
         if c != 0 {
             ind += 1
@@ -31,6 +42,7 @@ struct NdbStrIter: IteratorProtocol {
         str = ndb_tag_str(tag.note.note.ptr, tag.tag.ptr, tag.index)
         ind = 0
         self.tag = tag
+        self.isPackedId = (str.flag == NDB_PACKED_ID)
     }
 }
 
@@ -44,6 +56,8 @@ struct NdbTagElem: Sequence, Hashable, Equatable {
         if str.flag == NDB_PACKED_ID {
             hasher.combine(bytes: UnsafeRawBufferPointer(start: str.id, count: 32))
         } else if str.str != nil {
+            // Validate first byte is accessible before calling strlen
+            guard str.str[0] >= 0 || str.str[0] < 0 else { return }
             hasher.combine(bytes: UnsafeRawBufferPointer(start: str.str, count: strlen(str.str)))
         }
     }
@@ -56,6 +70,10 @@ struct NdbTagElem: Sequence, Hashable, Equatable {
         }
 
         guard lhs.str.str != nil, rhs.str.str != nil else { return false }
+
+        // Validate first byte is accessible before calling strlen
+        guard (lhs.str.str[0] >= 0 || lhs.str.str[0] < 0),
+              (rhs.str.str[0] >= 0 || rhs.str.str[0] < 0) else { return false }
 
         let l = strlen(lhs.str.str)
         let r = strlen(rhs.str.str)
@@ -80,6 +98,8 @@ struct NdbTagElem: Sequence, Hashable, Equatable {
             return false
         }
         guard str.str != nil else { return true }
+        // Validate pointer accessibility
+        guard str.str[0] >= 0 || str.str[0] < 0 else { return true }
         return str.str[0] == 0
     }
 
@@ -87,6 +107,8 @@ struct NdbTagElem: Sequence, Hashable, Equatable {
         if str.flag == NDB_PACKED_ID {
             return 32
         } else if str.str != nil {
+            // Validate pointer accessibility before calling strlen
+            guard str.str[0] >= 0 || str.str[0] < 0 else { return 0 }
             return strlen(str.str)
         } else {
             return 0
@@ -95,6 +117,8 @@ struct NdbTagElem: Sequence, Hashable, Equatable {
 
     var single_char: AsciiCharacter? {
         guard str.str != nil else { return nil }
+        // Validate pointer accessibility
+        guard str.str[0] >= 0 || str.str[0] < 0 else { return nil }
         let c = str.str[0]
         guard c != 0 && str.str[1] == 0 else { return nil }
         return AsciiCharacter(c)
@@ -102,6 +126,8 @@ struct NdbTagElem: Sequence, Hashable, Equatable {
 
     func matches_char(_ c: AsciiCharacter) -> Bool {
         guard str.str != nil else { return false }
+        // Validate pointer accessibility
+        guard str.str[0] >= 0 || str.str[0] < 0 else { return false }
         return str.str[0] == c.cchar && str.str[1] == 0
     }
 
@@ -126,9 +152,18 @@ struct NdbTagElem: Sequence, Hashable, Equatable {
             return false
         }
 
+        // Handle empty strings explicitly to avoid memcmp with nil base address
+        if s.utf8.count == 0 {
+            return true
+        }
+
         // Compare directly using the utf8 view.
         return s.utf8.withContiguousStorageIfAvailable { buffer in
-            memcmp(buffer.baseAddress, str.str, buffer.count) == 0
+            guard let baseAddress = buffer.baseAddress else {
+                // Handle case where buffer has no base address (shouldn't happen with count > 0, but be safe)
+                return false
+            }
+            return memcmp(baseAddress, str.str, buffer.count) == 0
         } ?? false
     }
 
@@ -147,10 +182,12 @@ struct NdbTagElem: Sequence, Hashable, Equatable {
             return nil
         case let .str(str):
             guard str.str != nil else { return nil }
-            var end_ptr = UnsafeMutablePointer<CChar>(nil as OpaquePointer?)
-            let res = strtoull(str.str, &end_ptr, 10)
 
-            if end_ptr?.pointee == 0 {
+            var endPtr: UnsafeMutablePointer<CChar>?
+            let res = strtoull(str.str, &endPtr, 10)
+
+            // Check if the entire string was consumed (null terminator reached)
+            if let end = endPtr, end.pointee == 0 {
                 return res
             } else {
                 return nil
@@ -164,6 +201,12 @@ struct NdbTagElem: Sequence, Hashable, Equatable {
             return hex_encode(id.id)
         case let .str(s):
             guard s.str != nil else { return "" }
+
+            // Additional safety: validate the first byte is accessible
+            // If the pointer is invalid/dangling, this will catch many cases
+            // before String(cString:) potentially crashes
+            guard s.str[0] >= 0 || s.str[0] < 0 else { return "" }
+
             return String(cString: s.str, encoding: .utf8) ?? ""
         }
     }
