@@ -120,16 +120,6 @@ struct DeveloperToolsView: View {
                     )
                 }
 
-                NavigationLink {
-                    TelemetrySettingsView()
-                } label: {
-                    ToolRow(
-                        icon: "chart.line.uptrend.xyaxis",
-                        title: "Telemetry",
-                        subtitle: "OpenTelemetry tracing",
-                        color: .purple
-                    )
-                }
             }
 
             // Quick Actions
