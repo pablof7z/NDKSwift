@@ -36,18 +36,46 @@ targets:
         INFOPLIST_KEY_CFBundleURLTypes: "<array><dict><key>CFBundleURLSchemes</key><array><string>chirp</string></array></dict></array>"
         INFOPLIST_KEY_LSApplicationQueriesSchemes: "<array><string>nostrconnect</string><string>primal</string></array>"
 
+  ChirpPerformanceTests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - ChirpPerformanceTests
+    dependencies:
+      - target: Chirp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ndkswift.Chirp.PerformanceTests
+        SWIFT_VERSION: "6.0"
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Chirp
+        CODE_SIGN_STYLE: Automatic
+
 schemes:
   Chirp:
     build:
       targets:
         Chirp: all
+        ChirpPerformanceTests: [test]
     run:
       config: Debug
     test:
       config: Debug
+      targets:
+        - ChirpPerformanceTests
     profile:
       config: Release
     analyze:
       config: Debug
     archive:
       config: Release
+
+  ChirpPerformanceTests:
+    build:
+      targets:
+        Chirp: all
+        ChirpPerformanceTests: [test]
+    test:
+      config: Debug
+      targets:
+        - ChirpPerformanceTests
