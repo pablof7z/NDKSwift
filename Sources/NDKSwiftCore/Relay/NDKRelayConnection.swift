@@ -316,22 +316,31 @@ public actor NDKRelayConnection {
         NDKLogger.log(.debug, category: .network, "publishEvent called for event \(eventId)")
 
         // Store continuation and handle the async work within actor context
+        // Use strong self to ensure the task completes and continuation is always resumed
         return try await withCheckedThrowingContinuation { continuation in
-            Task { [weak self] in
-                await self?.performPublishEvent(eventId: eventId, event: event, continuation: continuation, timeout: timeout)
+            Task {
+                await self.performPublishEvent(eventId: eventId, event: event, continuation: continuation, timeout: timeout)
             }
         }
     }
 
     /// Perform the actual publish event work (actor-isolated)
     private func performPublishEvent(eventId: EventID, event: NDKEvent, continuation: CheckedContinuation<Bool, Error>, timeout: TimeInterval) async {
+        // Check if there's already a pending event with this ID - if so, fail this one
+        // to prevent continuation leaks from overwriting
+        if let existingContinuation = pendingEvents[eventId] {
+            NDKLogger.log(.warning, category: .network, "Event \(eventId) already pending, failing duplicate")
+            continuation.resume(throwing: NDKError.publishFailed(relay: url.absoluteString, message: "Event already being published"))
+            return
+        }
+
         // Store the continuation - now within actor context
         pendingEvents[eventId] = continuation
 
-        // Create independent timeout task that won't be cancelled if send succeeds
-        let timeoutTask = Task { [weak self] in
+        // Create independent timeout task - use strong self to ensure timeout always fires
+        // This prevents continuation leaks when self is deallocated before timeout
+        let timeoutTask = Task {
             try? await Task.sleep(nanoseconds: UInt64(timeout * Double(TimeConstants.nanosecondsPerSecond)))
-            guard let self = self else { return }
             await self.handleTimeout(eventId: eventId)
         }
         eventTimeoutTasks[eventId] = timeoutTask
@@ -713,7 +722,13 @@ public actor NDKRelayConnection {
 
                 // Set up timeout
                 let timeoutTask = Task { [weak self] in
-                    guard let self = self else { return }
+                    guard let self else {
+                        if !checkHandled {
+                            checkHandled = true
+                            continuation.resume(returning: false)
+                        }
+                        return
+                    }
                     try? await Task.sleep(nanoseconds: UInt64(self.config.healthCheckTimeout * Double(TimeConstants.nanosecondsPerSecond)))
                     if !checkHandled {
                         checkHandled = true
@@ -722,22 +737,17 @@ public actor NDKRelayConnection {
                     }
                 }
 
-                task.sendPing { [weak self] error in
+                task.sendPing { error in
                     guard !checkHandled else { return }
                     checkHandled = true
                     timeoutTask.cancel()
 
                     if let error = error {
-                        Task { [weak self] in
-                            guard let self = self else { return }
-                            NDKLogger.log(.warning, category: .connection, "❌ Health check ping failed for \(self.url): \(error)")
-                            continuation.resume(returning: false)
-                        }
+                        NDKLogger.log(.warning, category: .connection, "❌ Health check ping failed: \(error)")
+                        continuation.resume(returning: false)
                     } else {
                         Task { [weak self] in
-                            guard let self = self else { return }
-                            await self.updateLastHealthCheck()
-                            NDKLogger.log(.trace, category: .connection, "✅ Health check passed for \(self.url)")
+                            await self?.updateLastHealthCheck()
                             continuation.resume(returning: true)
                         }
                     }
