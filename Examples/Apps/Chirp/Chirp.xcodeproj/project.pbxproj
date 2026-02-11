@@ -9,14 +9,29 @@
 /* Begin PBXBuildFile section */
 		0B4ABDDB0579005EEF1027DD /* ChirpApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BC56343E15FBDB8739D8CFC /* ChirpApp.swift */; };
 		31851F55BEEF519A0B02D12B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CADE37EF3FB10E3334126047 /* Assets.xcassets */; };
+		38D174421BC83EF81F22EC75 /* ChirpPerformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 696D4480039D42DB37D38A8F /* ChirpPerformanceTests.swift */; };
 		43C62F340FBBAA8AE4EDA869 /* ChirpFeature in Frameworks */ = {isa = PBXBuildFile; productRef = AF23DF5DD2F9CF8D4E336FF4 /* ChirpFeature */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		CA7159C216E89BE71DD9D9C4 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F9902D8B13CCB06443824441 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 063AA418A76E467C127B2092;
+			remoteInfo = Chirp;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		6642DD3D8D6000AC2E047C03 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		696D4480039D42DB37D38A8F /* ChirpPerformanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChirpPerformanceTests.swift; sourceTree = "<group>"; };
 		6BC56343E15FBDB8739D8CFC /* ChirpApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChirpApp.swift; sourceTree = "<group>"; };
+		735FEE18337704BB76EE4925 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		85E02C5D096F9D020C22A7F4 /* ChirpPackage */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ChirpPackage; path = ChirpPackage; sourceTree = SOURCE_ROOT; };
 		BE212C39877A658DFB0C98FA /* Chirp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Chirp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CADE37EF3FB10E3334126047 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		E0BEBD9DA8AEAD972A180F9B /* ChirpPerformanceTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ChirpPerformanceTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -35,6 +50,7 @@
 			isa = PBXGroup;
 			children = (
 				BE212C39877A658DFB0C98FA /* Chirp.app */,
+				E0BEBD9DA8AEAD972A180F9B /* ChirpPerformanceTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -52,14 +68,25 @@
 			children = (
 				CADE37EF3FB10E3334126047 /* Assets.xcassets */,
 				6BC56343E15FBDB8739D8CFC /* ChirpApp.swift */,
+				6642DD3D8D6000AC2E047C03 /* Info.plist */,
 			);
 			path = Chirp;
+			sourceTree = "<group>";
+		};
+		96845D033614925BB9386258 /* ChirpPerformanceTests */ = {
+			isa = PBXGroup;
+			children = (
+				696D4480039D42DB37D38A8F /* ChirpPerformanceTests.swift */,
+				735FEE18337704BB76EE4925 /* Info.plist */,
+			);
+			path = ChirpPerformanceTests;
 			sourceTree = "<group>";
 		};
 		E2E0CE7C80541C9169F414C6 = {
 			isa = PBXGroup;
 			children = (
 				715349A5CCFD688F835ADDB2 /* Chirp */,
+				96845D033614925BB9386258 /* ChirpPerformanceTests */,
 				688CF1B920AAAD8660A44488 /* Packages */,
 				26E6F52A54743D11DFA78B83 /* Products */,
 			);
@@ -88,6 +115,24 @@
 			productReference = BE212C39877A658DFB0C98FA /* Chirp.app */;
 			productType = "com.apple.product-type.application";
 		};
+		9C271A86928F3177924783A0 /* ChirpPerformanceTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4D46C87025CC33136334810B /* Build configuration list for PBXNativeTarget "ChirpPerformanceTests" */;
+			buildPhases = (
+				21319936E2F9184AAEB92500 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				618ECE87C871455AD3956D9E /* PBXTargetDependency */,
+			);
+			name = ChirpPerformanceTests;
+			packageProductDependencies = (
+			);
+			productName = ChirpPerformanceTests;
+			productReference = E0BEBD9DA8AEAD972A180F9B /* ChirpPerformanceTests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -99,6 +144,10 @@
 				TargetAttributes = {
 					063AA418A76E467C127B2092 = {
 						DevelopmentTeam = "";
+					};
+					9C271A86928F3177924783A0 = {
+						ProvisioningStyle = Automatic;
+						TestTargetID = 063AA418A76E467C127B2092;
 					};
 				};
 			};
@@ -120,6 +169,7 @@
 			projectRoot = "";
 			targets = (
 				063AA418A76E467C127B2092 /* Chirp */,
+				9C271A86928F3177924783A0 /* ChirpPerformanceTests */,
 			);
 		};
 /* End PBXProject section */
@@ -136,6 +186,14 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		21319936E2F9184AAEB92500 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				38D174421BC83EF81F22EC75 /* ChirpPerformanceTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		EE812C034A7568790A8F7328 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -146,6 +204,14 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		618ECE87C871455AD3956D9E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 063AA418A76E467C127B2092 /* Chirp */;
+			targetProxy = CA7159C216E89BE71DD9D9C4 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
 		078888E0E7264D0D14F863E2 /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -154,10 +220,16 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 456SHKPP26;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
-				GENERATE_INFOPLIST_FILE = NO;
+				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Chirp/Info.plist;
+				INFOPLIST_KEY_CFBundleURLTypes = "<array><dict><key>CFBundleURLSchemes</key><array><string>chirp</string></array></dict></array>";
+				INFOPLIST_KEY_LSApplicationQueriesSchemes = "<array><string>nostrconnect</string><string>primal</string></array>";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleLightContent;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -296,10 +368,16 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 456SHKPP26;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
-				GENERATE_INFOPLIST_FILE = NO;
+				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Chirp/Info.plist;
+				INFOPLIST_KEY_CFBundleURLTypes = "<array><dict><key>CFBundleURLSchemes</key><array><string>chirp</string></array></dict></array>";
+				INFOPLIST_KEY_LSApplicationQueriesSchemes = "<array><string>nostrconnect</string><string>primal</string></array>";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleLightContent;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -312,6 +390,46 @@
 			};
 			name = Debug;
 		};
+		9EEEEB2C0F801807BD2BC2D1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ChirpPerformanceTests/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.ndkswift.Chirp.PerformanceTests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Chirp;
+			};
+			name = Debug;
+		};
+		A97482EFE9D57CEB4DE57E56 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ChirpPerformanceTests/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.ndkswift.Chirp.PerformanceTests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Chirp;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -320,6 +438,15 @@
 			buildConfigurations = (
 				4AC550F33127223ECAB7403F /* Debug */,
 				0B54409F3C1DBC37D0DE3E87 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		4D46C87025CC33136334810B /* Build configuration list for PBXNativeTarget "ChirpPerformanceTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9EEEEB2C0F801807BD2BC2D1 /* Debug */,
+				A97482EFE9D57CEB4DE57E56 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
