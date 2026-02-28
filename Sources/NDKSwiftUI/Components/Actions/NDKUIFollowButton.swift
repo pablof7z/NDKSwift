@@ -388,7 +388,7 @@ public extension NDKUIFollowButton {
 #if DEBUG
     struct NDKUIFollowButton_Previews: PreviewProvider {
         static var previews: some View {
-            let mockNDK = NDK(relayURLs: [])
+            let mockNDK: NDK = { fatalError("NDK requires async cache init") }()
 
             VStack(spacing: 20) {
                 // Different styles

@@ -1,15 +1,14 @@
 @testable import NDKSwiftCore
-import NDKSwiftSQLite
 import XCTest
 
 final class ProfileSemanticCachingTests: XCTestCase {
-    var cache: NDKSQLiteCache!
+    var cache: NDKNostrDBCache!
 
     override func setUp() async throws {
         try await super.setUp()
 
-        // Create in-memory cache for testing
-        cache = try await NDKSQLiteCache(path: ":memory:", debugMode: true)
+        // Create test cache
+        cache = try await NDKTestFactory.createTestCache()
     }
 
     override func tearDown() async throws {
@@ -144,17 +143,18 @@ final class ProfileSemanticCachingTests: XCTestCase {
         }
 
         // Verify the profile now has semantic fields populated
-        let rawProfile = try await cache.getRawProfileForTesting(pubkey: pubkey)
+        let rawProfile: [String: Any]? = try await cache.getRawProfileForTesting(pubkey: pubkey)
         XCTAssertNotNil(rawProfile)
 
         // Check that individual fields are populated
-        XCTAssertEqual(rawProfile?["name"] as? String, "Pre-Migration User")
-        XCTAssertEqual(rawProfile?["display_name"] as? String, "Pre-Migration Display")
-        XCTAssertEqual(rawProfile?["about"] as? String, "Updated after migration")
-        XCTAssertEqual(rawProfile?["nip05"] as? String, "user@example.com")
-
-        // Check that additional fields are stored
-        XCTAssertNotNil(rawProfile?["additional_fields"] as? Data)
+        let nameVal = rawProfile?["name"] as? String
+        let displayNameVal = rawProfile?["display_name"] as? String
+        let aboutVal = rawProfile?["about"] as? String
+        let nip05Val = rawProfile?["nip05"] as? String
+        XCTAssertEqual(nameVal, "Pre-Migration User")
+        XCTAssertEqual(displayNameVal, "Pre-Migration Display")
+        XCTAssertEqual(aboutVal, "Updated after migration")
+        XCTAssertEqual(nip05Val, "user@example.com")
 
         // Retrieve again and verify it uses semantic fields (not JSON)
         let finalProfile = await cache.getProfile(pubkey: pubkey)

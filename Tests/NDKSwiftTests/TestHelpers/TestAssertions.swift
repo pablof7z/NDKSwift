@@ -104,7 +104,7 @@ func XCTAssertRelayDisconnected(
 /// Asserts an event exists in cache
 func XCTAssertEventInCache(
     _ event: NDKEvent,
-    cache: NDKCache,
+    cache: NDKNostrDBCache,
     file: StaticString = #filePath,
     line: UInt = #line
 ) async {
@@ -119,7 +119,7 @@ func XCTAssertEventInCache(
 /// Asserts an event does not exist in cache
 func XCTAssertEventNotInCache(
     eventId: EventID,
-    cache: NDKCache,
+    cache: NDKNostrDBCache,
     file: StaticString = #filePath,
     line: UInt = #line
 ) async {
@@ -131,7 +131,7 @@ func XCTAssertEventNotInCache(
 func XCTAssertCacheEventCount(
     _ expectedCount: Int,
     filter: NDKFilter? = nil,
-    cache: NDKCache,
+    cache: NDKNostrDBCache,
     file: StaticString = #filePath,
     line: UInt = #line
 ) async {

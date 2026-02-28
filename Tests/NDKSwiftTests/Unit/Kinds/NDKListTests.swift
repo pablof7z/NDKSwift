@@ -8,7 +8,7 @@ final class NDKListTests: XCTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
-        ndk = NDK()
+        ndk = try await NDKTestFactory.createNDK()
         signer = try NDKPrivateKeySigner(privateKey: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef")
         ndk.signer = signer
     }

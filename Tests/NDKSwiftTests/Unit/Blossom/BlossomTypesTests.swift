@@ -85,7 +85,7 @@ final class BlossomTypesTests: XCTestCase {
     // MARK: - BlossomAuth Tests
 
     func testBlossomAuthCreation() async throws {
-        let ndk = NDK()
+        let ndk = try await NDKTestFactory.createNDK()
         let signer = MockNDKSigner()
 
         // Test upload auth
@@ -107,7 +107,7 @@ final class BlossomTypesTests: XCTestCase {
     }
 
     func testBlossomAuthDeleteCreation() async throws {
-        let ndk = NDK()
+        let ndk = try await NDKTestFactory.createNDK()
         let signer = MockNDKSigner()
 
         let deleteAuth = try await BlossomAuth.createDeleteAuth(
@@ -124,7 +124,7 @@ final class BlossomTypesTests: XCTestCase {
     }
 
     func testBlossomAuthListCreation() async throws {
-        let ndk = NDK()
+        let ndk = try await NDKTestFactory.createNDK()
         let signer = MockNDKSigner()
 
         let since = Date().addingTimeInterval(-3600)
@@ -144,7 +144,7 @@ final class BlossomTypesTests: XCTestCase {
     }
 
     func testBlossomAuthHeaderValue() async throws {
-        let ndk = NDK()
+        let ndk = try await NDKTestFactory.createNDK()
         let signer = MockNDKSigner()
 
         let auth = try await BlossomAuth.createUploadAuth(

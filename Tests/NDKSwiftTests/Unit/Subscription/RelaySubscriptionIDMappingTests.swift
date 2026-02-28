@@ -7,7 +7,7 @@ final class RelaySubscriptionIDMappingTests: XCTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
-        ndk = NDK()
+        ndk = try await NDKTestFactory.createNDK()
         manager = InternalSubscriptionManager(ndk: ndk)
     }
 

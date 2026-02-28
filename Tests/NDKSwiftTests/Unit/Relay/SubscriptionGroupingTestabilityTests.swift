@@ -10,7 +10,7 @@ final class SubscriptionGroupingTestabilityTests: XCTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
-        ndk = NDK()
+        ndk = try await NDKTestFactory.createNDK()
         relay = NDKRelay(url: "wss://test.relay.com")
         await relay.setNDK(ndk)
         manager = relay.subscriptionManager

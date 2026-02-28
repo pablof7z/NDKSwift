@@ -1,5 +1,5 @@
 @testable import NDKSwiftCore
-import NDKSwiftSQLite
+
 import XCTest
 
 @available(iOS 17.0, macOS 14.0, *)

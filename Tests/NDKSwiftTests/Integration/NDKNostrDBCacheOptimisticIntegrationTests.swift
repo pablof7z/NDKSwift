@@ -1,5 +1,5 @@
 @testable import NDKSwiftCore
-@testable import NDKSwiftNostrDB
+@testable import NDKSwiftCore
 import XCTest
 
 /// Integration tests for optimistic publishing with NDKNostrDBCache

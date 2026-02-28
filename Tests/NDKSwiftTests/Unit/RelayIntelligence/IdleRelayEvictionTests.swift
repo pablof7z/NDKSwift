@@ -4,8 +4,8 @@ import XCTest
 final class IdleRelayEvictionTests: XCTestCase {
     // MARK: - Idle Relay Eviction Tests
 
-    func test_pool_evictIdleRelays_removesNonPersistentIdleRelays() async {
-        let ndk = NDK()
+    func test_pool_evictIdleRelays_removesNonPersistentIdleRelays() async throws {
+        let ndk = try await NDKTestFactory.createNDK()
 
         // Add a non-persistent relay (outbox origin)
         let relay = await ndk.pool.addRelay("wss://idle-relay.example.com", origin: .outbox(authorPubkey: "test"))
@@ -26,8 +26,8 @@ final class IdleRelayEvictionTests: XCTestCase {
         XCTAssertEqual(finalCount, 0)
     }
 
-    func test_pool_evictIdleRelays_preservesPersistentRelays() async {
-        let ndk = NDK()
+    func test_pool_evictIdleRelays_preservesPersistentRelays() async throws {
+        let ndk = try await NDKTestFactory.createNDK()
 
         // Add a persistent relay (explicit origin)
         _ = await ndk.pool.addRelay("wss://explicit-relay.example.com", origin: .appRelays)
@@ -43,8 +43,8 @@ final class IdleRelayEvictionTests: XCTestCase {
         XCTAssertEqual(finalCount, 1)
     }
 
-    func test_pool_evictIdleRelays_respectsIdleThreshold() async {
-        let ndk = NDK()
+    func test_pool_evictIdleRelays_respectsIdleThreshold() async throws {
+        let ndk = try await NDKTestFactory.createNDK()
 
         // Add a non-persistent relay
         let relay = await ndk.pool.addRelay("wss://active-relay.example.com", origin: .outbox(authorPubkey: "test"))
@@ -63,8 +63,8 @@ final class IdleRelayEvictionTests: XCTestCase {
         XCTAssertEqual(finalCount, 1)
     }
 
-    func test_pool_evictIdleRelays_evictsMixedPool() async {
-        let ndk = NDK()
+    func test_pool_evictIdleRelays_evictsMixedPool() async throws {
+        let ndk = try await NDKTestFactory.createNDK()
 
         // Add persistent relay
         _ = await ndk.pool.addRelay("wss://persistent.example.com", origin: .appRelays)

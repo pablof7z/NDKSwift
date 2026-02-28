@@ -18,7 +18,7 @@ final class NDKRelaySubscriptionTests: XCTestCase {
         groupableDelay: TimeInterval? = nil,
         groupableDelayType: NDKSubscriptionDelayType? = nil
     ) -> NDKSubscriptionCoordinator {
-        let ndk = NDK()
+        let ndk = try await NDKTestFactory.createNDK()
         return NDKSubscriptionCoordinator(
             id: id,
             filters: filters,

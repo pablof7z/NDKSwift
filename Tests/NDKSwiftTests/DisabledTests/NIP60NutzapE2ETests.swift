@@ -42,8 +42,8 @@ final class NIP60NutzapE2ETests: XCTestCase {
         print("   Pubkey2: \(pubkey2!)")
 
         // Create separate NDK instances with in-memory cache
-        let cache1 = MemoryCache()
-        let cache2 = MemoryCache()
+        let cache1 = try await NDKTestFactory.createTestCache()
+        let cache2 = try await NDKTestFactory.createTestCache()
 
         ndk1 = NDK(cache: cache1)
         ndk2 = NDK(cache: cache2)

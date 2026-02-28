@@ -99,7 +99,7 @@ final class NIP17Tests: XCTestCase {
     // MARK: - Wrap/Unwrap Tests
 
     func testWrapAndUnwrapSingleRecipient() async throws {
-        _ = NDK()
+        _ = try await NDKTestFactory.createNDK()
         let senderSigner = try NDKPrivateKeySigner(privateKey: senderPrivateKey)
         let recipientSigner = try NDKPrivateKeySigner(privateKey: recipientPrivateKey)
 
@@ -132,7 +132,7 @@ final class NIP17Tests: XCTestCase {
     }
 
     func testWrapManyRecipients() async throws {
-        _ = NDK()
+        _ = try await NDKTestFactory.createNDK()
         let senderSigner = try NDKPrivateKeySigner(privateKey: senderPrivateKey)
 
         let recipients = [

@@ -24,8 +24,8 @@ final class EncryptedDME2ETests: XCTestCase {
 
         // Step 1: Create two users (Alice and Bob)
         print("[\(timestamp())] Creating Alice and Bob...")
-        let aliceNDK = NDK(cache: MemoryCache())
-        let bobNDK = NDK(cache: MemoryCache())
+        let aliceNDK = NDK(cache: try await NDKTestFactory.createTestCache())
+        let bobNDK = NDK(cache: try await NDKTestFactory.createTestCache())
 
         let aliceSigner = try NDKPrivateKeySigner.generate()
         let bobSigner = try NDKPrivateKeySigner.generate()
@@ -210,8 +210,8 @@ final class EncryptedDME2ETests: XCTestCase {
         print("[\(timestamp())] Starting NIP-04 vs NIP-44 compatibility E2E test")
 
         // Create two users
-        let senderNDK = NDK(cache: MemoryCache())
-        let receiverNDK = NDK(cache: MemoryCache())
+        let senderNDK = NDK(cache: try await NDKTestFactory.createTestCache())
+        let receiverNDK = NDK(cache: try await NDKTestFactory.createTestCache())
 
         let senderSigner = try NDKPrivateKeySigner.generate()
         let receiverSigner = try NDKPrivateKeySigner.generate()
@@ -329,7 +329,7 @@ final class EncryptedDME2ETests: XCTestCase {
         print("[\(timestamp())] Starting encrypted DM with multiple recipients E2E test")
 
         // Create sender and multiple recipients
-        let senderNDK = NDK(cache: MemoryCache())
+        let senderNDK = NDK(cache: try await NDKTestFactory.createTestCache())
         let senderSigner = try NDKPrivateKeySigner.generate()
         senderNDK.signer = senderSigner
         let senderPubkey = try await senderSigner.pubkey
@@ -338,7 +338,7 @@ final class EncryptedDME2ETests: XCTestCase {
         var recipients: [(ndk: NDK, signer: NDKPrivateKeySigner, pubkey: String)] = []
 
         for i in 1 ... 3 {
-            let ndk = NDK(cache: MemoryCache())
+            let ndk = NDK(cache: try await NDKTestFactory.createTestCache())
             let signer = try NDKPrivateKeySigner.generate()
             let pubkey = try await signer.pubkey
             ndk.signer = signer
@@ -463,7 +463,7 @@ final class EncryptedDME2ETests: XCTestCase {
         print("[\(timestamp())] Starting encrypted DM caching E2E test")
 
         // Create users with cache
-        let cache = MemoryCache()
+        let cache = try await NDKTestFactory.createTestCache()
         let senderNDK = NDK(cache: cache)
         let receiverNDK = NDK(cache: cache)
 
@@ -541,8 +541,8 @@ final class EncryptedDME2ETests: XCTestCase {
         print("[\(timestamp())] Starting large encrypted messages E2E test")
 
         // Create users
-        let ndk1 = NDK(cache: MemoryCache())
-        let ndk2 = NDK(cache: MemoryCache())
+        let ndk1 = NDK(cache: try await NDKTestFactory.createTestCache())
+        let ndk2 = NDK(cache: try await NDKTestFactory.createTestCache())
 
         let signer1 = try NDKPrivateKeySigner.generate()
         let signer2 = try NDKPrivateKeySigner.generate()

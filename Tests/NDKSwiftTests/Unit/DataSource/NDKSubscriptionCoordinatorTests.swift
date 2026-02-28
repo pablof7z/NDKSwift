@@ -5,7 +5,7 @@ final class NDKSubscriptionCoordinatorTests: XCTestCase {
 
     func testHandleEventWithNonNDKRelayDoesNotCrash() async throws {
         // Given: A coordinator with event handler
-        let ndk = NDK()
+        let ndk = try await NDKTestFactory.createNDK()
         let filter = NDKFilter(kinds: [1])
         let coordinator = NDKSubscriptionCoordinator(
             id: "test-sub",
@@ -33,7 +33,7 @@ final class NDKSubscriptionCoordinatorTests: XCTestCase {
 
     func testHandleEOSEWithNonNDKRelayDoesNotCrash() async throws {
         // Given: A coordinator with EOSE handler
-        let ndk = NDK()
+        let ndk = try await NDKTestFactory.createNDK()
         let filter = NDKFilter(kinds: [1])
         let coordinator = NDKSubscriptionCoordinator(
             id: "test-sub",
@@ -59,7 +59,7 @@ final class NDKSubscriptionCoordinatorTests: XCTestCase {
 
     func testHandleEventWithNDKRelayWorks() async throws {
         // Given: A coordinator with event handler and real NDKRelay
-        let ndk = NDK()
+        let ndk = try await NDKTestFactory.createNDK()
         let filter = NDKFilter(kinds: [1])
         let coordinator = NDKSubscriptionCoordinator(
             id: "test-sub",

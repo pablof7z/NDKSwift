@@ -13,7 +13,7 @@ import XCTest
          try await super.setUp()
 
          // Create NDK with outbox disabled for these tests
-         ndk = NDK()
+         ndk = try await NDKTestFactory.createNDK()
          ndk.outboxEnabled = false
          pool = ndk.pool
      }

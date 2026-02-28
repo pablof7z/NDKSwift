@@ -20,7 +20,7 @@ final class NDKNutzapTests: XCTestCase {
 
         // Setup mock signer and NDK
         mockSigner = MockNDKSigner(publicKey: testSenderPubkey)
-        ndk = NDK()
+        ndk = try await NDKTestFactory.createNDK()
         ndk.signer = mockSigner
     }
 
@@ -421,7 +421,7 @@ final class NDKNutzapTests: XCTestCase {
     // MARK: - Error Cases
 
     func testCreateNutzapWithNoSigner() async throws {
-        let ndkWithoutSigner = NDK()
+        let ndkWithoutSigner = try await NDKTestFactory.createNDK()
 
         let proof = CashuSwift.Proof(
             keysetID: "keyset123",

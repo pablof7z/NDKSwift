@@ -8,8 +8,9 @@ final class ReactiveFilterTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
 
-        // Create NDK with in-memory cache
-        ndk = NDK(relayURLs: ["wss://relay.damus.io"], cache: MemoryCache())
+        // Create NDK with NostrDB cache
+        let cache = try await NDKTestFactory.createTestCache()
+        ndk = NDK(relayURLs: ["wss://relay.damus.io"], cache: cache)
 
         // Create test signer
         signer = try NDKPrivateKeySigner.generate()

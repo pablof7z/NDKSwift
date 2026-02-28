@@ -128,7 +128,7 @@ final class EOSETrackerTests: XCTestCase {
     /// This is the main test for issue #54 using the new mock relay infrastructure.
     func testOutboxStrategyWithUnknownAuthors_FallbackRelaysInExpected() async throws {
         // Create NDK and add mock relays that appear "connected"
-        let ndk = NDK()
+        let ndk = try await NDKTestFactory.createNDK()
 
         // Add fallback relays (these will be used for unknown authors)
         let fallbackRelay1URL = "wss://fallback1.test/"
@@ -229,7 +229,7 @@ final class EOSETrackerTests: XCTestCase {
     /// Test that EOSE from fallback relays is properly tracked after the fix.
     func testEOSEFromFallbackRelaysIsTracked() async throws {
         // Create NDK and add mock relays
-        let ndk = NDK()
+        let ndk = try await NDKTestFactory.createNDK()
 
         let fallbackRelayURL = "wss://fallback.test/"
         let outboxRelayURL = "wss://outbox.test/"

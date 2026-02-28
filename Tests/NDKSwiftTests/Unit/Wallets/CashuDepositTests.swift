@@ -10,7 +10,7 @@ final class CashuDepositTests: XCTestCase {
     var signer: NDKPrivateKeySigner!
 
     override func setUp() async throws {
-        ndk = NDK()
+        ndk = try await NDKTestFactory.createNDK()
         eventManager = WalletEventManager(ndk: ndk)
         mints = MintManager()
         // Use a valid 64 character hex string for testing

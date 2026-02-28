@@ -7,7 +7,7 @@ final class NDKOutboxManagerTests: NDKUnitTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
-        memoryCache = MemoryCache()
+        memoryCache = try await NDKTestFactory.createTestCache()
         let outboxConfig = NDKDiscoveryConfig(
             discoveryRelays: [
                 "wss://outbox1.test",

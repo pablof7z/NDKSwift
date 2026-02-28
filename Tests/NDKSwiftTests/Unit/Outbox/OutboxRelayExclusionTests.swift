@@ -5,7 +5,7 @@ final class OutboxRelayExclusionTests: XCTestCase {
     /// Test that outbox relays are excluded from data queries for unknown authors
     func testOutboxRelaysExcludedFromUnknownAuthorQueries() async throws {
         // Create NDK with outbox configuration
-        let ndk = NDK()
+        let ndk = try await NDKTestFactory.createNDK()
 
         // Add regular relay
         await ndk.addRelay("wss://relay.example.com")
@@ -58,7 +58,7 @@ final class OutboxRelayExclusionTests: XCTestCase {
     /// Test that ws:// (non-secure) relays are completely filtered from outbox strategy
     func testInsecureRelaysExcludedFromOutboxStrategy() async throws {
         // Create NDK with minimal config
-        let ndk = NDK()
+        let ndk = try await NDKTestFactory.createNDK()
         let outbox = ndk.outbox
 
         // Track an author with both secure and insecure relays
@@ -104,6 +104,7 @@ final class OutboxRelayExclusionTests: XCTestCase {
         )
         let ndk = NDK(
             relayURLs: [],  // NO fallback relays configured
+            cache: try await NDKTestFactory.createTestCache(),
             discoveryConfig: outboxConfig
         )
 
@@ -150,7 +151,7 @@ final class OutboxRelayExclusionTests: XCTestCase {
         let outboxConfig = NDKDiscoveryConfig(
             discoveryRelays: ["wss://outbox1.example.com", "wss://outbox2.example.com"]
         )
-        let ndk = NDK(discoveryConfig: outboxConfig)
+        let ndk = try await NDKTestFactory.createNDK(outboxEnabled: true)
 
         // Add regular relay
         await ndk.addRelay("wss://regular.example.com")

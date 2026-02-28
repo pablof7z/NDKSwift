@@ -17,7 +17,7 @@ final class SubscriptionPatternsE2ETests: XCTestCase {
         let startTime = Date()
         print("[\(timestamp())] Starting subscription patterns E2E test")
 
-        let ndk = NDK(cache: MemoryCache())
+        let ndk = NDK(cache: try await NDKTestFactory.createTestCache())
         let signer = try NDKPrivateKeySigner.generate()
         let pubkey = try await signer.pubkey
         ndk.signer = signer
@@ -259,7 +259,7 @@ final class SubscriptionPatternsE2ETests: XCTestCase {
     func testSubscriptionWithTransform() async throws {
         print("[\(timestamp())] Starting subscription with transform E2E test")
 
-        let ndk = NDK(cache: MemoryCache())
+        let ndk = NDK(cache: try await NDKTestFactory.createTestCache())
 
         for relay in relayURLs {
             await ndk.addRelay(relay)

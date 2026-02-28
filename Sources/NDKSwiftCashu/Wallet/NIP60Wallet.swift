@@ -61,7 +61,7 @@ public actor NIP60Wallet: NDKPaymentProvider {
 
     // MARK: - Initialization
 
-    public init(ndk: NDK, cache: NDKCache? = nil) throws {
+    public init(ndk: NDK, cache: NDKNostrDBCache? = nil) throws {
         let signer: NDKSigner
         do {
             signer = try ndk.requireSigner()

@@ -8,7 +8,7 @@ final class MultipleObserversTests: XCTestCase {
         let testPubkey = try await signer.pubkey
 
         // Initialize NDK with in-memory cache
-        let cache = MemoryCache()
+        let cache = try await NDKTestFactory.createTestCache()
         let ndk = NDK(cache: cache, debugMode: true, outboxEnabled: false)
         ndk.signer = signer
 
@@ -134,7 +134,7 @@ final class MultipleObserversTests: XCTestCase {
         let testPubkey = try await signer.pubkey
 
         // Initialize NDK with in-memory cache
-        let cache = MemoryCache()
+        let cache = try await NDKTestFactory.createTestCache()
         let ndk = NDK(cache: cache, debugMode: true, outboxEnabled: false)
         ndk.signer = signer
 

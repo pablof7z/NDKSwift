@@ -7,7 +7,7 @@ final class NDKSubscriptionTests: NDKTestCase {
 
     func testDataSourceCreation() async throws {
         try await performAsyncTest(timeout: 5) {
-            let ndk = self.createTestNDK()
+            let ndk = try await self.createTestNDK()
             let filter = NDKFilter(kinds: [1], limit: 10)
 
             let dataSource = ndk.subscribe(filter: filter)
@@ -20,7 +20,7 @@ final class NDKSubscriptionTests: NDKTestCase {
 
     func testDataSourceWithCustomId() async throws {
         try await performAsyncTest(timeout: 5) {
-            let ndk = self.createTestNDK()
+            let ndk = try await self.createTestNDK()
             let filter = NDKFilter(kinds: [1])
             let customId = "my-custom-subscription-id"
 
@@ -37,7 +37,7 @@ final class NDKSubscriptionTests: NDKTestCase {
 
     func testDataSourceReceivesEvents() async throws {
         try await performAsyncTest(timeout: 5) {
-            let cache = self.createMemoryCache()
+            let cache = self.createtry await NDKTestFactory.createTestCache()
             let ndk = self.createTestNDK(cache: cache)
 
             let filter = NDKFilter(kinds: [1])
@@ -71,7 +71,7 @@ final class NDKSubscriptionTests: NDKTestCase {
 
     func testAsyncSequenceIteration() async throws {
         try await performAsyncTest(timeout: 5) {
-            let cache = self.createMemoryCache()
+            let cache = self.createtry await NDKTestFactory.createTestCache()
             let ndk = self.createTestNDK(cache: cache)
 
             let filter = NDKFilter(kinds: [1])
@@ -109,7 +109,7 @@ final class NDKSubscriptionTests: NDKTestCase {
 
     func testDataSourceFiltering() async throws {
         try await performAsyncTest(timeout: 5) {
-            let cache = self.createMemoryCache()
+            let cache = self.createtry await NDKTestFactory.createTestCache()
             let ndk = self.createTestNDK(cache: cache)
 
             let targetAuthor = TestFixtures.Keys.alice.publicKey
@@ -151,7 +151,7 @@ final class NDKSubscriptionTests: NDKTestCase {
 
     func testEOSEHandling() async throws {
         try await performAsyncTest(timeout: 5) {
-            let cache = self.createMemoryCache()
+            let cache = self.createtry await NDKTestFactory.createTestCache()
             let ndk = self.createTestNDK(cache: cache)
 
             let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
@@ -183,7 +183,7 @@ final class NDKSubscriptionTests: NDKTestCase {
 
     func testCloseOnEose() async throws {
         try await performAsyncTest(timeout: 5) {
-            let cache = self.createMemoryCache()
+            let cache = self.createtry await NDKTestFactory.createTestCache()
             let ndk = self.createTestNDK(cache: cache)
 
             // Create with closeOnEose = true
@@ -221,7 +221,7 @@ final class NDKSubscriptionTests: NDKTestCase {
 
     func testCollectWithTimeout() async throws {
         try await performAsyncTest(timeout: 5) {
-            let cache = self.createMemoryCache()
+            let cache = self.createtry await NDKTestFactory.createTestCache()
             let ndk = self.createTestNDK(cache: cache)
 
             let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
@@ -251,7 +251,7 @@ final class NDKSubscriptionTests: NDKTestCase {
 
     func testFirstWithTimeout() async throws {
         try await performAsyncTest(timeout: 5) {
-            let cache = self.createMemoryCache()
+            let cache = self.createtry await NDKTestFactory.createTestCache()
             let ndk = self.createTestNDK(cache: cache)
 
             let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
@@ -279,7 +279,7 @@ final class NDKSubscriptionTests: NDKTestCase {
 
     func testMultipleDataSources() async throws {
         try await performAsyncTest(timeout: 5) {
-            let cache = self.createMemoryCache()
+            let cache = self.createtry await NDKTestFactory.createTestCache()
             let ndk = self.createTestNDK(cache: cache)
 
             // Create two data sources with different filters
@@ -333,7 +333,7 @@ final class NDKSubscriptionTests: NDKTestCase {
 
     func testCacheOnlyPolicy() async throws {
         try await performAsyncTest(timeout: 5) {
-            let cache = self.createMemoryCache()
+            let cache = self.createtry await NDKTestFactory.createTestCache()
             let ndk = self.createTestNDK(cache: cache)
 
             // Pre-populate cache
@@ -357,7 +357,7 @@ final class NDKSubscriptionTests: NDKTestCase {
 
     func testDataSourceWithTransform() async throws {
         try await performAsyncTest(timeout: 5) {
-            let cache = self.createMemoryCache()
+            let cache = self.createtry await NDKTestFactory.createTestCache()
             let ndk = self.createTestNDK(cache: cache)
 
             // Create data source that transforms events to just their content
@@ -390,7 +390,7 @@ final class NDKSubscriptionTests: NDKTestCase {
 
     func testDataSourceErrorHandling() async throws {
         try await performAsyncTest(timeout: 5) {
-            let cache = self.createMemoryCache()
+            let cache = self.createtry await NDKTestFactory.createTestCache()
             let ndk = self.createTestNDK(cache: cache)
 
             let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
@@ -409,7 +409,7 @@ final class NDKSubscriptionTests: NDKTestCase {
 
     func testTransformReturningNil() async throws {
         try await performAsyncTest(timeout: 5) {
-            let cache = self.createMemoryCache()
+            let cache = self.createtry await NDKTestFactory.createTestCache()
             let ndk = self.createTestNDK(cache: cache)
 
             // Transform that filters out certain events
@@ -449,7 +449,7 @@ final class NDKSubscriptionTests: NDKTestCase {
 
     func testComplexTransform() async throws {
         try await performAsyncTest(timeout: 5) {
-            let cache = self.createMemoryCache()
+            let cache = self.createtry await NDKTestFactory.createTestCache()
             let ndk = self.createTestNDK(cache: cache)
 
             struct EventSummary {
@@ -493,7 +493,7 @@ final class NDKSubscriptionTests: NDKTestCase {
 
     func testUpdateFilter() async throws {
         try await performAsyncTest(timeout: 5) {
-            let cache = self.createMemoryCache()
+            let cache = self.createtry await NDKTestFactory.createTestCache()
             let ndk = self.createTestNDK(cache: cache)
 
             // Start with kind 1 filter
@@ -539,7 +539,7 @@ final class NDKSubscriptionTests: NDKTestCase {
 
     func testUpdateFilterClearsData() async throws {
         try await performAsyncTest(timeout: 5) {
-            let cache = self.createMemoryCache()
+            let cache = self.createtry await NDKTestFactory.createTestCache()
             let ndk = self.createTestNDK(cache: cache)
 
             let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
@@ -570,7 +570,7 @@ final class NDKSubscriptionTests: NDKTestCase {
 
     func testRefresh() async throws {
         try await performAsyncTest(timeout: 5) {
-            let cache = self.createMemoryCache()
+            let cache = self.createtry await NDKTestFactory.createTestCache()
             let ndk = self.createTestNDK(cache: cache)
 
             let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
@@ -605,7 +605,7 @@ final class NDKSubscriptionTests: NDKTestCase {
 
     func testEventDeduplication() async throws {
         try await performAsyncTest(timeout: 5) {
-            let cache = self.createMemoryCache()
+            let cache = self.createtry await NDKTestFactory.createTestCache()
             let ndk = self.createTestNDK(cache: cache)
 
             let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
@@ -641,7 +641,7 @@ final class NDKSubscriptionTests: NDKTestCase {
 
     func testNetworkOnlyPolicy() async throws {
         try await performAsyncTest(timeout: 5) {
-            let cache = self.createMemoryCache()
+            let cache = self.createtry await NDKTestFactory.createTestCache()
             let ndk = self.createTestNDK(cache: cache)
 
             // Pre-populate cache
@@ -680,7 +680,7 @@ final class NDKSubscriptionTests: NDKTestCase {
 
     func testAggregatedEOSE() async throws {
         try await performAsyncTest(timeout: 5) {
-            let cache = self.createMemoryCache()
+            let cache = self.createtry await NDKTestFactory.createTestCache()
             let ndk = self.createTestNDK(cache: cache)
 
             let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
@@ -709,7 +709,7 @@ final class NDKSubscriptionTests: NDKTestCase {
 
     func testRelayEventUpdate() async throws {
         try await performAsyncTest(timeout: 5) {
-            let cache = self.createMemoryCache()
+            let cache = self.createtry await NDKTestFactory.createTestCache()
             let ndk = self.createTestNDK(cache: cache)
 
             let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
@@ -758,7 +758,7 @@ final class NDKSubscriptionTests: NDKTestCase {
     // MARK: - Edge Cases
 
     func testEmptyFilter() async throws {
-        let cache = createMemoryCache()
+        let cache = createtry await NDKTestFactory.createTestCache()
         let ndk = createTestNDK(cache: cache)
 
         // Empty filter should match all events
@@ -792,7 +792,7 @@ final class NDKSubscriptionTests: NDKTestCase {
     }
 
     func testLargeEventBatch() async throws {
-        let cache = createMemoryCache()
+        let cache = createtry await NDKTestFactory.createTestCache()
         let ndk = createTestNDK(cache: cache)
 
         let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))
@@ -821,7 +821,7 @@ final class NDKSubscriptionTests: NDKTestCase {
     // MARK: - Memory Management Tests
 
     func testDataSourceCleanup() async throws {
-        let cache = createMemoryCache()
+        let cache = createtry await NDKTestFactory.createTestCache()
         let ndk = createTestNDK(cache: cache)
 
         var dataSource: NDKSubscription<NDKEvent>? = ndk.subscribe(filter: NDKFilter(kinds: [1]))
@@ -859,7 +859,7 @@ final class NDKSubscriptionTests: NDKTestCase {
     // MARK: - Concurrent Access Tests
 
     func testConcurrentEventProcessing() async throws {
-        let cache = createMemoryCache()
+        let cache = createtry await NDKTestFactory.createTestCache()
         let ndk = createTestNDK(cache: cache)
 
         let dataSource = ndk.subscribe(filter: NDKFilter(kinds: [1]))

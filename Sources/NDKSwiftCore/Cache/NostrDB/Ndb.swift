@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import NDKSwiftCore
+
 import NostrDB
 
 typealias NoteKey = UInt64
@@ -1033,6 +1033,27 @@ class Ndb: @unchecked Sendable {
             return true
         }
         return false
+    }
+
+    /// Returns all relay URLs that a note was seen on, as persisted in nostrdb's LMDB
+    /// - Parameter noteKey: The internal note key to look up
+    /// - Returns: Set of relay URL strings, or empty set if none found
+    func getRelays(noteKey: NoteKey) -> Set<String> {
+        guard !is_closed else { return [] }
+        guard let txn = SafeNdbTxn<Void>.new(on: self) else { return [] }
+
+        var iter = ndb_note_relay_iterator()
+        guard ndb_note_relay_iterate_start(&txn.txn, &iter, noteKey) != 0 else {
+            return []
+        }
+
+        var relays: Set<String> = []
+        while let cstr = ndb_note_relay_iterate_next(&iter) {
+            relays.insert(String(cString: cstr))
+        }
+        ndb_note_relay_iterate_close(&iter)
+
+        return relays
     }
 
     // MARK: Internal ndb callback interfaces

@@ -20,7 +20,7 @@ final class NDKNutzapEventTests: XCTestCase {
 
         // Setup mock signer and NDK
         mockSigner = MockNDKSigner(publicKey: testSenderPubkey)
-        ndk = NDK()
+        ndk = try await NDKTestFactory.createNDK()
         ndk.signer = mockSigner
     }
 

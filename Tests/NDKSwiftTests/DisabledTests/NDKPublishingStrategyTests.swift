@@ -16,7 +16,7 @@ final class NDKPublishingStrategyTests: XCTestCase {
         mockSigner = try NDKPrivateKeySigner(privateKey: privateKey)
 
         // Create memory cache
-        mockCache = MemoryCache()
+        mockCache = try await NDKTestFactory.createTestCache()
 
         // Create NDK instance
         ndk = NDK(

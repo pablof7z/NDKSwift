@@ -4,11 +4,11 @@ import XCTest
 final class NDKRelaySelectorTests: XCTestCase {
     var ndk: NDK!
     var signer: NDKPrivateKeySigner!
-    var cache: MemoryCache!
+    var cache: NDKNostrDBCache!
     var relaySelector: NDKRelaySelector!
 
     override func setUp() async throws {
-        cache = MemoryCache()
+        cache = try await NDKTestFactory.createTestCache()
         signer = try NDKPrivateKeySigner.generate()
         ndk = NDK(
             relayURLs: [

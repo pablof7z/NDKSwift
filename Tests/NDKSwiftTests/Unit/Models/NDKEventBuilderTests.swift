@@ -9,7 +9,7 @@ final class NDKEventBuilderTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         signer = try NDKPrivateKeySigner.generate()
-        ndk = NDKTestFactory.createNDK(signer: signer)
+        ndk = try await NDKTestFactory.createNDK(signer: signer)
         builder = NDKEventBuilder(ndk: ndk)
     }
 

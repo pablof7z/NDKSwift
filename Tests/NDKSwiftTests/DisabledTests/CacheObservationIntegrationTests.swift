@@ -1,6 +1,6 @@
 import GRDB
 @testable import NDKSwiftCore
-import NDKSwiftSQLite
+
 import XCTest
 
 /// Integration tests for the new AsyncThrowingStream-based cache observation

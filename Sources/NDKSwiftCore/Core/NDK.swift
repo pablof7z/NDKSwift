@@ -56,9 +56,9 @@ public final class NDK {
     @ObservationIgnored
     public var sessionData: NDKSessionData?
 
-    /// Cache for storing events (always present, defaults to in-memory)
+    /// Cache for storing events (NostrDB-backed)
     @ObservationIgnored
-    public let cache: NDKCache
+    public let cache: NDKNostrDBCache
 
     // MARK: - Observable Relay State
 
@@ -301,11 +301,11 @@ public final class NDK {
 
     // MARK: - Initialization
 
-    /// Initialize NDK with a custom cache instance
+    /// Initialize NDK with a NostrDB cache instance
     /// - Parameters:
     ///   - relayURLs: Initial relay URLs to connect to
     ///   - signer: Optional signer for signing events
-    ///   - cache: Custom cache instance. If nil, uses MemoryCache
+    ///   - cache: NostrDB cache instance (required — construct via `NDKNostrDBCache(path:)`)
     ///   - signatureVerificationConfig: Configuration for signature verification
     ///   - debugMode: Whether debug mode is enabled
     ///   - outboxEnabled: Whether outbox model is enabled
@@ -316,7 +316,7 @@ public final class NDK {
         relayURLs: [RelayURL] = [],
         signer: NDKSigner? = nil,
         sessionData: NDKSessionData? = nil,
-        cache: NDKCache? = nil,
+        cache: NDKNostrDBCache,
         signatureVerificationConfig: NDKSignatureVerificationConfig = .default,
         debugMode: Bool = false,
         outboxEnabled: Bool = true,
@@ -326,7 +326,7 @@ public final class NDK {
     ) {
         self.signer = signer
         self.sessionData = sessionData
-        self.cache = cache ?? MemoryCache()
+        self.cache = cache
         self.signatureVerificationConfig = signatureVerificationConfig
         self.debugMode = debugMode
         self.outboxEnabled = outboxEnabled

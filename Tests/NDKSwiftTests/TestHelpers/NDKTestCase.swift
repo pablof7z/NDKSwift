@@ -1,5 +1,4 @@
 @testable import NDKSwiftCore
-import NDKSwiftSQLite
 import XCTest
 
 /// Base test case class for all NDKSwift tests
@@ -61,14 +60,21 @@ open class NDKTestCase: XCTestCase {
     func createTestNDK(
         relayURLs: [RelayURL] = [],
         signer: NDKSigner? = nil,
-        cache: NDKCache? = nil,
+        cache: NDKNostrDBCache? = nil,
         debugMode: Bool = false,
         outboxEnabled: Bool = false
-    ) -> NDK {
-        let ndk = NDKTestFactory.createNDK(
+    ) async throws -> NDK {
+        let resolvedCache: NDKNostrDBCache
+        if let cache = cache {
+            resolvedCache = cache
+        } else {
+            resolvedCache = try await createTestNostrDBCache()
+        }
+
+        let ndk = NDK(
             relayURLs: relayURLs,
             signer: signer,
-            cache: cache,
+            cache: resolvedCache,
             debugMode: debugMode,
             outboxEnabled: outboxEnabled
         )
@@ -81,27 +87,27 @@ open class NDKTestCase: XCTestCase {
         useTestRelays: Bool = false,
         signer: NDKSigner? = nil
     ) async throws -> NDK {
-        let ndk = try await NDKTestFactory.createConnectedNDK(
-            useTestRelays: useTestRelays,
-            signer: signer
+        let cache = try await createTestNostrDBCache()
+        let relayURLs = useTestRelays ? RelayConstants.testRelays : [RelayURL]()
+        let ndk = NDK(
+            relayURLs: relayURLs,
+            signer: signer,
+            cache: cache
         )
         createdNDKInstances.append(ndk)
+        await ndk.connect()
+        _ = await ndk.waitForRelayConnections(minimumRelays: 1, timeout: 10.0)
         return ndk
     }
 
-    /// Creates a test cache backed by a temporary database
-    func createTestCache(debugMode: Bool = false) async throws -> NDKSQLiteCache {
+    /// Creates a test NostrDB cache backed by a temporary directory
+    func createTestNostrDBCache() async throws -> NDKNostrDBCache {
         let dbPath = tempDirectory
-            .appendingPathComponent("\(UUID().uuidString).db")
+            .appendingPathComponent(UUID().uuidString)
             .path
-
+        try FileManager.default.createDirectory(atPath: dbPath, withIntermediateDirectories: true)
         createdFiles.append(URL(fileURLWithPath: dbPath))
-        return try await NDKSQLiteCache(path: dbPath, debugMode: debugMode)
-    }
-
-    /// Creates an in-memory test cache
-    func createMemoryCache() -> MemoryCache {
-        return MemoryCache()
+        return try await NDKNostrDBCache(path: dbPath)
     }
 
     // MARK: - Test Utilities
@@ -202,7 +208,7 @@ open class NDKIntegrationTestCase: NDKTestCase {
 
     /// Creates and connects to test relays
     func createConnectedNDK(signer: NDKSigner? = nil) async throws -> NDK {
-        let ndk = createTestNDK(
+        let ndk = try await createTestNDK(
             relayURLs: testRelayUrls,
             signer: signer
         )

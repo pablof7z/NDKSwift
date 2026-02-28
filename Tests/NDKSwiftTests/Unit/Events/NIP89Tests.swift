@@ -4,8 +4,8 @@ import XCTest
 final class NIP89Tests: XCTestCase {
     // MARK: - Client Tag Tests
 
-    func testClientTagBuilder() throws {
-        let ndk = NDK()
+    func testClientTagBuilder() async throws {
+        let ndk = try await NDKTestFactory.createNDK()
         let builder = NDKEventBuilder(ndk: ndk)
 
         _ = builder
@@ -16,8 +16,8 @@ final class NIP89Tests: XCTestCase {
         XCTAssertEqual(builder.tags.first, ["client", "TestClient", "31990:abc123:test", "wss://relay.test"])
     }
 
-    func testClientTagBuilderWithoutRelay() throws {
-        let ndk = NDK()
+    func testClientTagBuilderWithoutRelay() async throws {
+        let ndk = try await NDKTestFactory.createNDK()
         let builder = NDKEventBuilder(ndk: ndk)
 
         _ = builder
@@ -28,8 +28,8 @@ final class NIP89Tests: XCTestCase {
         XCTAssertEqual(builder.tags.first, ["client", "TestClient", "31990:abc123:test"])
     }
 
-    func testClientTagBuilderWithoutAddress() throws {
-        let ndk = NDK()
+    func testClientTagBuilderWithoutAddress() async throws {
+        let ndk = try await NDKTestFactory.createNDK()
         let builder = NDKEventBuilder(ndk: ndk)
 
         _ = builder
@@ -40,8 +40,8 @@ final class NIP89Tests: XCTestCase {
         XCTAssertEqual(builder.tags.first, ["client", "TestClient"])
     }
 
-    func testClientTagBuilderWithoutAddressButWithRelay() throws {
-        let ndk = NDK()
+    func testClientTagBuilderWithoutAddressButWithRelay() async throws {
+        let ndk = try await NDKTestFactory.createNDK()
         let builder = NDKEventBuilder(ndk: ndk)
 
         _ = builder
@@ -52,7 +52,7 @@ final class NIP89Tests: XCTestCase {
         XCTAssertEqual(builder.tags.first, ["client", "TestClient", "", "wss://relay.test"])
     }
 
-    func testEventClientTagExtraction() throws {
+    func testEventClientTagExtraction() async throws {
         let event = NDKEvent(
             id: "test_id",
             pubkey: "test_pubkey",
@@ -73,7 +73,7 @@ final class NIP89Tests: XCTestCase {
         XCTAssertEqual(clientTag?.relay, "wss://relay.test")
     }
 
-    func testEventClientTagExtractionWithoutRelay() throws {
+    func testEventClientTagExtractionWithoutRelay() async throws {
         let event = NDKEvent(
             id: "test_id",
             pubkey: "test_pubkey",
@@ -94,7 +94,7 @@ final class NIP89Tests: XCTestCase {
         XCTAssertNil(clientTag?.relay)
     }
 
-    func testEventClientTagExtractionWithoutAddress() throws {
+    func testEventClientTagExtractionWithoutAddress() async throws {
         let event = NDKEvent(
             id: "test_id",
             pubkey: "test_pubkey",
@@ -115,7 +115,7 @@ final class NIP89Tests: XCTestCase {
         XCTAssertNil(clientTag?.relay)
     }
 
-    func testEventWithoutClientTag() throws {
+    func testEventWithoutClientTag() async throws {
         let event = NDKEvent(
             id: "test_id",
             pubkey: "test_pubkey",
@@ -134,8 +134,8 @@ final class NIP89Tests: XCTestCase {
 
     // MARK: - Handler Information Tests
 
-    func testHandlerInfoBuilder() throws {
-        let ndk = NDK()
+    func testHandlerInfoBuilder() async throws {
+        let ndk = try await NDKTestFactory.createNDK()
         let builder = NDKEventBuilder(ndk: ndk)
 
         let metadata = NIP89HandlerMetadata(
@@ -166,7 +166,7 @@ final class NIP89Tests: XCTestCase {
         XCTAssertFalse(builder.content.isEmpty)
     }
 
-    func testHandlerInfoEventParsing() throws {
+    func testHandlerInfoEventParsing() async throws {
         let event = NDKEvent(
             id: "test_id",
             pubkey: "test_pubkey",
@@ -196,8 +196,8 @@ final class NIP89Tests: XCTestCase {
 
     // MARK: - Recommendation Tests
 
-    func testRecommendationBuilder() throws {
-        let ndk = NDK()
+    func testRecommendationBuilder() async throws {
+        let ndk = try await NDKTestFactory.createNDK()
         let builder = NDKEventBuilder(ndk: ndk)
 
         let handlers = [
@@ -224,7 +224,7 @@ final class NIP89Tests: XCTestCase {
         XCTAssertTrue(builder.tags.contains(["a", "31990:def456:handler2", "wss://relay2.test", "ios"]))
     }
 
-    func testRecommendationEventParsing() throws {
+    func testRecommendationEventParsing() async throws {
         let event = NDKEvent(
             id: "test_id",
             pubkey: "test_pubkey",
@@ -260,6 +260,7 @@ final class NIP89Tests: XCTestCase {
     func testAutomaticClientTagging() async throws {
         let signer = try NDKPrivateKeySigner(privateKey: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
         let ndk = NDK(
+            cache: try await NDKTestFactory.createTestCache(),
             clientTagConfig: NDKClientTagConfig(
                 name: "TestClient",
                 address: "31990:abc123:test",
@@ -292,6 +293,7 @@ final class NIP89Tests: XCTestCase {
     func testDisabledAutomaticClientTagging() async throws {
         let signer = try NDKPrivateKeySigner(privateKey: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
         let ndk = NDK(
+            cache: try await NDKTestFactory.createTestCache(),
             clientTagConfig: NDKClientTagConfig(
                 name: "TestClient",
                 address: "31990:abc123:test",
@@ -312,6 +314,7 @@ final class NIP89Tests: XCTestCase {
     func testManualClientTagOverridesAutomatic() async throws {
         let signer = try NDKPrivateKeySigner(privateKey: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
         let ndk = NDK(
+            cache: try await NDKTestFactory.createTestCache(),
             clientTagConfig: NDKClientTagConfig(
                 name: "TestClient",
                 address: "31990:abc123:test",
@@ -336,6 +339,7 @@ final class NIP89Tests: XCTestCase {
     func testAutomaticClientTaggingWithoutAddress() async throws {
         let signer = try NDKPrivateKeySigner(privateKey: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
         let ndk = NDK(
+            cache: try await NDKTestFactory.createTestCache(),
             clientTagConfig: NDKClientTagConfig(
                 name: "TestClient",
                 relay: "wss://relay.test",

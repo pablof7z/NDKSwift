@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import NDKSwiftCore
+
 
 struct AsciiCharacter: ExpressibleByStringLiteral, CustomStringConvertible, Equatable, Hashable {
     private let value: UInt8

@@ -13,7 +13,7 @@ public actor MintManager {
 
     // MARK: - Initialization
 
-    public init(cache: NDKCache? = nil) {
+    public init(cache: NDKNostrDBCache? = nil) {
         if let cache = cache {
             mintLoader = CachedMintLoader(cache: cache)
         } else {

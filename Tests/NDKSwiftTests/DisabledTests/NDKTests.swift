@@ -6,7 +6,7 @@ final class NDKTests: NDKTestCase {
 
     func testInitializationWithDefaults() async throws {
         try await performAsyncTest(timeout: 30) { [self] in
-            let ndk = NDK()
+            let ndk = try await NDKTestFactory.createNDK()
 
             XCTAssertNil(ndk.signer)
             XCTAssertNil(ndk.cache)
@@ -23,7 +23,7 @@ final class NDKTests: NDKTestCase {
         try await performAsyncTest(timeout: 30) { [self] in
             let relayUrls = ["wss://relay1.test", "wss://relay2.test"]
             let signer = try NDKPrivateKeySigner.generate()
-            let cache = self.createMemoryCache()
+            let cache = self.createtry await NDKTestFactory.createTestCache()
 
             let ndk = NDK(
                 relayURLs: relayUrls,
@@ -45,7 +45,7 @@ final class NDKTests: NDKTestCase {
 
     func testActiveUserUpdatesWithSigner() async throws {
         try await performAsyncTest(timeout: 30) { [self] in
-            let ndk = self.createTestNDK()
+            let ndk = try await self.createTestNDK()
             let activeUser1 = await ndk.activeUser
             XCTAssertNil(activeUser1)
 
@@ -63,7 +63,7 @@ final class NDKTests: NDKTestCase {
 
     func testAddRelay() async throws {
         try await performAsyncTest(timeout: 30) { [self] in
-            let ndk = self.createTestNDK()
+            let ndk = try await self.createTestNDK()
             let relayUrl = "wss://test.relay"
 
             let relay = await ndk.addRelay(relayUrl)
@@ -77,7 +77,7 @@ final class NDKTests: NDKTestCase {
 
     func testAddDuplicateRelay() async throws {
         try await performAsyncTest(timeout: 30) { [self] in
-            let ndk = self.createTestNDK()
+            let ndk = try await self.createTestNDK()
             let relayUrl = "wss://test.relay"
 
             let relay1 = await ndk.addRelay(relayUrl)
@@ -90,7 +90,7 @@ final class NDKTests: NDKTestCase {
     }
 
     func testRemoveRelay() async {
-        let ndk = createTestNDK()
+        let ndk = try await createTestNDK()
         let relayUrl = "wss://test.relay"
 
         await ndk.addRelay(relayUrl)
@@ -103,7 +103,7 @@ final class NDKTests: NDKTestCase {
     }
 
     func testRemoveNonExistentRelay() async {
-        let ndk = createTestNDK()
+        let ndk = try await createTestNDK()
         await ndk.addRelay("wss://test1.relay")
 
         await ndk.removeRelay("wss://nonexistent.relay")
@@ -141,7 +141,7 @@ final class NDKTests: NDKTestCase {
     }
 
     func testWaitForRelayConnections() async {
-        let ndk = createTestNDK()
+        let ndk = try await createTestNDK()
 
         // No relays, should return 0 immediately
         let connected = await ndk.waitForRelayConnections(minimumRelays: 1, timeout: 1.0)
@@ -151,7 +151,7 @@ final class NDKTests: NDKTestCase {
     // MARK: - Event Publishing Tests
 
     func testPublishWithoutSigner() async throws {
-        let ndk = createTestNDK()
+        let ndk = try await createTestNDK()
         let event = EventTestFactory.createEvent()
 
         await XCTAssertAsyncThrows {
@@ -204,7 +204,7 @@ final class NDKTests: NDKTestCase {
     // MARK: - Data Access Tests
 
     func testObserveCreatesDataSource() {
-        let ndk = createTestNDK()
+        let ndk = try await createTestNDK()
         let filter = NDKFilter(kinds: [1])
 
         let dataSource = ndk.subscribe(filter: filter)
@@ -214,7 +214,7 @@ final class NDKTests: NDKTestCase {
     }
 
     func testObserveWithTransform() {
-        let ndk = createTestNDK()
+        let ndk = try await createTestNDK()
         let filter = NDKFilter(kinds: [0])
 
         let dataSource = ndk.subscribe(
@@ -229,7 +229,7 @@ final class NDKTests: NDKTestCase {
     }
 
     func testFetchEventsWithCache() async throws {
-        let cache = createMemoryCache()
+        let cache = createtry await NDKTestFactory.createTestCache()
         let ndk = createTestNDK(cache: cache)
 
         // Pre-populate cache
@@ -259,7 +259,7 @@ final class NDKTests: NDKTestCase {
     }
 
     func testFetchEventById() async throws {
-        let cache = createMemoryCache()
+        let cache = createtry await NDKTestFactory.createTestCache()
         let ndk = createTestNDK(cache: cache)
 
         let event = EventTestFactory.createEvent()
@@ -280,7 +280,7 @@ final class NDKTests: NDKTestCase {
     }
 
     func testFetchEventByFilter() async throws {
-        let cache = createMemoryCache()
+        let cache = createtry await NDKTestFactory.createTestCache()
         let ndk = createTestNDK(cache: cache)
 
         let event = EventTestFactory.createEvent(kind: 30023)
@@ -303,7 +303,7 @@ final class NDKTests: NDKTestCase {
     // MARK: - User Management Tests
 
     func testGetUserFromNpub() throws {
-        let ndk = createTestNDK()
+        let ndk = try await createTestNDK()
         let npub = "npub1w0zv839p6nz2wnfp8u5fqdqzs9d9pdhg3znye9ej63wh27h73gns6h9nkx"
 
         let user = ndk.getUser(npub: npub)
@@ -314,7 +314,7 @@ final class NDKTests: NDKTestCase {
     }
 
     func testGetUserFromPubkey() {
-        let ndk = createTestNDK()
+        let ndk = try await createTestNDK()
         let pubkey = TestFixtures.Keys.alice.publicKey
 
         let user = ndk.getUser(pubkey)
@@ -326,7 +326,7 @@ final class NDKTests: NDKTestCase {
     // MARK: - Profile Fetching Tests
 
     func testFetchProfileFromCache() async throws {
-        let cache = createMemoryCache()
+        let cache = createtry await NDKTestFactory.createTestCache()
         let ndk = createTestNDK(cache: cache)
 
         // Create and cache metadata event
@@ -354,7 +354,7 @@ final class NDKTests: NDKTestCase {
     }
 
     func testFetchProfilesMultiple() async throws {
-        let cache = createMemoryCache()
+        let cache = createtry await NDKTestFactory.createTestCache()
         let ndk = createTestNDK(cache: cache)
 
         // Create metadata events for multiple users
@@ -395,7 +395,7 @@ final class NDKTests: NDKTestCase {
 
     func testDebugModeConfiguration() {
         // Test default value
-        let ndkDefault = createTestNDK()
+        let ndkDefault = try await createTestNDK()
         XCTAssertFalse(ndkDefault.debugMode)
 
         // Test initialized with debugMode: true
@@ -405,7 +405,7 @@ final class NDKTests: NDKTestCase {
 
     func testOutboxConfiguration() {
         // Test default value
-        let ndkDefault = createTestNDK()
+        let ndkDefault = try await createTestNDK()
         XCTAssertTrue(ndkDefault.outboxEnabled) // Default
 
         // Test initialized with outboxEnabled: false
@@ -422,7 +422,7 @@ final class NDKTests: NDKTestCase {
     // MARK: - Integration with Other Components Tests
 
     func testSubscriptionTracking() async {
-        let ndk = createTestNDK()
+        let ndk = try await createTestNDK()
         let filter = NDKFilter(kinds: [1])
 
         // Create data source (modern subscription approach)
@@ -436,7 +436,7 @@ final class NDKTests: NDKTestCase {
     }
 
     func testSignatureVerificationConfig() {
-        let ndk = createTestNDK()
+        let ndk = try await createTestNDK()
 
         let defaultConfig = ndk.signatureVerificationConfig
         XCTAssertEqual(defaultConfig.initialValidationRatio, NDKSignatureVerificationConfig.default.initialValidationRatio)

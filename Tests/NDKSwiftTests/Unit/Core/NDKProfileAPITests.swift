@@ -11,7 +11,7 @@ final class NDKProfileAPITests: XCTestCase {
     private let testPubkey = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
 
     override func setUp() async throws {
-        ndk = NDK()
+        ndk = try await NDKTestFactory.createNDK()
     }
 
     override func tearDown() async throws {

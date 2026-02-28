@@ -8,7 +8,7 @@ final class SubscriptionSwapManagerTests: XCTestCase {
 
     override func setUp() async throws {
         manager = SubscriptionSwapManager.shared
-        ndk = NDK()
+        ndk = try await NDKTestFactory.createNDK()
         sessionData = NDKSessionData(pubkey: TestFixtures.Keys.alice.publicKey, ndk: ndk)
     }
 

@@ -11,8 +11,9 @@ final class NDKSessionContactListTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
 
-        // Create NDK with in-memory cache (no relays needed for this test)
-        ndk = NDK(relayURLs: [], cache: MemoryCache())
+        // Create NDK with NostrDB cache (no relays needed for this test)
+        let cache = try await NDKTestFactory.createTestCache()
+        ndk = NDK(relayURLs: [], cache: cache)
 
         // Create test signer
         signer = try NDKPrivateKeySigner.generate()

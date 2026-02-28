@@ -1,5 +1,5 @@
 @testable import NDKSwiftCore
-import NDKSwiftSQLite
+
 import XCTest
 
 final class CacheObservationTests: XCTestCase {

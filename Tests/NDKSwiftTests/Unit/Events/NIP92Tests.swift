@@ -6,7 +6,7 @@ final class NIP92Tests: XCTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
-        ndk = NDK()
+        ndk = try await NDKTestFactory.createNDK()
         ndk.signer = try NDKPrivateKeySigner.generate()
     }
 

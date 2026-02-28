@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import NDKSwiftCore
+
 import NostrDB
 
 /// The sequence of strings in a single nostr event tag

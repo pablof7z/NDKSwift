@@ -20,8 +20,8 @@ final class EventDeletionE2ETests: XCTestCase {
         NDKLogger.log(.info, category: .event, "🧪 Starting testBasicEventDeletionE2E at \(startTime)")
 
         // Create NDK instances
-        let publisher = NDK(cache: MemoryCache())
-        let subscriber = NDK(cache: MemoryCache())
+        let publisher = NDK(cache: try await NDKTestFactory.createTestCache())
+        let subscriber = NDK(cache: try await NDKTestFactory.createTestCache())
 
         // Create signers
         let authorSigner = try NDKPrivateKeySigner.generate()
@@ -112,9 +112,9 @@ final class EventDeletionE2ETests: XCTestCase {
         NDKLogger.log(.info, category: .event, "🧪 Starting testDeletionAuthorValidationE2E at \(startTime)")
 
         // Create NDK instances
-        let originalAuthor = NDK(cache: MemoryCache())
-        let maliciousActor = NDK(cache: MemoryCache())
-        let observer = NDK(cache: MemoryCache())
+        let originalAuthor = NDK(cache: try await NDKTestFactory.createTestCache())
+        let maliciousActor = NDK(cache: try await NDKTestFactory.createTestCache())
+        let observer = NDK(cache: try await NDKTestFactory.createTestCache())
 
         // Create signers
         let authorSigner = try NDKPrivateKeySigner.generate()
@@ -224,7 +224,7 @@ final class EventDeletionE2ETests: XCTestCase {
         let startTime = Date()
         NDKLogger.log(.info, category: .event, "🧪 Starting testMultipleEventDeletionE2E at \(startTime)")
 
-        let ndk = NDK(cache: MemoryCache())
+        let ndk = NDK(cache: try await NDKTestFactory.createTestCache())
         let signer = try NDKPrivateKeySigner.generate()
         ndk.signer = signer
 
@@ -306,9 +306,9 @@ final class EventDeletionE2ETests: XCTestCase {
         let signer = try NDKPrivateKeySigner.generate()
         let pubkey = try await signer.pubkey
 
-        let instance1 = NDK(cache: MemoryCache())
-        let instance2 = NDK(cache: MemoryCache())
-        let instance3 = NDK(cache: MemoryCache())
+        let instance1 = NDK(cache: try await NDKTestFactory.createTestCache())
+        let instance2 = NDK(cache: try await NDKTestFactory.createTestCache())
+        let instance3 = NDK(cache: try await NDKTestFactory.createTestCache())
 
         instance1.signer = signer
         instance2.signer = signer
@@ -433,7 +433,7 @@ final class EventDeletionE2ETests: XCTestCase {
         let startTime = Date()
         NDKLogger.log(.info, category: .event, "🧪 Starting testDeletionTombstoneE2E at \(startTime)")
 
-        let ndk = NDK(cache: MemoryCache())
+        let ndk = NDK(cache: try await NDKTestFactory.createTestCache())
         let signer = try NDKPrivateKeySigner.generate()
         ndk.signer = signer
 

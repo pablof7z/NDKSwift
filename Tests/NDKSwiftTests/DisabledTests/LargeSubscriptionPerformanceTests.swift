@@ -4,14 +4,14 @@ import XCTest
 /// Performance tests for large subscription handling
 final class LargeSubscriptionPerformanceTests: XCTestCase {
     var ndk: NDK!
-    var cache: MemoryCache!
+    var cache: NDKNostrDBCache!
     var mockRelay: MockRelay!
 
     override func setUp() async throws {
         try await super.setUp()
 
         // Create cache
-        cache = MemoryCache()
+        cache = try await NDKTestFactory.createTestCache()
 
         // Create NDK with mock relay
         ndk = NDK(relayURLs: [], cache: cache)

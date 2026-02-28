@@ -4,10 +4,14 @@ import XCTest
 final class NDKOutboxModelTests: XCTestCase {
     var ndk: NDK!
     var signer: NDKPrivateKeySigner!
-    var cache: MemoryCache!
+    var cache: NDKNostrDBCache!
 
     override func setUp() async throws {
-        cache = MemoryCache()
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("NDKSwiftTests")
+            .appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        cache = try await NDKNostrDBCache(path: tempDir.path)
         signer = try NDKPrivateKeySigner.generate()
         ndk = NDK(
             relayURLs: [

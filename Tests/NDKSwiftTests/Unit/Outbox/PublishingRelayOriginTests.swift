@@ -11,7 +11,7 @@ final class PublishingRelayOriginTests: XCTestCase {
     /// it should NOT be marked as an app relay
     func test_relayAddedDuringPublishing_isNotAppRelay() async throws {
         // Setup: Create NDK with NO initial relays
-        let ndk = NDK()
+        let ndk = try await NDKTestFactory.createNDK()
 
         // Verify no app relays initially
         let initialAppRelays = await ndk.pool.appRelays
@@ -55,7 +55,7 @@ final class PublishingRelayOriginTests: XCTestCase {
     func test_publishingStrategyAddsRelayWithOutboxOrigin_notAppRelays() async throws {
         // Setup: Create NDK with one explicit app relay
         let appRelayUrl = "wss://my-app-relay.test.com"
-        let ndk = NDK(relayURLs: [appRelayUrl])
+        let ndk = try await NDKTestFactory.createNDK(relayURLs: [appRelayUrl])
         await ndk.initializeRelays()
 
         // Verify initial state: one app relay
@@ -101,7 +101,7 @@ final class PublishingRelayOriginTests: XCTestCase {
 
     /// Confirms that explicitly added app relays ARE in appRelays
     func test_explicitlyAddedRelay_isAppRelay() async throws {
-        let ndk = NDK()
+        let ndk = try await NDKTestFactory.createNDK()
 
         // Explicitly add a relay as an app relay
         let appRelayUrl = "wss://explicit-app-relay.test.com"
@@ -115,7 +115,7 @@ final class PublishingRelayOriginTests: XCTestCase {
 
     /// Confirms that discovery relays are NOT in appRelays
     func test_discoveryRelay_isNotAppRelay() async throws {
-        let ndk = NDK()
+        let ndk = try await NDKTestFactory.createNDK()
 
         let discoveryUrl = "wss://discovery.test.com"
         _ = await ndk.pool.addRelay(discoveryUrl, origin: .discovery)
@@ -126,7 +126,7 @@ final class PublishingRelayOriginTests: XCTestCase {
 
     /// Confirms that outbox relays are NOT in appRelays
     func test_outboxRelay_isNotAppRelay() async throws {
-        let ndk = NDK()
+        let ndk = try await NDKTestFactory.createNDK()
 
         let outboxUrl = "wss://outbox.test.com"
         _ = await ndk.pool.addRelay(outboxUrl, origin: .outbox(authorPubkey: "somepubkey12345678901234567890123456789012345678901234567890123"))

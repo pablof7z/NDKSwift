@@ -4,18 +4,33 @@ import Foundation
 // MARK: - NDK Factory
 
 enum NDKTestFactory {
+    /// Creates a test NostrDB cache backed by a temporary directory
+    static func createTestCache() async throws -> NDKNostrDBCache {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("NDKSwiftTests")
+            .appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        return try await NDKNostrDBCache(path: tempDir.path)
+    }
+
     /// Creates a test NDK instance with optional configuration
     static func createNDK(
         relayURLs: [RelayURL] = [],
         signer: NDKSigner? = nil,
-        cache: NDKCache? = MemoryCache(),
+        cache: NDKNostrDBCache? = nil,
         debugMode: Bool = false,
         outboxEnabled: Bool = false
-    ) -> NDK {
+    ) async throws -> NDK {
+        let resolvedCache: NDKNostrDBCache
+        if let cache = cache {
+            resolvedCache = cache
+        } else {
+            resolvedCache = try await createTestCache()
+        }
         return NDK(
             relayURLs: relayURLs,
             signer: signer,
-            cache: cache,
+            cache: resolvedCache,
             debugMode: debugMode,
             outboxEnabled: outboxEnabled
         )
@@ -24,10 +39,10 @@ enum NDKTestFactory {
     /// Creates an authenticated NDK instance with a generated signer
     static func createAuthenticatedNDK(
         relayURLs: [RelayURL] = [],
-        cache: NDKCache? = MemoryCache()
-    ) throws -> (ndk: NDK, signer: NDKSigner) {
+        cache: NDKNostrDBCache? = nil
+    ) async throws -> (ndk: NDK, signer: NDKSigner) {
         let signer = try NDKPrivateKeySigner.generate()
-        let ndk = createNDK(relayURLs: relayURLs, signer: signer, cache: cache)
+        let ndk = try await createNDK(relayURLs: relayURLs, signer: signer, cache: cache)
         return (ndk, signer)
     }
 
@@ -35,10 +50,10 @@ enum NDKTestFactory {
     static func createConnectedNDK(
         useTestRelays: Bool = true,
         signer: NDKSigner? = nil,
-        cache: NDKCache? = MemoryCache()
+        cache: NDKNostrDBCache? = nil
     ) async throws -> NDK {
         let relayURLs = useTestRelays ? RelayConstants.testRelays : []
-        let ndk = createNDK(relayURLs: relayURLs, signer: signer, cache: cache)
+        let ndk = try await createNDK(relayURLs: relayURLs, signer: signer, cache: cache)
         await ndk.connect()
 
         // Wait for connections
@@ -50,9 +65,9 @@ enum NDKTestFactory {
     /// Creates a connected, authenticated NDK with a generated signer
     static func createConnectedAuthenticatedNDK(
         useTestRelays: Bool = true,
-        cache: NDKCache? = MemoryCache()
+        cache: NDKNostrDBCache? = nil
     ) async throws -> (ndk: NDK, signer: NDKSigner) {
-        let (ndk, signer) = try createAuthenticatedNDK(relayURLs: useTestRelays ? RelayConstants.testRelays : [], cache: cache)
+        let (ndk, signer) = try await createAuthenticatedNDK(relayURLs: useTestRelays ? RelayConstants.testRelays : [], cache: cache)
         await ndk.connect()
         _ = await ndk.waitForRelayConnections(minimumRelays: 1, timeout: 10.0)
         return (ndk, signer)

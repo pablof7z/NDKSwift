@@ -16,7 +16,7 @@ final class NDKRelayRankerTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         mockTracker = MockRelayPreferenceProvider()
-        relayRanker = NDKRelayRanker(ndk: NDK(), tracker: mockTracker)
+        relayRanker = NDKRelayRanker(ndk: try await NDKTestFactory.createNDK(), tracker: mockTracker)
     }
 
     override func tearDown() async throws {

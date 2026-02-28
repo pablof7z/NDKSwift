@@ -1,7 +1,6 @@
 import CashuSwift
 import NDKSwiftCashu
 @testable import NDKSwiftCore
-import NDKSwiftSQLite
 import XCTest
 
 final class WalletHealthMonitorTests: XCTestCase {
@@ -18,8 +17,8 @@ final class WalletHealthMonitorTests: XCTestCase {
         let privateKey = Crypto.generatePrivateKey()
         signer = try NDKPrivateKeySigner(privateKey: privateKey)
 
-        // Create NDK instance with SQLite cache
-        let cache = try await NDKSQLiteCache()
+        // Create NDK instance with NostrDB cache
+        let cache = try await NDKTestFactory.createTestCache()
         ndk = NDK(signer: signer, cache: cache)
 
         // Create wallet

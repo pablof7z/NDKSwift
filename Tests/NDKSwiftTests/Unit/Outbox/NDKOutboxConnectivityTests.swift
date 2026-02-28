@@ -6,7 +6,7 @@ final class NDKOutboxConnectivityTests: XCTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
-        ndk = NDK()
+        ndk = try await NDKTestFactory.createNDK()
     }
 
     override func tearDown() async throws {
@@ -16,7 +16,7 @@ final class NDKOutboxConnectivityTests: XCTestCase {
 
     func testOutboxFallbackToConnectedRelays() async throws {
         // Configure NDK with an unreachable outbox relay
-        ndk = NDK(discoveryConfig: NDKDiscoveryConfig(
+        ndk = NDK(cache: try await NDKTestFactory.createTestCache(), discoveryConfig: NDKDiscoveryConfig(
             discoveryRelays: ["wss://unreachable.relay.test"]
         ))
 
@@ -42,7 +42,7 @@ final class NDKOutboxConnectivityTests: XCTestCase {
 
     func testOutboxStrategyWithDisconnectedOutboxRelays() async throws {
         // Configure NDK with an unreachable outbox relay
-        ndk = NDK(discoveryConfig: NDKDiscoveryConfig(
+        ndk = NDK(cache: try await NDKTestFactory.createTestCache(), discoveryConfig: NDKDiscoveryConfig(
             discoveryRelays: ["wss://unreachable.relay.test"]
         ))
 
@@ -70,7 +70,7 @@ final class NDKOutboxConnectivityTests: XCTestCase {
 
     func testRelayListFetchWithoutOutboxRelays() async throws {
         // Configure NDK with empty outbox relays
-        ndk = NDK(discoveryConfig: NDKDiscoveryConfig(
+        ndk = NDK(cache: try await NDKTestFactory.createTestCache(), discoveryConfig: NDKDiscoveryConfig(
             discoveryRelays: []
         ))
 
