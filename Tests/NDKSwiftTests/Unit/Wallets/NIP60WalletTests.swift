@@ -6,7 +6,7 @@ final class NIP60WalletTests: XCTestCase {
     // MARK: - Initialization Tests
 
     func testInitializationRequiresSigner() async throws {
-        let ndkWithoutSigner = NDK()
+        let ndkWithoutSigner = try await NDKTestFactory.createNDK()
 
         do {
             _ = try NIP60Wallet(ndk: ndkWithoutSigner)
@@ -20,7 +20,7 @@ final class NIP60WalletTests: XCTestCase {
 
     func testWalletPropertiesInitialize() async throws {
         let signer = try NDKPrivateKeySigner.generate()
-        let ndk = NDK(signer: signer)
+        let ndk = try await NDKTestFactory.createNDK(signer: signer)
         let wallet = try NIP60Wallet(ndk: ndk)
 
         // Test actor-isolated properties by accessing them in async context
@@ -39,7 +39,7 @@ final class NIP60WalletTests: XCTestCase {
 
     func testP2PKManagerGeneratesValidKeys() async throws {
         let signer = try NDKPrivateKeySigner.generate()
-        let ndk = NDK(signer: signer)
+        let ndk = try await NDKTestFactory.createNDK(signer: signer)
         let wallet = try NIP60Wallet(ndk: ndk)
 
         let publicKey = try await wallet.getP2PKPubkey()
@@ -52,7 +52,7 @@ final class NIP60WalletTests: XCTestCase {
 
     func testP2PKManagerConsistency() async throws {
         let signer = try NDKPrivateKeySigner.generate()
-        let ndk = NDK(signer: signer)
+        let ndk = try await NDKTestFactory.createNDK(signer: signer)
         let wallet = try NIP60Wallet(ndk: ndk)
 
         let key1 = try await wallet.getP2PKPubkey()
@@ -66,7 +66,7 @@ final class NIP60WalletTests: XCTestCase {
 
     func testMintManagerStartsEmpty() async throws {
         let signer = try NDKPrivateKeySigner.generate()
-        let ndk = NDK(signer: signer)
+        let ndk = try await NDKTestFactory.createNDK(signer: signer)
         let wallet = try NIP60Wallet(ndk: ndk)
 
         // Test that wallet is not available initially (no mints configured)
@@ -76,7 +76,7 @@ final class NIP60WalletTests: XCTestCase {
 
     func testWalletSetup() async throws {
         let signer = try NDKPrivateKeySigner.generate()
-        let ndk = NDK(signer: signer)
+        let ndk = try await NDKTestFactory.createNDK(signer: signer)
         let wallet = try NIP60Wallet(ndk: ndk)
 
         let mintUrls = ["https://mint.example.com"]
@@ -93,7 +93,7 @@ final class NIP60WalletTests: XCTestCase {
 
     func testHealthMonitorInitialState() async throws {
         let signer = try NDKPrivateKeySigner.generate()
-        let ndk = NDK(signer: signer)
+        let ndk = try await NDKTestFactory.createNDK(signer: signer)
         let wallet = try NIP60Wallet(ndk: ndk)
 
         // Test that relay health starts empty
@@ -105,7 +105,7 @@ final class NIP60WalletTests: XCTestCase {
 
     func testTransactionHistoryStartsEmpty() async throws {
         let signer = try NDKPrivateKeySigner.generate()
-        let ndk = NDK(signer: signer)
+        let ndk = try await NDKTestFactory.createNDK(signer: signer)
         let wallet = try NIP60Wallet(ndk: ndk)
 
         let transactions = await wallet.getRecentTransactions(limit: 10)
@@ -116,7 +116,7 @@ final class NIP60WalletTests: XCTestCase {
 
     func testInitialBalance() async throws {
         let signer = try NDKPrivateKeySigner.generate()
-        let ndk = NDK(signer: signer)
+        let ndk = try await NDKTestFactory.createNDK(signer: signer)
         let wallet = try NIP60Wallet(ndk: ndk)
 
         let balance = try await wallet.getBalance()
@@ -125,7 +125,7 @@ final class NIP60WalletTests: XCTestCase {
 
     func testBalancesByMint() async throws {
         let signer = try NDKPrivateKeySigner.generate()
-        let ndk = NDK(signer: signer)
+        let ndk = try await NDKTestFactory.createNDK(signer: signer)
         let wallet = try NIP60Wallet(ndk: ndk)
 
         let balancesByMint = await wallet.getBalancesByMint()
@@ -136,7 +136,7 @@ final class NIP60WalletTests: XCTestCase {
 
     func testWalletHealthCheck() async throws {
         let signer = try NDKPrivateKeySigner.generate()
-        let ndk = NDK(signer: signer)
+        let ndk = try await NDKTestFactory.createNDK(signer: signer)
         let wallet = try NIP60Wallet(ndk: ndk)
 
         // Test that wallet health check can be performed
@@ -146,7 +146,7 @@ final class NIP60WalletTests: XCTestCase {
 
     func testNutzapManagement() async throws {
         let signer = try NDKPrivateKeySigner.generate()
-        let ndk = NDK(signer: signer)
+        let ndk = try await NDKTestFactory.createNDK(signer: signer)
         let wallet = try NIP60Wallet(ndk: ndk)
 
         // Test that nutzap methods can be called without errors

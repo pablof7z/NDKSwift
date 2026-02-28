@@ -13,7 +13,7 @@ final class TagEventRelayHintTests: XCTestCase {
         signer = try NDKPrivateKeySigner(privateKey: privateKey)
 
         // Create NDK instance
-        ndk = NDK()
+        ndk = try await NDKTestFactory.createNDK()
     }
 
     override func tearDown() async throws {

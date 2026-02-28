@@ -5,16 +5,16 @@ final class NDKBlossomExtensionsTests: XCTestCase {
     var ndk: NDK!
     var mockSigner: MockNDKSigner!
 
-    override func setUp() {
-        super.setUp()
-        ndk = NDK()
+    override func setUp() async throws {
+        try await super.setUp()
+        ndk = try await NDKTestFactory.createNDK()
         mockSigner = MockNDKSigner()
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         ndk = nil
         mockSigner = nil
-        super.tearDown()
+        try await super.tearDown()
     }
 
     // MARK: - BlossomConstants Tests

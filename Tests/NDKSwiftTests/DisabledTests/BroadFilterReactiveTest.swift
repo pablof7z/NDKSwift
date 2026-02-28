@@ -1,5 +1,5 @@
 @testable import NDKSwiftCore
-import NDKSwiftSQLite
+
 import XCTest
 
 /// Tests that verify broader filters receive events from more specific subscriptions
@@ -10,7 +10,7 @@ final class BroadFilterReactiveTest: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         // Use SQLiteCache which properly implements reactive observation
-        cache = try await NDKSQLiteCache(path: ":memory:")
+        cache = try await NDKTestFactory.createTestCache()
         ndk = NDK(cache: cache, outboxEnabled: false)
     }
 

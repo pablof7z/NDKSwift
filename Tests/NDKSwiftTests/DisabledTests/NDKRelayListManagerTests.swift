@@ -10,7 +10,7 @@ final class NDKRelayListManagerTests: XCTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
-        mockCache = MemoryCache()
+        mockCache = try await NDKTestFactory.createTestCache()
         ndk = NDK(cache: mockCache)
         manager = NDKRelayListManager(
             ndk: ndk,

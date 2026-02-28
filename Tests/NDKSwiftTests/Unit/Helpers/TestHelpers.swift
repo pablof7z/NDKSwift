@@ -85,7 +85,7 @@ func createTestEvent(
     signer: NDKSigner? = nil
 ) async throws -> NDKEvent {
     // Create a temporary NDK instance for building the event
-    let ndk = NDK()
+    let ndk = try await NDKTestFactory.createNDK()
 
     // Build the event using NDKEventBuilder
     let builder = NDKEventBuilder(ndk: ndk)

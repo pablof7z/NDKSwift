@@ -4,7 +4,7 @@ import XCTest
 /// Focused tests for NIP-65 outbox model p-tag publishing behavior
 final class OutboxModelPTagTests: XCTestCase {
     func testEventWithFewerThan10PTagsUsesOutboxModel() async throws {
-        let cache = MemoryCache()
+        let cache = try await NDKTestFactory.createTestCache()
         let signer = try NDKPrivateKeySigner.generate()
         let ndk = NDK(relayURLs: [], signer: signer, cache: cache)
 
@@ -33,7 +33,7 @@ final class OutboxModelPTagTests: XCTestCase {
     }
 
     func testEventWith10OrMorePTagsSkipsOutboxModel() async throws {
-        let cache = MemoryCache()
+        let cache = try await NDKTestFactory.createTestCache()
         let signer = try NDKPrivateKeySigner.generate()
         let ndk = NDK(relayURLs: [], signer: signer, cache: cache)
 
@@ -62,7 +62,7 @@ final class OutboxModelPTagTests: XCTestCase {
     }
 
     func testEventWithNoPTagsWorksNormally() async throws {
-        let cache = MemoryCache()
+        let cache = try await NDKTestFactory.createTestCache()
         let signer = try NDKPrivateKeySigner.generate()
         let ndk = NDK(relayURLs: [], signer: signer, cache: cache)
 
@@ -86,7 +86,7 @@ final class OutboxModelPTagTests: XCTestCase {
     }
 
     func testPTagExtractionWorksCorrectly() async throws {
-        let cache = MemoryCache()
+        let cache = try await NDKTestFactory.createTestCache()
         let signer = try NDKPrivateKeySigner.generate()
         let ndk = NDK(relayURLs: [], signer: signer, cache: cache)
 
@@ -114,7 +114,7 @@ final class OutboxModelPTagTests: XCTestCase {
     }
 
     func testFetchingIgnoresPTagCount() async throws {
-        let cache = MemoryCache()
+        let cache = try await NDKTestFactory.createTestCache()
         let signer = try NDKPrivateKeySigner.generate()
         let ndk = NDK(relayURLs: [], signer: signer, cache: cache)
 

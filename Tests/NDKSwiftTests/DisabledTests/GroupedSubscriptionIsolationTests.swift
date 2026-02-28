@@ -14,7 +14,7 @@ final class GroupedSubscriptionIsolationTests: XCTestCase {
     /// Test that two observers with same kind but different authors don't mix results
     func testObserversWithDifferentAuthorsRemainIsolated() async throws {
         // Create NDK with in-memory cache
-        let cache = MemoryCache()
+        let cache = try await NDKTestFactory.createTestCache()
         let ndk = NDK(cache: cache)
 
         // Define test pubkeys
@@ -130,7 +130,7 @@ final class GroupedSubscriptionIsolationTests: XCTestCase {
 
     /// Test multiple observers with overlapping filters
     func testOverlappingFiltersRemainIsolated() async throws {
-        let cache = MemoryCache()
+        let cache = try await NDKTestFactory.createTestCache()
         let ndk = NDK(cache: cache)
 
         let author1 = "cccc1111222233334444555566667777888899990000aaaabbbbccccddddeeff"
@@ -211,7 +211,7 @@ final class GroupedSubscriptionIsolationTests: XCTestCase {
 
     /// Test that tag filters don't cause cross-contamination
     func testTagFiltersRemainIsolated() async throws {
-        let cache = MemoryCache()
+        let cache = try await NDKTestFactory.createTestCache()
         let ndk = NDK(cache: cache)
 
         let pubkey = "ffff1111222233334444555566667777888899990000aaaabbbbccccddddeeff"
@@ -303,7 +303,7 @@ final class GroupedSubscriptionIsolationTests: XCTestCase {
 
     /// Test rapid subscription creation and cancellation
     func testRapidSubscriptionLifecycle() async throws {
-        let cache = MemoryCache()
+        let cache = try await NDKTestFactory.createTestCache()
         let ndk = NDK(cache: cache)
 
         let authors = (0 ..< 5).map { i in

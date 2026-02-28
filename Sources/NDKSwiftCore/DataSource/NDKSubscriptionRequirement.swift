@@ -6,7 +6,7 @@ actor NDKSubscriptionRequirement {
     nonisolated let filter: NDKFilter
     nonisolated let subscriptionId: String
     nonisolated let internalSubscription: NDKSubscriptionCoordinator
-    private let cache: any NDKCache
+    private let cache: NDKNostrDBCache
     private weak var ndk: NDK?
     private let closeOnEose: Bool
     nonisolated let relayStrategy: InternalRelaySelectionStrategy
@@ -43,7 +43,7 @@ actor NDKSubscriptionRequirement {
         filter: NDKFilter,
         subscriptionId: String,
         internalSubscription: NDKSubscriptionCoordinator,
-        cache: any NDKCache,
+        cache: NDKNostrDBCache,
         ndk: NDK,
         relays _: Set<RelayURL>?,
         exclusiveRelays _: Bool,

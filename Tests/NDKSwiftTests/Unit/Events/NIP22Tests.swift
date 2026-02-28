@@ -12,7 +12,7 @@ final class NIP22Tests: XCTestCase {
         signer = try NDKPrivateKeySigner.generate()
 
         // Initialize NDK with test configuration
-        ndk = NDK(signer: signer)
+        ndk = try await NDKTestFactory.createNDK(signer: signer)
     }
 
     override func tearDown() async throws {
@@ -231,7 +231,7 @@ final class NIP22Tests: XCTestCase {
     func testPTagPropagation() async throws {
         // Create a different signer for second user
         let signer2 = try NDKPrivateKeySigner.generate()
-        let ndk2 = NDK(signer: signer2)
+        let ndk2 = try await NDKTestFactory.createNDK(signer: signer2)
 
         // Create blog post by user 1
         let blogPost = try await NDKEventBuilder(ndk: ndk)

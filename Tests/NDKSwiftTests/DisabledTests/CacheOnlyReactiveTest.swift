@@ -1,5 +1,5 @@
 @testable import NDKSwiftCore
-import NDKSwiftSQLite
+
 import XCTest
 
 /// Tests that verify cache-only subscriptions participate in the reactive system
@@ -10,7 +10,7 @@ final class CacheOnlyReactiveTest: XCTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
-        cache = try await NDKSQLiteCache()
+        cache = try await NDKTestFactory.createTestCache()
         ndk = NDK(cache: cache, outboxEnabled: false)
     }
 

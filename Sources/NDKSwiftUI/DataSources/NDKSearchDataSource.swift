@@ -1,6 +1,5 @@
 import Foundation
 import NDKSwiftCore
-import NDKSwiftNostrDB
 import Observation
 import SwiftUI
 
@@ -38,9 +37,6 @@ public final class NDKSearchDataSource {
     /// Current search query
     public private(set) var query: String = ""
 
-    /// Whether nostrdb cache is available
-    public private(set) var isNostrDBAvailable: Bool = false
-
     // MARK: - Private Properties
 
     private let ndk: NDK
@@ -51,14 +47,11 @@ public final class NDKSearchDataSource {
 
     /// Initialize a search data source
     /// - Parameters:
-    ///   - ndk: The NDK instance (must have nostrdb cache)
+    ///   - ndk: The NDK instance
     ///   - limit: Maximum number of results to return (default: 100)
     public init(ndk: NDK, limit: Int = 100) {
         self.ndk = ndk
         self.limit = limit
-
-        // Check cache availability immediately (synchronous check is fine for type checking)
-        self.isNostrDBAvailable = ndk.cache is NDKNostrDBCache
     }
 
     deinit {
@@ -91,28 +84,15 @@ public final class NDKSearchDataSource {
                 error = nil
             }
 
-            do {
-                // Check if NDK has nostrdb cache (off main thread)
-                guard let cache = ndk.cache as? NDKNostrDBCache else {
-                    throw SearchError.nostrdbNotAvailable
-                }
+            // Perform search (off main thread - won't block UI)
+            let cache = ndk.cache
+            let results = await cache.textSearch(query, limit: limit)
 
-                // Perform search (off main thread - won't block UI)
-                let results = await cache.textSearch(query, limit: limit)
-
-                // Update results on main thread only if not cancelled
-                await MainActor.run {
-                    guard !Task.isCancelled else { return }
-                    events = results
-                    isLoading = false
-                }
-            } catch {
-                await MainActor.run {
-                    guard !Task.isCancelled else { return }
-                    self.error = error
-                    self.events = []
-                    self.isLoading = false
-                }
+            // Update results on main thread only if not cancelled
+            await MainActor.run {
+                guard !Task.isCancelled else { return }
+                events = results
+                isLoading = false
             }
         }
     }
@@ -124,18 +104,5 @@ public final class NDKSearchDataSource {
         events = []
         isLoading = false
         error = nil
-    }
-}
-
-// MARK: - SearchError
-
-enum SearchError: Error, LocalizedError {
-    case nostrdbNotAvailable
-
-    var errorDescription: String? {
-        switch self {
-        case .nostrdbNotAvailable:
-            return "Search requires nostrdb cache to be configured"
-        }
     }
 }

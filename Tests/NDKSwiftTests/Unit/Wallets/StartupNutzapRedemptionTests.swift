@@ -18,7 +18,7 @@ final class StartupNutzapRedemptionTests: XCTestCase {
 
         // Create NDK with mock relay
         mockRelay = MockRelayProtocol(url: "wss://test.relay")
-        ndk = NDK(relayURLs: ["wss://test.relay"], signer: signer)
+        ndk = try await NDKTestFactory.createNDK(relayURLs: ["wss://test.relay"], signer: signer)
 
         // Create wallet
         wallet = try NIP60Wallet(ndk: ndk)

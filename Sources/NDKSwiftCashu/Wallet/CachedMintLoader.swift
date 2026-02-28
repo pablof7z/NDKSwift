@@ -25,7 +25,7 @@ public actor CachedMintLoader {
     ///   - mintInfoMaxAge: How long before mint info is considered stale (default: 7 days)
     ///   - keysetMaxAge: How long before keysets are considered stale (default: 3 days)
     public init(
-        cache: NDKCache,
+        cache: NDKNostrDBCache,
         mintInfoMaxAge: TimeInterval = CacheConstants.defaultMintInfoMaxAge,
         keysetMaxAge: TimeInterval = CacheConstants.defaultKeysetMaxAge
     ) {

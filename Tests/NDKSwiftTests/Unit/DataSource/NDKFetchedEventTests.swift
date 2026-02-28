@@ -5,10 +5,10 @@ import XCTest
 final class NDKFetchedEventTests: XCTestCase {
     var ndk: NDK!
     var signer: NDKPrivateKeySigner!
-    var cache: MemoryCache!
+    var cache: NDKNostrDBCache!
 
     override func setUp() async throws {
-        cache = MemoryCache()
+        cache = try await NDKTestFactory.createTestCache()
         signer = try NDKPrivateKeySigner.generate()
         ndk = NDK(
             relayURLs: [

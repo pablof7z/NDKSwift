@@ -3,7 +3,7 @@ import Foundation
 /// Manages NIP-05 resolution with caching, deduplication, and performance optimizations
 public actor NIP05Manager {
     private let ndk: NDK
-    private let cache: NDKCache
+    private let cache: NDKNostrDBCache
     private let memoryCache: LRUCache<String, NIP05CacheEntry>
     private let domainRateLimiter: LRUCache<String, Date>
     private let networkClient = NDKNetworkClient()
@@ -196,7 +196,7 @@ public actor NIP05Manager {
             await memoryCache.clear()
         }
 
-        // Note: Database clearing should be done through NDKCache protocol
+        // Note: Database clearing should be done through NDKNostrDBCache directly
     }
 
     /// Get cache statistics

@@ -1,5 +1,5 @@
 @testable import NDKSwiftCore
-import NDKSwiftSQLite
+
 import XCTest
 
 /// Tests for cache-first behavior in NDKSubscriptionManager
@@ -11,7 +11,7 @@ class CacheFirstTests: XCTestCase {
         try await super.setUp()
 
         // Create SQLite cache and NDK instance
-        cache = try await NDKSQLiteCache(path: ":memory:")
+        cache = try await NDKTestFactory.createTestCache()
         ndk = NDK(
             relayURLs: [], // No relays to ensure we're testing cache-only behavior
             cache: cache

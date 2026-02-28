@@ -1,5 +1,5 @@
 import Foundation
-import NDKSwiftCore
+
 
 /// Represents a change in the unpublished events store
 public enum UnpublishedChange: Sendable {

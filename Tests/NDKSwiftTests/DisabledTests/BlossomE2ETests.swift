@@ -20,7 +20,7 @@ final class BlossomE2ETests: XCTestCase {
         let startTime = Date()
 
         // Create NDK instance
-        let ndk = NDK()
+        let ndk = try await NDKTestFactory.createNDK()
         let signer = try NDKPrivateKeySigner.generate()
         ndk.signer = signer
 
@@ -80,7 +80,7 @@ final class BlossomE2ETests: XCTestCase {
         NDKLogger.log(.info, category: .general, "🧪 Starting testBlossomWithFileMetadataEventE2E")
 
         // Create NDK instance with relays
-        let ndk = NDK()
+        let ndk = try await NDKTestFactory.createNDK()
         let signer = try NDKPrivateKeySigner.generate()
         ndk.signer = signer
 
@@ -168,7 +168,7 @@ final class BlossomE2ETests: XCTestCase {
     func testBlossomListAndDeleteE2E() async throws {
         NDKLogger.log(.info, category: .general, "🧪 Starting testBlossomListAndDeleteE2E")
 
-        let ndk = NDK()
+        let ndk = try await NDKTestFactory.createNDK()
         let signer = try NDKPrivateKeySigner.generate()
         ndk.signer = signer
 
@@ -270,7 +270,7 @@ final class BlossomE2ETests: XCTestCase {
     func testBlossomMultiServerUploadE2E() async throws {
         NDKLogger.log(.info, category: .general, "🧪 Starting testBlossomMultiServerUploadE2E")
 
-        let ndk = NDK()
+        let ndk = try await NDKTestFactory.createNDK()
         let signer = try NDKPrivateKeySigner.generate()
         ndk.signer = signer
 

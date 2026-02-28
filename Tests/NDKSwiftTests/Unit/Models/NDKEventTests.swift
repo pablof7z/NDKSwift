@@ -156,7 +156,7 @@ final class NDKEventTests: NDKTestCase {
 
     func testValidateWithValidEvent() async throws {
         // Given
-        let ndk = createTestNDK()
+        let ndk = try await createTestNDK()
         let signer = try NDKPrivateKeySigner.generate()
         ndk.signer = signer
 
@@ -533,9 +533,9 @@ final class NDKEventTests: NDKTestCase {
 
     // MARK: - Tag Reference Tests
 
-    func testTagReferenceForParameterizedReplaceable() async {
+    func testTagReferenceForParameterizedReplaceable() async throws {
         // Given
-        let ndk = createTestNDK()
+        let ndk = try await createTestNDK()
         let pubkey = TestFixtures.Keys.alice.publicKey
         let event = EventTestFactory.createEvent(
             kind: 30000,
@@ -555,9 +555,9 @@ final class NDKEventTests: NDKTestCase {
         XCTAssertEqual(tagRef[4], pubkey)
     }
 
-    func testTagReferenceForReplaceable() async {
+    func testTagReferenceForReplaceable() async throws {
         // Given
-        let ndk = createTestNDK()
+        let ndk = try await createTestNDK()
         let pubkey = TestFixtures.Keys.alice.publicKey
         let event = EventTestFactory.createEvent(
             kind: EventKind.metadata,
@@ -576,9 +576,9 @@ final class NDKEventTests: NDKTestCase {
         XCTAssertEqual(tagRef[4], pubkey)
     }
 
-    func testTagReferenceForRegularEvent() async {
+    func testTagReferenceForRegularEvent() async throws {
         // Given
-        let ndk = createTestNDK()
+        let ndk = try await createTestNDK()
         let pubkey = TestFixtures.Keys.alice.publicKey
         let event = EventTestFactory.createEvent(kind: 1, pubkey: pubkey)
 
@@ -594,9 +594,9 @@ final class NDKEventTests: NDKTestCase {
         XCTAssertEqual(tagRef[4], pubkey)
     }
 
-    func testTagReferenceIncludesRelayHint() async {
+    func testTagReferenceIncludesRelayHint() async throws {
         // Given
-        let ndk = createTestNDK()
+        let ndk = try await createTestNDK()
         let pubkey = TestFixtures.Keys.alice.publicKey
         let event = EventTestFactory.createEvent(kind: 1, pubkey: pubkey)
         let sourceRelay = "wss://relay.example.com"
@@ -694,7 +694,7 @@ final class NDKEventTests: NDKTestCase {
 
     func testVerifySignatureWithValidEvent() async throws {
         // Given
-        let ndk = createTestNDK()
+        let ndk = try await createTestNDK()
         let signer = try NDKPrivateKeySigner.generate()
         ndk.signer = signer
 
@@ -740,7 +740,7 @@ final class NDKEventTests: NDKTestCase {
 
     func testCalculateID() async throws {
         // Given
-        let ndk = createTestNDK()
+        let ndk = try await createTestNDK()
         let signer = try NDKPrivateKeySigner.generate()
         ndk.signer = signer
 

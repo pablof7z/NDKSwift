@@ -25,8 +25,8 @@ final class UserProfileE2ETests: XCTestCase {
         print("[\(timestamp())] Starting user profile E2E test")
 
         // Create two NDK instances - publisher and fetcher
-        let publisherNDK = NDK(cache: MemoryCache())
-        let fetcherNDK = NDK(cache: MemoryCache())
+        let publisherNDK = NDK(cache: try await NDKTestFactory.createTestCache())
+        let fetcherNDK = NDK(cache: try await NDKTestFactory.createTestCache())
 
         // Create signer for publisher
         let signer = try NDKPrivateKeySigner.generate()
@@ -217,7 +217,7 @@ final class UserProfileE2ETests: XCTestCase {
     func testUserProfileWithMinimalData() async throws {
         print("[\(timestamp())] Starting minimal profile E2E test")
 
-        let ndk = NDK(cache: MemoryCache())
+        let ndk = NDK(cache: try await NDKTestFactory.createTestCache())
         let signer = try NDKPrivateKeySigner.generate()
         let pubkey = try await signer.pubkey
         ndk.signer = signer
@@ -272,7 +272,7 @@ final class UserProfileE2ETests: XCTestCase {
     func testUserProfileWithInvalidJSON() async throws {
         print("[\(timestamp())] Starting invalid JSON profile test")
 
-        let ndk = NDK(cache: MemoryCache())
+        let ndk = NDK(cache: try await NDKTestFactory.createTestCache())
         let signer = try NDKPrivateKeySigner.generate()
         let pubkey = try await signer.pubkey
         ndk.signer = signer

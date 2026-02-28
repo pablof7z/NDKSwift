@@ -3,8 +3,8 @@ import XCTest
 
 @MainActor
 final class SimpleSubscriptionGroupingTest: XCTestCase {
-    func testSubscriptionGroupingProperties() async {
-        let ndk = NDK()
+    func testSubscriptionGroupingProperties() async throws {
+        let ndk = try await NDKTestFactory.createNDK()
 
         // Test default grouping configuration
         let sub1 = NDKSubscriptionCoordinator(
@@ -49,7 +49,7 @@ final class SimpleSubscriptionGroupingTest: XCTestCase {
         // The fact that this compiles shows the properties exist and are being set correctly
     }
 
-    func testRelaySubscriptionManagerUsesProperties() async {
+    func testRelaySubscriptionManagerUsesProperties() async throws {
         let relay = NDKRelay(url: "wss://test.relay.com")
         let manager = NDKRelaySubscriptionManager(relay: relay)
 
@@ -63,7 +63,7 @@ final class SimpleSubscriptionGroupingTest: XCTestCase {
             id: "groupable",
             filters: [filter],
             relays: nil,
-            ndk: NDK(),
+            ndk: try await NDKTestFactory.createNDK(),
             closeOnEose: false,
             fingerprint: nil,
             isGroupable: true,
@@ -79,7 +79,7 @@ final class SimpleSubscriptionGroupingTest: XCTestCase {
             id: "non-groupable",
             filters: [filter],
             relays: nil,
-            ndk: NDK(),
+            ndk: try await NDKTestFactory.createNDK(),
             closeOnEose: false,
             fingerprint: nil,
             isGroupable: false

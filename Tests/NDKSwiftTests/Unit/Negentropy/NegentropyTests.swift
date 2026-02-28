@@ -181,11 +181,11 @@ final class NegentropyTests: XCTestCase {
     // MARK: - Cache Integration Tests
 
     func testCacheNegentropyStorage() async throws {
-        let cache = MemoryCache()
+        let cache = try await NDKTestFactory.createTestCache()
         let storage = NDKCacheNegentropyStorage(cache: cache)
 
         // Add some test events
-        let ndk = NDK()
+        let ndk = try await NDKTestFactory.createNDK()
         let events = try await createTestEvents(ndk: ndk, count: 10)
 
         for event in events {
@@ -210,7 +210,7 @@ final class NegentropyTests: XCTestCase {
     }
 
     func testCacheRangeQueries() async throws {
-        let cache = MemoryCache()
+        let cache = try await NDKTestFactory.createTestCache()
         let storage = NDKCacheNegentropyStorage(cache: cache)
 
         // Create events with specific timestamps
@@ -281,15 +281,15 @@ final class NegentropyTests: XCTestCase {
 
     func testCompleteReconciliationFlow() async throws {
         // Setup two caches with different sets of events
-        let cache1 = MemoryCache()
-        let cache2 = MemoryCache()
+        let cache1 = try await NDKTestFactory.createTestCache()
+        let cache2 = try await NDKTestFactory.createTestCache()
         let storage1 = NDKCacheNegentropyStorage(cache: cache1)
         let storage2 = NDKCacheNegentropyStorage(cache: cache2)
 
         // Create test events - some shared, some unique to each cache
-        let sharedEvents = try await createTestEvents(ndk: NDK(), count: 5, baseId: 1000, baseTime: 1_000_000)
-        let unique1Events = try await createTestEvents(ndk: NDK(), count: 3, baseId: 2000, baseTime: 1_100_000)
-        let unique2Events = try await createTestEvents(ndk: NDK(), count: 4, baseId: 3000, baseTime: 1_200_000)
+        let sharedEvents = try await createTestEvents(ndk: try await NDKTestFactory.createNDK(), count: 5, baseId: 1000, baseTime: 1_000_000)
+        let unique1Events = try await createTestEvents(ndk: try await NDKTestFactory.createNDK(), count: 3, baseId: 2000, baseTime: 1_100_000)
+        let unique2Events = try await createTestEvents(ndk: try await NDKTestFactory.createNDK(), count: 4, baseId: 3000, baseTime: 1_200_000)
 
         // Populate cache1
         for event in sharedEvents + unique1Events {
@@ -337,13 +337,13 @@ final class NegentropyTests: XCTestCase {
     }
 
     func testReconciliationWithEmptyCache() async throws {
-        let cache1 = MemoryCache()
-        let cache2 = MemoryCache()
+        let cache1 = try await NDKTestFactory.createTestCache()
+        let cache2 = try await NDKTestFactory.createTestCache()
         let storage1 = NDKCacheNegentropyStorage(cache: cache1)
         let storage2 = NDKCacheNegentropyStorage(cache: cache2)
 
         // Only populate cache1
-        let events = try await createTestEvents(ndk: NDK(), count: 5, baseId: 1000, baseTime: 1_000_000)
+        let events = try await createTestEvents(ndk: try await NDKTestFactory.createNDK(), count: 5, baseId: 1000, baseTime: 1_000_000)
         for event in events {
             try await cache1.saveEvent(event)
         }
@@ -361,13 +361,13 @@ final class NegentropyTests: XCTestCase {
     }
 
     func testReconciliationWithIdenticalCaches() async throws {
-        let cache1 = MemoryCache()
-        let cache2 = MemoryCache()
+        let cache1 = try await NDKTestFactory.createTestCache()
+        let cache2 = try await NDKTestFactory.createTestCache()
         let storage1 = NDKCacheNegentropyStorage(cache: cache1)
         let storage2 = NDKCacheNegentropyStorage(cache: cache2)
 
         // Populate both caches with identical events
-        let events = try await createTestEvents(ndk: NDK(), count: 10, baseId: 1000, baseTime: 1_000_000)
+        let events = try await createTestEvents(ndk: try await NDKTestFactory.createNDK(), count: 10, baseId: 1000, baseTime: 1_000_000)
         for event in events {
             try await cache1.saveEvent(event)
             try await cache2.saveEvent(event)
@@ -386,15 +386,15 @@ final class NegentropyTests: XCTestCase {
     }
 
     func testLargeDatasetReconciliation() async throws {
-        let cache1 = MemoryCache()
-        let cache2 = MemoryCache()
+        let cache1 = try await NDKTestFactory.createTestCache()
+        let cache2 = try await NDKTestFactory.createTestCache()
         let storage1 = NDKCacheNegentropyStorage(cache: cache1)
         let storage2 = NDKCacheNegentropyStorage(cache: cache2)
 
         // Create large datasets
-        let sharedEvents = try await createTestEvents(ndk: NDK(), count: 100, baseId: 1000, baseTime: 1_000_000)
-        let unique1Events = try await createTestEvents(ndk: NDK(), count: 50, baseId: 2000, baseTime: 2_000_000)
-        let unique2Events = try await createTestEvents(ndk: NDK(), count: 75, baseId: 3000, baseTime: 3_000_000)
+        let sharedEvents = try await createTestEvents(ndk: try await NDKTestFactory.createNDK(), count: 100, baseId: 1000, baseTime: 1_000_000)
+        let unique1Events = try await createTestEvents(ndk: try await NDKTestFactory.createNDK(), count: 50, baseId: 2000, baseTime: 2_000_000)
+        let unique2Events = try await createTestEvents(ndk: try await NDKTestFactory.createNDK(), count: 75, baseId: 3000, baseTime: 3_000_000)
 
         for event in sharedEvents + unique1Events {
             try await cache1.saveEvent(event)
@@ -476,14 +476,14 @@ final class NegentropyTests: XCTestCase {
     }
 
     func testNegentropyReconcilerFlow() async throws {
-        let cache1 = MemoryCache()
-        let cache2 = MemoryCache()
+        let cache1 = try await NDKTestFactory.createTestCache()
+        let cache2 = try await NDKTestFactory.createTestCache()
         let storage1 = NDKCacheNegentropyStorage(cache: cache1)
         let storage2 = NDKCacheNegentropyStorage(cache: cache2)
 
         // Add different events to each cache
-        let events1 = try await createTestEvents(ndk: NDK(), count: 5, baseId: 1000, baseTime: 1_000_000)
-        let events2 = try await createTestEvents(ndk: NDK(), count: 3, baseId: 2000, baseTime: 2_000_000)
+        let events1 = try await createTestEvents(ndk: try await NDKTestFactory.createNDK(), count: 5, baseId: 1000, baseTime: 1_000_000)
+        let events2 = try await createTestEvents(ndk: try await NDKTestFactory.createNDK(), count: 3, baseId: 2000, baseTime: 2_000_000)
 
         for event in events1 {
             try await cache1.saveEvent(event)
@@ -531,7 +531,7 @@ final class NegentropyTests: XCTestCase {
     }
 
     func testNegentropyReconcilerStatefulBehavior() async throws {
-        let storage = NDKCacheNegentropyStorage(cache: MemoryCache())
+        let storage = NDKCacheNegentropyStorage(cache: try await NDKTestFactory.createTestCache())
         let reconciler = NegentropyReconciler(storage: storage)
 
         // Test that calling initiate twice throws an error
@@ -547,8 +547,8 @@ final class NegentropyTests: XCTestCase {
     }
 
     func testNegentropyReconcilerLargeSetReconciliation() async throws {
-        let cache1 = MemoryCache()
-        let cache2 = MemoryCache()
+        let cache1 = try await NDKTestFactory.createTestCache()
+        let cache2 = try await NDKTestFactory.createTestCache()
         let storage1 = NDKCacheNegentropyStorage(cache: cache1)
         let storage2 = NDKCacheNegentropyStorage(cache: cache2)
 
@@ -556,8 +556,8 @@ final class NegentropyTests: XCTestCase {
         // Cache1: events 0-99 (100 events)
         // Cache2: events 50-149 (100 events)
         // Overlap: events 50-99 (50 events)
-        let events1 = try await createTestEvents(ndk: NDK(), count: 100, baseId: 0, baseTime: 1_000_000)
-        let events2 = try await createTestEvents(ndk: NDK(), count: 100, baseId: 50, baseTime: 1_500_000)
+        let events1 = try await createTestEvents(ndk: try await NDKTestFactory.createNDK(), count: 100, baseId: 0, baseTime: 1_000_000)
+        let events2 = try await createTestEvents(ndk: try await NDKTestFactory.createNDK(), count: 100, baseId: 50, baseTime: 1_500_000)
 
         for event in events1 {
             try await cache1.saveEvent(event)
@@ -615,14 +615,14 @@ final class NegentropyTests: XCTestCase {
     }
 
     func testNegentropyReconcilerAsResponder() async throws {
-        let cache1 = MemoryCache()
-        let cache2 = MemoryCache()
+        let cache1 = try await NDKTestFactory.createTestCache()
+        let cache2 = try await NDKTestFactory.createTestCache()
         let storage1 = NDKCacheNegentropyStorage(cache: cache1)
         let storage2 = NDKCacheNegentropyStorage(cache: cache2)
 
         // Add some events to each cache
-        let events1 = try await createTestEvents(ndk: NDK(), count: 3, baseId: 100, baseTime: 1_000_000)
-        let events2 = try await createTestEvents(ndk: NDK(), count: 2, baseId: 200, baseTime: 2_000_000)
+        let events1 = try await createTestEvents(ndk: try await NDKTestFactory.createNDK(), count: 3, baseId: 100, baseTime: 1_000_000)
+        let events2 = try await createTestEvents(ndk: try await NDKTestFactory.createNDK(), count: 2, baseId: 200, baseTime: 2_000_000)
 
         for event in events1 {
             try await cache1.saveEvent(event)
@@ -658,7 +658,7 @@ final class NegentropyTests: XCTestCase {
     // MARK: - Error Handling Tests
 
     func testInvalidProtocolVersion() async throws {
-        let cache = MemoryCache()
+        let cache = try await NDKTestFactory.createTestCache()
         let storage = NDKCacheNegentropyStorage(cache: cache)
         let negentropy = Negentropy(storage: storage)
 
@@ -677,7 +677,7 @@ final class NegentropyTests: XCTestCase {
     }
 
     func testTruncatedMessage() async throws {
-        let cache = MemoryCache()
+        let cache = try await NDKTestFactory.createTestCache()
         let storage = NDKCacheNegentropyStorage(cache: cache)
         let negentropy = Negentropy(storage: storage)
 
@@ -712,11 +712,11 @@ final class NegentropyTests: XCTestCase {
     }
 
     func testFrameSizeLimitHandling() async throws {
-        let cache1 = MemoryCache()
+        let cache1 = try await NDKTestFactory.createTestCache()
         let storage1 = NDKCacheNegentropyStorage(cache: cache1)
 
         // Add many events to trigger frame size limits
-        let events = try await createTestEvents(ndk: NDK(), count: 200, baseId: 1000, baseTime: 1_000_000)
+        let events = try await createTestEvents(ndk: try await NDKTestFactory.createNDK(), count: 200, baseId: 1000, baseTime: 1_000_000)
         for event in events {
             try await cache1.saveEvent(event)
         }
@@ -730,7 +730,7 @@ final class NegentropyTests: XCTestCase {
         XCTAssertLessThan(initMessage.count, 1200) // Allow some overhead
 
         // Create empty responder
-        let cache2 = MemoryCache()
+        let cache2 = try await NDKTestFactory.createTestCache()
         let storage2 = NDKCacheNegentropyStorage(cache: cache2)
         let negentropy2 = Negentropy(storage: storage2, frameSizeLimit: 1000)
 

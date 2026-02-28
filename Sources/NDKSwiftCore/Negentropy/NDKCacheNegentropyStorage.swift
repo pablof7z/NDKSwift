@@ -2,10 +2,10 @@ import Foundation
 
 /// Negentropy storage implementation backed by NDKCache
 public actor NDKCacheNegentropyStorage: NegentropyStorage {
-    private let cache: any NDKCache
+    private let cache: NDKNostrDBCache
     private var filter: NDKFilter?
 
-    public init(cache: any NDKCache, filter: NDKFilter? = nil) {
+    public init(cache: NDKNostrDBCache, filter: NDKFilter? = nil) {
         self.cache = cache
         self.filter = filter
     }

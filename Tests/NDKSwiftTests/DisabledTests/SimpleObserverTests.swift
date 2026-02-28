@@ -8,7 +8,7 @@ final class SimpleObserverTest: XCTestCase {
         let testPubkey = try await signer.pubkey
 
         // Initialize NDK with in-memory cache
-        let cache = MemoryCache()
+        let cache = try await NDKTestFactory.createTestCache()
         let ndk = NDK(
             signer: signer,
             cache: cache,

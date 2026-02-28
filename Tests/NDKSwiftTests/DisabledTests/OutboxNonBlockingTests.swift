@@ -4,7 +4,7 @@ import XCTest
 final class OutboxNonBlockingTests: XCTestCase {
     func testOutboxStrategyDoesNotBlock() async throws {
         // Create NDK instance
-        let ndk = NDK()
+        let ndk = try await NDKTestFactory.createNDK()
 
         // Add relays and connect to ensure pool has connected relays
         await ndk.pool.addRelay("wss://relay1.test")
@@ -43,7 +43,7 @@ final class OutboxNonBlockingTests: XCTestCase {
 
     func testOutboxStrategyWithCachedRelays() async throws {
         // Create NDK instance
-        let ndk = NDK()
+        let ndk = try await NDKTestFactory.createNDK()
 
         // Pre-populate some relay info
         let cachedPubkey = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -70,7 +70,7 @@ final class OutboxNonBlockingTests: XCTestCase {
 
     func testBackgroundRelayDiscoveryStartsImmediately() async throws {
         // Create NDK instance
-        let ndk = NDK()
+        let ndk = try await NDKTestFactory.createNDK()
 
         // Add a test relay
         await ndk.pool.addRelay("wss://test.relay")
@@ -87,7 +87,7 @@ final class OutboxNonBlockingTests: XCTestCase {
     }
 
     func testFilterDecompositionByRelay() async throws {
-        let ndk = NDK()
+        let ndk = try await NDKTestFactory.createNDK()
 
         // Set up test data - add relays
         await ndk.pool.addRelay("wss://relay1.com")

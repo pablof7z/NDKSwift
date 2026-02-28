@@ -4,7 +4,7 @@ import XCTest
 final class InternalSubscriptionO1Test: XCTestCase {
     func testRelayConnectionUsesO1Lookup() async throws {
         // Create NDK instance
-        let ndk = NDK()
+        let ndk = try await NDKTestFactory.createNDK()
 
         // Create a mock relay pool with some relays
         let relayUrls = [
@@ -82,7 +82,7 @@ final class InternalSubscriptionO1Test: XCTestCase {
     }
 
     func testRelayToSubscriptionMappingCorrectness() async throws {
-        let ndk = NDK()
+        let ndk = try await NDKTestFactory.createNDK()
         let manager = InternalSubscriptionManager(ndk: ndk)
 
         // Create subscriptions

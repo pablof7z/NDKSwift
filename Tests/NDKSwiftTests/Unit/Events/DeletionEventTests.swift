@@ -4,7 +4,7 @@ import XCTest
 final class DeletionEventTests: XCTestCase {
     var ndk: NDK!
     var signer: NDKPrivateKeySigner!
-    var cache: MemoryCache!
+    var cache: NDKNostrDBCache!
 
     override func setUp() async throws {
         try await super.setUp()
@@ -13,7 +13,7 @@ final class DeletionEventTests: XCTestCase {
         signer = try NDKPrivateKeySigner.generate()
 
         // Create cache
-        cache = MemoryCache()
+        cache = try await NDKTestFactory.createTestCache()
 
         // Create NDK with test configuration
         ndk = NDK(

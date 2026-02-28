@@ -13,15 +13,13 @@ let package = Package(
     ],
     products: [
         .library(name: "NDKSwiftCore", targets: ["NDKSwiftCore"]),
-        .library(name: "NDKSwiftSQLite", targets: ["NDKSwiftSQLite"]),
-        .library(name: "NDKSwiftNostrDB", targets: ["NDKSwiftNostrDB"]),
         .library(name: "NDKSwiftCashu", targets: ["NDKSwiftCashu"]),
         .library(name: "NDKSwiftUI", targets: ["NDKSwiftUI"]),
         .library(name: "NDKSwiftTesting", targets: ["NDKSwiftTesting"]),
     ],
     dependencies: [
         .package(url: "https://github.com/krzyzanowskim/CryptoSwift.git", from: "1.8.0"),
-        .package(url: "https://github.com/groue/GRDB.swift.git", from: "6.29.3"),
+
         .package(url: "https://github.com/pablof7z/CashuSwift.git", branch: "main"),
         .package(url: "https://github.com/21-DOT-DEV/swift-secp256k1", from: "0.19.0"),
         .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.0.0"),
@@ -87,24 +85,12 @@ let package = Package(
         .target(
             name: "NDKSwiftCore",
             dependencies: [
+                "NostrDB",
                 .product(name: "CryptoSwift", package: "CryptoSwift"),
                 .product(name: "secp256k1", package: "swift-secp256k1"),
             ]
         ),
-        .target(
-            name: "NDKSwiftSQLite",
-            dependencies: [
-                "NDKSwiftCore",
-                .product(name: "GRDB", package: "GRDB.swift"),
-            ]
-        ),
-        .target(
-            name: "NDKSwiftNostrDB",
-            dependencies: [
-                "NDKSwiftCore",
-                "NostrDB",
-            ]
-        ),
+
         .target(
             name: "NDKSwiftCashu",
             dependencies: [
@@ -117,7 +103,6 @@ let package = Package(
             dependencies: [
                 "NDKSwiftCore",
                 "NDKSwiftCashu",
-                "NDKSwiftNostrDB",
                 .product(name: "Kingfisher", package: "Kingfisher"),
             ]
         ),
@@ -131,8 +116,6 @@ let package = Package(
             name: "NDKSwiftTests",
             dependencies: [
                 "NDKSwiftCore",
-                "NDKSwiftSQLite",
-                "NDKSwiftNostrDB",
                 "NDKSwiftCashu",
                 "NDKSwiftUI",
             ],

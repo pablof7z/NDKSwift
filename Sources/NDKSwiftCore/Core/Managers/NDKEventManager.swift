@@ -3,12 +3,12 @@ import Foundation
 /// Manages event publishing and lifecycle
 public actor NDKEventManager {
     private weak var ndk: NDK?
-    private let cache: NDKCache
+    private let cache: NDKNostrDBCache
 
     /// Track events that failed due to auth requirements per relay
     private var pendingAuthEvents: [RelayURL: [NDKEvent]] = [:]
 
-    init(ndk: NDK, cache: NDKCache) {
+    init(ndk: NDK, cache: NDKNostrDBCache) {
         self.ndk = ndk
         self.cache = cache
     }

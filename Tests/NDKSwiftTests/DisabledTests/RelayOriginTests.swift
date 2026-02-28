@@ -4,10 +4,10 @@ import XCTest
 final class RelayOriginTests: XCTestCase {
     var ndk: NDK!
     var signer: NDKPrivateKeySigner!
-    var cache: MemoryCache!
+    var cache: NDKNostrDBCache!
 
     override func setUp() async throws {
-        cache = MemoryCache()
+        cache = try await NDKTestFactory.createTestCache()
         signer = try NDKPrivateKeySigner.generate()
         ndk = NDK(
             relayURLs: [
@@ -128,7 +128,7 @@ final class RelayOriginTests: XCTestCase {
 
     func testGetCurrentUserRelayUrlsNoSigner() async throws {
         // Create NDK without signer
-        let ndkNoSigner = NDK(cache: MemoryCache())
+        let ndkNoSigner = NDK(cache: try await NDKTestFactory.createTestCache())
 
         // Should return empty set
         let userRelays = await ndkNoSigner.pool.getCurrentUserRelayUrls()

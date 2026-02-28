@@ -1,6 +1,5 @@
 import Foundation
 import NDKSwiftCore
-import NDKSwiftNostrDB
 import Observation
 import SwiftUI
 
@@ -62,8 +61,7 @@ public final class NDKUnifiedSearchDataSource {
     /// Classified input type for the current query
     public private(set) var inputType: NDKSearchInputType = .empty
 
-    /// Whether nostrdb cache is available
-    public private(set) var isNostrDBAvailable: Bool = false
+
 
     // MARK: - Navigation Signals
 
@@ -103,7 +101,6 @@ public final class NDKUnifiedSearchDataSource {
         self.ndk = ndk
         self.limit = limit
         self.debounceInterval = debounceInterval
-        self.isNostrDBAvailable = ndk.cache is NDKNostrDBCache
     }
 
     deinit {
@@ -254,9 +251,7 @@ public final class NDKUnifiedSearchDataSource {
         error = nil
 
         do {
-            guard let cache = ndk.cache as? NDKNostrDBCache else {
-                throw UnifiedSearchError.cacheNotAvailable
-            }
+            let cache = ndk.cache
 
             // Search profiles
             let pubkeys = await cache.searchProfiles(searchQuery, limit: limit)

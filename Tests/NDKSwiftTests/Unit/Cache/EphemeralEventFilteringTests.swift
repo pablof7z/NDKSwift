@@ -1,5 +1,4 @@
 @testable import NDKSwiftCore
-import NDKSwiftSQLite
 import XCTest
 
 final class EphemeralEventFilteringTests: XCTestCase {
@@ -8,13 +7,14 @@ final class EphemeralEventFilteringTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         let signer = try NDKPrivateKeySigner.generate()
-        ndk = NDK(signer: signer)
+        let cache = try await NDKTestFactory.createTestCache()
+        ndk = NDK(signer: signer, cache: cache)
     }
 
-    // MARK: - SQLite Cache Tests
+    // MARK: - NostrDB Cache Tests
 
-    func testSQLiteCacheDoesNotSaveEphemeralEvents() async throws {
-        let cache = try await NDKSQLiteCache(path: ":memory:")
+    func testCacheDoesNotSaveEphemeralEvents() async throws {
+        let cache = try await NDKTestFactory.createTestCache()
 
         // Create ephemeral events (kinds 20000-29999)
         let ephemeralEvent1 = try await createSignedEvent(kind: 20000, content: "ephemeral auth")
@@ -53,8 +53,8 @@ final class EphemeralEventFilteringTests: XCTestCase {
         XCTAssertNotNil(retrievedParameterized, "Parameterized event should be cached")
     }
 
-    func testSQLiteCacheQueryEventsExcludesEphemeral() async throws {
-        let cache = try await NDKSQLiteCache(path: ":memory:")
+    func testCacheQueryEventsExcludesEphemeral() async throws {
+        let cache = try await NDKTestFactory.createTestCache()
 
         // Create and save mixed events
         let events = try [
@@ -88,8 +88,8 @@ final class EphemeralEventFilteringTests: XCTestCase {
         XCTAssertEqual(kinds, [1, 1, 30000], "Should have correct non-ephemeral kinds")
     }
 
-    func testSQLiteCacheProcessEventSkipsEphemeral() async throws {
-        let cache = try await NDKSQLiteCache(path: ":memory:")
+    func testCacheProcessEventSkipsEphemeral() async throws {
+        let cache = try await NDKTestFactory.createTestCache()
 
         // Create ephemeral event
         let ephemeralEvent = try await createSignedEvent(kind: 22222, content: "ephemeral")
@@ -102,53 +102,10 @@ final class EphemeralEventFilteringTests: XCTestCase {
         XCTAssertNil(retrieved, "Ephemeral event should not be saved via processEvent")
     }
 
-    // MARK: - Memory Cache Tests
-
-    func testMemoryCacheDoesNotSaveEphemeralEvents() async throws {
-        let cache = MemoryCache()
-
-        // Create ephemeral events
-        let ephemeralEvent1 = try await createSignedEvent(kind: 20000, content: "ephemeral auth")
-        let ephemeralEvent2 = try await createSignedEvent(kind: 25000, content: "ephemeral middle")
-
-        // Create non-ephemeral event
-        let regularEvent = try await createSignedEvent(kind: 1, content: "regular note")
-
-        // Save all events
-        try await cache.saveEvent(ephemeralEvent1)
-        try await cache.saveEvent(ephemeralEvent2)
-        try await cache.saveEvent(regularEvent)
-
-        // Verify ephemeral events are not saved
-        let retrieved1 = await cache.getEvent(id: ephemeralEvent1.id)
-        let retrieved2 = await cache.getEvent(id: ephemeralEvent2.id)
-
-        XCTAssertNil(retrieved1, "Ephemeral event kind 20000 should not be cached")
-        XCTAssertNil(retrieved2, "Ephemeral event kind 25000 should not be cached")
-
-        // Verify non-ephemeral event is saved
-        let retrievedRegular = await cache.getEvent(id: regularEvent.id)
-        XCTAssertNotNil(retrievedRegular, "Regular event should be cached")
-    }
-
-    func testMemoryCacheProcessEventSkipsEphemeral() async throws {
-        let cache = MemoryCache()
-
-        // Create ephemeral event
-        let ephemeralEvent = try await createSignedEvent(kind: 28888, content: "ephemeral")
-
-        // Process the event
-        try await cache.processEvent(ephemeralEvent, from: "wss://relay.test", subscriptionId: "sub1")
-
-        // Verify it wasn't saved
-        let retrieved = await cache.getEvent(id: ephemeralEvent.id)
-        XCTAssertNil(retrieved, "Ephemeral event should not be saved via processEvent")
-    }
-
     // MARK: - Edge Case Tests
 
     func testBoundaryKinds() async throws {
-        let cache = try await NDKSQLiteCache(path: ":memory:")
+        let cache = try await NDKTestFactory.createTestCache()
 
         // Test boundary values
         let justBelowEphemeral = try await createSignedEvent(kind: 19999, content: "not ephemeral")
@@ -175,7 +132,7 @@ final class EphemeralEventFilteringTests: XCTestCase {
     }
 
     func testQueryWithSpecificEphemeralKind() async throws {
-        let cache = try await NDKSQLiteCache(path: ":memory:")
+        let cache = try await NDKTestFactory.createTestCache()
 
         // Create events
         let regularEvent = try await createSignedEvent(kind: 1, content: "note")

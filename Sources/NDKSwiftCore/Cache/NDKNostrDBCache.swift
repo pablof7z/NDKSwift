@@ -1,5 +1,5 @@
 import Foundation
-import NDKSwiftCore
+
 
 /// Configuration for NDKNostrDBCache memory and disk limits
 public struct NDKCacheConfig: Sendable {
@@ -45,9 +45,8 @@ public struct NDKCacheConfig: Sendable {
 
 /// NostrDB-based cache implementation for NDKSwift
 ///
-/// This actor provides persistent event storage using nostrdb as the backend.
-/// It implements the NDKCache protocol and provides high-performance event
-/// storage with native nostrdb querying capabilities.
+/// This actor provides persistent event storage using nostrdb as the backend,
+/// with high-performance event storage and native nostrdb querying capabilities.
 ///
 /// ## Features
 /// - Fast event storage and retrieval using nostrdb's C-based engine
@@ -58,36 +57,27 @@ public struct NDKCacheConfig: Sendable {
 /// - Full-text search across event content
 /// - Relay source tracking for events
 ///
-/// ## Implemented NDKCache Methods
+/// ## Event Operations
 /// - `saveEvent(_:)` - Stores events in nostrdb with LMDB persistence
 /// - `getEvent(id:)` - Retrieves events from nostrdb by ID
-/// - `queryEvents(_:)` - Basic filtering (currently in-memory, will use nostrdb native queries in future)
-/// - `deleteEvent(id:)` - Removes from in-memory cache only (nostrdb events are immutable)
+/// - `queryEvents(_:)` - Queries using nostrdb native filters with in-memory fallback
+/// - `deleteEvent(id:)` - Marks as deleted in-memory (nostrdb events are immutable)
 /// - `getProfileMetadata(pubkey:)` - Uses nostrdb's native profile lookup
 /// - `textSearch(_:limit:)` - Leverages nostrdb's full-text search index
 /// - `processEvent(_:from:subscriptionId:)` - Tracks relay sources via nostrdb
-/// - `getRelaySources(eventId:)` - Returns relays that provided an event
+/// - `getRelaySources(eventId:)` - Returns relays that provided an event (in-memory + nostrdb)
 /// - `observeEvents(matching:includeExisting:)` - Real-time event observation using nostrdb subscriptions
 /// - `observeProfile(pubkey:includeExisting:)` - Real-time profile observation using nostrdb subscriptions
 /// - `clear()` - Clears in-memory cache and unpublished events
 /// - `clearPersisted()` - Clears persisted database and unpublished events
 ///
-/// ## Implemented Optimistic Publishing
+/// ## Optimistic Publishing
 /// - `addUnpublishedEvent(_:publishedRelays:pendingRelays:)` - Tracks unpublished events with per-relay state in JSONL file
 /// - `confirmEvent(eventId:onRelay:)` - Marks events as confirmed on specific relays
 /// - `getEventConfirmationState(eventId:)` - Returns detailed state (which relays pending/confirmed)
 /// - `getUnpublishedEvents(maxAge:limit:)` - Returns pending events (persists across app restarts)
 /// - `recordPublishFailure(eventId:relay:reason:)` - Records failure reason for specific relay
 /// - `removeUnpublishedEvent(eventId:)` - Removes event from tracking when threshold is met
-///
-/// ## Protocol Defaults Used
-/// The following methods use default implementations from NDKCache protocol extensions:
-/// - Decrypted content: `getDecryptedContent`, `storeDecryptedContent`, `clearDecryptedContent`
-/// - Mint/wallet cache: All mint and keyset methods
-/// - Negentropy: `getEventsByTimeRange`, `getEventIdsWithTimestamps`, `hasEvents`
-/// - Cache freshness: `getLastFetchTime`, `recordFetchTime`
-/// - NIP-05: All NIP-05 verification methods
-/// - Profile batch: `getMultipleProfileMetadata`, `saveProfileMetadata`
 ///
 /// ## Usage
 /// ```swift
@@ -96,7 +86,7 @@ public struct NDKCacheConfig: Sendable {
 /// let event = await cache.getEvent(id: eventId)
 /// let results = await cache.textSearch("bitcoin")
 /// ```
-public actor NDKNostrDBCache: NDKCache {
+public actor NDKNostrDBCache {
     private var nostrDB: Ndb?
     private var events: [String: NDKEvent] = [:]
     private let cachePath: String?
@@ -911,12 +901,39 @@ public actor NDKNostrDBCache: NDKCache {
     }
 
     /// Get relay sources for an event
+    ///
+    /// Returns relay URLs that have provided this event. First checks the in-memory cache
+    /// for immediate availability, then falls back to querying nostrdb's persisted relay
+    /// index. This means relay sources survive app restarts — nostrdb stores relay provenance
+    /// in LMDB via `ndb_note_relay_iterate_*`.
+    ///
     /// - Parameter eventId: The event ID to check
     /// - Returns: Set of relay URLs that have provided this event
     public func getRelaySources(eventId: String) async -> Set<String> {
-        // Use in-memory tracking which is immediately available
-        // NostrDB also tracks this, but it's async and may not be indexed yet
-        return eventRelaySources[eventId] ?? []
+        // Check in-memory cache first (immediately available, includes recently-seen relays)
+        if let sources = eventRelaySources[eventId], !sources.isEmpty {
+            return sources
+        }
+
+        // Fall back to nostrdb's persisted relay index
+        guard let nostrDB = nostrDB,
+              let idData = hexToData(eventId) else {
+            return []
+        }
+
+        let noteId = NdbNoteId(idData)
+        guard let noteKey = nostrDB.lookup_note_key(noteId) else {
+            return []
+        }
+
+        let persistedRelays = nostrDB.getRelays(noteKey: noteKey)
+
+        // Backfill in-memory cache for future fast lookups
+        if !persistedRelays.isEmpty {
+            eventRelaySources[eventId] = persistedRelays
+        }
+
+        return persistedRelays
     }
 
     // MARK: - Optimistic Publishing
@@ -1077,6 +1094,274 @@ public actor NDKNostrDBCache: NDKCache {
             return nil
         }
         return convertToNDKEvent(note)
+    }
+
+    // MARK: - Decrypted Content Cache (In-Memory LRU)
+
+    /// LRU cache for decrypted content
+    private var decryptedContentCache: LRUCache<String, String> = LRUCache(capacity: 1000)
+
+    /// Retrieve decrypted content for an event and viewer
+    public func getDecryptedContent(for eventId: String, viewerPubkey: String) async -> String? {
+        let key = "\(eventId):\(viewerPubkey)"
+        return await decryptedContentCache.get(key)
+    }
+
+    /// Store decrypted content for an event and viewer
+    public func storeDecryptedContent(_ content: String, for eventId: String, viewerPubkey: String) async {
+        let key = "\(eventId):\(viewerPubkey)"
+        await decryptedContentCache.set(key, value: content)
+    }
+
+    /// Clear all decrypted content from cache
+    public func clearDecryptedContent() async {
+        await decryptedContentCache.clear()
+    }
+
+    /// Clear decrypted content for a specific viewer
+    public func clearDecryptedContent(for viewerPubkey: String) async {
+        let allItems = await decryptedContentCache.allItems()
+        for (key, _) in allItems where key.hasSuffix(":\(viewerPubkey)") {
+            await decryptedContentCache.delete(key)
+        }
+    }
+
+    // MARK: - Generic Key-Value Store (In-Memory)
+
+    /// In-memory key-value store: namespace -> key -> value
+    private var kvStore: [String: [String: Data]] = [:]
+
+    /// Store a value in the generic key-value store
+    public func setValue(_ value: Data, forKey key: String, namespace: String) async throws {
+        if kvStore[namespace] == nil {
+            kvStore[namespace] = [:]
+        }
+        kvStore[namespace]?[key] = value
+    }
+
+    /// Retrieve a value from the generic key-value store
+    public func getValue(forKey key: String, namespace: String) async -> Data? {
+        return kvStore[namespace]?[key]
+    }
+
+    /// Delete a value from the generic key-value store
+    public func deleteValue(forKey key: String, namespace: String) async throws {
+        kvStore[namespace]?.removeValue(forKey: key)
+    }
+
+    /// Get all values in a namespace, optionally filtered by key prefix
+    public func getValues(namespace: String, keyPrefix: String?) async -> [String: Data] {
+        guard let namespaceStore = kvStore[namespace] else {
+            return [:]
+        }
+        if let prefix = keyPrefix {
+            return namespaceStore.filter { $0.key.hasPrefix(prefix) }
+        }
+        return namespaceStore
+    }
+
+    // MARK: - NIP-05 Caching (In-Memory)
+
+    /// In-memory NIP-05 cache
+    private var nip05Cache: [String: NIP05CacheEntry] = [:]
+    private var nip05ByPubkey: [String: String] = [:]
+
+    /// Domain rate limiting tracker
+    private var domainVerificationAttempts: [String: Date] = [:]
+
+    /// Save an unverified NIP-05 claim
+    public func saveNIP05Claim(_ identifier: String, pubkey: String, retrievedAt: Date = Date()) async throws {
+        let entry = NIP05CacheEntry(
+            identifier: identifier,
+            pubkey: pubkey,
+            status: .unverified,
+            claimedAt: retrievedAt
+        )
+        nip05Cache[identifier] = entry
+    }
+
+    /// Get a NIP-05 cache entry by identifier
+    public func getNIP05Entry(_ identifier: String) async -> NIP05CacheEntry? {
+        return nip05Cache[identifier]
+    }
+
+    /// Get all NIP-05 entries for a given pubkey
+    public func getNIP05Entries(pubkey: String) async -> [NIP05CacheEntry] {
+        return nip05Cache.values.filter { $0.pubkey == pubkey }
+    }
+
+    /// Search for NIP-05 identifiers matching a prefix
+    public func searchNIP05(_ prefix: String, limit: Int) async -> [NIP05CacheEntry] {
+        let results = nip05Cache.values.filter { $0.identifier.hasPrefix(prefix) }
+        return Array(results.prefix(limit))
+    }
+
+    /// Save a NIP-05 entry (convenience alias for saveNIP05Resolution)
+    public func saveNIP05Entry(_ entry: NIP05CacheEntry) async throws {
+        nip05Cache[entry.identifier] = entry
+        // Also update reverse lookup by pubkey
+        if entry.status == .verified {
+            nip05ByPubkey[entry.pubkey] = entry.identifier
+        }
+    }
+
+    /// Save a verified NIP-05 resolution result
+    public func saveNIP05Resolution(_ entry: NIP05CacheEntry) async throws {
+        try await saveNIP05Entry(entry)
+    }
+
+    /// Get NIP-05 identifier for a given pubkey
+    public func getNIP05ForPubkey(_ pubkey: String) async -> String? {
+        return nip05ByPubkey[pubkey]
+    }
+
+    /// Check if we can check a NIP-05 domain (rate limiting) - convenience alias
+    public func canCheckNIP05Domain(_ domain: String) async -> Bool {
+        return await canVerifyDomain(domain)
+    }
+
+    /// Record a NIP-05 domain check - convenience alias
+    public func recordNIP05DomainCheck(_ domain: String) async throws {
+        await recordDomainVerificationAttempt(domain)
+    }
+
+    /// Mark a NIP-05 entry as invalid
+    public func invalidateNIP05(_ identifier: String, actualPubkey: String?) async throws {
+        if var entry = nip05Cache[identifier] {
+            // Remove old pubkey mapping
+            nip05ByPubkey.removeValue(forKey: entry.pubkey)
+            entry.status = .invalid
+            nip05Cache[identifier] = entry
+        }
+
+        // If we know the actual pubkey, save a new verified entry
+        if let actualPubkey = actualPubkey {
+            let newEntry = NIP05CacheEntry(
+                identifier: identifier,
+                pubkey: actualPubkey,
+                status: .verified,
+                nip46Relays: nil,
+                claimedAt: Date(),
+                verifiedAt: Date(),
+                lastCheckAt: Date()
+            )
+            try await saveNIP05Entry(newEntry)
+        }
+    }
+
+    /// Check if a NIP-05 entry needs verification
+    public func needsNIP05Verification(_ identifier: String, maxAge: TimeInterval) async -> Bool {
+        guard let entry = nip05Cache[identifier] else { return true }
+        if entry.status == .unverified || entry.status == .expired { return true }
+        guard let lastCheck = entry.lastCheckAt ?? entry.verifiedAt else { return true }
+        return Date().timeIntervalSince(lastCheck) > maxAge
+    }
+
+    /// Get unverified NIP-05 entries for background verification
+    public func getUnverifiedNIP05s(limit: Int) async -> [NIP05CacheEntry] {
+        let results = nip05Cache.values.filter { $0.status == .unverified }
+        return Array(results.prefix(limit))
+    }
+
+    /// Check if we can verify a domain (rate limiting)
+    public func canVerifyDomain(_ domain: String) async -> Bool {
+        guard let lastAttempt = domainVerificationAttempts[domain] else { return true }
+        return Date().timeIntervalSince(lastAttempt) > 360 // 6 minutes between checks per domain
+    }
+
+    /// Record a domain verification attempt
+    public func recordDomainVerificationAttempt(_ domain: String) async {
+        domainVerificationAttempts[domain] = Date()
+    }
+
+    // MARK: - Cache Freshness Tracking (In-Memory)
+
+    /// In-memory tracking of last fetch times per filter fingerprint
+    private var fetchTimes: [String: Date] = [:]
+
+    /// Get the timestamp when events matching a filter were last fetched
+    public func getLastFetchTime(for filter: NDKFilter) async -> Date? {
+        return fetchTimes[filter.fingerprint]
+    }
+
+    /// Record that a filter was just queried
+    public func recordFetchTime(for filter: NDKFilter, timestamp: Date = Date()) async {
+        fetchTimes[filter.fingerprint] = timestamp
+    }
+
+    // MARK: - Batch Profile Metadata Lookup
+
+    /// Save parsed profile metadata to cache
+    public func saveProfileMetadata(pubkey: String, metadata: [String: Any], updatedAt _: Timestamp, eventId _: String) async throws {
+        // Profile metadata is stored in nostrdb via event processing
+        // This method is a no-op for nostrdb since profiles are derived from kind:0 events
+        // The metadata will be available through getProfileMetadata when the kind:0 event is ingested
+        NDKLogger.log(.trace, category: .cache, "saveProfileMetadata called for \(pubkey) - profiles are auto-indexed by nostrdb")
+    }
+
+    /// Get multiple profile metadata entries at once using nostrdb's native lookup
+    public func getMultipleProfileMetadata(pubkeys: [String]) async -> [String: (metadata: [String: Any], updatedAt: Timestamp, eventId: String)] {
+        var result: [String: (metadata: [String: Any], updatedAt: Timestamp, eventId: String)] = [:]
+        for pubkey in pubkeys {
+            if let profile = await getProfileMetadata(pubkey: pubkey) {
+                result[pubkey] = profile
+            }
+        }
+        return result
+    }
+
+    // MARK: - Negentropy Optimized Queries
+
+    /// Get events in a timestamp range for Negentropy reconciliation
+    /// Uses nostrdb's native query when possible for better performance
+    public func getEventsByTimeRange(from: Timestamp, to: Timestamp, filter: NDKFilter?) async throws -> [NDKEvent] {
+        var rangeFilter = filter ?? NDKFilter()
+        rangeFilter.since = from
+        rangeFilter.until = to
+        return try await queryEvents(rangeFilter)
+    }
+
+    /// Get event IDs and timestamps for efficient fingerprinting
+    public func getEventIdsWithTimestamps(from: Timestamp, to: Timestamp, filter: NDKFilter?) async throws -> [(id: String, timestamp: Timestamp)] {
+        let events = try await getEventsByTimeRange(from: from, to: to, filter: filter)
+        return events.map { (id: $0.id, timestamp: $0.createdAt) }
+    }
+
+    /// Batch check which events exist in cache
+    public func hasEvents(ids: [String]) async -> [String: Bool] {
+        var result: [String: Bool] = [:]
+        for id in ids {
+            result[id] = await getEvent(id: id) != nil
+        }
+        return result
+    }
+
+    // MARK: - Convenience Methods
+
+    /// Check if an event exists in cache
+    public func hasEvent(id: String) async -> Bool {
+        return await getEvent(id: id) != nil
+    }
+
+    /// Batch save events
+    public func saveEvents(_ events: [NDKEvent]) async throws {
+        for event in events {
+            try await saveEvent(event)
+        }
+    }
+
+    /// Query events by author
+    public func queryEvents(author: String, kinds: [Int]? = nil, limit: Int? = nil) async throws -> [NDKEvent] {
+        var filter = NDKFilter(authors: [author])
+        filter.kinds = kinds
+        filter.limit = limit
+        return try await queryEvents(filter)
+    }
+
+    /// Query events by kind
+    public func queryEvents(kind: Int, limit: Int? = nil) async throws -> [NDKEvent] {
+        let filter = NDKFilter(kinds: [kind], limit: limit)
+        return try await queryEvents(filter)
     }
 }
 

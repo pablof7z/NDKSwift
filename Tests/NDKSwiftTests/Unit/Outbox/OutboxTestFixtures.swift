@@ -80,7 +80,7 @@ enum OutboxTestFixtures {
         tags: [Tag] = [],
         createdAt _: Timestamp? = nil
     ) async throws -> NDKEvent {
-        let builder = NDKEventBuilder(ndk: NDK())
+        let builder = NDKEventBuilder(ndk: try await NDKTestFactory.createNDK())
             .kind(Kind(kind))
             .content(content)
             .tags(tags)

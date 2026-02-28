@@ -99,7 +99,7 @@ final class NIP42AuthenticationIntegrationTests: XCTestCase {
         let ndk = NDK(signer: signer)
 
         // Create a simulated auth-required scenario
-        let mockCache = MemoryCache()
+        let mockCache = try await NDKTestFactory.createTestCache()
         let eventManager = NDKEventManager(ndk: ndk, cache: mockCache)
 
         // Create test event

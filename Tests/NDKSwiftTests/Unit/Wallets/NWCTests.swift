@@ -44,7 +44,7 @@ final class NWCTests: XCTestCase {
 
     func testNWCWalletInitialization() async throws {
         let signer = try NDKPrivateKeySigner.generate()
-        let ndk = NDK(signer: signer)
+        let ndk = try await NDKTestFactory.createNDK(signer: signer)
         let uri = "nostr+walletconnect://abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234?relay=wss://relay.example.com&secret=abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234"
 
         let wallet = try await NDKNWCWallet(ndk: ndk, connectionURI: uri)
@@ -55,7 +55,7 @@ final class NWCTests: XCTestCase {
     }
 
     func testNWCWalletRequiresSigner() async throws {
-        let ndk = NDK() // No signer
+        let ndk = try await NDKTestFactory.createNDK() // No signer
         let uri = "nostr+walletconnect://abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234?relay=wss://relay.example.com&secret=abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234"
 
         do {
@@ -70,7 +70,7 @@ final class NWCTests: XCTestCase {
 
     func testBuildPayInvoiceRequest() async throws {
         let signer = try NDKPrivateKeySigner.generate()
-        let ndk = NDK(signer: signer)
+        let ndk = try await NDKTestFactory.createNDK(signer: signer)
         let builder = NWCRequestBuilder(ndk: ndk, walletPubkey: "abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234", signer: signer)
 
         let invoice = "lnbc100n1pjkl7sdpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypq"
@@ -83,7 +83,7 @@ final class NWCTests: XCTestCase {
 
     func testBuildGetBalanceRequest() async throws {
         let signer = try NDKPrivateKeySigner.generate()
-        let ndk = NDK(signer: signer)
+        let ndk = try await NDKTestFactory.createNDK(signer: signer)
         let builder = NWCRequestBuilder(ndk: ndk, walletPubkey: "abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234", signer: signer)
 
         let event = try await builder.buildGetBalanceRequest()
@@ -94,7 +94,7 @@ final class NWCTests: XCTestCase {
 
     func testBuildMakeInvoiceRequest() async throws {
         let signer = try NDKPrivateKeySigner.generate()
-        let ndk = NDK(signer: signer)
+        let ndk = try await NDKTestFactory.createNDK(signer: signer)
         let builder = NWCRequestBuilder(ndk: ndk, walletPubkey: "abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234", signer: signer)
 
         let amount: Int64 = 1000
@@ -108,7 +108,7 @@ final class NWCTests: XCTestCase {
 
     func testBuildGetInfoRequest() async throws {
         let signer = try NDKPrivateKeySigner.generate()
-        let ndk = NDK(signer: signer)
+        let ndk = try await NDKTestFactory.createNDK(signer: signer)
         let builder = NWCRequestBuilder(ndk: ndk, walletPubkey: "abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234", signer: signer)
 
         let event = try await builder.buildGetInfoRequest()
@@ -119,7 +119,7 @@ final class NWCTests: XCTestCase {
 
     // MARK: - Response Handler Tests
 
-    func testHandleSuccessfulPaymentResponse() throws {
+    func testHandleSuccessfulPaymentResponse() async throws {
         let responseContent = """
         {
             "result": {
@@ -129,7 +129,7 @@ final class NWCTests: XCTestCase {
         """
 
         let signer = try NDKPrivateKeySigner.generate()
-        let ndk = NDK(signer: signer)
+        let ndk = try await NDKTestFactory.createNDK(signer: signer)
         _ = NWCResponseHandler(ndk: ndk, signer: signer, relayURLs: [])
 
         // Test basic JSON parsing
@@ -140,7 +140,7 @@ final class NWCTests: XCTestCase {
         XCTAssertEqual(response.result?.preimage, "test_preimage_12345")
     }
 
-    func testHandleBalanceResponse() throws {
+    func testHandleBalanceResponse() async throws {
         let responseContent = """
         {
             "result": {
@@ -150,7 +150,7 @@ final class NWCTests: XCTestCase {
         """
 
         let signer = try NDKPrivateKeySigner.generate()
-        let ndk = NDK(signer: signer)
+        let ndk = try await NDKTestFactory.createNDK(signer: signer)
         _ = NWCResponseHandler(ndk: ndk, signer: signer, relayURLs: [])
 
         // Test basic JSON parsing

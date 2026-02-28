@@ -4,13 +4,13 @@ import XCTest
 /// Tests for NDKPool's handling of unpublished events when connectivity changes
 final class NDKPoolUnpublishedEventsTests: NDKTestCase {
     var ndk: NDK!
-    var mockCache: MemoryCache!
+    var mockCache: NDKNostrDBCache!
 
     override func setUp() async throws {
         try await super.setUp()
 
-        mockCache = createMemoryCache()
-        ndk = createTestNDK(cache: mockCache)
+        mockCache = try await createTestNostrDBCache()
+        ndk = try await createTestNDK(cache: mockCache)
     }
 
     override func tearDown() async throws {

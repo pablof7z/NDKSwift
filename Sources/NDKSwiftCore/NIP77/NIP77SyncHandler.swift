@@ -13,7 +13,7 @@ public actor NIP77SyncHandler {
     private let logPrefix = "[NIP77]"
 
     private let ndk: NDK
-    private let cache: any NDKCache
+    private let cache: NDKNostrDBCache
     private let storage: NDKCacheNegentropyStorage
 
     /// Direction of sync operations
@@ -42,7 +42,7 @@ public actor NIP77SyncHandler {
         var actualUploadedEvents: [NDKEvent] = []
     }
 
-    public init(ndk: NDK, cache: any NDKCache) {
+    public init(ndk: NDK, cache: NDKNostrDBCache) {
         self.ndk = ndk
         self.cache = cache
         storage = NDKCacheNegentropyStorage(cache: cache)

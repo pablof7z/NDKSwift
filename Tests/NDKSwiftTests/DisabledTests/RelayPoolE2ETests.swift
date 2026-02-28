@@ -14,7 +14,7 @@ final class RelayPoolE2ETests: XCTestCase {
         let startTime = Date()
         print("[\(timestamp())] Starting relay connection management E2E test")
 
-        let ndk = NDK(cache: MemoryCache())
+        let ndk = NDK(cache: try await NDKTestFactory.createTestCache())
 
         // Test 1: Add relays before connecting
         print("\n[\(timestamp())] Test 1: Adding relays before connection...")
@@ -134,7 +134,7 @@ final class RelayPoolE2ETests: XCTestCase {
     func testRelayPoolLoadBalancing() async throws {
         print("[\(timestamp())] Starting relay pool load balancing E2E test")
 
-        let ndk = NDK(cache: MemoryCache())
+        let ndk = NDK(cache: try await NDKTestFactory.createTestCache())
         let signer = try NDKPrivateKeySigner.generate()
         ndk.signer = signer
 
@@ -185,7 +185,7 @@ final class RelayPoolE2ETests: XCTestCase {
     func testRelayPoolReconnection() async throws {
         print("[\(timestamp())] Starting relay pool reconnection E2E test")
 
-        let ndk = NDK(cache: MemoryCache())
+        let ndk = NDK(cache: try await NDKTestFactory.createTestCache())
 
         // Use a reliable relay for this test
         let testRelay = RelayConstants.damus

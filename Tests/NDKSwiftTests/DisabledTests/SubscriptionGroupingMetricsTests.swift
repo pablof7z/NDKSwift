@@ -8,7 +8,7 @@ final class SubscriptionGroupingMetricsTests: XCTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
-        ndk = NDK()
+        ndk = try await NDKTestFactory.createNDK()
         // Reset metrics before each test
         await NDKSubscriptionMetrics.reset()
     }

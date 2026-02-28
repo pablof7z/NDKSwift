@@ -11,7 +11,7 @@ final class SubscriptionGroupingIntegrationTests: XCTestCase {
         try await super.setUp()
 
         // Create NDK instance with in-memory cache
-        ndk = NDK()
+        ndk = try await NDKTestFactory.createNDK()
     }
 
     override func tearDown() async throws {

@@ -5,13 +5,13 @@ import XCTest
 final class NDKEventManagerTests: NDKTestCase {
     var ndk: NDK!
     var eventManager: NDKEventManager!
-    var mockCache: MemoryCache!
+    var mockCache: NDKNostrDBCache!
 
     override func setUp() async throws {
         try await super.setUp()
 
-        mockCache = createMemoryCache()
-        ndk = createTestNDK(cache: mockCache)
+        mockCache = try await createTestNostrDBCache()
+        ndk = try await createTestNDK(cache: mockCache)
         eventManager = ndk.eventManager
     }
 

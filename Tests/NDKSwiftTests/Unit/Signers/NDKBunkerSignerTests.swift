@@ -18,8 +18,8 @@ final class NDKBunkerSignerTests: XCTestCase {
         super.tearDown()
     }
 
-    private func createTestNDK() -> NDK {
-        return NDK()
+    private func createTestNDK() async throws -> NDK {
+        return try await NDKTestFactory.createNDK()
     }
 
     private func createLocalSigner() throws -> NDKPrivateKeySigner {
@@ -89,7 +89,7 @@ final class NDKBunkerSignerTests: XCTestCase {
     // MARK: - Factory Method Tests
 
     func testCreateBunkerSignerWithConnectionToken() async throws {
-        let ndk = createTestNDK()
+        let ndk = try await createTestNDK()
         let localSigner = try createLocalSigner()
         // Use a valid hex pubkey for the bunker
         let bunkerPubkey = "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
@@ -102,7 +102,7 @@ final class NDKBunkerSignerTests: XCTestCase {
     }
 
     func testCreateBunkerSignerWithNIP05() async throws {
-        let ndk = createTestNDK()
+        let ndk = try await createTestNDK()
         let localSigner = try createLocalSigner()
         let nip05 = "alice@example.com"
 
@@ -112,7 +112,7 @@ final class NDKBunkerSignerTests: XCTestCase {
     }
 
     func testCreateNostrConnectSigner() async throws {
-        let ndk = createTestNDK()
+        let ndk = try await createTestNDK()
         let localSigner = try createLocalSigner()
         let relays = ["wss://relay.example.com"]
         let options = NDKBunkerSigner.NostrConnectOptions(
@@ -139,7 +139,7 @@ final class NDKBunkerSignerTests: XCTestCase {
     }
 
     func testCreateNostrConnectSignerMinimal() async throws {
-        let ndk = createTestNDK()
+        let ndk = try await createTestNDK()
         let relays = ["wss://relay.example.com"]
 
         // Without local signer - should generate one
@@ -186,7 +186,7 @@ final class NDKBunkerSignerTests: XCTestCase {
     // MARK: - NDKSigner Protocol Tests
 
     func testBunkerSignerConformsToNDKSigner() async throws {
-        let ndk = createTestNDK()
+        let ndk = try await createTestNDK()
         let localSigner = try createLocalSigner()
         let bunkerSigner = try await NDKBunkerSigner.bunker(ndk: ndk, connectionToken: "bunker://test", localSigner: localSigner)
 
@@ -195,7 +195,7 @@ final class NDKBunkerSignerTests: XCTestCase {
     }
 
     func testPubkeyTriggersConnection() async throws {
-        let ndk = createTestNDK()
+        let ndk = try await createTestNDK()
         let localSigner = try createLocalSigner()
         let bunkerSigner = try await NDKBunkerSigner.bunker(ndk: ndk, connectionToken: "bunker://test", localSigner: localSigner)
 
@@ -208,7 +208,7 @@ final class NDKBunkerSignerTests: XCTestCase {
     // MARK: - Auth URL Publisher Tests
 
     func testAuthURLPublisher() async throws {
-        let ndk = createTestNDK()
+        let ndk = try await createTestNDK()
         let localSigner = try createLocalSigner()
         let bunkerSigner = try await NDKBunkerSigner.bunker(ndk: ndk, connectionToken: "bunker://test", localSigner: localSigner)
 
@@ -256,7 +256,7 @@ final class NDKBunkerSignerTests: XCTestCase {
     // MARK: - NostrConnect URI Generation Tests
 
     func testNostrConnectURIWithAllOptions() async throws {
-        let ndk = createTestNDK()
+        let ndk = try await createTestNDK()
         let localSigner = try createLocalSigner()
         let localPubkey = try await localSigner.pubkey
 
@@ -305,7 +305,7 @@ final class NDKBunkerSignerTests: XCTestCase {
     }
 
     func testNostrConnectURIWithSpecialCharacters() async throws {
-        let ndk = createTestNDK()
+        let ndk = try await createTestNDK()
         let options = NDKBunkerSigner.NostrConnectOptions(
             name: "Test & App",
             url: "https://test.com/path?query=1"
@@ -331,7 +331,7 @@ final class NDKBunkerSignerTests: XCTestCase {
     }
 
     func testNostrConnectURIWithMultipleRelays() async throws {
-        let ndk = createTestNDK()
+        let ndk = try await createTestNDK()
         let relays = [
             "wss://relay1.example.com",
             "wss://relay2.example.com",
@@ -362,7 +362,7 @@ final class NDKBunkerSignerTests: XCTestCase {
     // MARK: - Connection Type Tests
 
     func testBunkerConnectionTypeInitialization() async throws {
-        let ndk = createTestNDK()
+        let ndk = try await createTestNDK()
         let localSigner = try createLocalSigner()
 
         // Test bunker type

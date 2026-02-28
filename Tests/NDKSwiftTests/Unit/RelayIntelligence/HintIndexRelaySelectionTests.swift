@@ -4,8 +4,8 @@ import XCTest
 final class HintIndexRelaySelectionTests: XCTestCase {
     // MARK: - Publishing Integration Tests
 
-    func test_selectRelaysForPublishing_usesHintIndexWhenTrackerHasNoInfo() async {
-        let ndk = NDK()
+    func test_selectRelaysForPublishing_usesHintIndexWhenTrackerHasNoInfo() async throws {
+        let ndk = try await NDKTestFactory.createNDK()
 
         // Add explicit relay (fallback)
         _ = await ndk.pool.addRelay("wss://explicit.example.com", origin: .appRelays)
@@ -23,8 +23,8 @@ final class HintIndexRelaySelectionTests: XCTestCase {
         XCTAssertTrue(selection.relays.contains("wss://author-hint.example.com/"), "Should include relay from HintIndex")
     }
 
-    func test_selectRelaysForPublishing_includesHintsForPTaggedUsers() async {
-        let ndk = NDK()
+    func test_selectRelaysForPublishing_includesHintsForPTaggedUsers() async throws {
+        let ndk = try await NDKTestFactory.createNDK()
 
         // Add explicit relay
         _ = await ndk.pool.addRelay("wss://explicit.example.com", origin: .appRelays)
@@ -48,8 +48,8 @@ final class HintIndexRelaySelectionTests: XCTestCase {
 
     // MARK: - Fetching Integration Tests
 
-    func test_selectRelaysForFetching_usesHintIndexForAuthors() async {
-        let ndk = NDK()
+    func test_selectRelaysForFetching_usesHintIndexForAuthors() async throws {
+        let ndk = try await NDKTestFactory.createNDK()
 
         // Add explicit relay
         _ = await ndk.pool.addRelay("wss://explicit.example.com", origin: .appRelays)
@@ -67,8 +67,8 @@ final class HintIndexRelaySelectionTests: XCTestCase {
         XCTAssertTrue(selection.relays.contains("wss://target-author-relay.example.com/"), "Should include relay from HintIndex for filter authors")
     }
 
-    func test_selectRelaysForFetching_combinesTrackerAndHintIndex() async {
-        let ndk = NDK()
+    func test_selectRelaysForFetching_combinesTrackerAndHintIndex() async throws {
+        let ndk = try await NDKTestFactory.createNDK()
 
         // Add explicit relay
         _ = await ndk.pool.addRelay("wss://explicit.example.com", origin: .appRelays)
@@ -90,8 +90,8 @@ final class HintIndexRelaySelectionTests: XCTestCase {
 
     // MARK: - Event ID Hints Tests
 
-    func test_selectRelaysForFetching_usesEventIdHints() async {
-        let ndk = NDK()
+    func test_selectRelaysForFetching_usesEventIdHints() async throws {
+        let ndk = try await NDKTestFactory.createNDK()
 
         // Add explicit relay
         _ = await ndk.pool.addRelay("wss://explicit.example.com", origin: .appRelays)
@@ -111,10 +111,10 @@ final class HintIndexRelaySelectionTests: XCTestCase {
 
     // MARK: - Priority Tests
 
-    func test_trackerRelaysHavePriorityOverHintIndex() async {
+    func test_trackerRelaysHavePriorityOverHintIndex() async throws {
         // When tracker has relay info, it should be used
         // HintIndex should only fill gaps when tracker returns nil
-        let ndk = NDK()
+        let ndk = try await NDKTestFactory.createNDK()
 
         // Add explicit relay
         _ = await ndk.pool.addRelay("wss://explicit.example.com", origin: .appRelays)

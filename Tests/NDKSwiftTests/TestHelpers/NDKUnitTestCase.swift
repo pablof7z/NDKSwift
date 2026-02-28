@@ -1,5 +1,4 @@
 @testable import NDKSwiftCore
-import NDKSwiftSQLite
 import XCTest
 
 /// Enhanced base class for NDKSwift unit tests with common setup
@@ -7,14 +6,14 @@ import XCTest
 open class NDKUnitTestCase: NDKTestCase {
     // MARK: - Pre-configured Properties
 
-    /// Pre-configured NDK instance with memory cache
+    /// Pre-configured NDK instance with NostrDB cache
     var ndk: NDK!
 
     /// Pre-configured test signer
     var signer: NDKPrivateKeySigner!
 
-    /// Pre-configured memory cache
-    var cache: MemoryCache!
+    /// Pre-configured NostrDB cache
+    var cache: NDKNostrDBCache!
 
     /// Test user created from signer
     var testUser: TestUser!
@@ -24,8 +23,10 @@ open class NDKUnitTestCase: NDKTestCase {
     override open func setUp() async throws {
         try await super.setUp()
 
-        // Create cache
-        cache = MemoryCache()
+        // Create cache using temp directory
+        let cachePath = tempDirectory.appendingPathComponent("nostrdb").path
+        try FileManager.default.createDirectory(atPath: cachePath, withIntermediateDirectories: true)
+        cache = try await NDKNostrDBCache(path: cachePath)
 
         // Create signer
         signer = try NDKPrivateKeySigner.generate()
@@ -95,8 +96,6 @@ open class NDKUnitTestCase: NDKTestCase {
     func addMockRelay(url: String = "wss://mock.relay.test") async -> MockRelay {
         let relay = MockRelay(url: url)
         await ndk.addRelay(url)
-        // Note: In real implementation, you'd need to inject the mock relay
-        // This is a simplified version for demonstration
         return relay
     }
 
@@ -146,9 +145,6 @@ open class NDKMockTestCase: NDKUnitTestCase {
 
     override open func setUp() async throws {
         try await super.setUp()
-
-        // Create NDK with custom pool that supports mock injection
-        // Note: This would require NDK to support relay injection for testing
     }
 
     override open func tearDown() async throws {
@@ -169,8 +165,6 @@ open class NDKMockTestCase: NDKUnitTestCase {
             publishDelay: publishDelay
         )
         mockRelays.append(relay)
-
-        // Note: In real implementation, inject mock into NDK pool
         return relay
     }
 
@@ -180,8 +174,6 @@ open class NDKMockTestCase: NDKUnitTestCase {
         relay _: MockRelay,
         subscriptionId _: String = "test-sub"
     ) async {
-        // Note: This would require mock relay to have a method to inject events
-        // relay.simulateEvent(event, forSubscription: subscriptionId)
     }
 
     /// Simulates EOSE from a mock relay
@@ -189,8 +181,6 @@ open class NDKMockTestCase: NDKUnitTestCase {
         relay _: MockRelay,
         subscriptionId _: String = "test-sub"
     ) async {
-        // Note: This would require mock relay to have a method to inject EOSE
-        // relay.simulateEOSE(forSubscription: subscriptionId)
     }
 }
 
@@ -198,50 +188,17 @@ open class NDKMockTestCase: NDKUnitTestCase {
 
 /// Base class for cache-specific tests
 open class NDKCacheTestCase: NDKUnitTestCase {
-    /// SQLite cache for testing persistence
-    var sqliteCache: NDKSQLiteCache?
-
-    /// Path to SQLite database
-    var dbPath: String!
-
     override open func setUp() async throws {
         try await super.setUp()
-
-        // Create SQLite cache for persistence tests
-        dbPath = tempDirectory
-            .appendingPathComponent("test-cache.db")
-            .path
-
-        sqliteCache = try await NDKSQLiteCache(path: dbPath)
     }
 
     override open func tearDown() async throws {
-        // Clean up SQLite cache
-        if let sqliteCache = sqliteCache {
-            try await sqliteCache.clear()
-        }
-        sqliteCache = nil
-
-        // Remove database file
-        if let dbPath = dbPath {
-            try? FileManager.default.removeItem(atPath: dbPath)
-        }
-
         try await super.tearDown()
-    }
-
-    /// Tests both memory and SQLite caches with the same operation
-    func testWithBothCaches<T>(
-        operation: (NDKCache) async throws -> T
-    ) async throws -> (memory: T, sqlite: T) {
-        let memoryResult = try await operation(cache)
-        let sqliteResult = try await operation(sqliteCache!)
-        return (memoryResult, sqliteResult)
     }
 
     /// Populates cache with test data
     func populateCache(
-        _ cache: NDKCache,
+        _ cache: NDKNostrDBCache,
         eventCount: Int = 10,
         userCount: Int = 3
     ) async throws -> (events: [NDKEvent], users: [TestUser]) {

@@ -1,5 +1,5 @@
 @testable import NDKSwiftCore
-import NDKSwiftSQLite
+
 import XCTest
 
 // DISABLED: This test file needs to be rewritten as it attempts to mock final classes and actors

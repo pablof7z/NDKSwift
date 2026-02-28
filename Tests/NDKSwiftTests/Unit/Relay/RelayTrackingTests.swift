@@ -3,7 +3,7 @@ import XCTest
 
 final class RelayTrackingTests: XCTestCase {
     func testEventTrackerIsPublic() async throws {
-        let ndk = NDK()
+        let ndk = try await NDKTestFactory.createNDK()
 
         // Verify eventTracker is publicly accessible
         XCTAssertNotNil(ndk.eventTracker)
@@ -22,7 +22,7 @@ final class RelayTrackingTests: XCTestCase {
     }
 
     func testMultipleRelayTracking() async throws {
-        let ndk = NDK()
+        let ndk = try await NDKTestFactory.createNDK()
         let eventId = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
         let relay1 = "wss://relay1.example.com"
         let relay2 = "wss://relay2.example.com"

@@ -298,7 +298,7 @@ public typealias NDKMarkdown = NDKUIMarkdownView<
 #if DEBUG
     struct NDKUIMarkdownView_Previews: PreviewProvider {
         static var previews: some View {
-            let mockNDK = NDK(relayURLs: [])
+            let mockNDK: NDK = { fatalError("NDK requires async cache init") }()
 
             ScrollView {
                 VStack(spacing: 20) {

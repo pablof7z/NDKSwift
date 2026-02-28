@@ -1,9 +1,9 @@
 import Foundation
 @testable import NDKSwiftCore
 
-// MARK: - Test Extensions for NDKCache
+// MARK: - Test Extensions for NDKNostrDBCache
 
-extension NDKCache {
+extension NDKNostrDBCache {
     /// Save a user profile to the cache (test helper)
     func saveProfile(_ profile: NDKUserProfile, pubkey: String) async throws {
         // Convert profile to metadata dictionary
@@ -33,6 +33,27 @@ extension NDKCache {
         } catch {
             return nil
         }
+    }
+
+    /// Insert a raw JSON profile string for testing backward compatibility
+    func insertRawProfileForTesting(pubkey: String, json: String) async throws {
+        guard let data = json.data(using: .utf8),
+              let metadata = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else {
+            throw NDKError.invalidInput(message: "Invalid JSON for profile")
+        }
+
+        let timestamp = Timestamp.now
+        let eventId = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+        try await saveProfileMetadata(pubkey: pubkey, metadata: metadata, updatedAt: timestamp, eventId: eventId)
+    }
+
+    /// Get raw profile data for testing migration scenarios
+    func getRawProfileForTesting(pubkey: String) async throws -> [String: Any]? {
+        guard let (metadata, _, _) = await getProfileMetadata(pubkey: pubkey) else {
+            return nil
+        }
+        return metadata
     }
 
     /// Observe profile changes test helper - just delegates to the protocol method

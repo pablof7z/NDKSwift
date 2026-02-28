@@ -2,12 +2,12 @@ import CashuSwift
 import Foundation
 import NDKSwiftCore
 
-/// Helper for storing Cashu-related data in NDKCache's generic KV store
+/// Helper for storing Cashu-related data in NDKNostrDBCache's generic KV store
 public struct CashuCacheHelper: Sendable {
-    private let cache: NDKCache
+    private let cache: NDKNostrDBCache
     private let namespace = "cashu"
 
-    public init(cache: NDKCache) {
+    public init(cache: NDKNostrDBCache) {
         self.cache = cache
     }
 

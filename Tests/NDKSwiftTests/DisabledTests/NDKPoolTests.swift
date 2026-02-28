@@ -4,12 +4,12 @@ import XCTest
 final class NDKPoolTests: NDKTestCase {
     // MARK: - Helper Methods
 
-    private func createMockNDK() -> NDK {
-        return createTestNDK()
+    private func createMockNDK() async throws -> NDK {
+        return try await createTestNDK()
     }
 
     func testAddRelay() async throws {
-        let ndk = createMockNDK()
+        let ndk = try await createMockNDK()
         let pool = ndk.pool
 
         let relayURL = "wss://relay.example.com"
@@ -23,7 +23,7 @@ final class NDKPoolTests: NDKTestCase {
     }
 
     func testAddDuplicateRelay() async throws {
-        let ndk = createMockNDK()
+        let ndk = try await createMockNDK()
         let pool = ndk.pool
 
         let relayURL = "wss://relay.example.com"
@@ -38,7 +38,7 @@ final class NDKPoolTests: NDKTestCase {
     }
 
     func testRemoveRelay() async throws {
-        let ndk = createMockNDK()
+        let ndk = try await createMockNDK()
         let pool = ndk.pool
 
         let relayURL = "wss://relay.example.com"
@@ -54,7 +54,7 @@ final class NDKPoolTests: NDKTestCase {
     }
 
     func testGetRelayByURL() async throws {
-        let ndk = createMockNDK()
+        let ndk = try await createMockNDK()
         let pool = ndk.pool
 
         let relayURL = "wss://relay.example.com"
@@ -71,7 +71,7 @@ final class NDKPoolTests: NDKTestCase {
     }
 
     func testExplicitRelays() async throws {
-        let ndk = createMockNDK()
+        let ndk = try await createMockNDK()
         let pool = ndk.pool
 
         // Add explicit relay
@@ -89,7 +89,7 @@ final class NDKPoolTests: NDKTestCase {
     }
 
     func testPrepareRelays() async throws {
-        let ndk = createMockNDK()
+        let ndk = try await createMockNDK()
         let pool = ndk.pool
 
         let urls = [
@@ -118,7 +118,7 @@ final class NDKPoolTests: NDKTestCase {
         // Use timeout protection to prevent hanging
         try await performAsyncTest(timeout: 5.0) { [weak self] in
             guard let self = self else { return }
-            let ndk = self.createMockNDK()
+            let ndk = self.try await createMockNDK()
             let pool = ndk.pool
 
             var receivedEvents: [NDKPoolChangeEvent] = []
@@ -213,7 +213,7 @@ final class NDKPoolTests: NDKTestCase {
     }
 
     func testConnectionSummary() async throws {
-        let ndk = createMockNDK()
+        let ndk = try await createMockNDK()
         let pool = ndk.pool
 
         // Add some relays
@@ -229,7 +229,7 @@ final class NDKPoolTests: NDKTestCase {
     }
 
     func testDisconnectAll() async throws {
-        let ndk = createMockNDK()
+        let ndk = try await createMockNDK()
         let pool = ndk.pool
 
         // Add relays
@@ -246,7 +246,7 @@ final class NDKPoolTests: NDKTestCase {
     // MARK: - Blocked Relay Tests
 
     func testBlockedRelayNotAdded() async throws {
-        let ndk = createMockNDK()
+        let ndk = try await createMockNDK()
         let pool = ndk.pool
 
         // Setup mock signer with test user
@@ -278,7 +278,7 @@ final class NDKPoolTests: NDKTestCase {
     }
 
     func testRefreshBlockedRelaysRemovesExistingRelays() async throws {
-        let ndk = createMockNDK()
+        let ndk = try await createMockNDK()
         let pool = ndk.pool
 
         // Setup mock signer with test user
@@ -319,7 +319,7 @@ final class NDKPoolTests: NDKTestCase {
     // MARK: - Connection State Tests
 
     func testGetRelayStateSnapshot() async throws {
-        let ndk = createMockNDK()
+        let ndk = try await createMockNDK()
         let pool = ndk.pool
 
         // Add multiple relays
@@ -342,7 +342,7 @@ final class NDKPoolTests: NDKTestCase {
     }
 
     func testConnectedRelayURLs() async throws {
-        let ndk = createMockNDK()
+        let ndk = try await createMockNDK()
         let pool = ndk.pool
 
         // Add relays
@@ -355,7 +355,7 @@ final class NDKPoolTests: NDKTestCase {
     }
 
     func testConnectAll() async throws {
-        let ndk = createMockNDK()
+        let ndk = try await createMockNDK()
         let pool = ndk.pool
 
         // Add multiple relays
@@ -377,7 +377,7 @@ final class NDKPoolTests: NDKTestCase {
     }
 
     func testPrepareRelaysWithAutoConnect() async throws {
-        let ndk = createMockNDK()
+        let ndk = try await createMockNDK()
         let pool = ndk.pool
 
         let urls = [

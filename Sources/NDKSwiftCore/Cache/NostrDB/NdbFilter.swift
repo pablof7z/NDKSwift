@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import NDKSwiftCore
+
 import NostrDB
 
 // Stub NostrFilter for NostrDB - will be replaced by NDK layer

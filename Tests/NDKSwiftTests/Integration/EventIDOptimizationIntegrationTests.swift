@@ -8,7 +8,7 @@ final class EventIDOptimizationIntegrationTest: XCTestCase {
         // In a real scenario, you would:
 
         // 1. Create NDK with a cache that has some events
-        let cache = MemoryCache()
+        let cache = try await NDKTestFactory.createTestCache()
         _ = NDK(cache: cache)
 
         // 2. Pre-populate cache with some events

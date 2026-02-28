@@ -5,7 +5,7 @@ import XCTest
 /// Verifies getOutboxStrategy() produces correct relay-author mappings
 final class OutboxSubscriptionFlowTests: XCTestCase {
     var ndk: NDK!
-    var cache: MemoryCache!
+    var cache: NDKNostrDBCache!
 
     // Test relay URLs
     let relay1URL: RelayURL = "wss://relay1.test/"
@@ -21,7 +21,7 @@ final class OutboxSubscriptionFlowTests: XCTestCase {
     let pubkey3 = "3333333333333333333333333333333333333333333333333333333333333333"
 
     override func setUp() async throws {
-        cache = MemoryCache()
+        cache = try await NDKTestFactory.createTestCache()
         let outboxConfig = NDKDiscoveryConfig(
             blocklistedRelays: [],
             discoveryRelays: [outboxRelayURL]

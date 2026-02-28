@@ -9,7 +9,7 @@ import CommonCrypto
 import CryptoKit
 import Foundation
 import NaturalLanguage
-import NDKSwiftCore
+
 import NostrDB
 
 // Stub types for Damus dependencies - will be replaced by NDK layer

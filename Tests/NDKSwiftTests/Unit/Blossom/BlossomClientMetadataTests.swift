@@ -12,7 +12,7 @@ final class BlossomClientMetadataTests: NDKTestCase {
         mockURLSession = SimpleMockURLSession()
         client = BlossomClient(urlSession: mockURLSession)
         signer = try NDKPrivateKeySigner.generate()
-        ndk = createTestNDK(signer: signer)
+        ndk = try await createTestNDK(signer: signer)
     }
 
     #if canImport(UIKit)
