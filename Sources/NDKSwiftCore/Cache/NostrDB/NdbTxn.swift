@@ -4,6 +4,22 @@
 //
 //  Created by William Casarin on 2023-08-30.
 //
+//  Rewritten 2026-05 for Swift Concurrency.
+//
+//  The original implementation tracked nested transactions through
+//  `Thread.current.threadDictionary`, which is fundamentally incompatible
+//  with Swift Concurrency: an `async` function can suspend at any await
+//  and resume on a different thread, so the "inherited txn" fast-path
+//  could silently miss a parent's open transaction OR pick up an
+//  unrelated thread's snapshot. The deinit could also run on a thread
+//  where the refcount slot was missing, leaking the LMDB read-txn.
+//
+//  This rewrite drops the inheritance fast-path entirely: every NdbTxn /
+//  SafeNdbTxn owns exactly one `ndb_begin_query` and unconditionally
+//  closes it with `ndb_end_query` in its deinit. The cost is extra LMDB
+//  read transactions when nested-looking calls happen; the gain is
+//  correctness — no data race on threadDictionary, no use of another
+//  context's snapshot, no leaked read-txn pinning a stale snapshot.
 
 import Foundation
 
@@ -18,13 +34,20 @@ class NdbTxn<T>: RawNdbTxnAccessible {
     var txn: ndb_txn
     private var val: T!
     var moved: Bool
-    var inherited: Bool
+    /// Retained for binary-compat with callers that read this; always false
+    /// in the new design since we no longer inherit parent transactions.
+    let inherited: Bool = false
     var ndb: Ndb
     var generation: Int
     var name: String
 
     static func pure(ndb: Ndb, val: T) -> NdbTxn<T> {
-        .init(ndb: ndb, txn: ndb_txn(), val: val, generation: ndb.generation, inherited: true, name: "pure_txn")
+        // A "pure" txn carries a value without an actual db handle. Mark it
+        // as a moved/no-op so deinit doesn't try to end a query that was
+        // never begun.
+        let txn = NdbTxn(ndb: ndb, txn: ndb_txn(), val: val, generation: ndb.generation, name: "pure_txn")
+        txn.moved = true
+        return txn
     }
 
     init?(ndb: Ndb, with: (NdbTxn<T>) -> T = { _ in () }, name: String? = nil) {
@@ -32,48 +55,23 @@ class NdbTxn<T>: RawNdbTxnAccessible {
         self.name = name ?? "txn"
         self.ndb = ndb
         generation = ndb.generation
-        if let active_txn = Thread.current.threadDictionary["ndb_txn"] as? ndb_txn,
-           let txn_generation = Thread.current.threadDictionary["txn_generation"] as? Int,
-           let ref_count = Thread.current.threadDictionary["ndb_txn_ref_count"] as? Int,
-           txn_generation == ndb.generation {
-            // some parent thread is active, use that instead
-            #if DEBUG
-                print("txn: inherited txn")
-            #endif
-            txn = active_txn
-            inherited = true
-            generation = txn_generation
-            let new_ref_count = ref_count + 1
-            Thread.current.threadDictionary["ndb_txn_ref_count"] = new_ref_count
-        } else {
-            txn = ndb_txn()
-            guard !ndb.is_closed else { return nil }
-            generation = ndb.generation
-            #if TXNDEBUG
-                txn_count += 1
-            #endif
-            let ok = ndb_begin_query(ndb.ndb.ndb, &txn) != 0
-            if !ok {
-                return nil
-            }
-            generation = ndb.generation
-            Thread.current.threadDictionary["ndb_txn"] = txn
-            Thread.current.threadDictionary["ndb_txn_ref_count"] = 1
-            Thread.current.threadDictionary["txn_generation"] = ndb.generation
-            inherited = false
+        txn = ndb_txn()
+        let ok = ndb_begin_query(ndb.ndb.ndb, &txn) != 0
+        if !ok {
+            return nil
         }
         #if TXNDEBUG
+            txn_count += 1
             print("txn: open  gen\(generation) '\(self.name)' \(txn_count)")
         #endif
         moved = false
         val = with(self)
     }
 
-    private init(ndb: Ndb, txn: ndb_txn, val: T, generation: Int, inherited: Bool, name: String) {
+    private init(ndb: Ndb, txn: ndb_txn, val: T, generation: Int, name: String) {
         self.txn = txn
         self.val = val
         moved = false
-        self.inherited = inherited
         self.ndb = ndb
         self.generation = generation
         self.name = name
@@ -87,7 +85,13 @@ class NdbTxn<T>: RawNdbTxnAccessible {
     }
 
     deinit {
-        if self.generation != ndb.generation {
+        // Skip closing under three conditions:
+        // - moved/pure: another instance now owns the read-txn (or it was never opened).
+        // - generation mismatch: the underlying nostrdb has been reopened
+        //   since we begun; our txn handle is stale.
+        // - db closed: there's nothing to end the query against.
+        guard !moved else { return }
+        if generation != ndb.generation {
             #if DEBUG
                 print("txn: OLD GENERATION (\(self.generation) != \(ndb.generation)), IGNORING")
             #endif
@@ -99,26 +103,8 @@ class NdbTxn<T>: RawNdbTxnAccessible {
             #endif
             return
         }
-        if let ref_count = Thread.current.threadDictionary["ndb_txn_ref_count"] as? Int {
-            let new_ref_count = ref_count - 1
-            Thread.current.threadDictionary["ndb_txn_ref_count"] = new_ref_count
-            assert(new_ref_count >= 0, "NdbTxn reference count should never be below zero")
-            if new_ref_count <= 0 {
-                ndb_end_query(&self.txn)
-                Thread.current.threadDictionary.removeObject(forKey: "ndb_txn")
-                Thread.current.threadDictionary.removeObject(forKey: "ndb_txn_ref_count")
-            }
-        }
-        if inherited {
-            #if DEBUG
-                print("txn: not closing. inherited")
-            #endif
-            return
-        }
-        if moved {
-            return
-        }
 
+        ndb_end_query(&self.txn)
         #if TXNDEBUG
             txn_count -= 1
             print("txn: close gen\(generation) '\(name)' \(txn_count)")
@@ -128,14 +114,14 @@ class NdbTxn<T>: RawNdbTxnAccessible {
     // functor
     func map<Y>(_ transform: (T) -> Y) -> NdbTxn<Y> {
         moved = true
-        return .init(ndb: ndb, txn: txn, val: transform(val), generation: generation, inherited: inherited, name: name)
+        return .init(ndb: ndb, txn: txn, val: transform(val), generation: generation, name: name)
     }
 
     // comonad!?
     // useful for moving ownership of a transaction to another value
     func extend<Y>(_ with: (NdbTxn<T>) -> Y) -> NdbTxn<Y> {
         moved = true
-        return .init(ndb: ndb, txn: txn, val: with(self), generation: generation, inherited: inherited, name: name)
+        return .init(ndb: ndb, txn: txn, val: with(self), generation: generation, name: name)
     }
 }
 
@@ -155,70 +141,52 @@ class SafeNdbTxn<T: ~Copyable> {
     var txn: ndb_txn
     var val: T!
     var moved: Bool
-    var inherited: Bool
+    /// Retained for binary-compat with callers that read this; always false
+    /// in the new design. See NdbTxn for the rewrite rationale.
+    let inherited: Bool = false
     var ndb: Ndb
     var generation: Int
     var name: String
 
     static func pure(ndb: Ndb, val: consuming T) -> SafeNdbTxn<T> {
-        .init(ndb: ndb, txn: ndb_txn(), val: val, generation: ndb.generation, inherited: true, name: "pure_txn")
+        let txn = SafeNdbTxn(ndb: ndb, txn: ndb_txn(), val: val, generation: ndb.generation, name: "pure_txn")
+        txn.moved = true
+        return txn
     }
 
     static func new(on ndb: Ndb, with valueGetter: (PlaceholderNdbTxn) -> T? = { _ in () }, name: String = "txn") -> SafeNdbTxn<T>? {
         guard !ndb.is_closed else { return nil }
-        var generation = ndb.generation
-        var txn: ndb_txn
-        let inherited: Bool
-        if let active_txn = Thread.current.threadDictionary["ndb_txn"] as? ndb_txn,
-           let txn_generation = Thread.current.threadDictionary["txn_generation"] as? Int,
-           let ref_count = Thread.current.threadDictionary["ndb_txn_ref_count"] as? Int,
-           txn_generation == ndb.generation {
-            // some parent thread is active, use that instead
-            #if DEBUG
-                print("txn: inherited txn")
-            #endif
-            txn = active_txn
-            inherited = true
-            generation = txn_generation
-            let new_ref_count = ref_count + 1
-            Thread.current.threadDictionary["ndb_txn_ref_count"] = new_ref_count
-        } else {
-            txn = ndb_txn()
-            guard !ndb.is_closed else { return nil }
-            generation = ndb.generation
-            #if TXNDEBUG
-                txn_count += 1
-            #endif
-            let ok = ndb_begin_query(ndb.ndb.ndb, &txn) != 0
-            if !ok {
-                return nil
-            }
-            generation = ndb.generation
-            Thread.current.threadDictionary["ndb_txn"] = txn
-            Thread.current.threadDictionary["ndb_txn_ref_count"] = 1
-            Thread.current.threadDictionary["txn_generation"] = ndb.generation
-            inherited = false
+        var txn = ndb_txn()
+        let ok = ndb_begin_query(ndb.ndb.ndb, &txn) != 0
+        if !ok {
+            return nil
         }
+        let generation = ndb.generation
         #if TXNDEBUG
-            print("txn: open  gen\(self.generation) '\(self.name)' \(txn_count)")
+            txn_count += 1
+            print("txn: open  gen\(generation) '\(name)' \(txn_count)")
         #endif
         let placeholderTxn = PlaceholderNdbTxn(txn: txn)
-        guard let val = valueGetter(placeholderTxn) else { return nil }
-        return SafeNdbTxn<T>(ndb: ndb, txn: txn, val: val, generation: generation, inherited: inherited, name: name)
+        guard let val = valueGetter(placeholderTxn) else {
+            // Caller refused; clean up the txn we opened so we don't leak it.
+            ndb_end_query(&txn)
+            return nil
+        }
+        return SafeNdbTxn<T>(ndb: ndb, txn: txn, val: val, generation: generation, name: name)
     }
 
-    private init(ndb: Ndb, txn: ndb_txn, val: consuming T, generation: Int, inherited: Bool, name: String) {
+    private init(ndb: Ndb, txn: ndb_txn, val: consuming T, generation: Int, name: String) {
         self.txn = txn
         self.val = consume val
         moved = false
-        self.inherited = inherited
         self.ndb = ndb
         self.generation = generation
         self.name = name
     }
 
     deinit {
-        if self.generation != ndb.generation {
+        guard !moved else { return }
+        if generation != ndb.generation {
             #if DEBUG
                 print("txn: OLD GENERATION (\(self.generation) != \(ndb.generation)), IGNORING")
             #endif
@@ -230,26 +198,8 @@ class SafeNdbTxn<T: ~Copyable> {
             #endif
             return
         }
-        if let ref_count = Thread.current.threadDictionary["ndb_txn_ref_count"] as? Int {
-            let new_ref_count = ref_count - 1
-            Thread.current.threadDictionary["ndb_txn_ref_count"] = new_ref_count
-            assert(new_ref_count >= 0, "NdbTxn reference count should never be below zero")
-            if new_ref_count <= 0 {
-                ndb_end_query(&self.txn)
-                Thread.current.threadDictionary.removeObject(forKey: "ndb_txn")
-                Thread.current.threadDictionary.removeObject(forKey: "ndb_txn_ref_count")
-            }
-        }
-        if inherited {
-            #if DEBUG
-                print("txn: not closing. inherited")
-            #endif
-            return
-        }
-        if moved {
-            return
-        }
 
+        ndb_end_query(&self.txn)
         #if TXNDEBUG
             txn_count -= 1
             print("txn: close gen\(generation) '\(name)' \(txn_count)")
@@ -259,14 +209,14 @@ class SafeNdbTxn<T: ~Copyable> {
     // functor
     func map<Y>(_ transform: (borrowing T) -> Y) -> SafeNdbTxn<Y> {
         moved = true
-        return .init(ndb: ndb, txn: txn, val: transform(val), generation: generation, inherited: inherited, name: name)
+        return .init(ndb: ndb, txn: txn, val: transform(val), generation: generation, name: name)
     }
 
     // comonad!?
     // useful for moving ownership of a transaction to another value
     func extend<Y>(_ with: (SafeNdbTxn<T>) -> Y) -> SafeNdbTxn<Y> {
         moved = true
-        return .init(ndb: ndb, txn: txn, val: with(self), generation: generation, inherited: inherited, name: name)
+        return .init(ndb: ndb, txn: txn, val: with(self), generation: generation, name: name)
     }
 
     consuming func maybeExtend<Y>(_ with: (consuming SafeNdbTxn<T>) -> Y?) -> SafeNdbTxn<Y>? where Y: ~Copyable {
@@ -274,10 +224,9 @@ class SafeNdbTxn<T: ~Copyable> {
         let ndb = self.ndb
         let txn = self.txn
         let generation = self.generation
-        let inherited = self.inherited
         let name = self.name
         guard let newVal = with(consume self) else { return nil }
-        return .init(ndb: ndb, txn: txn, val: newVal, generation: generation, inherited: inherited, name: name)
+        return .init(ndb: ndb, txn: txn, val: newVal, generation: generation, name: name)
     }
 }
 
@@ -300,7 +249,7 @@ extension NdbTxn where T: OptionalType {
             return nil
         }
         moved = true
-        return NdbTxn<T.Wrapped>(ndb: ndb, txn: txn, val: unwrappedVal, generation: generation, inherited: inherited, name: name)
+        return NdbTxn<T.Wrapped>(ndb: ndb, txn: txn, val: unwrappedVal, generation: generation, name: name)
     }
 }
 
