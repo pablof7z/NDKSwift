@@ -93,6 +93,15 @@ class NdbFilter {
     // MARK: - Conversion to/from ndb_filter
 
     private static func from(nostrFilter: NostrFilter) throws(NdbFilterConversionError) -> UnsafeMutablePointer<ndb_filter> {
+        try validateNonEmpty(nostrFilter.ids)
+        try validateNonEmpty(nostrFilter.kinds)
+        try validateNonEmpty(nostrFilter.referenced_ids)
+        try validateNonEmpty(nostrFilter.pubkeys)
+        try validateNonEmpty(nostrFilter.authors)
+        try validateNonEmpty(nostrFilter.hashtag)
+        try validateNonEmpty(nostrFilter.parameter)
+        try validateNonEmpty(nostrFilter.quotes)
+
         let filterPointer = UnsafeMutablePointer<ndb_filter>.allocate(capacity: 1)
 
         guard ndb_filter_init(filterPointer) == 1 else {
@@ -356,6 +365,13 @@ class NdbFilter {
         case failedToStartField
         case failedToAddElement
         case failedToFinalize
+        case emptyElementList
+    }
+
+    private static func validateNonEmpty<T>(_ elements: [T]?) throws(NdbFilterConversionError) {
+        if let elements, elements.isEmpty {
+            throw .emptyElementList
+        }
     }
 
     deinit {
