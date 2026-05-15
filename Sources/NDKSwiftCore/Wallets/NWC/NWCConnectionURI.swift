@@ -60,12 +60,9 @@ public struct NWCConnectionURI {
             throw NDKError.missingRequired(NostrConstants.JSONField.relay, in: "NWC URI")
         }
 
-        // Validate relay URLs
-        for relay in relays {
-            guard URL(string: relay) != nil else {
-                throw NDKError.invalidDataFormat("relay URL", details: "Invalid URL: \(relay)")
-            }
-        }
+        // Validate relay URLs. NWC carries wallet credentials and encrypted
+        // payment traffic, so non-local relays must use secure WebSockets.
+        try Self.validateRelayURLs(relays)
         relayURLs = relays
 
         // Extract secret
@@ -98,12 +95,7 @@ public struct NWCConnectionURI {
             throw NDKError.missingRequired("relayURLs")
         }
 
-        // Validate relay URLs
-        for relay in relayURLs {
-            guard URL(string: relay) != nil else {
-                throw NDKError.invalidDataFormat("relay URL", details: "Invalid URL: \(relay)")
-            }
-        }
+        try Self.validateRelayURLs(relayURLs)
 
         self.walletPubkey = walletPubkey.lowercased()
         self.relayURLs = relayURLs
@@ -146,6 +138,37 @@ public struct NWCConnectionURI {
         return Set(relayURLs.compactMap { urlString in
             URLNormalizer.tryNormalizeRelayUrl(urlString) ?? urlString
         })
+    }
+
+    private static func validateRelayURLs(_ relayURLs: [String]) throws {
+        for relay in relayURLs {
+            guard let components = URLComponents(string: relay),
+                  let scheme = components.scheme?.lowercased(),
+                  let host = components.host,
+                  !host.isEmpty
+            else {
+                throw NDKError.invalidDataFormat("relay URL", details: "Invalid URL: \(relay)")
+            }
+
+            switch scheme {
+            case "wss":
+                continue
+            case "ws" where isLocalhost(host):
+                continue
+            case "ws":
+                throw NDKError.invalidDataFormat(
+                    "relay URL",
+                    details: "NWC relay URL must use wss:// unless it is localhost: \(relay)"
+                )
+            default:
+                throw NDKError.invalidDataFormat("relay URL", details: "NWC relay URL must use wss://: \(relay)")
+            }
+        }
+    }
+
+    private static func isLocalhost(_ host: String) -> Bool {
+        let lowercased = host.lowercased()
+        return lowercased == "localhost" || lowercased == "127.0.0.1" || lowercased == "::1"
     }
 }
 

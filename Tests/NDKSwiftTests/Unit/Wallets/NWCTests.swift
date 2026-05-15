@@ -25,12 +25,16 @@ final class NWCTests: XCTestCase {
     }
 
     func testParseInvalidNWCConnectionURI() {
+        let walletPubkey = "abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234"
+        let secret = "abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234"
         let invalidURIs = [
             "invalid://abcd1234",
             "nostr+walletconnect://",
-            "nostr+walletconnect://abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234", // Missing required params
-            "nostr+walletconnect://abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234?relay=wss://relay.example.com", // Missing secret
-            "nostr+walletconnect://abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234?secret=abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234", // Missing relay
+            "nostr+walletconnect://\(walletPubkey)", // Missing required params
+            "nostr+walletconnect://\(walletPubkey)?relay=wss://relay.example.com", // Missing secret
+            "nostr+walletconnect://\(walletPubkey)?secret=\(secret)", // Missing relay
+            "nostr+walletconnect://\(walletPubkey)?relay=http://relay.example.com&secret=\(secret)",
+            "nostr+walletconnect://\(walletPubkey)?relay=ws://relay.example.com&secret=\(secret)",
         ]
 
         for uri in invalidURIs {
@@ -38,6 +42,15 @@ final class NWCTests: XCTestCase {
                 XCTAssertTrue(error is NDKError)
             }
         }
+    }
+
+    func testNWCConnectionURIAllowsLocalhostWebSocketRelay() throws {
+        let walletPubkey = "abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234"
+        let secret = "abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234"
+        let uri = "nostr+walletconnect://\(walletPubkey)?relay=ws://localhost:8080&secret=\(secret)"
+        let connection = try NWCConnectionURI(uri: uri)
+
+        XCTAssertEqual(connection.relayURLs.first, "ws://localhost:8080")
     }
 
     // MARK: - NWC Wallet Initialization Tests
