@@ -208,6 +208,7 @@ final class NIP17Tests: XCTestCase {
 
     func testTimestampRandomization() async throws {
         let senderSigner = try NDKPrivateKeySigner(privateKey: senderPrivateKey)
+        let recipientSigner = try NDKPrivateKeySigner(privateKey: recipientPrivateKey)
         let recipient = NIP17Recipient(pubkey: recipientPublicKey)
 
         let beforeTimestamp = Timestamp.now
@@ -220,14 +221,18 @@ final class NIP17Tests: XCTestCase {
 
         let afterTimestamp = Timestamp.now
 
-        // Wrapped event timestamp should be randomized
         let twoDaysInSeconds: Int64 = 2 * 24 * 60 * 60
         let minExpected = beforeTimestamp - twoDaysInSeconds
-        let maxExpected = afterTimestamp + twoDaysInSeconds
 
         XCTAssertTrue(
-            wrapped.createdAt >= minExpected && wrapped.createdAt <= maxExpected,
-            "Timestamp should be within randomization range"
+            wrapped.createdAt >= minExpected && wrapped.createdAt <= afterTimestamp,
+            "Gift wrap timestamp should be randomized into the recent past"
+        )
+
+        let seal = try await NIP59.unwrap(giftWrap: wrapped, recipientSigner: recipientSigner)
+        XCTAssertTrue(
+            seal.createdAt >= minExpected && seal.createdAt <= afterTimestamp,
+            "Seal timestamp should be randomized into the recent past"
         )
     }
 
