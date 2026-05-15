@@ -165,23 +165,51 @@ public final class NDKSubscription<T: Sendable>: Sendable {
     private final class FanoutSink<Element: Sendable>: @unchecked Sendable {
         private let lock = NSLock()
         private var consumers: [UUID: AsyncStream<Element>.Continuation] = [:]
+        /// Bounded replay buffer. The default `AsyncStream` continuation used
+        /// to back the producer had `.unbounded` buffering, so cache-hit
+        /// batches yielded BEFORE the first consumer registered would queue
+        /// and replay. The fan-out rewrite lost that property — batches sent
+        /// to an empty consumer set were dropped forever, and the dedup
+        /// set still recorded them so refresh() couldn't recover. We retain
+        /// the most recent `replayCapacity` batches and replay them to each
+        /// newly-registered consumer.
+        private var replayBuffer: [Element] = []
+        private let replayCapacity: Int
         private var finished = false
 
+        init(replayCapacity: Int = 64) {
+            self.replayCapacity = replayCapacity
+        }
+
         /// Register a new consumer; returns its stream and the registration ID.
+        /// Any retained replay batches are immediately yielded to the new
+        /// consumer (in original order) before live yields begin.
         /// The caller MUST eventually invoke `unregister(_:)` (typically from
         /// `onTermination`) or the continuation stays alive for the life of
         /// the sink.
         func register() -> (stream: AsyncStream<Element>, id: UUID) {
             let id = UUID()
-            let stream = AsyncStream<Element> { continuation in
-                lock.lock()
-                if finished {
-                    lock.unlock()
+            let stream = AsyncStream<Element> { [weak self] continuation in
+                guard let self = self else {
                     continuation.finish()
                     return
                 }
-                consumers[id] = continuation
-                lock.unlock()
+                self.lock.lock()
+                if self.finished {
+                    let buffered = self.replayBuffer
+                    self.lock.unlock()
+                    for value in buffered { continuation.yield(value) }
+                    continuation.finish()
+                    return
+                }
+                self.consumers[id] = continuation
+                let buffered = self.replayBuffer
+                self.lock.unlock()
+                // Replay outside the lock so a slow consumer doesn't block
+                // other registrations.
+                for value in buffered {
+                    continuation.yield(value)
+                }
             }
             return (stream, id)
         }
@@ -192,9 +220,14 @@ public final class NDKSubscription<T: Sendable>: Sendable {
             lock.unlock()
         }
 
-        /// Deliver `value` to every currently-registered consumer.
+        /// Deliver `value` to every currently-registered consumer and retain it
+        /// in the bounded replay buffer for late-arriving consumers.
         func yield(_ value: Element) {
             lock.lock()
+            replayBuffer.append(value)
+            if replayBuffer.count > replayCapacity {
+                replayBuffer.removeFirst(replayBuffer.count - replayCapacity)
+            }
             let snapshot = Array(consumers.values)
             lock.unlock()
             for continuation in snapshot {

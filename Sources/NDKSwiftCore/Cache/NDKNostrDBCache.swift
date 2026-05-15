@@ -231,13 +231,24 @@ public actor NDKNostrDBCache {
         }
     }
 
+    /// Tail of the FIFO write-through queue. Each call to
+    /// `sqliteWriteThrough` chains its work onto the prior tail Task and
+    /// installs itself as the new tail, so concurrent writers preserve
+    /// submission order. Without this, two `setValue(...)` calls to the
+    /// same key could land in SQLite in either order — Swift's actor
+    /// mailbox doesn't guarantee FIFO across independent Tasks awaiting
+    /// the same actor.
+    private var sqliteWriteTail: Task<Void, Never>?
+
     /// Fire-and-forget write-through helper for SQLite persistence.
-    /// We don't want every public method to gain `try` / `throws`, so we
-    /// log errors and let the in-memory copy win for this run.
-    private nonisolated func sqliteWriteThrough(_ work: @Sendable @escaping (NDKCacheSQLiteStore) async throws -> Void) {
-        Task { [weak self] in
-            guard let self else { return }
-            guard let store = self.sqliteStore else { return }
+    /// Writes are serialized in caller submission order to preserve
+    /// in-memory / on-disk consistency under concurrent mutations. Errors
+    /// are logged; the in-memory copy is authoritative for this process.
+    private func sqliteWriteThrough(_ work: @Sendable @escaping (NDKCacheSQLiteStore) async throws -> Void) {
+        guard let store = sqliteStore else { return }
+        let prior = sqliteWriteTail
+        sqliteWriteTail = Task {
+            await prior?.value
             do {
                 try await work(store)
             } catch {
@@ -701,7 +712,26 @@ public actor NDKNostrDBCache {
         eventRelaySources.removeAll()
         await relayCache.clear()
         deletedEventIds.removeAll()
+        decryptedContentCache = LRUCache(capacity: 1000)
+        kvStore.removeAll()
+        nip05Cache.removeAll()
+        nip05ByPubkey.removeAll()
+        domainVerificationAttempts.removeAll()
+        fetchTimes.removeAll()
         try await publishingManager.clear()
+
+        // Wipe the SQLite auxiliary store. Without this, hydration on the
+        // next init would resurrect every NIP-09 deletion marker / NIP-05
+        // entry / KV pair / fetch time that clearPersisted() promised to
+        // remove.
+        if let store = sqliteStore {
+            do {
+                try await store.clearAll()
+            } catch {
+                NDKLogger.log(.warning, category: .cache,
+                              "Failed to clear SQLite auxiliary store during clearPersisted: \(error.localizedDescription)")
+            }
+        }
 
         // Close the nostrdb connection
         nostrDB?.close()
@@ -1443,6 +1473,15 @@ public actor NDKNostrDBCache {
             nip05ByPubkey.removeValue(forKey: entry.pubkey)
             entry.status = .invalid
             nip05Cache[identifier] = entry
+            // Write through so SQLite reflects the invalidation. Without
+            // this, hydration on next launch reads the old verified row
+            // and the entry comes back as if invalidation never happened.
+            if let json = try? JSONEncoder().encode(entry) {
+                let storedIdentifier = identifier
+                sqliteWriteThrough { store in
+                    try await store.saveNIP05(identifier: storedIdentifier, entryJSON: json)
+                }
+            }
         }
 
         // If we know the actual pubkey, save a new verified entry

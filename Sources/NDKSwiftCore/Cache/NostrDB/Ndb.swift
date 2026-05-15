@@ -155,14 +155,22 @@ class Ndb: @unchecked Sendable {
     var ndb: ndb_t
     let path: String?
     let owns_db: Bool
+    /// `generation` / `closed` are mutated by `close()` and read by every
+    /// `NdbTxn` deinit. Guarded by `lifecycleLock` so concurrent reads see a
+    /// consistent view and the close ordering (bump generation, mark
+    /// closed, destroy env) is atomic — without this an `NdbTxn` deinit
+    /// could see `is_closed == false` for the duration of its decision
+    /// window and then call `ndb_end_query` against an env that `close()`
+    /// has just destroyed.
     var generation: Int
     private var closed: Bool
+    private let lifecycleLock = NSLock()
     private var callbackHandler: Ndb.CallbackHandler
 
     private static let DEFAULT_WRITER_SCRATCH_SIZE: Int32 = 2_097_152 // 2mb scratch size for the writer thread, it should match with the one specified in nostrdb.c
 
     var is_closed: Bool {
-        closed || ndb.ndb == nil
+        lifecycleLock.withLock { closed || ndb.ndb == nil }
     }
 
     static func safemode() -> Ndb? {
@@ -344,13 +352,27 @@ class Ndb: @unchecked Sendable {
     }
 
     func close() {
-        guard !is_closed else { return }
-        closed = true
+        // Order matters and must be atomic relative to any NdbTxn deinit:
+        //   1. Mark closed under the lock and bump generation. After this,
+        //      every NdbTxn deinit observing `is_closed == true` or a
+        //      generation mismatch will skip its `ndb_end_query` call.
+        //   2. THEN destroy the LMDB env. Any deinit that got past the
+        //      lock before step 1 has already finished its `ndb_end_query`
+        //      because the lock serialized us against it.
+        // Previously the order was reversed (closed=true; destroy; generation++),
+        // which left a window where a concurrent deinit could call
+        // `ndb_end_query` against a destroyed env.
+        let shouldDestroy: Bool = lifecycleLock.withLock {
+            guard !(closed || ndb.ndb == nil) else { return false }
+            closed = true
+            generation += 1
+            return true
+        }
+        guard shouldDestroy else { return }
         #if DEBUG
             print("txn: CLOSING NOSTRDB")
         #endif
         ndb_destroy(ndb.ndb)
-        generation += 1
         #if DEBUG
             print("txn: NOSTRDB CLOSED")
         #endif
@@ -367,9 +389,27 @@ class Ndb: @unchecked Sendable {
             print("txn: NOSTRDB REOPENED (gen \(generation))")
         #endif
 
-        closed = false
-        ndb = db
+        lifecycleLock.withLock {
+            closed = false
+            ndb = db
+        }
         return true
+    }
+
+    /// Atomically validate that a transaction is still on the current
+    /// generation and the env is open, then run `body` (typically
+    /// `ndb_end_query`). Returns `true` if the body ran. Called from
+    /// `NdbTxn.deinit` / `SafeNdbTxn.deinit` to avoid a race where
+    /// `Ndb.close()` destroys the env between the deinit's
+    /// generation/is_closed read and its call to `ndb_end_query`.
+    func endQueryIfAlive(generation expectedGeneration: Int, _ body: () -> Void) -> Bool {
+        return lifecycleLock.withLock {
+            guard !closed, ndb.ndb != nil, generation == expectedGeneration else {
+                return false
+            }
+            body()
+            return true
+        }
     }
 
     func lookup_blocks_by_key_with_txn(_ key: NoteKey, txn: RawNdbTxnAccessible) -> NdbBlockGroup.BlocksMetadata? {

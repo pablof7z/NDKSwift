@@ -85,29 +85,27 @@ class NdbTxn<T>: RawNdbTxnAccessible {
     }
 
     deinit {
-        // Skip closing under three conditions:
-        // - moved/pure: another instance now owns the read-txn (or it was never opened).
-        // - generation mismatch: the underlying nostrdb has been reopened
-        //   since we begun; our txn handle is stale.
-        // - db closed: there's nothing to end the query against.
+        // The previous version did three checks (moved, generation, closed)
+        // then called ndb_end_query — but the close-state checks weren't
+        // synchronized against Ndb.close(), so an interleaving where
+        // close() destroyed the env between our check and our call was
+        // possible. endQueryIfAlive locks Ndb's lifecycle state, validates
+        // both conditions inside the lock, and runs the close call from
+        // within it.
         guard !moved else { return }
-        if generation != ndb.generation {
-            #if DEBUG
-                print("txn: OLD GENERATION (\(self.generation) != \(ndb.generation)), IGNORING")
-            #endif
-            return
+        var localTxn = self.txn
+        let didClose = ndb.endQueryIfAlive(generation: generation) {
+            ndb_end_query(&localTxn)
         }
-        if ndb.is_closed {
-            #if DEBUG
-                print("txn: not closing. db closed")
-            #endif
-            return
-        }
-
-        ndb_end_query(&self.txn)
         #if TXNDEBUG
-            txn_count -= 1
-            print("txn: close gen\(generation) '\(name)' \(txn_count)")
+            if didClose {
+                txn_count -= 1
+                print("txn: close gen\(generation) '\(name)' \(txn_count)")
+            } else {
+                print("txn: skip close gen\(generation) '\(name)' (closed or stale generation)")
+            }
+        #else
+            _ = didClose
         #endif
     }
 
@@ -185,24 +183,22 @@ class SafeNdbTxn<T: ~Copyable> {
     }
 
     deinit {
+        // See NdbTxn.deinit for rationale — atomically validate generation
+        // and is_closed under Ndb.lifecycleLock, then run ndb_end_query
+        // inside the lock so close() can't destroy the env between
+        // validation and the call.
         guard !moved else { return }
-        if generation != ndb.generation {
-            #if DEBUG
-                print("txn: OLD GENERATION (\(self.generation) != \(ndb.generation)), IGNORING")
-            #endif
-            return
+        var localTxn = self.txn
+        let didClose = ndb.endQueryIfAlive(generation: generation) {
+            ndb_end_query(&localTxn)
         }
-        if ndb.is_closed {
-            #if DEBUG
-                print("txn: not closing. db closed")
-            #endif
-            return
-        }
-
-        ndb_end_query(&self.txn)
         #if TXNDEBUG
-            txn_count -= 1
-            print("txn: close gen\(generation) '\(name)' \(txn_count)")
+            if didClose {
+                txn_count -= 1
+                print("txn: close gen\(generation) '\(name)' \(txn_count)")
+            }
+        #else
+            _ = didClose
         #endif
     }
 
