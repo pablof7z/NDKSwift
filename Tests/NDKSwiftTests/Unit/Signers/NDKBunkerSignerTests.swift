@@ -322,11 +322,14 @@ final class NDKBunkerSignerTests: XCTestCase {
         XCTAssertNotNil(uri)
 
         if let uri = uri {
-            // Should properly encode special characters
-            // The actual implementation may vary in how it encodes URLs
-            XCTAssertTrue(uri.contains("name=Test%20&%20App"), "Expected name parameter with encoded space")
-            XCTAssertTrue(uri.contains("url=https://test.com/path?query=1"), "Expected URL parameter")
-            XCTAssertTrue(uri.contains("relay=wss://relay.test.com/path"), "Expected relay parameter")
+            // Should properly encode special characters per RFC 3986: `&` in a query value must
+            // be percent-encoded as `%26`, otherwise it terminates the query item.
+            let components = URLComponents(string: uri)
+            let queryItems = components?.queryItems ?? []
+            XCTAssertEqual(queryItems.first(where: { $0.name == "name" })?.value, "Test & App")
+            XCTAssertEqual(queryItems.first(where: { $0.name == "url" })?.value, "https://test.com/path?query=1")
+            XCTAssertEqual(queryItems.first(where: { $0.name == "relay" })?.value, "wss://relay.test.com/path")
+            XCTAssertTrue(uri.contains("name=Test%20%26%20App"), "Expected `&` to be percent-encoded as %26 in: \(uri)")
         }
     }
 

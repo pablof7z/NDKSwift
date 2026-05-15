@@ -173,12 +173,25 @@ public actor NDKBunkerSigner: NDKSigner {
         public let url: String?
         public let image: String?
         public let perms: String?
+        /// Additional, non-standard query items appended verbatim to the nostrconnect:// URI.
+        ///
+        /// NIP-46 only standardizes `relay`, `secret`, `perms`, `name`, `url`, `image`. Use this
+        /// escape hatch for vendor extensions — e.g. iOS `callback=myapp://nip46` (read by
+        /// Primal-iOS and Nostrify) or per-signer `includeNWC` flags.
+        public let extraQueryItems: [URLQueryItem]?
 
-        public init(name: String? = nil, url: String? = nil, image: String? = nil, perms: String? = nil) {
+        public init(
+            name: String? = nil,
+            url: String? = nil,
+            image: String? = nil,
+            perms: String? = nil,
+            extraQueryItems: [URLQueryItem]? = nil
+        ) {
             self.name = name
             self.url = url
             self.image = image
             self.perms = perms
+            self.extraQueryItems = extraQueryItems
         }
     }
 
@@ -243,35 +256,26 @@ public actor NDKBunkerSigner: NDKSigner {
     }
 
     private func generateNostrConnectUri(pubkey: String, relays: [String], options: NostrConnectOptions?) -> String {
-        var uri = "nostrconnect://\(pubkey)"
-        var params: [String] = []
+        var items: [URLQueryItem] = []
 
-        if let name = options?.name {
-            params.append("name=\(name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")
-        }
-        if let url = options?.url {
-            params.append("url=\(url.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")
-        }
-        if let image = options?.image {
-            params.append("image=\(image.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")
-        }
-        if let perms = options?.perms {
-            params.append("perms=\(perms.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")
-        }
-        if let secret = nostrConnectSecret {
-            params.append("secret=\(secret.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")
-        }
-
-        // Add all relays (NIP-46 supports multiple relay URLs)
+        if let name = options?.name { items.append(URLQueryItem(name: "name", value: name)) }
+        if let url = options?.url { items.append(URLQueryItem(name: "url", value: url)) }
+        if let image = options?.image { items.append(URLQueryItem(name: "image", value: image)) }
+        if let perms = options?.perms { items.append(URLQueryItem(name: "perms", value: perms)) }
+        if let secret = nostrConnectSecret { items.append(URLQueryItem(name: "secret", value: secret)) }
         for relay in relays {
-            params.append("relay=\(relay.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")
+            items.append(URLQueryItem(name: "relay", value: relay))
+        }
+        if let extras = options?.extraQueryItems {
+            items.append(contentsOf: extras)
         }
 
-        if !params.isEmpty {
-            uri += "?" + params.joined(separator: "&")
-        }
+        var components = URLComponents()
+        components.scheme = "nostrconnect"
+        components.host = pubkey
+        components.queryItems = items.isEmpty ? nil : items
 
-        return uri
+        return components.url?.absoluteString ?? "nostrconnect://\(pubkey)"
     }
 
     private func generateNostrConnectSecret() -> String {
