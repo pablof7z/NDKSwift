@@ -20,7 +20,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/krzyzanowskim/CryptoSwift.git", from: "1.8.0"),
 
-        .package(url: "https://github.com/pablof7z/CashuSwift.git", branch: "main"),
+        .package(url: "https://github.com/zeugmaster/CashuSwift.git", from: "0.3.2"),
         .package(url: "https://github.com/21-DOT-DEV/swift-secp256k1", from: "0.19.0"),
         .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.0.0"),
         .package(url: "https://github.com/onevcat/Kingfisher.git", from: "8.0.0"),

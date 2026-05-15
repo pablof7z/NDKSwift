@@ -62,24 +62,15 @@ public enum Nutzap {
                 lastError = error
                 continue
             }
-            // Get available proofs and use CashuSwift's pick function to handle fee calculation
             let availableProofs = await proofStateManager.getAvailableProofs(mint: mintURL)
-            guard let pickResult = CashuSwift.pick(availableProofs, amount: Int(amount), mint: mint) else {
-                let mintBalance = Int64(availableProofs.reduce(0) { $0 + $1.amount })
+            let mintBalance = Int64(availableProofs.reduce(0) { $0 + $1.amount })
+            if mintBalance < amount {
                 lastError = NDKError.walletInsufficientBalance(amount: amount, available: mintBalance)
                 continue
             }
 
-            // Convert ProofRepresenting to concrete Proof types
-            let selectedProofs = pickResult.selected.compactMap { $0 as? CashuSwift.Proof }
-            guard selectedProofs.count == pickResult.selected.count else {
-                lastError = NDKError.walletInvalidProof(details: "Failed to convert selected proofs")
-                continue
-            }
-
-            let calculatedFee = pickResult.fee
-
-            NDKLogger.log(.debug, category: .wallet, "Selected \(selectedProofs.count) proofs for nutzap. Amount: \(amount), Fee: \(calculatedFee)")
+            let selectedProofs = availableProofs
+            NDKLogger.log(.debug, category: .wallet, "Sending nutzap. Mint: \(mintURL), inputs: \(selectedProofs.count), amount: \(amount)")
 
             // Reserve proofs
             do {

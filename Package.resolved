@@ -41,17 +41,17 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/pengpengliu/BIP39.git",
       "state" : {
-        "revision" : "e79bd90275e50643cf8f97208ffa536d0def3ec7",
-        "version" : "1.0.1"
+        "revision" : "4948b8b47072dad519f4e2c2b946b0a2d8238dc0",
+        "version" : "1.0.2"
       }
     },
     {
       "identity" : "cashuswift",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/pablof7z/CashuSwift.git",
+      "location" : "https://github.com/zeugmaster/CashuSwift.git",
       "state" : {
-        "branch" : "main",
-        "revision" : "3501e3baed8882cdf5e9badb7c26c72c05211a1a"
+        "revision" : "618decee07ab85ba3749fb459f5e8146e6af98bf",
+        "version" : "0.3.2"
       }
     },
     {
@@ -68,8 +68,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/onevcat/Kingfisher.git",
       "state" : {
-        "revision" : "d30a5fad881137e2267f96a8e3fc35c58999bb94",
-        "version" : "8.6.2"
+        "revision" : "cf8be20d07654570554c8a8a4952bc8a5766a8b0",
+        "version" : "8.9.0"
       }
     },
     {
@@ -86,8 +86,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/mkrd/Swift-BigInt.git",
       "state" : {
-        "revision" : "b07e961f4c999671cf8c2dc80e740899e8946013",
-        "version" : "2.3.0"
+        "revision" : "7e2117797cd1b608303cc2da1a3a2263cc4e7727",
+        "version" : "2.4.0"
       }
     },
     {
@@ -95,8 +95,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-docc-plugin",
       "state" : {
-        "revision" : "3e4f133a77e644a5812911a0513aeb7288b07d06",
-        "version" : "1.4.5"
+        "revision" : "647c708be89f834fa6a6d4945442793a77ddf5b6",
+        "version" : "1.5.0"
       }
     },
     {
@@ -122,8 +122,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/myfreeweb/SwiftCBOR.git",
       "state" : {
-        "revision" : "04ccff117f6549121d5721ec84fdf0162122b90e",
-        "version" : "0.5.0"
+        "revision" : "fd929a6d8f7651ce0f63fc99397fd5762358cc29",
+        "version" : "0.6.0"
       }
     }
   ],
