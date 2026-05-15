@@ -1,5 +1,4 @@
 @testable import NDKSwiftCore
-@testable import NDKSwiftCore
 import XCTest
 
 /// Integration tests for optimistic publishing with NDKNostrDBCache
@@ -74,13 +73,13 @@ final class NDKNostrDBCacheOptimisticIntegrationTests: NDKTestCase {
         // Confirm on relay
         try await cache.confirmEvent(eventId: event.id, onRelay: "wss://relay1.com")
 
-        // Now confirmed
+        // Once the only pending relay confirms, the event leaves unpublished
+        // retry tracking.
         state = await cache.getEventConfirmationState(eventId: event.id)
-        if case .confirmed(let relay) = state {
-            XCTAssertEqual(relay, "wss://relay1.com")
-        } else {
-            XCTFail("Expected confirmed state")
-        }
+        XCTAssertNil(state)
+
+        let unpublished = await cache.getUnpublishedEvents(maxAge: 3600, limit: nil)
+        XCTAssertEqual(unpublished.count, 0)
     }
 
     func testRecordPublishFailureTracksReason() async throws {
@@ -241,9 +240,9 @@ final class NDKNostrDBCacheOptimisticIntegrationTests: NDKTestCase {
             ]
         )
 
-        // All should be tracked
+        // Only events with pending relays are returned for retry.
         let unpublished = await cache.getUnpublishedEvents(maxAge: 3600, limit: nil)
-        XCTAssertEqual(unpublished.count, 3)
+        XCTAssertEqual(unpublished.count, 2)
 
         // Check states
         let state1 = await cache.getEventConfirmationState(eventId: event1.id)
@@ -277,19 +276,13 @@ final class NDKNostrDBCacheOptimisticIntegrationTests: NDKTestCase {
         // Should be in unpublished (for retry on relay3)
         var unpublished = await cache.getUnpublishedEvents(maxAge: 3600, limit: nil)
         XCTAssertEqual(unpublished.count, 1)
-        XCTAssertEqual(unpublished[0].targetRelays.count, 3)
+        XCTAssertEqual(unpublished[0].targetRelays.count, 1)
+        XCTAssertTrue(unpublished[0].targetRelays.contains("wss://relay3.com"))
 
         // Simulate successful retry on relay3
         try await cache.confirmEvent(eventId: event.id, onRelay: "wss://relay3.com")
 
-        // Still in unpublished (has target relays)
-        unpublished = await cache.getUnpublishedEvents(maxAge: 3600, limit: nil)
-        XCTAssertEqual(unpublished.count, 1)
-
-        // NDK-core would decide to remove it when threshold is met
-        try await cache.removeUnpublishedEvent(eventId: event.id)
-
-        // Now it should be gone from unpublished
+        // No relays remain pending, so the event is removed from retry tracking.
         unpublished = await cache.getUnpublishedEvents(maxAge: 3600, limit: nil)
         XCTAssertEqual(unpublished.count, 0)
     }
@@ -346,11 +339,11 @@ final class NDKNostrDBCacheOptimisticIntegrationTests: NDKTestCase {
             try await cache.confirmEvent(eventId: events[i].id, onRelay: "wss://relay1.com")
         }
 
-        // All still tracked (not removed yet)
+        // Confirmed events no longer have pending relay work.
         unpublished = await cache.getUnpublishedEvents(maxAge: 3600, limit: nil)
-        XCTAssertEqual(unpublished.count, 20)
+        XCTAssertEqual(unpublished.count, 10)
 
-        // Remove first 10 (threshold met)
+        // Removing already-confirmed records is a harmless no-op.
         for i in 0..<10 {
             try await cache.removeUnpublishedEvent(eventId: events[i].id)
         }

@@ -56,26 +56,27 @@ public actor UnpublishedStore {
         changeStream
     }
 
-    init(cachePath: String?) throws {
+    init(cachePath: String?, migrateLegacyDefault: Bool = false) throws {
         // Initialize the change stream
         (changeStream, changeContinuation) = AsyncStream<UnpublishedChange>.makeStream()
 
         // Determine file location
+        let shouldMigrateLegacy = migrateLegacyDefault || cachePath == nil
         let url: URL
         if let cachePath = cachePath {
             let cacheURL = URL(fileURLWithPath: cachePath)
+            try FileManager.default.createDirectory(at: cacheURL, withIntermediateDirectories: true)
             url = cacheURL.appendingPathComponent("unpublished.jsonl")
         } else {
-            // Use default cache directory
-            guard let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else {
-                throw NSError(domain: "UnpublishedStore", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not find cache directory"])
-            }
-            let ndkCache = cacheDir.appendingPathComponent("NDKSwift")
-            try FileManager.default.createDirectory(at: ndkCache, withIntermediateDirectories: true)
-            url = ndkCache.appendingPathComponent("unpublished.jsonl")
+            let durableDir = try Self.defaultDurableDirectory()
+            try FileManager.default.createDirectory(at: durableDir, withIntermediateDirectories: true)
+            url = durableDir.appendingPathComponent("unpublished.jsonl")
         }
 
         self.fileURL = url
+        if shouldMigrateLegacy {
+            try Self.migrateLegacyCacheFileIfNeeded(to: url)
+        }
 
         // Load existing records synchronously during initialization
         var loadedRecords: [String: UnpublishedEventRecord] = [:]
@@ -95,6 +96,39 @@ public actor UnpublishedStore {
         }
 
         self.records = loadedRecords
+    }
+
+    private static func defaultDurableDirectory() throws -> URL {
+        guard let appSupportDir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            throw NSError(
+                domain: "UnpublishedStore",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Could not find application support directory"]
+            )
+        }
+        return appSupportDir.appendingPathComponent("NDKSwift", isDirectory: true)
+    }
+
+    private static func legacyCacheFileURL() -> URL? {
+        guard let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else {
+            return nil
+        }
+        return cacheDir
+            .appendingPathComponent("NDKSwift", isDirectory: true)
+            .appendingPathComponent("unpublished.jsonl")
+    }
+
+    private static func migrateLegacyCacheFileIfNeeded(to targetURL: URL) throws {
+        guard let legacyURL = legacyCacheFileURL(),
+              legacyURL.standardizedFileURL != targetURL.standardizedFileURL,
+              FileManager.default.fileExists(atPath: legacyURL.path),
+              !FileManager.default.fileExists(atPath: targetURL.path) else {
+            return
+        }
+
+        let parent = targetURL.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
+        try FileManager.default.moveItem(at: legacyURL, to: targetURL)
     }
 
     // MARK: - File Operations
@@ -230,6 +264,10 @@ public actor UnpublishedStore {
 
     /// Get unpublished events (events that still have pending relays to publish to)
     func getUnpublishedEvents(maxAge: TimeInterval, limit: Int?) -> [(event: NDKEvent, targetRelays: Set<String>)] {
+        if let limit = limit, limit <= 0 {
+            return []
+        }
+
         let now = Date().timeIntervalSince1970
         let cutoff = now - maxAge
 

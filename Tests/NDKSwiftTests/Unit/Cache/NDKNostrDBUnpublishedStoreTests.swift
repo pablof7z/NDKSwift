@@ -1,5 +1,4 @@
 @testable import NDKSwiftCore
-@testable import NDKSwiftCore
 import XCTest
 
 /// Tests for UnpublishedStore
@@ -45,8 +44,7 @@ final class NDKNostrDBUnpublishedStoreTests: NDKTestCase {
 
         XCTAssertEqual(unpublished.count, 1)
         XCTAssertEqual(unpublished[0].event.id, event.id)
-        XCTAssertEqual(unpublished[0].targetRelays.count, 3)
-        XCTAssertTrue(unpublished[0].targetRelays.contains("wss://relay1.com"))
+        XCTAssertEqual(unpublished[0].targetRelays.count, 2)
         XCTAssertTrue(unpublished[0].targetRelays.contains("wss://relay2.com"))
         XCTAssertTrue(unpublished[0].targetRelays.contains("wss://relay3.com"))
     }
@@ -375,9 +373,10 @@ final class NDKNostrDBUnpublishedStoreTests: NDKTestCase {
         try await store.markRelayPublished(eventId: event.id, relay: "wss://relay1.com")
         try await store.markRelayPublished(eventId: event.id, relay: "wss://relay1.com")
 
-        // Should not duplicate in publishedRelays array
+        // The first success removes the only pending relay, so the event is no
+        // longer retryable. Repeating the confirmation is a harmless no-op.
         let unpublished = await store.getUnpublishedEvents(maxAge: 3600, limit: nil)
-        XCTAssertEqual(unpublished.count, 1)
+        XCTAssertEqual(unpublished.count, 0)
     }
 
     func testClearEmptyStore() async throws {
@@ -423,11 +422,10 @@ final class NDKNostrDBUnpublishedStoreTests: NDKTestCase {
         try await store.markRelayPublished(eventId: event.id, relay: "wss://relay1.com")
 
         state = await store.getEventConfirmationState(eventId: event.id)
-        if case .confirmed(let relay) = state {
-            XCTAssertEqual(relay, "wss://relay1.com")
-        } else {
-            XCTFail("Expected confirmed state after marking relay as published")
-        }
+        XCTAssertNil(state)
+
+        let unpublished = await store.getUnpublishedEvents(maxAge: 3600, limit: nil)
+        XCTAssertEqual(unpublished.count, 0)
     }
 
     func testEventWithNoRelays() async throws {
@@ -437,12 +435,28 @@ final class NDKNostrDBUnpublishedStoreTests: NDKTestCase {
         try await store.add(event, publishedRelays: [], pendingRelays: [:])
 
         let unpublished = await store.getUnpublishedEvents(maxAge: 3600, limit: nil)
-        XCTAssertEqual(unpublished.count, 1)
-        XCTAssertEqual(unpublished[0].targetRelays.count, 0)
+        XCTAssertEqual(unpublished.count, 0)
 
         // State should be optimistic (no published relays)
         let state = await store.getEventConfirmationState(eventId: event.id)
         XCTAssertEqual(state, .optimistic)
+    }
+
+    func testCustomPathCreatesDirectory() async throws {
+        let nestedPath = tempDir.appendingPathComponent("nested/store")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: nestedPath.path))
+
+        let nestedStore = try UnpublishedStore(cachePath: nestedPath.path)
+        let event = createSignedEvent(content: "Creates directory")
+
+        try await nestedStore.add(
+            event,
+            publishedRelays: [],
+            pendingRelays: ["wss://relay1.com": "timeout"]
+        )
+
+        let fileURL = nestedPath.appendingPathComponent("unpublished.jsonl")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fileURL.path))
     }
 
     // MARK: - Helper Methods

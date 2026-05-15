@@ -128,11 +128,16 @@ public actor NDKNostrDBCache {
         self.config = config
         relayCache = LRUCache<String, Bool>(capacity: Self.maxRelayCount, defaultTTL: TimeInterval.infinity)
         nostrDB = Ndb(path: path)
-        publishingManager = OptimisticPublishingManager(cachePath: path)
 
         if nostrDB == nil {
             throw NDKNostrDBCacheError.failedToOpen
         }
+
+        let resolvedCachePath = path ?? Ndb.db_path()
+        publishingManager = try OptimisticPublishingManager(
+            cachePath: resolvedCachePath,
+            migrateLegacyDefault: path == nil
+        )
 
         // Open the SQLite auxiliary store. Best-effort: failures here are
         // logged and we fall back to memory-only behavior so a corrupt
