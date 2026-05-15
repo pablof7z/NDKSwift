@@ -45,11 +45,14 @@ final class NIP59Tests: XCTestCase {
             pubkey: senderPublicKey
         )
 
+        let beforeTimestamp = Timestamp.now
         let seal = try await NIP59.seal(
             rumor: rumor,
             signer: signer,
             recipientPubkey: recipientPublicKey
         )
+        let afterTimestamp = Timestamp.now
+        let twoDaysInSeconds: Int64 = 2 * 24 * 60 * 60
 
         // Verify seal properties
         XCTAssertEqual(seal.kind, EventKind.seal)
@@ -58,6 +61,8 @@ final class NIP59Tests: XCTestCase {
         XCTAssertFalse(seal.id.isEmpty, "Seal should be signed with ID")
         XCTAssertFalse(seal.sig.isEmpty, "Seal should be signed")
         XCTAssertEqual(seal.tags.count, 0, "Seal should have no tags")
+        XCTAssertGreaterThanOrEqual(seal.createdAt, beforeTimestamp - twoDaysInSeconds)
+        XCTAssertLessThanOrEqual(seal.createdAt, afterTimestamp)
     }
 
     func testSealSignedEventFails() async throws {

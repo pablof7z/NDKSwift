@@ -106,7 +106,7 @@ public enum NIP59 {
         let sealEvent = NDKEvent(
             id: "", // Will be set during signing
             pubkey: sealPubkey,
-            createdAt: .now,
+            createdAt: randomizeTimestamp(),
             kind: EventKind.seal,
             tags: [],
             content: encryptedContent,
