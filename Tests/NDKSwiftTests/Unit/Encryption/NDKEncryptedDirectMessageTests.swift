@@ -3,6 +3,25 @@ import Foundation
 import XCTest
 
 final class NDKEncryptedDirectMessageTests: XCTestCase {
+    func testEncryptedDirectMessageDefaultsToNIP04Kind4Payload() async throws {
+        let sender = try NDKPrivateKeySigner.generate()
+        let recipient = try NDKPrivateKeySigner.generate()
+        let recipientPubkey = try await recipient.pubkey
+        let ndk = try await NDKTestFactory.createNDK(signer: sender)
+
+        let event = try await NDKEvent.encryptedDirectMessage(
+            content: "legacy dm",
+            recipientPubkey: recipientPubkey,
+            signer: sender,
+            ndk: ndk
+        )
+
+        XCTAssertEqual(event.kind, EventKind.encryptedDirectMessage)
+        XCTAssertTrue(event.content.contains("?iv="))
+        let decrypted = try await event.decryptedContent(signer: recipient)
+        XCTAssertEqual(decrypted, "legacy dm")
+    }
+
     func testDecryptedContentRejectsTamperedEventBeforeDecrypting() async throws {
         let sender = try NDKPrivateKeySigner.generate()
         let recipient = try NDKPrivateKeySigner.generate()

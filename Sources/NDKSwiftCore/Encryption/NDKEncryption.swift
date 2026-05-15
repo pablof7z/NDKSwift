@@ -83,14 +83,14 @@ public extension NDKEvent {
     ///   - content: The plaintext message content
     ///   - recipientPubkey: The recipient's public key
     ///   - signer: The signer to use for encryption and signing
-    ///   - useNIP44: Whether to use NIP-44 (true) or NIP-04 (false). Defaults to true.
+    ///   - useNIP44: Whether to use NIP-44 (true) or NIP-04 (false). Defaults to false for kind-4 compatibility.
     /// - Returns: An encrypted direct message event
     static func encryptedDirectMessage(
         content: String,
         recipientPubkey: PublicKey,
         signer: NDKSigner,
         ndk: NDK,
-        useNIP44: Bool = true
+        useNIP44: Bool = false
     ) async throws -> NDKEvent {
         let scheme: NDKEncryptionScheme = useNIP44 ? .nip44 : .nip04
 
