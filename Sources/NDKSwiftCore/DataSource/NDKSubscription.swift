@@ -46,8 +46,10 @@ public final class NDKSubscription<T: Sendable>: Sendable {
     public var events: AsyncStream<[T]> {
         createTrackedEventStream()
     }
-    private let eventsContinuation: AsyncStream<[T]>.Continuation
-    private let internalEvents: AsyncStream<[T]>
+
+    /// Fan-out sink: producer-side yields batches; every active consumer
+    /// (each created via `events`) receives every batch.
+    private let fanout = FanoutSink<[T]>()
 
     /// Thread-safe consumer count tracker for auto-close functionality
     private let consumerTracker: ConsumerTracker
@@ -150,6 +152,74 @@ public final class NDKSubscription<T: Sendable>: Sendable {
         }
     }
 
+    /// Fan-out sink: a single producer side accepts batches and forwards each
+    /// batch to every registered consumer. Replaces the previous single
+    /// `internalEvents` AsyncStream which silently broke when more than one
+    /// caller iterated `subscription.events` — AsyncStream is single-consumer,
+    /// so two iterators would race and lose batches to each other.
+    ///
+    /// Each call to `register()` returns a fresh AsyncStream specific to that
+    /// caller. When the caller's iteration ends (loop exits, Task cancelled,
+    /// view deallocated), `onTermination` removes the entry. Producer side
+    /// calls `yield(_:)` / `finish()` exactly like a single Continuation.
+    private final class FanoutSink<Element: Sendable>: @unchecked Sendable {
+        private let lock = NSLock()
+        private var consumers: [UUID: AsyncStream<Element>.Continuation] = [:]
+        private var finished = false
+
+        /// Register a new consumer; returns its stream and the registration ID.
+        /// The caller MUST eventually invoke `unregister(_:)` (typically from
+        /// `onTermination`) or the continuation stays alive for the life of
+        /// the sink.
+        func register() -> (stream: AsyncStream<Element>, id: UUID) {
+            let id = UUID()
+            let stream = AsyncStream<Element> { continuation in
+                lock.lock()
+                if finished {
+                    lock.unlock()
+                    continuation.finish()
+                    return
+                }
+                consumers[id] = continuation
+                lock.unlock()
+            }
+            return (stream, id)
+        }
+
+        func unregister(_ id: UUID) {
+            lock.lock()
+            consumers.removeValue(forKey: id)
+            lock.unlock()
+        }
+
+        /// Deliver `value` to every currently-registered consumer.
+        func yield(_ value: Element) {
+            lock.lock()
+            let snapshot = Array(consumers.values)
+            lock.unlock()
+            for continuation in snapshot {
+                continuation.yield(value)
+            }
+        }
+
+        /// Permanently close the sink. All current and future consumers will
+        /// see their streams finish.
+        func finish() {
+            lock.lock()
+            guard !finished else {
+                lock.unlock()
+                return
+            }
+            finished = true
+            let snapshot = Array(consumers.values)
+            consumers.removeAll()
+            lock.unlock()
+            for continuation in snapshot {
+                continuation.finish()
+            }
+        }
+    }
+
     /// Thread-safe consumer count tracker for auto-close when all consumers are gone
     private final class ConsumerTracker: @unchecked Sendable {
         private let lock = NSLock()
@@ -182,27 +252,25 @@ public final class NDKSubscription<T: Sendable>: Sendable {
         }
     }
 
-    /// Creates a tracked event stream that monitors consumer lifecycle
+    /// Creates a tracked event stream that monitors consumer lifecycle.
+    /// Each call returns a fresh AsyncStream registered with the fan-out sink
+    /// so multiple consumers each receive every batch.
     private func createTrackedEventStream() -> AsyncStream<[T]> {
-        // If closeOnEose is true, we don't need consumer tracking
-        // since the subscription will close automatically after EOSE
+        let (stream, registrationId) = fanout.register()
+        // closeOnEose subscriptions auto-close on their own; no consumer
+        // tracking needed.
         guard !closeOnEose else {
-            return internalEvents
+            return stream
         }
 
         let tracker = consumerTracker
-        let source = internalEvents
+        let sink = fanout
+        tracker.increment()
 
-        return AsyncStream { continuation in
-            tracker.increment()
-
-            continuation.onTermination = { @Sendable _ in
-                tracker.decrement()
-            }
-
-            // Forward events from the internal stream
-            let task = Task {
-                for await batch in source {
+        return AsyncStream<[T]> { continuation in
+            // Forward fan-out batches into the caller's stream.
+            let forwardTask = Task {
+                for await batch in stream {
                     guard !Task.isCancelled else { break }
                     continuation.yield(batch)
                 }
@@ -210,7 +278,8 @@ public final class NDKSubscription<T: Sendable>: Sendable {
             }
 
             continuation.onTermination = { @Sendable _ in
-                task.cancel()
+                forwardTask.cancel()
+                sink.unregister(registrationId)
                 tracker.decrement()
             }
         }
@@ -297,12 +366,8 @@ public final class NDKSubscription<T: Sendable>: Sendable {
             }
         }
 
-        // Set up the internal AsyncStream for event batches
-        var continuation: AsyncStream<[T]>.Continuation!
-        internalEvents = AsyncStream { cont in
-            continuation = cont
-        }
-        eventsContinuation = continuation
+        // Note: the fan-out sink (`fanout`) was initialized as a stored property
+        // default value, so no continuation setup is needed here.
 
         // Set up the AsyncStream for relay updates (opt-in)
         if includeRelayUpdates {
@@ -368,12 +433,8 @@ public final class NDKSubscription<T: Sendable>: Sendable {
             }
         }
 
-        // Set up the internal AsyncStream for event batches
-        var continuation: AsyncStream<[T]>.Continuation!
-        internalEvents = AsyncStream { cont in
-            continuation = cont
-        }
-        eventsContinuation = continuation
+        // Note: the fan-out sink (`fanout`) was initialized as a stored property
+        // default value, so no continuation setup is needed here.
 
         // Set up the AsyncStream for relay updates (opt-in)
         if includeRelayUpdates {
@@ -397,7 +458,7 @@ public final class NDKSubscription<T: Sendable>: Sendable {
 
     deinit {
         cancellation.cancel()
-        eventsContinuation.finish()
+        fanout.finish()
         relayUpdatesContinuation?.finish()
         let manager = stateManager
         Task {
@@ -470,8 +531,8 @@ public final class NDKSubscription<T: Sendable>: Sendable {
 
         guard !newTransformed.isEmpty else { return }
 
-        // Yield batch to AsyncStream
-        eventsContinuation.yield(newTransformed)
+        // Yield batch to every registered consumer.
+        fanout.yield(newTransformed)
     }
 
     /// Handle relay-level updates (EOSE, subscription status, etc)
@@ -506,7 +567,7 @@ public final class NDKSubscription<T: Sendable>: Sendable {
     public func close() async {
         NDKLogger.log(.info, category: .subscription, "Manually closing subscription", correlationId: correlationId)
         cancellation.cancel()
-        eventsContinuation.finish()
+        fanout.finish()
         relayUpdatesContinuation?.finish()
         await stateManager.cancelTask()
         await stateManager.cancelRequirement()

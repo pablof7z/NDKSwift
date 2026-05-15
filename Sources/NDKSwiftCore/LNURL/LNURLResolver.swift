@@ -97,9 +97,12 @@ public class LNURLResolver: LNURLResolving {
             throw LNURLError.invalidFormat("Decoded LNURL is not a valid URL: \(urlString)")
         }
 
-        // Validate it's an HTTP(S) URL
+        // NDKSwift's policy is to allow both http and https (see URLUtils for
+        // the rationale). The point of this check is the dangerous-scheme
+        // floor — reject `file://`, `javascript:`, `data:`, etc. — not to
+        // require TLS. App-side callers that need TLS should enforce it.
         guard url.scheme == "http" || url.scheme == "https" else {
-            throw LNURLError.invalidFormat("LNURL must be an HTTP or HTTPS URL, got: \(url.scheme ?? "nil")")
+            throw LNURLError.invalidFormat("LNURL must use http or https, got: \(url.scheme ?? "nil")")
         }
 
         return url
