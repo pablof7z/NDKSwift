@@ -88,6 +88,14 @@ let package = Package(
                 "NostrDB",
                 .product(name: "CryptoSwift", package: "CryptoSwift"),
                 .product(name: "secp256k1", package: "swift-secp256k1"),
+            ],
+            linkerSettings: [
+                // SQLite is part of the system on Apple platforms; we just need
+                // to link against it. Used by Cache/SQLitePersistence to back
+                // the non-event stores (NIP-05 cache, KV, decrypted content
+                // cache, deletion markers, fetch times) that were left in
+                // memory-only after commit e9925313 removed NDKSQLiteCache.
+                .linkedLibrary("sqlite3"),
             ]
         ),
 

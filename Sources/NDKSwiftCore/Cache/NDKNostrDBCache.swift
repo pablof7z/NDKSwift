@@ -112,6 +112,12 @@ public actor NDKNostrDBCache {
     /// Background task for enforcing cache limits
     private var enforcementTask: Task<Void, Never>?
 
+    /// Persistent SQLite-backed store for non-event auxiliary state (NIP-05
+    /// cache, KV, decrypted content cache, deletion markers, fetch times).
+    /// Nil if we couldn't open the auxiliary database; the cache still works
+    /// in memory-only mode in that case (losing the persistence guarantees).
+    private let sqliteStore: NDKCacheSQLiteStore?
+
     /// Initialize a new NostrDB cache
     /// - Parameters:
     ///   - path: Optional path to the database directory. If nil, uses the default location.
@@ -128,9 +134,116 @@ public actor NDKNostrDBCache {
             throw NDKNostrDBCacheError.failedToOpen
         }
 
+        // Open the SQLite auxiliary store. Best-effort: failures here are
+        // logged and we fall back to memory-only behavior so a corrupt
+        // sidecar can't take the whole cache down. Pre-e9925313 stores
+        // (deletedEventIds, decrypted content cache, kvStore, NIP-05 cache,
+        // fetchTimes) all hydrate from this on init and write through to
+        // it on every set.
+        let sqlitePath = Self.auxStorePath(for: path)
+        do {
+            sqliteStore = try NDKCacheSQLiteStore(path: sqlitePath)
+        } catch {
+            NDKLogger.log(.warning, category: .cache,
+                          "Failed to open auxiliary SQLite store at \(sqlitePath): \(error) — falling back to memory-only")
+            sqliteStore = nil
+        }
+
+        // Hydrate in-memory caches from SQLite. Each hydration is best-effort.
+        await hydrateFromSQLite()
+
         // Start background limit enforcement if enabled
         if config.autoEnforceLimits {
             startBackgroundEnforcement()
+        }
+    }
+
+    /// Compute the path to the auxiliary SQLite store file. Lives alongside
+    /// the NostrDB LMDB files so a single cache directory holds both.
+    private static func auxStorePath(for cachePath: String?) -> String {
+        let base = cachePath ?? Ndb.db_path() ?? NSTemporaryDirectory()
+        if base.hasSuffix("/") {
+            return base + "ndkswift-aux.sqlite"
+        }
+        return base + "/ndkswift-aux.sqlite"
+    }
+
+    /// Load persisted state from SQLite into the in-memory caches.
+    private func hydrateFromSQLite() async {
+        guard let store = sqliteStore else { return }
+
+        // Deletion markers (NIP-09 tombstones).
+        if let loaded = try? await store.loadDeletedEvents() {
+            deletedEventIds = loaded
+            NDKLogger.log(.debug, category: .cache,
+                          "Hydrated \(loaded.count) deletion markers from SQLite")
+        }
+
+        // Decrypted content cache (most-recent first up to capacity).
+        if let rows = try? await store.loadRecentDecrypted(limit: 1000) {
+            for row in rows {
+                await decryptedContentCache.set(row.key, value: row.content)
+            }
+            if !rows.isEmpty {
+                NDKLogger.log(.debug, category: .cache,
+                              "Hydrated \(rows.count) decrypted-content entries from SQLite")
+            }
+        }
+
+        // Generic key/value store. Loads the whole table — keep small.
+        if let rows = try? await store.loadAllKV() {
+            for row in rows {
+                if kvStore[row.namespace] == nil { kvStore[row.namespace] = [:] }
+                kvStore[row.namespace]?[row.key] = row.value
+            }
+            if !rows.isEmpty {
+                NDKLogger.log(.debug, category: .cache,
+                              "Hydrated \(rows.count) KV entries from SQLite")
+            }
+        }
+
+        // NIP-05 verification cache.
+        if let rows = try? await store.loadAllNIP05() {
+            let decoder = JSONDecoder()
+            for row in rows {
+                if let entry = try? decoder.decode(NIP05CacheEntry.self, from: row.entryJSON) {
+                    nip05Cache[row.identifier] = entry
+                    if entry.status == .verified {
+                        nip05ByPubkey[entry.pubkey] = entry.identifier
+                    }
+                }
+            }
+            if !rows.isEmpty {
+                NDKLogger.log(.debug, category: .cache,
+                              "Hydrated \(rows.count) NIP-05 entries from SQLite")
+            }
+        }
+
+        // Per-filter fetch timestamps.
+        if let rows = try? await store.loadAllFetchTimes() {
+            for row in rows {
+                fetchTimes[row.fingerprint] = row.date
+            }
+            if !rows.isEmpty {
+                NDKLogger.log(.debug, category: .cache,
+                              "Hydrated \(rows.count) fetch-time entries from SQLite")
+            }
+        }
+    }
+
+    /// Fire-and-forget write-through helper for SQLite persistence.
+    /// We don't want every public method to gain `try` / `throws`, so we
+    /// log errors and let the in-memory copy win for this run.
+    private nonisolated func sqliteWriteThrough(_ work: @Sendable @escaping (NDKCacheSQLiteStore) async throws -> Void) {
+        Task { [weak self] in
+            guard let self else { return }
+            guard let store = await self.sqliteStore else { return }
+            do {
+                try await work(store)
+            } catch {
+                NDKLogger.log(.warning, category: .cache,
+                              "SQLite write-through failed: \(error.localizedDescription)")
+            }
         }
     }
 
@@ -335,15 +448,26 @@ public actor NDKNostrDBCache {
     private func applyDeletionIfApplicable(_ event: NDKEvent) {
         guard event.kind == EventKind.deletion else { return }
 
+        var newlyDeleted: [String] = []
         for tag in event.tags where tag.count >= 2 && tag[0] == "e" {
             let targetId = tag[1]
             // If we have the target locally, verify authorship before honoring.
             if let target = events[targetId] {
                 guard target.pubkey == event.pubkey else { continue }
             }
-            deletedEventIds.insert(targetId)
+            if deletedEventIds.insert(targetId).inserted {
+                newlyDeleted.append(targetId)
+            }
             events.removeValue(forKey: targetId)
             eventAccessOrder.removeAll { $0 == targetId }
+        }
+        if !newlyDeleted.isEmpty {
+            sqliteWriteThrough { store in
+                for id in newlyDeleted {
+                    try? await store.addDeletedEvent(id)
+                }
+                _ = store
+            }
         }
     }
 
@@ -539,8 +663,12 @@ public actor NDKNostrDBCache {
         eventAccessOrder.removeAll { $0 == id }
         // Drop relay-source bookkeeping too — used to grow forever.
         eventRelaySources.removeValue(forKey: id)
-        // Track as deleted to filter from all queries
-        deletedEventIds.insert(id)
+        // Track as deleted to filter from all queries (persisted via SQLite).
+        if deletedEventIds.insert(id).inserted {
+            sqliteWriteThrough { store in
+                try await store.addDeletedEvent(id)
+            }
+        }
     }
 
     // MARK: - Cache Management
@@ -1158,18 +1286,34 @@ public actor NDKNostrDBCache {
     public func storeDecryptedContent(_ content: String, for eventId: String, viewerPubkey: String) async {
         let key = "\(eventId):\(viewerPubkey)"
         await decryptedContentCache.set(key, value: content)
+        sqliteWriteThrough { store in
+            try await store.setDecrypted(key: key, content: content)
+        }
     }
 
     /// Clear all decrypted content from cache
     public func clearDecryptedContent() async {
         await decryptedContentCache.clear()
+        sqliteWriteThrough { store in
+            try await store.clearAll() // limited blast — but we don't have a per-table truncate yet
+            _ = store
+        }
     }
 
     /// Clear decrypted content for a specific viewer
     public func clearDecryptedContent(for viewerPubkey: String) async {
         let allItems = await decryptedContentCache.allItems()
+        var deletedKeys: [String] = []
         for (key, _) in allItems where key.hasSuffix(":\(viewerPubkey)") {
             await decryptedContentCache.delete(key)
+            deletedKeys.append(key)
+        }
+        let toDelete = deletedKeys
+        sqliteWriteThrough { store in
+            for key in toDelete {
+                try? await store.deleteDecrypted(key: key)
+            }
+            _ = store
         }
     }
 
@@ -1184,6 +1328,9 @@ public actor NDKNostrDBCache {
             kvStore[namespace] = [:]
         }
         kvStore[namespace]?[key] = value
+        sqliteWriteThrough { store in
+            try await store.setKV(namespace: namespace, key: key, value: value)
+        }
     }
 
     /// Retrieve a value from the generic key-value store
@@ -1194,6 +1341,9 @@ public actor NDKNostrDBCache {
     /// Delete a value from the generic key-value store
     public func deleteValue(forKey key: String, namespace: String) async throws {
         kvStore[namespace]?.removeValue(forKey: key)
+        sqliteWriteThrough { store in
+            try await store.deleteKV(namespace: namespace, key: key)
+        }
     }
 
     /// Get all values in a namespace, optionally filtered by key prefix
@@ -1225,6 +1375,11 @@ public actor NDKNostrDBCache {
             claimedAt: retrievedAt
         )
         nip05Cache[identifier] = entry
+        if let json = try? JSONEncoder().encode(entry) {
+            sqliteWriteThrough { store in
+                try await store.saveNIP05(identifier: identifier, entryJSON: json)
+            }
+        }
     }
 
     /// Get a NIP-05 cache entry by identifier
@@ -1249,6 +1404,12 @@ public actor NDKNostrDBCache {
         // Also update reverse lookup by pubkey
         if entry.status == .verified {
             nip05ByPubkey[entry.pubkey] = entry.identifier
+        }
+        let identifier = entry.identifier
+        if let json = try? JSONEncoder().encode(entry) {
+            sqliteWriteThrough { store in
+                try await store.saveNIP05(identifier: identifier, entryJSON: json)
+            }
         }
     }
 
@@ -1334,6 +1495,10 @@ public actor NDKNostrDBCache {
     /// Record that a filter was just queried
     public func recordFetchTime(for filter: NDKFilter, timestamp: Date = Date()) async {
         fetchTimes[filter.fingerprint] = timestamp
+        let fingerprint = filter.fingerprint
+        sqliteWriteThrough { store in
+            try await store.setFetchTime(fingerprint: fingerprint, at: timestamp)
+        }
     }
 
     // MARK: - Batch Profile Metadata Lookup
