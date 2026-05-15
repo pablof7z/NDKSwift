@@ -353,7 +353,8 @@ public actor NIP05Manager {
         }
 
         guard let names = json["names"] as? [String: String],
-              let pubkey = names[name]
+              let pubkey = names[name],
+              HexValidator.isValid32ByteHex(pubkey)
         else {
             // Cache invalid format
             let invalidEntry = NIP05CacheEntry(

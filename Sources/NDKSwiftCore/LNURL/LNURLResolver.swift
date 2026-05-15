@@ -79,7 +79,7 @@ public class LNURLResolver: LNURLResolving {
 
     /// Decode bech32-encoded LNURL
     private func decodeLNURL(_ lnurl: String) throws -> URL {
-        // Decode the bech32 string
+        // Bech32.decode already returns the 8-bit decoded payload.
         let (hrp, data) = try Bech32.decode(lnurl)
 
         // Verify it's an LNURL (correct HRP)
@@ -87,11 +87,8 @@ public class LNURLResolver: LNURLResolving {
             throw LNURLError.invalidFormat("Invalid HRP: expected '\(Bech32HRP.lnurl)', got '\(hrp)'")
         }
 
-        // Convert 5-bit groups back to 8-bit bytes
-        let decodedData = try Bech32.convertBits(data: data, fromBits: 5, toBits: 8, pad: false)
-
         // Convert to UTF-8 string
-        guard let urlString = String(data: Data(decodedData), encoding: .utf8) else {
+        guard let urlString = String(data: Data(data), encoding: .utf8) else {
             throw LNURLError.decodingError("Failed to decode LNURL data as UTF-8 string")
         }
 

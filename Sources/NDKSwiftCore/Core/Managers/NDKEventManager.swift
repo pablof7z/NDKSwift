@@ -156,10 +156,12 @@ public actor NDKEventManager {
                             return (relay, false, false, result.message)
                         }
                     } catch let error as NDKError {
-                        // Check if error is auth-required
+                        // Check if error is auth-required per NIP-01 (`auth-required:` /
+                        // `restricted:` prefixes). Substring matching ("auth" / "restricted")
+                        // misclassifies e.g. "author blocked" — use hasPrefix.
                         if case let .publishFailed(_, message) = error {
-                            let errorMsg = message.lowercased()
-                            if errorMsg.contains("auth") || errorMsg.contains("restricted") || errorMsg.contains("authentication") {
+                            let lower = message.lowercased()
+                            if lower.hasPrefix("auth-required:") || lower.hasPrefix("restricted:") {
                                 // Track this event for retry after authentication
                                 await self?.trackPendingAuthEvent(event, for: relay.url)
                                 NDKLogger.log(.info, category: .auth, "Event \(event.id) requires authentication on \(relay.url)")

@@ -188,15 +188,11 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
                 let receiptZapRequestId = receipt.zapRequestId
                 if let zapRequestId = zapRequestId,
                    receiptZapRequestId == zapRequestId {
-                    // Validate the receipt if we have provider pubkey
-                    if let providerPubkey = providerPubkey {
-                        let isValid = receipt.validate(lnurlProviderPubkey: providerPubkey)
-                        if isValid {
-                            timeoutTask.cancel()
-                            return event
-                        }
-                    } else {
-                        // No provider pubkey to validate against, accept the receipt
+                    // We must have a trusted LNURL provider pubkey to validate the
+                    // receipt's signature; otherwise anyone publishing a 9735 event
+                    // matching the zap-request id would be accepted as authentic.
+                    if let providerPubkey = providerPubkey,
+                       receipt.validate(lnurlProviderPubkey: providerPubkey) {
                         timeoutTask.cancel()
                         return event
                     }

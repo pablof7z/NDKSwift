@@ -845,6 +845,15 @@ public final class NDK {
         }
     }
 
+    /// Handle NIP-01 CLOSED (relay-initiated subscription termination).
+    /// Treated like a relay-side EOSE for the coordinator: observers stop
+    /// waiting on this relay for the subscription so closeOnEose paths complete.
+    func processClosed(subscriptionId: String, message: String, from relay: RelayProtocol) async {
+        NDKLogger.log(.info, category: .subscription,
+                      "🚪 [NDK] CLOSED for '\(subscriptionId)' from \(relay.url): \(message)")
+        await internalSubscriptionManager.processClosed(subscriptionId: subscriptionId, message: message, from: relay)
+    }
+
     func processOKMessage(eventId: EventID, accepted: Bool, message: String?, from relay: RelayProtocol) async {
         // Check if this is an auth event response
         let authRelay = await pendingAuthEvents.remove(for: eventId)

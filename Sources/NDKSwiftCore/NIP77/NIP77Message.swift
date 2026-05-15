@@ -316,13 +316,15 @@ extension NDKFilter {
         if let kinds = dict["kinds"] as? [Int] {
             filter.kinds = kinds
         }
-        if let since = dict["since"] as? Int64 {
+        // JSONSerialization bridges JSON numbers to NSNumber (and `Int` on 64-bit),
+        // not `Int64`. Read via NSNumber so the cast can't silently fail.
+        if let since = (dict["since"] as? NSNumber)?.int64Value {
             filter.since = Timestamp(since)
         }
-        if let until = dict["until"] as? Int64 {
+        if let until = (dict["until"] as? NSNumber)?.int64Value {
             filter.until = Timestamp(until)
         }
-        if let limit = dict["limit"] as? Int {
+        if let limit = (dict["limit"] as? NSNumber)?.intValue {
             filter.limit = limit
         }
 

@@ -324,16 +324,28 @@ public enum NIP59 {
         recipientSigner: NDKSigner
     ) async throws -> NDKEvent {
         let seal = try await unwrap(giftWrap: giftWrap, recipientSigner: recipientSigner)
-        return try await unseal(seal: seal, recipientSigner: recipientSigner)
+        let rumor = try await unseal(seal: seal, recipientSigner: recipientSigner)
+
+        // NIP-59: the seal's pubkey is the true sender; the gift-wrap pubkey is an
+        // ephemeral wrapping key. A malicious wrapper can put any pubkey into the
+        // inner rumor, so we MUST verify the rumor's claimed author matches the
+        // seal author to prevent sender forgery.
+        guard rumor.pubkey == seal.pubkey else {
+            throw NIP59Error.unwrapFailed("rumor.pubkey does not match seal.pubkey — sender forgery attempt")
+        }
+
+        return rumor
     }
 
     // MARK: - Utilities
 
-    /// Randomizes a timestamp within +/- 2 days to prevent time-based analysis
+    /// Randomizes a timestamp into the recent past to prevent send-time leakage.
+    /// NIP-59 requires the wrap created_at be a randomized past timestamp; future
+    /// timestamps are commonly rejected by relays (created_at > now + tolerance).
     private static func randomizeTimestamp() -> Timestamp {
         let twoDaysInSeconds: Int64 = 2 * 24 * 60 * 60
-        let randomOffset = Int64.random(in: -twoDaysInSeconds ... twoDaysInSeconds)
-        return .now + randomOffset
+        let randomOffset = Int64.random(in: 0 ... twoDaysInSeconds)
+        return .now - randomOffset
     }
 
     /// Calculate the event ID for an event

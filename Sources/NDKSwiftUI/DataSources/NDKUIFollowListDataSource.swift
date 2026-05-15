@@ -33,25 +33,24 @@ public class NDKUIFollowListDataSource {
     }
 
     private func observeFollowList() {
-        observationTask = Task { @MainActor in
+        // Hold the stream locally so the Task does not capture self.dataSource,
+        // and weak-capture self so deinit can run and cancel observationTask.
+        let stream = dataSource.events
+        observationTask = Task { @MainActor [weak self] in
             var latestEvent: NDKEvent?
 
-            for await batch in dataSource.events {
+            for await batch in stream {
+                guard let self else { return }
                 for event in batch {
                     // Keep only the most recent event
                     if latestEvent == nil || event.createdAt > (latestEvent?.createdAt ?? 0) {
                         latestEvent = event
 
-                        // Extract follow list from event
                         let pubkeys = event.tags
-                            .filter { tag in
-                                tag.count >= 2 && tag[0] == "p"
-                            }
-                            .map { tag in
-                                tag[1]
-                            }
-                        followList = Set(pubkeys)
-                        lastUpdate = Date(timeIntervalSince1970: TimeInterval(event.createdAt))
+                            .filter { tag in tag.count >= 2 && tag[0] == "p" }
+                            .map { tag in tag[1] }
+                        self.followList = Set(pubkeys)
+                        self.lastUpdate = Date(timeIntervalSince1970: TimeInterval(event.createdAt))
                     }
                 }
             }

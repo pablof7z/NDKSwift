@@ -58,16 +58,18 @@ public enum Bolt11Parser {
         case nano = "n"
         case pico = "p"
 
+        // Values yield satoshis when multiplied by the encoded amount.
+        // Callers needing millisats must multiply the result by 1000.
         var value: Decimal {
             switch self {
             case .milli:
-                return 100_000 // mBTC to millisats
+                return 100_000 // 1 mBTC = 100,000 sats
             case .micro:
-                return 100 // μBTC to millisats
+                return 100 // 1 μBTC = 100 sats
             case .nano:
-                return 0.1 // nBTC to millisats
+                return 0.1 // 1 nBTC = 0.1 sats
             case .pico:
-                return 0.0001 // pBTC to millisats
+                return 0.0001 // 1 pBTC = 0.0001 sats
             }
         }
     }

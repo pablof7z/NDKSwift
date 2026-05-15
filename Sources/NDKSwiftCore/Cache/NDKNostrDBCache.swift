@@ -315,10 +315,45 @@ public actor NDKNostrDBCache {
         }
         events[event.id] = event
 
+        // Apply NIP-09 deletion semantics for kind-5 events at ingestion time.
+        applyDeletionIfApplicable(event)
+
         // Enforce memory limit if needed (immediate enforcement on save)
         if events.count > config.maxMemoryEvents {
             await enforceMemoryLimit()
         }
+    }
+
+    /// If `event` is a NIP-09 deletion (kind 5), mark each e-tagged event ID as
+    /// deleted — but only when the deletion's author matches the original
+    /// event's author (per NIP-09 only the author can delete their own events).
+    /// Events that are not yet in the in-memory map are still recorded as
+    /// deleted so they will be filtered out when they arrive later.
+    private func applyDeletionIfApplicable(_ event: NDKEvent) {
+        guard event.kind == EventKind.deletion else { return }
+
+        for tag in event.tags where tag.count >= 2 && tag[0] == "e" {
+            let targetId = tag[1]
+            // If we have the target locally, verify authorship before honoring.
+            if let target = events[targetId] {
+                guard target.pubkey == event.pubkey else { continue }
+            }
+            deletedEventIds.insert(targetId)
+            events.removeValue(forKey: targetId)
+            eventAccessOrder.removeAll { $0 == targetId }
+        }
+    }
+
+    /// NIP-40: an event with an `expiration` tag (Unix timestamp seconds)
+    /// is considered expired once that time has passed and SHOULD NOT be
+    /// returned from queries or `getEvent`.
+    private func isExpired(_ event: NDKEvent) -> Bool {
+        for tag in event.tags where tag.count >= 2 && tag[0] == "expiration" {
+            if let ts = Int64(tag[1]), ts > 0, ts <= Int64(Date().timeIntervalSince1970) {
+                return true
+            }
+        }
+        return false
     }
 
     public func getEvent(id: String) async -> NDKEvent? {
@@ -333,25 +368,23 @@ public actor NDKNostrDBCache {
             eventAccessOrder.append(id)
         }
 
-        guard let nostrDB = nostrDB else { return nil }
+        let resolved: NDKEvent? = {
+            guard let nostrDB = nostrDB else { return events[id] }
+            guard let idData = hexToData(id) else { return nil }
+            let noteId = NdbNoteId(idData)
+            guard let txn = nostrDB.lookup_note(noteId),
+                  let note = txn.unsafeUnownedValue
+            else {
+                return events[id]
+            }
+            return convertToNDKEvent(note)
+        }()
 
-        // Convert hex ID to NdbNoteId
-        guard let idData = hexToData(id) else { return nil }
-        let noteId = NdbNoteId(idData)
-
-        // Lookup the note from nostrdb
-        guard let txn = nostrDB.lookup_note(noteId) else {
-            // Fall back to in-memory cache if not in nostrdb yet
-            return events[id]
+        // NIP-40: don't surface expired events.
+        if let event = resolved, isExpired(event) {
+            return nil
         }
-
-        let note = txn.unsafeUnownedValue
-        guard let note = note else {
-            return events[id]
-        }
-
-        // Convert NdbNote to NDKEvent
-        return convertToNDKEvent(note)
+        return resolved
     }
 
     public func queryEvents(_ filter: NDKFilter) async throws -> [NDKEvent] {
@@ -372,12 +405,14 @@ public actor NDKNostrDBCache {
             let ndbFilter = try NdbFilter(from: nostrFilter)
             let noteKeys = try nostrDB.query(filters: [ndbFilter], maxResults: filter.limit ?? 10000)
 
-            // Convert note keys to NDKEvents, filtering out deleted events
+            // Convert note keys to NDKEvents, filtering out deleted/expired events
             for noteKey in noteKeys {
                 if let txn = nostrDB.lookup_note_by_key(noteKey),
                    let note = txn.unsafeUnownedValue,
                    let event = convertToNDKEvent(note) {
-                    if !seenIds.contains(event.id) && !deletedEventIds.contains(event.id) {
+                    if !seenIds.contains(event.id),
+                       !deletedEventIds.contains(event.id),
+                       !isExpired(event) {
                         seenIds.insert(event.id)
                         results.append(event)
                     }
@@ -391,7 +426,9 @@ public actor NDKNostrDBCache {
         // Also query in-memory cache for events not yet indexed
         let inMemoryResults = queryEventsInMemory(filter)
         for event in inMemoryResults {
-            if !seenIds.contains(event.id) && !deletedEventIds.contains(event.id) {
+            if !seenIds.contains(event.id),
+               !deletedEventIds.contains(event.id),
+               !isExpired(event) {
                 seenIds.insert(event.id)
                 results.append(event)
             }
@@ -898,6 +935,10 @@ public actor NDKNostrDBCache {
 
         // Also save to in-memory cache
         events[event.id] = event
+
+        // Apply NIP-09 deletion semantics so kind-5 events ingested from a relay
+        // immediately remove their targets from query results.
+        applyDeletionIfApplicable(event)
     }
 
     /// Get relay sources for an event

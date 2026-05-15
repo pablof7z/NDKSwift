@@ -36,9 +36,17 @@ public actor NDKCacheNegentropyStorage: NegentropyStorage {
             filter: filter
         )
 
-        // Convert to NegentropyItems
-        return try events.map { event in
-            try NegentropyItem(event: event)
+        // Convert to NegentropyItems and sort ASC by (timestamp, id). The cache
+        // returns events DESC by createdAt, but Negentropy fingerprinting,
+        // varint delta encoding, and binary-search bound location all assume
+        // canonical ASC order. Without this, reconciliation cannot converge
+        // with spec-compliant peers.
+        let items = try events.map { try NegentropyItem(event: $0) }
+        return items.sorted { lhs, rhs in
+            if lhs.timestamp != rhs.timestamp {
+                return lhs.timestamp < rhs.timestamp
+            }
+            return lhs.id.lexicographicallyPrecedes(rhs.id)
         }
     }
 
@@ -92,11 +100,19 @@ public actor NDKCacheNegentropyStorage: NegentropyStorage {
             filter: filter
         )
 
-        return try idsAndTimestamps.map { id, timestamp in
+        let mapped: [(id: Data, timestamp: UInt64)] = try idsAndTimestamps.map { id, timestamp in
             guard let idData = id.hexDecoded(), idData.count == 32 else {
                 throw NegentropyError.invalidItemId
             }
             return (id: idData, timestamp: UInt64(timestamp))
+        }
+
+        // Negentropy canonical order: ASC by (timestamp, id).
+        return mapped.sorted { lhs, rhs in
+            if lhs.timestamp != rhs.timestamp {
+                return lhs.timestamp < rhs.timestamp
+            }
+            return lhs.id.lexicographicallyPrecedes(rhs.id)
         }
     }
 }

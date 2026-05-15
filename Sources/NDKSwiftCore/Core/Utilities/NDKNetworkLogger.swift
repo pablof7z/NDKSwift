@@ -101,6 +101,11 @@ public enum NDKNetworkLogger {
             output += "   TYPE: CLOSE\n"
             output += "   SUBSCRIPTION: \(subscriptionId)"
 
+        case let .closed(subscriptionId, message):
+            output += "   TYPE: CLOSED\n"
+            output += "   SUBSCRIPTION: \(subscriptionId)\n"
+            output += "   MESSAGE: \(message)"
+
         case let .eose(subscriptionId):
             output += "   TYPE: EOSE (End of Stored Events)\n"
             output += "   SUBSCRIPTION: \(subscriptionId)"

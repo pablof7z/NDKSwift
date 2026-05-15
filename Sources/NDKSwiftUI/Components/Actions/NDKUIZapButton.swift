@@ -434,19 +434,34 @@ private class ZapState: ObservableObject {
     }
 
     private func parseInvoiceAmount(_ invoice: String) -> Int? {
-        // Use comprehensive Bolt11 parser
+        // Bolt11Parser.Invoice.amount is Satoshi (sats) — display directly.
         guard let parsedInvoice = Bolt11Parser.decode(string: invoice),
               let amount = parsedInvoice.amount
         else {
             return nil
         }
 
-        // Convert millisatoshis to satoshis for display
-        return Int(PaymentConstants.millisatsToSats(amount.int64))
+        return Int(amount.int64)
     }
 
-    private func parseZapRequestSender(_: String) -> String? {
-        // Parse JSON to extract the pubkey from the zap request
+    private func parseZapRequestSender(_ zapRequestJson: String) -> String? {
+        // The `description` tag of a kind-9735 receipt holds the signed kind-9734
+        // zap-request event as JSON; its `pubkey` is the zapper. (Receipts are
+        // signed by the LSP, so receipt.event.pubkey is NOT the zapper.)
+        guard let data = zapRequestJson.data(using: .utf8) else { return nil }
+
+        // Try Codable first, fall back to JSON dictionary for tolerant decoding.
+        if let event = JSONCoding.safeDecode(NDKEvent.self, from: data),
+           HexValidator.isValid32ByteHex(event.pubkey) {
+            return event.pubkey
+        }
+
+        if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let pubkey = object["pubkey"] as? String,
+           HexValidator.isValid32ByteHex(pubkey) {
+            return pubkey
+        }
+
         return nil
     }
 

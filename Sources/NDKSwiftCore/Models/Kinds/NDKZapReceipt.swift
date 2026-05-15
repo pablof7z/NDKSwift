@@ -166,13 +166,12 @@ public struct NDKZapReceipt {
 // MARK: - Bolt11 Parsing
 
 private func parseBolt11Amount(_ bolt11: String) -> Int64? {
-    // Use comprehensive Bolt11 parser
+    // Bolt11Parser.Invoice.amount is Satoshi (sats); convert to millisats.
     guard let invoice = Bolt11Parser.decode(string: bolt11),
           let amount = invoice.amount
     else {
         return nil
     }
 
-    // Convert satoshis to millisatoshis
-    return amount.int64
+    return amount.int64 * 1000
 }

@@ -207,6 +207,26 @@ actor InternalSubscriptionManager {
         NDKLogger.log(.trace, category: .subscription, "🚫 Ignoring EOSE for non-existent subscription: \(subscriptionId)")
     }
 
+    /// Process CLOSED (NIP-01) from relay. Routes to the same set as EOSE so that
+    /// downstream subscriptions can treat the relay as done and unblock closeOnEose.
+    func processClosed(subscriptionId: String, message: String, from relay: RelayProtocol) async {
+        if let subscription = activeSubscriptions[subscriptionId] {
+            await subscription.handleClosed(from: relay, message: message)
+            return
+        }
+
+        if let fingerprint = relayIdToFingerprint[subscriptionId],
+           let subscriptions = fingerprintSubscriptions[fingerprint] {
+            let subscriptionsOnThisRelay = relayToSubscriptions[relay.url] ?? []
+            for subscription in subscriptions where subscriptionsOnThisRelay.contains(subscription) {
+                await subscription.handleClosed(from: relay, message: message)
+            }
+            return
+        }
+
+        NDKLogger.log(.trace, category: .subscription, "🚫 Ignoring CLOSED for non-existent subscription: \(subscriptionId)")
+    }
+
     // MARK: - Relay Monitoring
 
     /// Start monitoring relay connection events

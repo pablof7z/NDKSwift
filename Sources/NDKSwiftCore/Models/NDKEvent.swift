@@ -326,11 +326,14 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
         let relayHint = await ndk.eventTracker.getSourceRelay(eventId: id) ?? ""
         let markerValue = marker ?? ""
 
-        if isParameterizedReplaceable {
-            return ["a", tagAddress, relayHint, markerValue, pubkey]
-        } else if isReplaceable {
-            return ["a", tagAddress, relayHint, markerValue, pubkey]
+        if isParameterizedReplaceable || isReplaceable {
+            // NIP-01 `a` tag format is `["a", "kind:pubkey:d", relay-hint]`.
+            // Marker is a NIP-10 concept (only valid on `e` tags) and the pubkey
+            // is already embedded in the coordinate, so we don't emit them.
+            return ["a", tagAddress, relayHint]
         } else {
+            // NIP-10 `e` tag: `["e", id, relay, marker, pubkey]` (marker and pubkey
+            // optional). Emit the full form for thread context.
             return ["e", id, relayHint, markerValue, pubkey]
         }
     }

@@ -284,14 +284,13 @@ public enum NIP44 {
         aad.append(nonce)
         aad.append(ciphertext)
 
-        // Calculate HMAC using CryptoKit
-        let calculatedMac = CryptoKit.HMAC<CryptoKit.SHA256>.authenticationCode(
-            for: aad,
+        // Verify MAC using constant-time comparison.
+        let isValid = CryptoKit.HMAC<CryptoKit.SHA256>.isValidAuthenticationCode(
+            mac,
+            authenticating: aad,
             using: SymmetricKey(data: hmacKey)
         )
-
-        // Verify MAC
-        guard Data(calculatedMac) == mac else {
+        guard isValid else {
             throw NIP44Error.invalidMAC
         }
 

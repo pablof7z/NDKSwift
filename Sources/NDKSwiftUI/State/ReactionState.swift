@@ -54,7 +54,11 @@ public final class ReactionState {
     private let event: NDKEvent
     private let reaction: String
     private var userReactionEvent: NDKEvent?
+    /// All reactions we've observed for this event, keyed by reaction event id.
+    /// Lifted to instance state so toggle() and the deletion observer can mutate it.
+    private var allReactions: [String: NDKEvent] = [:]
     @ObservationIgnored nonisolated(unsafe) private var observationTask: Task<Void, Never>?
+    @ObservationIgnored nonisolated(unsafe) private var deletionObservationTask: Task<Void, Never>?
 
     // MARK: - Initialization
 
@@ -71,6 +75,7 @@ public final class ReactionState {
 
     deinit {
         observationTask?.cancel()
+        deletionObservationTask?.cancel()
     }
 
     // MARK: - Public Methods
@@ -78,8 +83,12 @@ public final class ReactionState {
     /// Start observing reaction events for this event
     public func start() async {
         observationTask?.cancel()
+        deletionObservationTask?.cancel()
         observationTask = Task { [weak self] in
             await self?.observeReactions()
+        }
+        deletionObservationTask = Task { [weak self] in
+            await self?.observeReactionDeletions()
         }
     }
 
@@ -87,6 +96,8 @@ public final class ReactionState {
     public func stop() {
         observationTask?.cancel()
         observationTask = nil
+        deletionObservationTask?.cancel()
+        deletionObservationTask = nil
     }
 
     /// Toggle reaction state - creates a reaction if not reacted, deletes if already reacted
@@ -98,8 +109,12 @@ public final class ReactionState {
         if hasReacted, let userReactionEvent {
             // Delete existing reaction
             try await userReactionEvent.delete(signer: ndk.signer!, ndk: ndk)
+            // Immediately drop the reaction locally so a late batch can't flip
+            // hasReacted back to true before the deletion event propagates.
+            allReactions.removeValue(forKey: userReactionEvent.id)
             self.userReactionEvent = nil
             hasReacted = false
+            await updateState(from: Array(allReactions.values))
         } else {
             // Create new reaction
             let reactionEvent = try await ndk.react(to: event, with: reaction)
@@ -123,13 +138,45 @@ public final class ReactionState {
             closeOnEose: false
         )
 
-        var allReactions: [String: NDKEvent] = [:]
-
         for await batch in subscription.events {
-            for event in batch {
-                allReactions[event.id] = event
+            for reactionEvent in batch {
+                allReactions[reactionEvent.id] = reactionEvent
             }
             await updateState(from: Array(allReactions.values))
+        }
+    }
+
+    /// Observe NIP-09 reaction deletions and remove them from local state.
+    /// Filters by `#k: 7` so we only see reaction deletions, not arbitrary kind-5s.
+    /// Drops a reaction only when the deletion event is signed by the same pubkey
+    /// that authored the reaction (per NIP-09).
+    private func observeReactionDeletions() async {
+        let filter = NDKFilter(
+            kinds: [EventKind.deletion],
+            tags: ["k": Set([String(EventKind.reaction)])]
+        )
+
+        let subscription = ndk.subscribe(
+            filter: filter,
+            maxAge: 0,
+            cachePolicy: .cacheWithNetwork,
+            closeOnEose: false
+        )
+
+        for await batch in subscription.events {
+            var changed = false
+            for deletion in batch {
+                for tag in deletion.tags where tag.count >= 2 && tag[0] == "e" {
+                    let targetId = tag[1]
+                    if let reaction = allReactions[targetId], reaction.pubkey == deletion.pubkey {
+                        allReactions.removeValue(forKey: targetId)
+                        changed = true
+                    }
+                }
+            }
+            if changed {
+                await updateState(from: Array(allReactions.values))
+            }
         }
     }
 

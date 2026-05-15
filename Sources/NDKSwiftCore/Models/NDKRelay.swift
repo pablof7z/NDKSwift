@@ -662,6 +662,15 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
 
         let url = try URLUtils.validateURL(normalizedURL)
 
+        // If a previous connection is still on the actor (e.g. after a failure
+        // before we ran handleConnectionFailure), tear it down before swapping
+        // in a new one. Otherwise the old actor + its healthCheckTask /
+        // stateMonitorTask / receiveMessages task leak and accumulate on every
+        // reconnect.
+        if let existing = await stateActor.getConnection() {
+            await existing.disconnect()
+        }
+
         let newConnection = NDKRelayConnection(url: url, config: config)
         await stateActor.setConnection(newConnection)
         await newConnection.setDelegate(self)
@@ -679,8 +688,15 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
     /// This is a graceful disconnect that properly cleans up resources.
     public func disconnect() async {
         let currentState = await stateActor.getConnectionState()
-        guard currentState == .connected || currentState == .connecting else {
+        // Previously only `.connected`/`.connecting` were honored, which silently
+        // dropped disconnects from `.authenticated`, `.authRequired`,
+        // `.authenticating`, and `.failed` — and left pending reconnect Tasks
+        // for failed relays. Skip only the terminal states.
+        switch currentState {
+        case .disconnected, .disconnecting:
             return
+        default:
+            break
         }
 
         await stateActor.updateConnectionState(.disconnecting)
@@ -800,6 +816,9 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
         case let .notice(message):
             await handleNoticeMessage(message)
 
+        case let .closed(subscriptionId, reason):
+            await handleClosedMessage(subscriptionId: subscriptionId, message: reason)
+
         case let .auth(challenge):
             await handleAuthMessage(challenge: challenge)
 
@@ -898,6 +917,22 @@ public final class NDKRelay: RelayProtocol, Hashable, Equatable, Identifiable {
 
         // Notify NDK about notice message
         await ndk?.processNotice(message: message, from: self)
+    }
+
+    /// Handle CLOSED message (NIP-01 relay-initiated subscription termination).
+    /// Routes through both the per-relay subscription manager and the coordinator
+    /// so callers waiting on EOSE/events for this subscription stop waiting.
+    private func handleClosedMessage(subscriptionId: String, message: String) async {
+        NDKLogger.log(.info, category: .subscription,
+                      "🚪 [Relay] CLOSED for subscription '\(subscriptionId)' on \(url): \(message)")
+
+        // Route to per-relay subscription manager (closes group's view of this sub).
+        await subscriptionManager.routeClosed(subscriptionId: subscriptionId, message: message)
+
+        // Route to NDK so global coordinator can fan out to observers.
+        if let ndk = await ndk {
+            await ndk.processClosed(subscriptionId: subscriptionId, message: message, from: self)
+        }
     }
 
     /// Handle AUTH message

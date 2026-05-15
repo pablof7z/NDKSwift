@@ -352,7 +352,11 @@ public actor NDKZapManager: ZapManaging {
             return nil
         }
 
-        // Try to get provider pubkey from recipient's profile
+        // Trust model: a zap receipt is only authentic if its pubkey matches the
+        // LNURL provider's published nostrPubkey. Falling back to the receipt's
+        // own pubkey (or to the recipient's) would make validation tautological
+        // and lets anyone forge a receipt. We require a trusted LNURL pubkey;
+        // if we can't establish one, the receipt is dropped.
         var providerPubkey: String?
         let lnurlAddress = await MainActor.run {
             ndk.profile(for: recipientPubkey).metadata?.lud16 ??
@@ -362,22 +366,10 @@ public actor NDKZapManager: ZapManaging {
             do {
                 let resolution = try await ndk.lnurlResolver.resolve(lnurlAddress)
                 providerPubkey = resolution.providerPubkey
-
-                // If no provider pubkey from LNURL, check if service allows Nostr
-                if providerPubkey == nil && resolution.payResponse.allowsNostr == true {
-                    // Some services that allow Nostr might use the recipient's pubkey
-                    // as the zap receipt signer
-                    providerPubkey = receipt.event.pubkey
-                }
             } catch {
                 NDKLogger.log(.warning, category: .general,
                             "Failed to resolve LNURL for \(lnurlAddress): \(error)")
-                // Fall back to using receipt pubkey
-                providerPubkey = receipt.event.pubkey
             }
-        } else {
-            // No LNURL configured, use receipt pubkey
-            providerPubkey = receipt.event.pubkey
         }
 
         guard let providerPubkey = providerPubkey,

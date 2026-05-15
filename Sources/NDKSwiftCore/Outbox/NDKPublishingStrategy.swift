@@ -201,7 +201,7 @@ actor NDKPublishingStrategy {
             case .rateLimited:
                 await item.updateRelayStatus(relayURL, status: .rateLimited)
                 // Exponential backoff
-                try? await Task.sleep(nanoseconds: UInt64(backoffInterval) * TimeConstants.nanosecondsPerSecond)
+                try? await Task.sleep(nanoseconds: UInt64(backoffInterval * Double(TimeConstants.nanosecondsPerSecond)))
                 backoffInterval *= OutboxConstants.backoffMultiplier
 
             case .authRequired:
@@ -222,7 +222,7 @@ actor NDKPublishingStrategy {
             case .temporaryFailure:
                 if attempts < OutboxConstants.publishRetries {
                     await item.updateRelayStatus(relayURL, status: .retrying(attempt: attempts))
-                    try? await Task.sleep(nanoseconds: UInt64(backoffInterval) * TimeConstants.nanosecondsPerSecond)
+                    try? await Task.sleep(nanoseconds: UInt64(backoffInterval * Double(TimeConstants.nanosecondsPerSecond)))
                     backoffInterval *= OutboxConstants.backoffMultiplier
                 } else {
                     await item.updateRelayStatus(relayURL, status: .failed(.maxRetriesExceeded))
@@ -242,16 +242,28 @@ actor NDKPublishingStrategy {
             // Send event
             let response = try await relay.publish(event)
 
-            // Parse response
+            // Parse response. NIP-01 specifies machine-readable prefixes; substring
+            // matching ("auth" / "rate" / "error") catches false positives like
+            // "unauthorized", "moderate spam" and misses canonical prefixes like
+            // "pow:" — match the documented prefix protocol instead.
             if response.success {
                 return .success
             } else if let message = response.message {
-                if message.contains("rate") {
+                let lower = message.lowercased()
+                if lower.hasPrefix("rate-limited:") {
                     return .rateLimited
-                } else if message.contains("auth") {
+                } else if lower.hasPrefix("auth-required:") {
                     return .authRequired
-                } else if message.contains("invalid") || message.contains("error") {
+                } else if lower.hasPrefix("blocked:") ||
+                            lower.hasPrefix("restricted:") ||
+                            lower.hasPrefix("invalid:") ||
+                            lower.hasPrefix("pow:") ||
+                            lower.hasPrefix("duplicate:") {
                     return .permanentFailure(reason: .invalid(message))
+                } else if lower.hasPrefix("error:") {
+                    // "error:" historically signals a relay-side problem that may
+                    // resolve on retry; keep treating it as temporary.
+                    return .temporaryFailure
                 }
             }
             return .temporaryFailure

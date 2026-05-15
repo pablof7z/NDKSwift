@@ -80,14 +80,18 @@ actor NDKRelaySelector {
         // Extract relay URLs from the map
         var selectedRelays = Set(relayToPubkeys.keys)
 
-        // Add e-tag relay hints per NIP-10
+        // Add e-tag relay hints per NIP-10. Validate and normalize each hint so
+        // event-supplied URLs cannot redirect publishes to invalid/malicious
+        // endpoints. Apply the same blocklist / wss-only checks every other
+        // relay-selection path applies.
         for tag in event.tags {
-            if tag.count >= 3 && tag[0] == "e" {
-                let relayHint = tag[2]
-                if !relayHint.isEmpty {
-                    selectedRelays.insert(relayHint)
-                }
-            }
+            guard tag.count >= 3, tag[0] == "e" else { continue }
+            let rawHint = tag[2]
+            guard !rawHint.isEmpty,
+                  URLNormalizer.isValidForOutbox(rawHint),
+                  let normalizedHint = URLNormalizer.tryNormalizeRelayUrl(rawHint)
+            else { continue }
+            selectedRelays.insert(normalizedHint)
         }
 
         // Ensure minimum relays

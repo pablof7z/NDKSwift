@@ -454,26 +454,60 @@ public class NDKList {
         }
     }
 
-    /// Encrypt the content using the provided signer
-    private func encrypt(_: NDKSigner) async throws {
+    /// Encrypt the content (NIP-51 encrypt-to-self) using the provided signer.
+    ///
+    /// Caller pre-condition: `content` holds the JSON-serialized encrypted items
+    /// (the `encryptedItems` setter writes that form). This method replaces
+    /// `content` with the ciphertext produced by the signer.
+    private func encrypt(_ signer: NDKSigner) async throws {
         guard !encryptedItems.isEmpty else {
             content = ""
             return
         }
 
-        // Create JSON representation of encrypted items
-        let jsonString = try JSONCoding.serializeToString(encryptedItems)
+        let plaintext = content
+        let ownPubkey = try await signer.pubkey
 
-        // For now, store as plain JSON - encryption would require NIP-04/44 implementation
-        content = jsonString
+        // Prefer NIP-44 when the signer advertises it; NIP-51 historically uses NIP-04
+        // and most existing mute lists are NIP-04, so fall back to NIP-04.
+        let supported = await signer.encryptionEnabled()
+        let scheme: NDKEncryptionScheme
+        if supported.contains(.nip44) {
+            scheme = .nip44
+        } else if supported.contains(.nip04) || supported.isEmpty {
+            // Some signers (e.g. some NIP-46 bunkers) don't advertise their schemes
+            // but still implement NIP-04. Try it before giving up.
+            scheme = .nip04
+        } else {
+            throw NDKError.notImplemented("Signer does not advertise NIP-04 or NIP-44 support; cannot encrypt list items")
+        }
+
+        content = try await signer.encrypt(recipientPubkey: ownPubkey, value: plaintext, scheme: scheme)
     }
 
-    /// Decrypt the content using the provided signer
-    private func decrypt(_: NDKSigner) async throws {
+    /// Decrypt the content (NIP-51 encrypt-to-self) using the provided signer.
+    /// Replaces `content` with the decrypted JSON payload so subsequent
+    /// `encryptedItems` reads return the original tags.
+    private func decrypt(_ signer: NDKSigner) async throws {
         guard !content.isEmpty else { return }
 
-        // For now, assume content is plain JSON - decryption would require NIP-04/44 implementation
-        // This is a placeholder for future encryption support
+        let ownPubkey = try await signer.pubkey
+        let supported = await signer.encryptionEnabled()
+        let preferred: [NDKEncryptionScheme] = supported.isEmpty ? [.nip44, .nip04] : supported
+
+        var lastError: Error?
+        for scheme in preferred {
+            do {
+                content = try await signer.decrypt(senderPubkey: ownPubkey, value: content, scheme: scheme)
+                return
+            } catch {
+                lastError = error
+            }
+        }
+
+        if let lastError {
+            throw lastError
+        }
     }
 
     /// Sign this list as an event

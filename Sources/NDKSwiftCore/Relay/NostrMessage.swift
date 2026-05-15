@@ -3,6 +3,7 @@ public enum NostrMessageType: String {
     case event = "EVENT"
     case req = "REQ"
     case close = "CLOSE"
+    case closed = "CLOSED"
     case notice = "NOTICE"
     case eose = "EOSE"
     case ok = "OK"
@@ -20,6 +21,8 @@ public enum NostrMessage {
     case event(subscriptionId: String?, event: NDKEvent)
     case req(subscriptionId: String, filters: [NDKFilter])
     case close(subscriptionId: String)
+    /// Relay-initiated subscription termination: `["CLOSED", subId, message]`
+    case closed(subscriptionId: String, message: String)
     case notice(message: String)
     case eose(subscriptionId: String)
     case ok(eventId: EventID, accepted: Bool, message: String?)
@@ -91,6 +94,15 @@ public enum NostrMessage {
                 throw invalidMessageError(for: "CLOSE")
             }
             return .close(subscriptionId: subscriptionId)
+
+        case .closed:
+            guard array.count >= 2,
+                  let subscriptionId = array[1] as? String
+            else {
+                throw invalidMessageError(for: "CLOSED")
+            }
+            let message = (array.count > 2 ? array[2] as? String : nil) ?? ""
+            return .closed(subscriptionId: subscriptionId, message: message)
 
         case .notice:
             guard array.count >= 2,
@@ -198,6 +210,12 @@ public enum NostrMessage {
             array.append("CLOSE")
             array.append(subscriptionId)
 
+        case let .closed(subscriptionId, message):
+            // Relay-initiated; included for symmetry though clients don't send it.
+            array.append("CLOSED")
+            array.append(subscriptionId)
+            array.append(message)
+
         case let .notice(message):
             array.append("NOTICE")
             array.append(message)
@@ -257,6 +275,8 @@ public enum NostrMessage {
         case let .count(id, _):
             return id
         case let .req(id, _), let .close(id):
+            return id
+        case let .closed(id, _):
             return id
         case let .negOpen(id, _, _), let .negMsg(id, _), let .negClose(id), let .negErr(id, _):
             return id

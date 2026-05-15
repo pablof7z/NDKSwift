@@ -307,12 +307,15 @@ public actor NDKPool {
             return existing
         }
 
-        // Check if relay is blocked
+        // Check if relay is blocked. Return a placeholder relay marked as
+        // permanently failed so callers that try to publish/subscribe through it
+        // see the error state rather than silently no-op against an unmanaged
+        // socket. The relay is intentionally NOT inserted into relayMap.
         let blockedRelays = await getBlockedRelays()
         if blockedRelays.contains(normalizedUrl) {
-            NDKLogger.log(.warning, category: .general, "Attempted to add blocked relay: \(normalizedUrl)")
-            // Create a disconnected relay instance to return (won't be added to pool)
+            NDKLogger.log(.warning, category: .general, "Refusing to add blocklisted relay: \(normalizedUrl)")
             let blockedRelay = NDKRelay(url: normalizedUrl, config: config)
+            await blockedRelay.updateConnectionState(.failed("Relay is blocklisted"))
             return blockedRelay
         }
 

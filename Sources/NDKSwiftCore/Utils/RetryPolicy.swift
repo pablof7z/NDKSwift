@@ -173,8 +173,8 @@ public extension RetryPolicy {
                     throw NDKError.unknown("Max retry attempts reached", underlying: error)
                 }
 
-                // Wait for the delay
-                try await Task.sleep(nanoseconds: UInt64(delay) * TimeConstants.nanosecondsPerSecond)
+                // Wait for the delay (preserve fractional seconds).
+                try await Task.sleep(nanoseconds: UInt64(delay * Double(TimeConstants.nanosecondsPerSecond)))
             }
         }
     }
@@ -196,7 +196,7 @@ public extension RetryPolicy {
 
             // Add timeout task
             group.addTask {
-                try await Task.sleep(nanoseconds: UInt64(timeout) * TimeConstants.nanosecondsPerSecond)
+                try await Task.sleep(nanoseconds: UInt64(timeout * Double(TimeConstants.nanosecondsPerSecond)))
                 throw NDKError.timeout(operation: "Retry operation", seconds: Int(timeout))
             }
 
