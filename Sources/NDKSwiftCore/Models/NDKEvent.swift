@@ -279,20 +279,28 @@ public struct NDKEvent: Codable, Equatable, Hashable, Sendable {
         return kind >= 20000 && kind < 30000
     }
 
-    /// Check if this event is replaceable
-    /// - Returns: true if the event is replaceable (kind 0, 3, or 10000-19999)
-    /// - Note: Replaceable events can be overwritten by newer events with the same kind from the same author
+    /// Check if this event is *narrowly* replaceable (NIP-01).
+    /// - Returns: true for kind 0, 3, and 10000-19999. Does NOT include
+    ///   parameterized replaceable (30000-39999) — use ``isAnyReplaceable``
+    ///   or check ``isParameterizedReplaceable`` separately for that.
+    /// - Note: Replaceable events can be overwritten by newer events with the
+    ///   same kind from the same author. ``EventKind/isReplaceable(_:)``
+    ///   returns true for the *union* of both ranges; the two helpers have
+    ///   different semantics on purpose.
     public var isReplaceable: Bool {
-        // Kind 0 (metadata) and kind 3 (contacts) are replaceable
-        // Also kinds 10000-19999 are replaceable
         return kind == EventKind.metadata || kind == EventKind.contacts || (kind >= 10000 && kind < 20000)
     }
 
-    /// Check if this event is parameterized replaceable
-    /// - Returns: true if the event kind is between 30000-39999 (NIP-33)
-    /// - Note: These events are replaceable based on kind, author, and 'd' tag value
+    /// Check if this event is parameterized replaceable (NIP-33).
+    /// - Returns: true for kinds 30000-39999, replaceable by (kind, author, d-tag).
     public var isParameterizedReplaceable: Bool {
         return kind >= 30000 && kind < 40000
+    }
+
+    /// Check if this event is replaceable in any sense (NIP-01 + NIP-33).
+    /// Matches the umbrella semantics of ``EventKind/isReplaceable(_:)``.
+    public var isAnyReplaceable: Bool {
+        return isReplaceable || isParameterizedReplaceable
     }
 
     /// Check if this event is protected (NIP-70)

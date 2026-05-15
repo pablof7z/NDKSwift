@@ -1,34 +1,33 @@
+import CryptoKit
 import Foundation
 
 /// A deterministic identifier for filter grouping, following ndk-core's approach
 public typealias NDKFilterFingerprint = String
 
 public extension NDKFilter {
-    /// Creates a fingerprint for a single filter
+    /// Creates a fingerprint for a single filter.
     ///
-    /// The fingerprint includes hashed values of filter fields to ensure that
-    /// filters with different values are correctly identified as distinct.
-    /// For example, `authors: ["alice"]` and `authors: ["bob"]` will have
-    /// different fingerprints.
+    /// The fingerprint must be stable across:
+    /// - process restarts (so persisted fetch-times keyed by fingerprint stay valid)
+    /// - multiple NDK instances in the same process (extensions, tests)
+    /// - rebuilds with different toolchains
     ///
-    /// This is critical for subscription grouping - filters must only be grouped
-    /// when they have the exact same values, not just the same field presence.
+    /// Swift's `Hasher` is seeded randomly per process, so `[String].hashValue`
+    /// returns a different value on each launch. Using it here previously made
+    /// every persisted fingerprint look stale on relaunch and split routing
+    /// keys between NDK instances. We now SHA-256 a canonical string form.
     func toFingerprint() -> String {
         var parts: [String] = []
 
-        // Include hashed values for each non-nil property to ensure
-        // filters with different values get different fingerprints
         if let ids = ids {
-            let hash = ids.sorted().hashValue
-            parts.append("\(NostrConstants.JSONField.ids):\(hash)")
+            parts.append("\(NostrConstants.JSONField.ids):\(ids.sorted().joined(separator: ","))")
         }
         if let authors = authors {
-            let hash = authors.sorted().hashValue
-            parts.append("\(NostrConstants.JSONField.authors):\(hash)")
+            parts.append("\(NostrConstants.JSONField.authors):\(authors.sorted().joined(separator: ","))")
         }
         if let kinds = kinds {
-            let hash = kinds.sorted().hashValue
-            parts.append("\(NostrConstants.JSONField.kinds):\(hash)")
+            let kindStr = kinds.sorted().map(String.init).joined(separator: ",")
+            parts.append("\(NostrConstants.JSONField.kinds):\(kindStr)")
         }
         if let since = since {
             parts.append("\(NostrConstants.JSONField.since):\(since)")
@@ -37,19 +36,22 @@ public extension NDKFilter {
             parts.append("\(NostrConstants.JSONField.until):\(until)")
         }
         if let tags = tags {
-            // Create deterministic hash from sorted tag entries
-            let tagHash = tags.sorted { $0.key < $1.key }
-                .map { "\($0.key):\($0.value.sorted().hashValue)" }
-                .joined(separator: ",")
-                .hashValue
-            parts.append("\(NostrConstants.JSONField.tags):\(tagHash)")
+            let tagStr = tags.sorted { $0.key < $1.key }
+                .map { "\($0.key)=\($0.value.sorted().joined(separator: ","))" }
+                .joined(separator: ";")
+            parts.append("\(NostrConstants.JSONField.tags):\(tagStr)")
         }
         if let limit = limit {
             parts.append("\(NostrConstants.JSONField.limit):\(limit)")
         }
 
-        // Sort alphabetically and join with "-"
-        return parts.sorted().joined(separator: "-")
+        let canonical = parts.sorted().joined(separator: "-")
+        if canonical.isEmpty {
+            return "empty-filter"
+        }
+        let digest = SHA256.hash(data: Data(canonical.utf8))
+        // 16 hex chars (64 bits) is plenty to dedupe filters across a process.
+        return String(Data(digest).hexString.prefix(16))
     }
 }
 

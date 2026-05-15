@@ -94,13 +94,11 @@ public actor SubscriptionSwapManager {
         }
     }
 
-    /// Check if two filters are equal
+    /// Check if two filters are equal.
+    /// Previously only compared kinds/authors/tags/since/until, so changes in
+    /// ids, events (#e), pubkeys (#p), or limit silently skipped a swap. Use
+    /// NDKFilter's synthesized Equatable for full structural equality.
     private func filtersEqual(_ a: NDKFilter, _ b: NDKFilter) -> Bool {
-        // Compare relevant fields
-        return a.kinds == b.kinds &&
-            a.authors == b.authors &&
-            a.tags == b.tags &&
-            a.since == b.since &&
-            a.until == b.until
+        return a == b
     }
 }

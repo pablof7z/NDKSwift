@@ -38,9 +38,19 @@ public actor NDKNostrRPC {
     private let ndk: NDK
     private let localSigner: NDKPrivateKeySigner
     private let relayURLs: [String]
-    private var encryptionScheme: NDKEncryptionScheme = .nip44
+    /// Default scheme used when we haven't yet learned a peer's preference.
+    private let defaultEncryptionScheme: NDKEncryptionScheme = .nip44
+    /// Per-peer encryption scheme learned from successful decrypts. Scoping
+    /// this per-pubkey (rather than mutating a single shared field) prevents
+    /// one peer's NIP-04 reply from downgrading subsequent encrypts to other
+    /// peers — the actor-wide field used to do exactly that.
+    private var peerEncryptionSchemes: [String: NDKEncryptionScheme] = [:]
     private var pendingRequests: [String: CheckedContinuation<NDKRPCResponse, Error>] = [:]
     private var timeoutTasks: [String: Task<Void, Never>] = [:]
+
+    private func encryptionScheme(for pubkey: String) -> NDKEncryptionScheme {
+        return peerEncryptionSchemes[pubkey] ?? defaultEncryptionScheme
+    }
 
     init(ndk: NDK, localSigner: NDKPrivateKeySigner, relayURLs: [String]) {
         self.ndk = ndk
@@ -64,14 +74,17 @@ public actor NDKNostrRPC {
         let pTags = event.tags.filter { $0.first == "p" }.map { $0.dropFirst().first ?? "?" }
         NDKLogger.log(.debug, category: .auth, "Parsing event \(event.id.prefix(8))... created_at: \(event.createdAt), p-tags: \(pTags)")
 
+        let peerScheme = encryptionScheme(for: event.pubkey)
         var decryptedContent: String
         do {
-            decryptedContent = try await localSigner.decrypt(senderPubkey: event.pubkey, value: event.content, scheme: encryptionScheme)
+            decryptedContent = try await localSigner.decrypt(senderPubkey: event.pubkey, value: event.content, scheme: peerScheme)
         } catch {
-            // Try other encryption scheme (fallback to NIP04 if NIP44 fails)
-            let otherScheme: NDKEncryptionScheme = encryptionScheme == .nip44 ? .nip04 : .nip44
+            // Try the other encryption scheme. Record the learned preference
+            // per-peer so future encrypts to THIS pubkey use the right scheme,
+            // without affecting other peers.
+            let otherScheme: NDKEncryptionScheme = peerScheme == .nip44 ? .nip04 : .nip44
             decryptedContent = try await localSigner.decrypt(senderPubkey: event.pubkey, value: event.content, scheme: otherScheme)
-            encryptionScheme = otherScheme
+            peerEncryptionSchemes[event.pubkey] = otherScheme
         }
 
         NDKLogger.log(.debug, category: .auth, "Event \(event.id.prefix(8))... decrypted: \(decryptedContent)")
@@ -140,8 +153,9 @@ public actor NDKNostrRPC {
         let requestString = String(data: requestData, encoding: .utf8) ?? ""
         NDKLogger.log(.debug, category: .auth, "Request JSON: \(requestString)")
 
-        let encryptedContent = try await localSigner.encrypt(recipientPubkey: pubkey, value: requestString, scheme: encryptionScheme)
-        NDKLogger.log(.debug, category: .auth, "Encrypted content using scheme: \(encryptionScheme)")
+        let outboundScheme = encryptionScheme(for: pubkey)
+        let encryptedContent = try await localSigner.encrypt(recipientPubkey: pubkey, value: requestString, scheme: outboundScheme)
+        NDKLogger.log(.debug, category: .auth, "Encrypted content using scheme: \(outboundScheme)")
 
         let localPubkey = try await localSigner.pubkey
         let event = try await NDKEventBuilder(ndk: ndk)
@@ -169,24 +183,14 @@ public actor NDKNostrRPC {
         }
     }
 
-    func sendRequest(to pubkey: String, method: String, params: [String], handler: ((NDKRPCResponse) -> Void)? = nil) async throws {
-        let id = IDGenerator.randomId(length: 8)
-
-        try await sendRequestInternal(to: pubkey, method: method, params: params, id: id)
-
-        // If handler provided, call it when response arrives
-        if let handler = handler {
-            Task { [weak self] in
-                guard let self = self else { return }
-                NDKLogger.log(.debug, category: .auth, "Waiting for response with id: \(id)")
-                do {
-                    let response = try await self.waitForResponse(id: id)
-                    handler(response)
-                } catch {
-                    NDKLogger.log(.error, category: .auth, "Failed to wait for response: \(error)")
-                }
-            }
-        }
+    /// Send an RPC request and deliver the response to `handler`.
+    /// Routes through the throwing variant which registers the response
+    /// waiter BEFORE publishing — necessary to avoid a race where a fast
+    /// remote signer's response arrives before the waiter is registered.
+    /// Zero in-tree callers today, but the API is part of the public surface.
+    func sendRequest(to pubkey: String, method: String, params: [String], handler: @escaping (NDKRPCResponse) -> Void) async throws {
+        let response = try await sendRequest(to: pubkey, method: method, params: params)
+        handler(response)
     }
 
     func sendRequest(to pubkey: String, method: String, params: [String], timeout: TimeInterval? = nil) async throws -> NDKRPCResponse {

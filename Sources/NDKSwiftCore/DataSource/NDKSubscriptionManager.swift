@@ -25,24 +25,9 @@ actor NDKSubscriptionManager {
         self.ndk = ndk
         NDKLogger.log(.trace, category: .subscription, "🏗️ NDKSubscriptionManager initialized")
 
-        // Start periodic cleanup task
-        Task {
-            await startPeriodicCleanup()
-        }
-
         // Listen for relay discoveries
         Task {
             await listenForRelayDiscoveries()
-        }
-    }
-
-    /// Periodic cleanup of stale handles and requirements
-    private func startPeriodicCleanup() async {
-        while !Task.isCancelled {
-            // Wait 1 hour between cleanups
-            try? await Task.sleep(nanoseconds: UInt64(TimeConstants.hour * Double(TimeConstants.nanosecondsPerSecond)))
-
-            // Future cleanup tasks can be added here
         }
     }
 
