@@ -146,12 +146,19 @@ actor NDKSubscriptionRequirement {
 
     /// Apply the relay selection strategy
     private func applyRelayStrategy() async {
-        // Don't create relay subscriptions if NDK hasn't been connected yet (offline mode)
-        // This prevents subscriptions from triggering relay discovery and addition before connect() is called
-        guard let ndk = ndk, ndk.hasConnected else {
-            NDKLogger.log(.info, category: .subscription,
-                          "⏸️  Deferring relay subscription creation for '\(subscriptionId)' - NDK not connected yet (offline mode). Subscriptions will be created when connect() is called.")
+        // Don't create relay subscriptions if NDK hasn't been connected yet (offline mode).
+        // If the pool already has connected relays, proceed so the requirement can
+        // open subscriptions against that existing pool.
+        guard let ndk = ndk else {
             return
+        }
+        let connectedRelayCount = await ndk.pool.connectedRelayURLs.count
+        if !ndk.hasConnected {
+            guard connectedRelayCount > 0 else {
+                NDKLogger.log(.info, category: .subscription,
+                              "⏸️  Deferring relay subscription creation for '\(subscriptionId)' - NDK not connected yet (offline mode). Subscriptions will be created when connect() is called.")
+                return
+            }
         }
 
         switch relayStrategy {
