@@ -116,6 +116,11 @@ public extension NDKEvent {
             throw NDKEncryptionError.invalidFormat
         }
 
+        try validate()
+        guard verifySignature() else {
+            throw NDKError.invalidSignature(sig)
+        }
+
         // Get viewer pubkey for cache
         let viewerPubkey = try await signer.pubkey
 
