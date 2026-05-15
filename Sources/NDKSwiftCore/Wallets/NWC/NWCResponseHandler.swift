@@ -92,7 +92,7 @@ public struct NWCResponseHandler {
                         value: eventContent,
                         scheme: .nip04
                     )
-                    NDKLogger.log(.trace, category: .wallet, "[NWC Response] Decrypted content: \(decryptedContent)")
+                    NDKLogger.log(.trace, category: .wallet, "[NWC Response] Decrypted response payload (\(decryptedContent.count) bytes)")
 
                     // Parse and return the response
                     let result = try parseResponse(decryptedContent, expectedType: responseType)

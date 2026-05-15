@@ -87,7 +87,7 @@ public actor NDKNostrRPC {
             peerEncryptionSchemes[event.pubkey] = otherScheme
         }
 
-        NDKLogger.log(.debug, category: .auth, "Event \(event.id.prefix(8))... decrypted: \(decryptedContent)")
+        NDKLogger.log(.debug, category: .auth, "Event \(event.id.prefix(8))... decrypted RPC payload (\(decryptedContent.count) bytes)")
 
         let json: [String: Any]
         do {
@@ -128,7 +128,7 @@ public actor NDKNostrRPC {
                     pendingRequests.removeValue(forKey: id)
                     timeoutTasks[id]?.cancel()
                     timeoutTasks.removeValue(forKey: id)
-                    NDKLogger.log(.debug, category: .auth, "RPC success for \(id): \(result)")
+                    NDKLogger.log(.debug, category: .auth, "RPC success for \(id) (\(result.count) result bytes)")
                     continuation.resume(returning: response)
                 } else {
                     // Error response - log but keep waiting for potential success
@@ -151,7 +151,7 @@ public actor NDKNostrRPC {
 
         let requestData = try JSONSerialization.data(withJSONObject: request)
         let requestString = String(data: requestData, encoding: .utf8) ?? ""
-        NDKLogger.log(.debug, category: .auth, "Request JSON: \(requestString)")
+        NDKLogger.log(.debug, category: .auth, "Prepared RPC request payload for \(method) (\(requestString.count) bytes)")
 
         let outboundScheme = encryptionScheme(for: pubkey)
         let encryptedContent = try await localSigner.encrypt(recipientPubkey: pubkey, value: requestString, scheme: outboundScheme)
