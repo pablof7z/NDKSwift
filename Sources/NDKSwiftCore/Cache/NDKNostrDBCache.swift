@@ -1057,6 +1057,7 @@ public actor NDKNostrDBCache {
     public func searchProfiles(_ query: String, limit: Int = 20) async -> [String] {
         guard let nostrDB = nostrDB else { return [] }
         guard !query.isEmpty else { return [] }
+        guard limit > 0 else { return [] }
 
         // Use nostrdb's native profile search
         guard let txn = NdbTxn(ndb: nostrDB) else { return [] }

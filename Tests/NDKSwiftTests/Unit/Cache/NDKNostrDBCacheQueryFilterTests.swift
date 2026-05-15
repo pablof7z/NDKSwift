@@ -2,6 +2,14 @@
 import XCTest
 
 final class NDKNostrDBCacheQueryFilterTests: XCTestCase {
+    func testSearchProfilesRespectsZeroLimit() async throws {
+        let cache = try await NDKTestFactory.createTestCache()
+
+        let results = await cache.searchProfiles("alice", limit: 0)
+
+        XCTAssertEqual(results, [])
+    }
+
     func testQueryEventsHonorsArbitraryTagFilters() async throws {
         let cache = try await NDKTestFactory.createTestCache()
         let targetAddress = "30023:pubkey:target"

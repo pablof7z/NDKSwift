@@ -849,6 +849,8 @@ class Ndb: @unchecked Sendable {
     }
 
     func search_profile<Y>(_ search: String, limit: Int, txn: NdbTxn<Y>) -> [Pubkey] {
+        guard limit > 0 else { return [] }
+
         var pks = [Pubkey]()
 
         return search.withCString { q in
@@ -860,7 +862,7 @@ class Ndb: @unchecked Sendable {
             defer { ndb_search_profile_end(&s) }
             pks.append(Pubkey(Data(bytes: &s.key.pointee.id.0, count: 32)))
 
-            var n = limit
+            var n = limit - 1
             while n > 0 {
                 guard ndb_search_profile_next(&s) != 0 else {
                     return pks
