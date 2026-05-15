@@ -45,6 +45,7 @@ jobs:
           path: docs
 
   deploy:
+    if: ${{ vars.ENABLE_PAGES_DEPLOY == 'true' }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
