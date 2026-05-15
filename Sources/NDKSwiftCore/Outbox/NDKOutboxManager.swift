@@ -755,9 +755,6 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
     }
 
     private func fetchRelayListFromNetwork(for pubkey: String) async throws -> (item: NDKOutboxItem?, eoseRelays: Set<String>) {
-        var eoseRelays = Set<String>()
-        var relayListEvent: NDKEvent?
-
         NDKLogger.log(.info, category: .outbox, "🔍 Fetching relay list (10002) for \(pubkey.prefix(8))...")
 
         let filter = NDKFilter(
@@ -780,15 +777,34 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
             includeRelayUpdates: true
         )
 
-        // Process both events and relay updates with timeout
+        // Actor-isolated collector. Previously this function declared two
+        // local `var`s and wrote to them from two `@Sendable` child tasks,
+        // a Swift-6 data race. It also raced `group.next()` against a
+        // 2-second timeout task that won the race in normal operation,
+        // cancelling the event-collector mid-iteration and dropping events
+        // delivered in the last few ms before cancellation.
+        actor RelayListCollector {
+            private(set) var event: NDKEvent?
+            private(set) var eoseRelays = Set<String>()
+
+            func updateEvent(_ candidate: NDKEvent) {
+                if event == nil || candidate.createdAt > (event?.createdAt ?? 0) {
+                    event = candidate
+                }
+            }
+
+            func recordEose(_ relay: String) {
+                eoseRelays.insert(relay)
+            }
+        }
+        let collector = RelayListCollector()
+
         await withTaskGroup(of: Void.self) { group in
             // Task 1: Collect events
             group.addTask {
                 for await batch in dataSource.events {
                     for event in batch {
-                        if relayListEvent == nil || event.createdAt > (relayListEvent?.createdAt ?? 0) {
-                            relayListEvent = event
-                        }
+                        await collector.updateEvent(event)
                     }
                 }
             }
@@ -798,22 +814,24 @@ public actor NDKOutboxManager: RelayPreferenceProvider {
                 guard let relayUpdates = dataSource.relayUpdates else { return }
                 for await update in relayUpdates {
                     if case let .eose(relay) = update {
-                        eoseRelays.insert(relay)
+                        await collector.recordEose(relay)
                     }
                 }
             }
 
-            // Task 3: Timeout after 2 seconds
+            // Task 3: Timeout after 2 seconds — when this fires, cancel the
+            // other tasks. We don't return on first-completed because the
+            // event-collector would otherwise lose stragglers.
             group.addTask {
                 try? await Task.sleep(nanoseconds: 2 * TimeConstants.nanosecondsPerSecond)
             }
 
-            // Wait for the first task to complete (timeout or data)
             await group.next()
-
-            // Cancel remaining tasks
             group.cancelAll()
         }
+
+        let relayListEvent = await collector.event
+        let eoseRelays = await collector.eoseRelays
 
         // Parse relay list if found
         guard let event = relayListEvent else {

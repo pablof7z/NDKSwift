@@ -74,10 +74,13 @@ public final class NDKProfile {
         let pubkey = self.pubkey
 
         Task { [weak self] in
-            // Start relay subscription to fetch fresh profile data
-            // Events are automatically saved to cache by NDKSubscriptionRequirement
+            // Start relay subscription to fetch fresh profile data.
+            // Profile metadata (kind 0) is replaceable, so once we receive
+            // it from each contacted relay there's nothing else to wait for —
+            // closeOnEose stops up to 500 always-open subs from accumulating
+            // for the life of the cache (one per cached profile).
             let filter = NDKFilter(authors: [pubkey], kinds: [EventKind.metadata])
-            let subscription = ndk.subscribe(filter: filter)
+            let subscription = ndk.subscribe(filter: filter, closeOnEose: true)
 
             // Observe cache for profile changes (reactive updates)
             let cacheStream = await ndk.cache.observeProfile(pubkey: pubkey, includeExisting: true)

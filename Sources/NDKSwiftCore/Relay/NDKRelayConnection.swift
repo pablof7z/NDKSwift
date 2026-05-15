@@ -370,13 +370,17 @@ public actor NDKRelayConnection {
             throw NDKError.connectionLost(relay: url.absoluteString, message: ErrorMessageConstants.Messages.notConnected)
         }
 
-        // Log network traffic
-        do {
-            let parsed = try NostrMessage.parse(from: json)
-            NDKNetworkLogger.logNetworkSend(to: url, message: json, parsed: parsed)
-        } catch {
-            NDKLogger.log(.warning, category: .network, "Failed to parse outgoing message for logging: \(error)")
-            NDKNetworkLogger.logNetworkSend(to: url, message: json, parsed: nil)
+        // Log network traffic. Re-parsing every outbound JSON purely for the
+        // logger is hot-path expensive — skip the parse when network logging
+        // is disabled, which is the production default.
+        if NDKLogger.logNetworkTraffic {
+            do {
+                let parsed = try NostrMessage.parse(from: json)
+                NDKNetworkLogger.logNetworkSend(to: url, message: json, parsed: parsed)
+            } catch {
+                NDKLogger.log(.warning, category: .network, "Failed to parse outgoing message for logging: \(error)")
+                NDKNetworkLogger.logNetworkSend(to: url, message: json, parsed: nil)
+            }
         }
 
         #if os(iOS) || os(macOS) || os(watchOS) || os(tvOS)

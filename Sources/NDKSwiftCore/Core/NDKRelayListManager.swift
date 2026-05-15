@@ -195,8 +195,13 @@ public class NDKRelayListManager {
             // Get all current relays from NDK
             let currentRelays = await ndk.pool.relays
 
-            // Add each relay to the list
+            // Only include user-chosen relays in the published kind:10002.
+            // Previously this loop added *every* connected relay, which
+            // polluted the user's relay list with outbox-discovered or
+            // discovery-bootstrap relays they never opted into.
             for relay in currentRelays {
+                let origin = await relay.origin
+                guard case .appRelays = origin else { continue }
                 newRelayList.addRelay(relay.url, access: [.read, .write])
             }
 

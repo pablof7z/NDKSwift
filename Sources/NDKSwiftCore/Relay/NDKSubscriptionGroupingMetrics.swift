@@ -17,8 +17,12 @@ public actor NDKSubscriptionGroupingMetrics {
     /// Number of REQ messages saved through grouping
     private var reqMessagesSaved: Int = 0
 
-    /// Average group size (subscriptions per group)
-    private var groupSizes: [Int] = []
+    /// Running aggregates over group sizes. Replaces the previous unbounded
+    /// `[Int]` history that grew linearly with REQ count for the lifetime of
+    /// the process — `getSnapshot()` used to fold over the entire history on
+    /// each read.
+    private var groupSizeSum: Int = 0
+    private var groupSizeCount: Int = 0
 
     /// Time saved through batching (estimated)
     private var totalTimeSaved: TimeInterval = 0
@@ -47,7 +51,8 @@ public actor NDKSubscriptionGroupingMetrics {
     /// Records when a REQ message is sent
     public func recordReqMessage(groupSize: Int, relay: String) {
         totalReqMessages += 1
-        groupSizes.append(groupSize)
+        groupSizeSum += groupSize
+        groupSizeCount += 1
 
         // Calculate saved messages (group size - 1)
         if groupSize > 1 {
@@ -81,8 +86,8 @@ public actor NDKSubscriptionGroupingMetrics {
 
     /// Get current metrics snapshot
     public func getSnapshot() -> MetricsSnapshot {
-        let avgGroupSize = groupSizes.isEmpty ? 0.0 :
-            Double(groupSizes.reduce(0, +)) / Double(groupSizes.count)
+        let avgGroupSize = groupSizeCount == 0 ? 0.0 :
+            Double(groupSizeSum) / Double(groupSizeCount)
 
         let groupingEfficiency = totalSubscriptions > 0 ?
             Double(groupedSubscriptions) / Double(totalSubscriptions) : 0.0
@@ -112,7 +117,8 @@ public actor NDKSubscriptionGroupingMetrics {
         nonGroupableSubscriptions = 0
         totalReqMessages = 0
         reqMessagesSaved = 0
-        groupSizes = []
+        groupSizeSum = 0
+        groupSizeCount = 0
         totalTimeSaved = 0
         delayStatistics = DelayStatistics()
         relayMetrics = [:]
