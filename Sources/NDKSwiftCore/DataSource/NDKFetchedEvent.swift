@@ -57,7 +57,7 @@ public final class NDKFetchedEvent {
         fetchTask = Task { await startFetching(tag: tag) }
     }
 
-    nonisolated deinit {
+    deinit {
         cancellation.cancel()
     }
 
