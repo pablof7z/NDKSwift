@@ -311,7 +311,7 @@ public enum NIP44 {
     /// - Returns: Base64-encoded encrypted payload
     public static func encrypt(message: String, privateKey: PrivateKey, pubkey: PublicKey) throws -> String {
         let conversationKey = try getConversationKey(privateKey: privateKey, pubkey: pubkey)
-        let nonce = Crypto.randomBytes(count: Constants.nonceSize)
+        let nonce = try Crypto.randomBytes(count: Constants.nonceSize)
         return try encrypt(plaintext: message, conversationKey: conversationKey, nonce: nonce)
     }
 

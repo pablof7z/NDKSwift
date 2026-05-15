@@ -154,7 +154,7 @@ public class CashuZapFallbackHandler: ZapFallbackHandler {
             }
 
             // Generate a seed for deterministic output generation
-            let seed = Crypto.randomBytes(count: Crypto.Constants.privateKeySize).hexString
+            let seed = try Crypto.randomBytes(count: Crypto.Constants.privateKeySize).hexString
 
             // Create a properly typed mint quote from our stored data
             let mintQuoteData: [String: Any] = [

@@ -4,6 +4,9 @@ import secp256k1
 #if canImport(Security)
     import Security
 #endif
+#if os(Linux)
+    import Glibc
+#endif
 
 /// Cryptographic utilities for Nostr
 public enum Crypto {
@@ -23,6 +26,7 @@ public enum Crypto {
         case verificationFailed
         case invalidPoint
         case invalidScalar
+        case randomGenerationFailed(String)
 
         public var errorDescription: String? {
             switch self {
@@ -38,13 +42,15 @@ public enum Crypto {
                 return ErrorMessageConstants.invalid("elliptic curve point")
             case .invalidScalar:
                 return ErrorMessageConstants.invalid("scalar value")
+            case .randomGenerationFailed(let reason):
+                return "Failed to generate secure random bytes: \(reason)"
             }
         }
     }
 
     /// Generate a new private key (internal use only - use NDKPrivateKeySigner.generate() instead)
-    static func generatePrivateKey() -> PrivateKey {
-        return randomBytes(count: Constants.privateKeySize).hexString
+    static func generatePrivateKey() throws -> PrivateKey {
+        return try randomBytes(count: Constants.privateKeySize).hexString
     }
 
     /// Derive public key from private key using secp256k1
@@ -110,15 +116,49 @@ public enum Crypto {
     }
 
     /// Generate random bytes
-    public static func randomBytes(count: Int) -> Data {
+    public static func randomBytes(count: Int) throws -> Data {
+        guard count >= 0 else {
+            throw CryptoError.randomGenerationFailed("negative byte count")
+        }
+        guard count > 0 else {
+            return Data()
+        }
+
         var bytes = [UInt8](repeating: 0, count: count)
         #if canImport(Security)
-            _ = SecRandomCopyBytes(kSecRandomDefault, count, &bytes)
-        #else
-            // Fallback for Linux
-            for i in 0 ..< count {
-                bytes[i] = UInt8.random(in: 0 ... 255)
+            let status = bytes.withUnsafeMutableBytes { buffer -> OSStatus in
+                guard let baseAddress = buffer.baseAddress else {
+                    return errSecParam
+                }
+                return SecRandomCopyBytes(kSecRandomDefault, count, baseAddress)
             }
+            guard status == errSecSuccess else {
+                throw CryptoError.randomGenerationFailed("SecRandomCopyBytes failed with status \(status)")
+            }
+        #elseif os(Linux)
+            var offset = 0
+            while offset < count {
+                let readCount = bytes.withUnsafeMutableBytes { buffer -> Int in
+                    guard let baseAddress = buffer.baseAddress else {
+                        return -1
+                    }
+                    return Glibc.getrandom(baseAddress.advanced(by: offset), count - offset, 0)
+                }
+
+                if readCount < 0 {
+                    if errno == EINTR {
+                        continue
+                    }
+                    throw CryptoError.randomGenerationFailed("getrandom failed with errno \(errno)")
+                }
+                guard readCount > 0 else {
+                    throw CryptoError.randomGenerationFailed("getrandom returned no bytes")
+                }
+
+                offset += readCount
+            }
+        #else
+            throw CryptoError.randomGenerationFailed("no secure random byte generator is available")
         #endif
         return Data(bytes)
     }

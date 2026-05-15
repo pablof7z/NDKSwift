@@ -4,18 +4,18 @@ import XCTest
 final class CryptoTests: XCTestCase {
     // MARK: - Random bytes tests
 
-    func testRandomBytes_generatesCorrectLength() {
+    func testRandomBytes_generatesCorrectLength() throws {
         let lengths = [16, 32, 64, 128]
 
         for length in lengths {
-            let bytes = Crypto.randomBytes(count: length)
+            let bytes = try Crypto.randomBytes(count: length)
             XCTAssertEqual(bytes.count, length)
         }
     }
 
-    func testRandomBytes_generatesUniqueValues() {
+    func testRandomBytes_generatesUniqueValues() throws {
         // Generate multiple sets of random bytes
-        let sets = (0 ..< 10).map { _ in Crypto.randomBytes(count: 32) }
+        let sets = try (0 ..< 10).map { _ in try Crypto.randomBytes(count: 32) }
 
         // Check that all sets are unique
         let uniqueSets = Set(sets)
@@ -87,8 +87,8 @@ final class CryptoTests: XCTestCase {
 
     // MARK: - Key generation tests
 
-    func testGeneratePrivateKey_validLength() {
-        let privateKey = Crypto.generatePrivateKey()
+    func testGeneratePrivateKey_validLength() throws {
+        let privateKey = try Crypto.generatePrivateKey()
 
         // Should be 64 hex characters (32 bytes)
         XCTAssertEqual(privateKey.count, 64)
@@ -97,8 +97,8 @@ final class CryptoTests: XCTestCase {
         XCTAssertTrue(HexValidator.isValid32ByteHex(privateKey))
     }
 
-    func testGeneratePrivateKey_uniqueKeys() {
-        let keys = (0 ..< 10).map { _ in Crypto.generatePrivateKey() }
+    func testGeneratePrivateKey_uniqueKeys() throws {
+        let keys = try (0 ..< 10).map { _ in try Crypto.generatePrivateKey() }
         let uniqueKeys = Set(keys)
 
         XCTAssertEqual(uniqueKeys.count, keys.count, "Generated keys should be unique")
@@ -176,7 +176,7 @@ final class CryptoTests: XCTestCase {
     // MARK: - Signature tests
 
     func testSignAndVerify_roundTrip() throws {
-        let privateKey = Crypto.generatePrivateKey()
+        let privateKey = try Crypto.generatePrivateKey()
         let publicKey = try Crypto.getPublicKey(from: privateKey)
         let message = "Hello, Nostr!"
         let messageData = message.data(using: .utf8)!
@@ -191,7 +191,7 @@ final class CryptoTests: XCTestCase {
     }
 
     func testVerifySignature_invalidSignatureFails() throws {
-        let privateKey = Crypto.generatePrivateKey()
+        let privateKey = try Crypto.generatePrivateKey()
         let publicKey = try Crypto.getPublicKey(from: privateKey)
         let messageData = "Hello, Nostr!".data(using: .utf8)!
         let message = Crypto.sha256(messageData)
@@ -211,8 +211,8 @@ final class CryptoTests: XCTestCase {
     }
 
     func testVerifySignature_wrongPublicKeyFails() throws {
-        let privateKey1 = Crypto.generatePrivateKey()
-        let privateKey2 = Crypto.generatePrivateKey()
+        let privateKey1 = try Crypto.generatePrivateKey()
+        let privateKey2 = try Crypto.generatePrivateKey()
         let publicKey2 = try Crypto.getPublicKey(from: privateKey2)
         let messageData = "Hello, Nostr!".data(using: .utf8)!
         let message = Crypto.sha256(messageData)
@@ -242,7 +242,7 @@ final class CryptoTests: XCTestCase {
     }
 
     func testVerifySignature_invalidInputs() throws {
-        let privateKey = Crypto.generatePrivateKey()
+        let privateKey = try Crypto.generatePrivateKey()
         let publicKey = try Crypto.getPublicKey(from: privateKey)
         let messageData = "test".data(using: .utf8)!
         let message = Crypto.sha256(messageData)

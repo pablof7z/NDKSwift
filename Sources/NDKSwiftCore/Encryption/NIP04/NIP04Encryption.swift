@@ -66,7 +66,7 @@ public enum NIP04 {
     /// - Returns: Encrypted message in format: base64(ciphertext)?iv=base64(iv)
     public static func encrypt(message: String, privateKey: PrivateKey, pubkey: PublicKey) throws -> String {
         // Generate random IV
-        let iv = Crypto.randomBytes(count: 16)
+        let iv = try Crypto.randomBytes(count: 16)
 
         // Compute shared secret via ECDH
         let sharedSecret = try computeSharedSecret(privateKey: privateKey, pubkey: pubkey)

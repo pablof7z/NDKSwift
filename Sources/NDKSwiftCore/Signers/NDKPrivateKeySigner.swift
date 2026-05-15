@@ -32,7 +32,7 @@ public final class NDKPrivateKeySigner: NDKSigner {
 
     /// Generate a new signer with a random private key
     public static func generate() throws -> NDKPrivateKeySigner {
-        let privateKey = Crypto.generatePrivateKey()
+        let privateKey = try Crypto.generatePrivateKey()
         return try NDKPrivateKeySigner(privateKey: privateKey)
     }
 

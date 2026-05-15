@@ -14,7 +14,7 @@ final class WalletHealthMonitorTests: XCTestCase {
         try await super.setUp()
 
         // Create signer
-        let privateKey = Crypto.generatePrivateKey()
+        let privateKey = try Crypto.generatePrivateKey()
         signer = try NDKPrivateKeySigner(privateKey: privateKey)
 
         // Create NDK instance with NostrDB cache
