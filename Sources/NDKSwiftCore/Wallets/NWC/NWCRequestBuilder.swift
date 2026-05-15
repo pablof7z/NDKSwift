@@ -90,8 +90,11 @@ public extension Int {
     /// NWC response event kind (23195)
     static let nostrWalletConnectRes = 23195
 
-    /// NWC notification event kind (23196)
-    static let nostrWalletConnectNotification = 23196
+    /// NWC notification event kind (23197)
+    static let nostrWalletConnectNotification = 23197
+
+    /// Legacy NWC notification event kind for NIP-04 compatibility (23196)
+    static let nostrWalletConnectLegacyNotification = 23196
 
     /// NWC info event kind (13194)
     static let nostrWalletConnectInfo = 13194

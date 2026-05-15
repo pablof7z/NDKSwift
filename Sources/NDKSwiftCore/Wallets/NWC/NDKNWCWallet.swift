@@ -57,7 +57,8 @@ public actor NDKNWCWallet: NDKPaymentProvider {
             ndk: ndk,
             signer: signer,
             relayURLs: Array(self.connectionURI.normalizedRelayURLs()),
-            walletPubkey: self.connectionURI.walletPubkey
+            walletPubkey: self.connectionURI.walletPubkey,
+            clientPubkey: try self.connectionURI.clientPubkey()
         )
     }
 
@@ -75,7 +76,8 @@ public actor NDKNWCWallet: NDKPaymentProvider {
             ndk: ndk,
             signer: signer,
             relayURLs: Array(connectionURI.normalizedRelayURLs()),
-            walletPubkey: connectionURI.walletPubkey
+            walletPubkey: connectionURI.walletPubkey,
+            clientPubkey: try connectionURI.clientPubkey()
         )
     }
 

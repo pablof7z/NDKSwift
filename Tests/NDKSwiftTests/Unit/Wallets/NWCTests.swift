@@ -161,6 +161,108 @@ final class NWCTests: XCTestCase {
         XCTAssertEqual(response.result?.balance, 50000)
     }
 
+    func testResponseHandlerRejectsEventsForOtherClients() async throws {
+        let clientSigner = try NDKPrivateKeySigner.generate()
+        let walletSigner = try NDKPrivateKeySigner.generate()
+        let otherClientSigner = try NDKPrivateKeySigner.generate()
+        let ndk = try await NDKTestFactory.createNDK(signer: clientSigner)
+        let clientPubkey = try await clientSigner.pubkey
+        let walletPubkey = try await walletSigner.pubkey
+        let otherClientPubkey = try await otherClientSigner.pubkey
+        let requestId = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        let handler = NWCResponseHandler(
+            ndk: ndk,
+            signer: clientSigner,
+            relayURLs: [],
+            walletPubkey: walletPubkey,
+            clientPubkey: clientPubkey
+        )
+
+        let expectedEvent = try await makeNWCEvent(
+            ndk: ndk,
+            signer: walletSigner,
+            kind: .nostrWalletConnectRes,
+            tags: [["p", clientPubkey], ["e", requestId]]
+        )
+        XCTAssertTrue(handler.isExpectedResponseEvent(expectedEvent, requestId: requestId))
+
+        let wrongClientEvent = try await makeNWCEvent(
+            ndk: ndk,
+            signer: walletSigner,
+            kind: .nostrWalletConnectRes,
+            tags: [["p", otherClientPubkey], ["e", requestId]]
+        )
+        XCTAssertFalse(handler.isExpectedResponseEvent(wrongClientEvent, requestId: requestId))
+
+        let wrongAuthorEvent = try await makeNWCEvent(
+            ndk: ndk,
+            signer: otherClientSigner,
+            kind: .nostrWalletConnectRes,
+            tags: [["p", clientPubkey], ["e", requestId]]
+        )
+        XCTAssertFalse(handler.isExpectedResponseEvent(wrongAuthorEvent, requestId: requestId))
+    }
+
+    func testResponseHandlerValidatesNWCNotificationKindsAndClientTag() async throws {
+        let clientSigner = try NDKPrivateKeySigner.generate()
+        let walletSigner = try NDKPrivateKeySigner.generate()
+        let otherClientSigner = try NDKPrivateKeySigner.generate()
+        let ndk = try await NDKTestFactory.createNDK(signer: clientSigner)
+        let clientPubkey = try await clientSigner.pubkey
+        let walletPubkey = try await walletSigner.pubkey
+        let otherClientPubkey = try await otherClientSigner.pubkey
+        let handler = NWCResponseHandler(
+            ndk: ndk,
+            signer: clientSigner,
+            relayURLs: [],
+            walletPubkey: walletPubkey,
+            clientPubkey: clientPubkey
+        )
+
+        let currentNotification = try await makeNWCEvent(
+            ndk: ndk,
+            signer: walletSigner,
+            kind: .nostrWalletConnectNotification,
+            tags: [["p", clientPubkey]]
+        )
+        XCTAssertTrue(handler.isExpectedNotificationEvent(currentNotification))
+
+        let legacyNotification = try await makeNWCEvent(
+            ndk: ndk,
+            signer: walletSigner,
+            kind: .nostrWalletConnectLegacyNotification,
+            tags: [["p", clientPubkey]]
+        )
+        XCTAssertTrue(handler.isExpectedNotificationEvent(legacyNotification))
+
+        let responseKindEvent = try await makeNWCEvent(
+            ndk: ndk,
+            signer: walletSigner,
+            kind: .nostrWalletConnectRes,
+            tags: [["p", clientPubkey]]
+        )
+        XCTAssertFalse(handler.isExpectedNotificationEvent(responseKindEvent))
+
+        let eventForOtherClient = try await makeNWCEvent(
+            ndk: ndk,
+            signer: walletSigner,
+            kind: .nostrWalletConnectNotification,
+            tags: [["p", otherClientPubkey]]
+        )
+        XCTAssertFalse(handler.isExpectedNotificationEvent(eventForOtherClient))
+
+        let responseLinkedNotification = try await makeNWCEvent(
+            ndk: ndk,
+            signer: walletSigner,
+            kind: .nostrWalletConnectNotification,
+            tags: [
+                ["p", clientPubkey],
+                ["e", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"],
+            ]
+        )
+        XCTAssertFalse(handler.isExpectedNotificationEvent(responseLinkedNotification))
+    }
+
     // NOTE: Commented out - NWCError type is not defined in the codebase
     /*
      func testHandleErrorResponse() throws {
@@ -221,4 +323,12 @@ final class NWCTests: XCTestCase {
          }
      }
      */
+}
+
+private func makeNWCEvent(ndk: NDK, signer: NDKSigner, kind: Int, tags: [Tag]) async throws -> NDKEvent {
+    try await NDKEventBuilder(ndk: ndk)
+        .kind(kind)
+        .content("encrypted-payload")
+        .tags(tags)
+        .build(signer: signer)
 }

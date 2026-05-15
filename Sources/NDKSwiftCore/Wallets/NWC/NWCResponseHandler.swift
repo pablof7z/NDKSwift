@@ -9,12 +9,22 @@ public struct NWCResponseHandler {
     /// Used to validate response/notification events instead of trusting an
     /// arbitrary `p` tag on the wire (which any client can forge).
     private let walletPubkey: String
+    /// The client's pubkey derived from the NWC URI secret. When available, we
+    /// require responses and notifications to be addressed to this key.
+    private let clientPubkey: String?
 
-    public init(ndk: NDK, signer: NDKSigner, relayURLs: [String], walletPubkey: String) {
+    public init(
+        ndk: NDK,
+        signer: NDKSigner,
+        relayURLs: [String],
+        walletPubkey: String,
+        clientPubkey: String? = nil
+    ) {
         self.ndk = ndk
         self.signer = signer
         self.relayURLs = relayURLs
-        self.walletPubkey = walletPubkey
+        self.walletPubkey = walletPubkey.lowercased()
+        self.clientPubkey = clientPubkey?.lowercased()
     }
 
     /// Execute a request and wait for response with proper sequencing
@@ -34,6 +44,9 @@ public struct NWCResponseHandler {
         filter.kinds = [.nostrWalletConnectRes]
         filter.authors = [walletPubkey]
         filter.addTagFilter("e", values: [requestId])
+        if let clientPubkey {
+            filter.addTagFilter("p", values: [clientPubkey])
+        }
         NDKLogger.log(.trace, category: .wallet, "[NWC Response] Filter: kinds=\(filter.kinds ?? []), e-tag=\(requestId), author=\(walletPubkey)")
 
         // Get the connected relays
@@ -76,11 +89,11 @@ public struct NWCResponseHandler {
                     NDKLogger.log(.trace, category: .wallet, "[NWC Response]   Pubkey: \(responseEvent.pubkey)")
                     NDKLogger.log(.trace, category: .wallet, "[NWC Response]   Tags: \(responseEvent.tags)")
 
-                    // Defence-in-depth: the filter is authored-locked but a
-                    // misconfigured relay could still return foreign events.
-                    guard responseEvent.pubkey == walletPubkey else {
+                    // Defence-in-depth: relays are untrusted and may return
+                    // events outside the requested author/tag filters.
+                    guard isExpectedResponseEvent(responseEvent, requestId: requestId) else {
                         NDKLogger.log(.warning, category: .wallet,
-                                      "[NWC Response] Ignoring event from non-wallet author \(responseEvent.pubkey)")
+                                      "[NWC Response] Ignoring unexpected response event \(responseEvent.id)")
                         continue
                     }
 
@@ -151,6 +164,9 @@ public struct NWCResponseHandler {
         filter.kinds = [.nostrWalletConnectRes]
         filter.authors = [walletPubkey]
         filter.addTagFilter("e", values: [requestId])
+        if let clientPubkey {
+            filter.addTagFilter("p", values: [clientPubkey])
+        }
 
         // Get connected relays that match our wallet relays
         let allConnected = await ndk.pool.connectedRelays()
@@ -190,9 +206,9 @@ public struct NWCResponseHandler {
                     let dTagValue = dTag[1]
 
                     // Decrypt and parse the response. Defence-in-depth check
-                    // that the event came from the wallet we trust — the filter
-                    // already enforces this but a misbehaving relay could lie.
-                    guard event.pubkey == walletPubkey else {
+                    // that the event came from the wallet we trust and is
+                    // addressed to this client.
+                    guard isExpectedResponseEvent(event, requestId: requestId) else {
                         continue
                     }
 
@@ -246,9 +262,16 @@ public struct NWCResponseHandler {
         AsyncStream { continuation in
             Task {
                 // Create filter for notification events (no e-tag). Restrict
-                // authors to the trusted wallet pubkey.
-                var filter = NDKFilter(kinds: [.nostrWalletConnectRes])
+                // authors to the trusted wallet pubkey and, when known, this
+                // NWC client's pubkey.
+                var filter = NDKFilter(kinds: [
+                    .nostrWalletConnectNotification,
+                    .nostrWalletConnectLegacyNotification,
+                ])
                 filter.authors = [walletPubkey]
+                if let clientPubkey {
+                    filter.addTagFilter("p", values: [clientPubkey])
+                }
 
                 // Get connected relays that match our wallet relays
                 var connectedRelays: [NDKRelay] = []
@@ -279,15 +302,7 @@ public struct NWCResponseHandler {
                 let task = Task {
                     for await batch in dataSource.events {
                         for event in batch {
-                            // Check if this is an NWC notification (no e-tag)
-                            let eventTags = event.tags
-                            guard !eventTags.contains(where: { $0.count >= 1 && $0[0] == "e" }) else {
-                                continue
-                            }
-
-                            // Defence-in-depth: only accept notifications from
-                            // the trusted wallet (filter already enforces this).
-                            guard event.pubkey == walletPubkey else {
+                            guard isExpectedNotificationEvent(event) else {
                                 continue
                             }
 
@@ -297,7 +312,7 @@ public struct NWCResponseHandler {
                                 let decrypted = try await signer.decrypt(
                                     senderPubkey: walletPubkey,
                                     value: eventContent,
-                                    scheme: .nip04
+                                    scheme: event.kind == .nostrWalletConnectLegacyNotification ? .nip04 : .nip44
                                 )
 
                                 // Parse as notification
@@ -343,6 +358,47 @@ public struct NWCResponseHandler {
     }
 
     // MARK: - Private Helpers
+
+    func isExpectedResponseEvent(_ event: NDKEvent, requestId: String) -> Bool {
+        guard event.kind == .nostrWalletConnectRes else {
+            return false
+        }
+        guard event.pubkey.lowercased() == walletPubkey else {
+            return false
+        }
+        guard event.referencedEventIds.contains(requestId) else {
+            return false
+        }
+        guard isAddressedToClient(event) else {
+            return false
+        }
+        return event.verifySignature()
+    }
+
+    func isExpectedNotificationEvent(_ event: NDKEvent) -> Bool {
+        guard event.kind == .nostrWalletConnectNotification ||
+            event.kind == .nostrWalletConnectLegacyNotification
+        else {
+            return false
+        }
+        guard event.pubkey.lowercased() == walletPubkey else {
+            return false
+        }
+        guard !event.tags.contains(where: { $0.count >= 1 && $0[0] == "e" }) else {
+            return false
+        }
+        guard isAddressedToClient(event) else {
+            return false
+        }
+        return event.verifySignature()
+    }
+
+    private func isAddressedToClient(_ event: NDKEvent) -> Bool {
+        guard let clientPubkey else {
+            return true
+        }
+        return event.referencedPubkeys.contains { $0.lowercased() == clientPubkey }
+    }
 
     private func parseResponse<T: Decodable>(_ content: String, expectedType _: T.Type) throws -> T {
         guard let data = content.data(using: .utf8) else {
