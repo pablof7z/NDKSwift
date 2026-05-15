@@ -130,7 +130,7 @@ final class NWCTests: XCTestCase {
 
         let signer = try NDKPrivateKeySigner.generate()
         let ndk = try await NDKTestFactory.createNDK(signer: signer)
-        _ = NWCResponseHandler(ndk: ndk, signer: signer, relayURLs: [])
+        _ = NWCResponseHandler(ndk: ndk, signer: signer, relayURLs: [], walletPubkey: try await signer.pubkey)
 
         // Test basic JSON parsing
         let data = responseContent.data(using: .utf8)!
@@ -151,7 +151,7 @@ final class NWCTests: XCTestCase {
 
         let signer = try NDKPrivateKeySigner.generate()
         let ndk = try await NDKTestFactory.createNDK(signer: signer)
-        _ = NWCResponseHandler(ndk: ndk, signer: signer, relayURLs: [])
+        _ = NWCResponseHandler(ndk: ndk, signer: signer, relayURLs: [], walletPubkey: try await signer.pubkey)
 
         // Test basic JSON parsing
         let data = responseContent.data(using: .utf8)!

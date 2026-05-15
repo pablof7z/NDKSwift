@@ -150,16 +150,6 @@ public struct NDKNutzap {
             return .fail
         }
     }
-}
-
-// Re-export CashuSwift's DLEQVerificationResult for callers' convenience.
-extension CashuSwift.Crypto.DLEQVerificationResult {
-    /// `true` when DLEQ verification has positively succeeded for every proof.
-    /// Callers should only credit funds when this is `true`.
-    public var passes: Bool {
-        if case .valid = self { return true }
-        return false
-    }
 
     /// Create nutzap preferences from a user's kind 10019 event
     public static func createPreferences(ndk: NDK, mints: [NDKNutzapPreferences.MintConfig]) async throws -> NDKEvent {
@@ -181,5 +171,15 @@ extension CashuSwift.Crypto.DLEQVerificationResult {
             .build(signer: signer)
 
         return event
+    }
+}
+
+// Re-export CashuSwift's DLEQVerificationResult for callers' convenience.
+extension CashuSwift.Crypto.DLEQVerificationResult {
+    /// `true` when DLEQ verification has positively succeeded for every proof.
+    /// Callers should only credit funds when this is `true`.
+    public var passes: Bool {
+        if case .valid = self { return true }
+        return false
     }
 }
