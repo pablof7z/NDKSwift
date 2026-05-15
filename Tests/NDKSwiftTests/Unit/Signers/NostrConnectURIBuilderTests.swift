@@ -97,6 +97,32 @@ final class NostrConnectURIBuilderTests: XCTestCase {
         XCTAssertEqual(Set(relayValues), Set(relays))
     }
 
+    func testGeneratedSecretIsSecureHexToken() async throws {
+        let ndk = try await makeNDK()
+        let localSigner = try NDKPrivateKeySigner.generate()
+
+        let signer = try await NDKBunkerSigner.nostrConnect(
+            ndk: ndk,
+            relays: ["wss://relay.example.com"],
+            localSigner: localSigner
+        )
+
+        let maybeURI = await signer.nostrConnectUri
+        let uri = try XCTUnwrap(maybeURI)
+        let components = try XCTUnwrap(URLComponents(string: uri))
+        let secret = try XCTUnwrap((components.queryItems ?? []).first(where: { $0.name == "secret" })?.value)
+
+        XCTAssertEqual(secret.count, 32)
+        XCTAssertNotNil(secret.range(of: #"^[0-9a-f]{32}$"#, options: .regularExpression))
+    }
+
+    func testNostrConnectResponseRequiresExactSecret() {
+        XCTAssertTrue(NDKBunkerSigner.isValidNostrConnectResponse(result: "0123456789abcdef", expectedSecret: "0123456789abcdef"))
+        XCTAssertFalse(NDKBunkerSigner.isValidNostrConnectResponse(result: "ack", expectedSecret: "0123456789abcdef"))
+        XCTAssertFalse(NDKBunkerSigner.isValidNostrConnectResponse(result: "", expectedSecret: "0123456789abcdef"))
+        XCTAssertFalse(NDKBunkerSigner.isValidNostrConnectResponse(result: "0123456789abcdee", expectedSecret: "0123456789abcdef"))
+    }
+
     func testValuesWithSpacesArePercentEncoded() async throws {
         let ndk = try await makeNDK()
         let localSigner = try NDKPrivateKeySigner.generate()

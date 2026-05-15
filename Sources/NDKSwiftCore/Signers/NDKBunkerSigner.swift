@@ -234,7 +234,7 @@ public actor NDKBunkerSigner: NDKSigner {
             parseBunkerUrl(token)
         case let .nostrConnect(relays, options):
             let pubkey = try await localSigner.pubkey
-            initNostrConnect(relays: relays, options: options, pubkey: pubkey)
+            try initNostrConnect(relays: relays, options: options, pubkey: pubkey)
         case .nip05:
             break // Will be handled in connect()
         }
@@ -249,9 +249,9 @@ public actor NDKBunkerSigner: NDKSigner {
         self.secret = secret
     }
 
-    private func initNostrConnect(relays: [String], options: NostrConnectOptions?, pubkey: String) {
+    private func initNostrConnect(relays: [String], options: NostrConnectOptions?, pubkey: String) throws {
         relayURLs = relays
-        nostrConnectSecret = generateNostrConnectSecret()
+        nostrConnectSecret = try generateNostrConnectSecret()
         nostrConnectUri = generateNostrConnectUri(pubkey: pubkey, relays: relays, options: options)
     }
 
@@ -278,8 +278,12 @@ public actor NDKBunkerSigner: NDKSigner {
         return components.url?.absoluteString ?? "nostrconnect://\(pubkey)"
     }
 
-    private func generateNostrConnectSecret() -> String {
-        return IDGenerator.randomId(length: 16)
+    private func generateNostrConnectSecret() throws -> String {
+        return try Crypto.randomBytes(count: 16).hexString
+    }
+
+    static func isValidNostrConnectResponse(result: String, expectedSecret: String) -> Bool {
+        return result == expectedSecret
     }
 
     // MARK: - Connection
@@ -495,10 +499,9 @@ public actor NDKBunkerSigner: NDKSigner {
 
         // Handle nostrconnect flow
         if let secret = nostrConnectSecret {
-            // Validate secret (NIP-46 allows either echoing the secret or returning "ack")
-            let isValidSecret = response.result == secret || response.result == "ack"
-
-            if isValidSecret {
+            // NIP-46 requires client-initiated nostrconnect responses to echo the secret.
+            // "ack" is only valid for direct bunker connect requests.
+            if Self.isValidNostrConnectResponse(result: response.result, expectedSecret: secret) {
                 let responsePubkey = response.event.pubkey
                 bunkerPubkey = responsePubkey // Store remote signer pubkey
 
@@ -520,6 +523,8 @@ public actor NDKBunkerSigner: NDKSigner {
                 }
                 return
             }
+
+            NDKLogger.log(.warning, category: .auth, "Ignoring nostrconnect response with invalid secret from \(response.event.pubkey)")
         }
 
         // Handle connect response

@@ -19,7 +19,7 @@ public enum Crypto {
     }
 
     /// Errors that can occur during cryptographic operations
-    public enum CryptoError: LocalizedError {
+    public enum CryptoError: LocalizedError, Equatable {
         case invalidKeyLength
         case invalidSignatureLength
         case signingFailed
