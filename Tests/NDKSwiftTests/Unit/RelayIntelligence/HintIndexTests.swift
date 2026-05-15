@@ -217,4 +217,77 @@ final class HintIndexTests: XCTestCase {
         XCTAssertTrue(relays.contains("wss://relay1.com/"))
         XCTAssertTrue(relays.contains("wss://relay2.com/"))
     }
+
+    // MARK: - Eviction Performance Contract
+    //
+    // Documents the perf contract for the heap-based eviction (O(log N) per insert
+    // when over cap, vs the previous O(N log N) full-rebuild). With maxSize=100 and
+    // 10k recordHint calls the old implementation allocated several MB per write and
+    // rebuilt all three dictionaries each time; the new path does one heap push +
+    // (at most) one heap pop per call once the cap is reached.
+
+    func test_eviction_evictsOldestByRecordedAt_andStaysAtCap() async {
+        let smallIndex = HintIndex(maxSize: 100)
+
+        // Insert 10,000 hints with distinct pubkey keys. Each key is unique so dedup
+        // never short-circuits and every recordHint actually adds + evicts.
+        let insertCount = 10_000
+        let start = Date()
+        for i in 0 ..< insertCount {
+            await smallIndex.recordHint(
+                pubkey: "pub-\(i)",
+                relay: "wss://relay-\(i % 20).example.com",
+                source: .nip19
+            )
+        }
+        let elapsed = Date().timeIntervalSince(start)
+
+        // Strict cap: heap-based eviction keeps totalEntries at exactly maxSize.
+        let count = await smallIndex.count
+        XCTAssertEqual(count, 100, "Eviction should keep totalEntries == maxSize after going over cap")
+
+        // The 100 surviving entries should be the most recent ones.
+        // pub-9900..pub-9999 should still be present; pub-0..pub-9899 should be gone.
+        for i in (insertCount - 100) ..< insertCount {
+            let hints = await smallIndex.hints(for: "pub-\(i)")
+            XCTAssertEqual(hints.count, 1, "Recent entry pub-\(i) should survive eviction")
+        }
+        for i in 0 ..< 100 {
+            let hints = await smallIndex.hints(for: "pub-\(i)")
+            XCTAssertTrue(hints.isEmpty, "Old entry pub-\(i) should have been evicted")
+        }
+
+        // Generous budget — heap-based eviction should be well under this even on CI.
+        // Old O(N log N) path with maxSize=100 over 10k inserts is still relatively
+        // cheap because N stays bounded by maxSize; the real win for the old vs new
+        // code is at larger maxSize. Keep the threshold loose to avoid flakes.
+        XCTAssertLessThan(elapsed, 5.0, "10k inserts with maxSize=100 took \(elapsed)s — perf regression?")
+    }
+
+    func test_eviction_handlesMixedTables() async {
+        // Exercise eviction across all three storage tables to verify the heap
+        // correctly identifies which table to remove from.
+        let smallIndex = HintIndex(maxSize: 30)
+
+        for i in 0 ..< 50 {
+            await smallIndex.recordHint(pubkey: "pub-\(i)", relay: "wss://r.com", source: .nip19)
+            await smallIndex.recordHint(eventId: "ev-\(i)", relay: "wss://r.com", source: .eventObserved)
+            await smallIndex.recordHint(address: "addr-\(i)", relay: "wss://r.com", source: .userRelayList)
+        }
+
+        let count = await smallIndex.count
+        XCTAssertEqual(count, 30, "Eviction should hold cap across all three tables")
+
+        // Surviving entries should be the most recent ones across all tables.
+        // After 50 rounds (150 inserts total) and cap of 30, the last 10 rounds'
+        // worth (30 entries: pub-40..49, ev-40..49, addr-40..49) should survive.
+        for i in 40 ..< 50 {
+            let pubHints = await smallIndex.hints(for: "pub-\(i)")
+            let evHints = await smallIndex.hints(forEventId: "ev-\(i)")
+            let addrHints = await smallIndex.hints(forAddress: "addr-\(i)")
+            XCTAssertEqual(pubHints.count, 1, "Recent pub-\(i) should survive")
+            XCTAssertEqual(evHints.count, 1, "Recent ev-\(i) should survive")
+            XCTAssertEqual(addrHints.count, 1, "Recent addr-\(i) should survive")
+        }
+    }
 }
