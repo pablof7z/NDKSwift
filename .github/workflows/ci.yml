@@ -55,7 +55,6 @@ jobs:
   lint:
     name: SwiftLint
     runs-on: macos-15
-    continue-on-error: true
     steps:
     - uses: actions/checkout@v4
     
@@ -63,4 +62,5 @@ jobs:
       run: brew install swiftlint
     
     - name: Run SwiftLint
+      continue-on-error: true
       run: swiftlint --strict --config .swiftlint.yml
