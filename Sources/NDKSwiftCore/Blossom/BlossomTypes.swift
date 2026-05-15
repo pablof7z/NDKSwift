@@ -134,6 +134,13 @@ public struct BlossomAuth {
         self.event = event
     }
 
+    /// Default expiration window for Blossom auth events when the caller
+    /// doesn't supply one. BUD-01 requires an `expiration` tag and strict
+    /// servers will reject auth events without it; lax servers turn them
+    /// into perpetual capabilities that anyone in possession of the signed
+    /// event can replay forever, so we cap to a short window.
+    public static let defaultAuthExpirationInterval: TimeInterval = 10 * 60 // 10 minutes
+
     /// Create authorization event for upload
     public static func createUploadAuth(
         sha256: String,
@@ -153,9 +160,10 @@ public struct BlossomAuth {
             tags.append([NostrConstants.BlossomTag.type, mimeType])
         }
 
-        if let expiration = expiration {
-            tags.append([NostrConstants.BlossomTag.expiration, String(Timestamp.from(expiration))])
-        }
+        // BUD-01: `expiration` is REQUIRED. Default to a short window so a
+        // signed auth event can't be replayed forever.
+        let effectiveExpiration = expiration ?? Date().addingTimeInterval(defaultAuthExpirationInterval)
+        tags.append([NostrConstants.BlossomTag.expiration, String(Timestamp.from(effectiveExpiration))])
 
         let event = try await NDKEventBuilder(ndk: ndk)
             .content("Authorize upload")
@@ -171,12 +179,16 @@ public struct BlossomAuth {
         sha256: String,
         signer: NDKSigner,
         ndk: NDK,
-        reason: String? = nil
+        reason: String? = nil,
+        expiration: Date? = nil
     ) async throws -> BlossomAuth {
-        let tags: [[String]] = [
+        var tags: [[String]] = [
             [NostrConstants.TagName.hashtag, NostrConstants.BlossomTag.delete],
             [NostrConstants.BlossomTag.hash, sha256]
         ]
+
+        let effectiveExpiration = expiration ?? Date().addingTimeInterval(defaultAuthExpirationInterval)
+        tags.append([NostrConstants.BlossomTag.expiration, String(Timestamp.from(effectiveExpiration))])
 
         let event = try await NDKEventBuilder(ndk: ndk)
             .content(reason ?? "Delete blob")
@@ -192,7 +204,8 @@ public struct BlossomAuth {
         signer: NDKSigner,
         ndk: NDK,
         since: Date? = nil,
-        until: Date? = nil
+        until: Date? = nil,
+        expiration: Date? = nil
     ) async throws -> BlossomAuth {
         var tags: [[String]] = [
             [NostrConstants.TagName.hashtag, NostrConstants.BlossomTag.list]
@@ -205,6 +218,9 @@ public struct BlossomAuth {
         if let until = until {
             tags.append(["until", String(Timestamp.from(until))])
         }
+
+        let effectiveExpiration = expiration ?? Date().addingTimeInterval(defaultAuthExpirationInterval)
+        tags.append([NostrConstants.BlossomTag.expiration, String(Timestamp.from(effectiveExpiration))])
 
         let event = try await NDKEventBuilder(ndk: ndk)
             .content("List blobs")

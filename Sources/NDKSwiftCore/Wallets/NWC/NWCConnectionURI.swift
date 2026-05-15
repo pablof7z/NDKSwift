@@ -152,7 +152,22 @@ public struct NWCConnectionURI {
 // MARK: - Convenience Extensions
 
 extension NWCConnectionURI: CustomStringConvertible {
+    /// Redacted description suitable for logs / error messages / debug printing.
+    /// The raw `uri` contains `?secret=<hex>` which is the wallet client's
+    /// private key; emitting it via `description` (and therefore via every
+    /// `print(uri)`, string interpolation, or default error log) leaks the key.
+    /// Callers that need the full URI for serialization must use ``fullURI``
+    /// explicitly.
     public var description: String {
+        let walletPrefix = walletPubkey.prefix(8)
+        let relayCount = relayURLs.count
+        return "NWCConnectionURI(wallet: \(walletPrefix)…, relays: \(relayCount), secret: <redacted>)"
+    }
+
+    /// The full `nostr+walletconnect://…` URI including the secret. Use this
+    /// only when you actually need to round-trip the URI (e.g. persisting it
+    /// to the keychain) — never in logs.
+    public var fullURI: String {
         return uri
     }
 }

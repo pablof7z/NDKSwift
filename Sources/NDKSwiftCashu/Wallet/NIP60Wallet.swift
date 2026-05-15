@@ -1,7 +1,17 @@
 import CashuSwift
+import CryptoKit
 import Foundation
 import NDKSwiftCore
 import secp256k1
+
+/// Helpers for producing a stable opaque identifier from a P2PK private key
+/// suitable for logs/diagnostics. Never logs key material directly.
+private enum P2PKKeyIdentifier {
+    static func opaqueId(forHex privateKeyHex: String) -> String {
+        let digest = SHA256.hash(data: Data(privateKeyHex.utf8))
+        return Data(digest).hexString.prefix(8).lowercased()
+    }
+}
 
 /// NIP-60 wallet implementation for Cashu-based wallets
 public actor NIP60Wallet: NDKPaymentProvider {
@@ -335,9 +345,14 @@ public actor NIP60Wallet: NDKPaymentProvider {
             // Get current mints before update
             let previousMints = Set(await mints.getMintURLs())
 
-            // Process P2PK private key
+            // Process P2PK private key. Never log any portion of the key
+            // itself — even a hex prefix materially reduces brute-force
+            // search space. Log an opaque, derived identifier instead so
+            // debug output remains useful for matching wallets across logs
+            // without exposing key material.
             if let privkey = try await walletEvent.privateKey(signer: signer) {
-                NDKLogger.log(.debug, category: .wallet, "🔑 Found P2PK private key in wallet config: \(privkey.prefix(StringConstants.DisplayFormatting.hexPrefixLength))...")
+                NDKLogger.log(.debug, category: .wallet,
+                              "🔑 Found P2PK private key in wallet config (id: \(P2PKKeyIdentifier.opaqueId(forHex: privkey)))")
                 try? await p2pkManager.restoreFromPrivateKey(privkey)
             } else {
                 NDKLogger.log(.debug, category: .wallet, "🔑 No P2PK private key found in wallet config")

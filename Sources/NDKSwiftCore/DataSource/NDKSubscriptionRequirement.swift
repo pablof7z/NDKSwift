@@ -13,8 +13,11 @@ actor NDKSubscriptionRequirement {
     private let shouldFetchFromNetwork: Bool
     private let cachePolicy: CachePolicy
 
-    // Event deduplication
-    private var seenEventIds = Set<EventID>()
+    /// Event deduplication. Bounded so long-running (`!closeOnEose`)
+    /// subscriptions like a global timeline don't grow this set forever —
+    /// previously this was an uncapped `Set<EventID>` that leaked memory
+    /// for the lifetime of the subscription.
+    private var seenEventIds = BoundedSeenSet(capacity: 50_000)
 
     // Observers - yields batches of events for efficient UI updates
     private var observers: [(id: RequirementID, stream: AsyncStream<[NDKEvent]>, continuation: AsyncStream<[NDKEvent]>.Continuation, filter: NDKFilter)] = []
@@ -404,7 +407,7 @@ actor NDKSubscriptionRequirement {
         await eoseTracker.trackEOSE(from: relay.url)
 
         // Check if we should emit aggregated EOSE
-        if await eoseTracker.shouldEmitEOSE(events: seenEventIds, filter: filter) {
+        if await eoseTracker.shouldEmitEOSE(events: seenEventIds.snapshot, filter: filter) {
             // Notify all relay update observers about aggregated EOSE
             for (_, _, continuation) in relayUpdateObservers {
                 continuation.yield(.aggregatedEose)
@@ -584,6 +587,43 @@ actor NDKSubscriptionRequirement {
 }
 
 // MARK: - Supporting Types
+
+/// FIFO-bounded set of event IDs used for dedup on long-running subscriptions.
+/// Evicting the oldest IDs when full means a very-old event may be re-delivered
+/// after eviction — acceptable for live feeds where freshness matters and
+/// uncapped memory growth does not.
+private struct BoundedSeenSet {
+    private let capacity: Int
+    private var set: Set<EventID> = []
+    private var queue: [EventID] = []
+
+    init(capacity: Int) {
+        precondition(capacity > 0)
+        self.capacity = capacity
+    }
+
+    @discardableResult
+    mutating func insert(_ id: EventID) -> Bool {
+        guard set.insert(id).inserted else { return false }
+        queue.append(id)
+        if queue.count > capacity {
+            let evict = queue.removeFirst()
+            set.remove(evict)
+        }
+        return true
+    }
+
+    func contains(_ id: EventID) -> Bool {
+        return set.contains(id)
+    }
+
+    /// Snapshot of currently-tracked IDs. Used to feed callers that expect
+    /// a `Set<EventID>` (e.g. EOSETracker.shouldEmitEOSE). Cheap because
+    /// `Set` is COW; the count is bounded by `capacity`.
+    var snapshot: Set<EventID> {
+        return set
+    }
+}
 
 /// Tracks a subscription on a specific relay
 private struct RelaySubscription {

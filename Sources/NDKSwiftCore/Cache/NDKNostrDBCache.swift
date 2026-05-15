@@ -220,6 +220,7 @@ public actor NDKNostrDBCache {
         while removed < eventsToRemove && !eventAccessOrder.isEmpty {
             let eventId = eventAccessOrder.removeFirst()
             if events.removeValue(forKey: eventId) != nil {
+                eventRelaySources.removeValue(forKey: eventId)
                 removed += 1
             }
         }
@@ -232,6 +233,7 @@ public actor NDKNostrDBCache {
             for (id, _) in toRemove {
                 events.removeValue(forKey: id)
                 eventAccessOrder.removeAll { $0 == id }
+                eventRelaySources.removeValue(forKey: id)
             }
         }
 
@@ -269,6 +271,7 @@ public actor NDKNostrDBCache {
         for (id, _) in eventsToPrune {
             events.removeValue(forKey: id)
             eventAccessOrder.removeAll { $0 == id }
+            eventRelaySources.removeValue(forKey: id)
             deletedEventIds.insert(id)
             prunedCount += 1
         }
@@ -533,6 +536,9 @@ public actor NDKNostrDBCache {
     public func deleteEvent(id: String) async throws {
         // Remove from in-memory cache
         events.removeValue(forKey: id)
+        eventAccessOrder.removeAll { $0 == id }
+        // Drop relay-source bookkeeping too — used to grow forever.
+        eventRelaySources.removeValue(forKey: id)
         // Track as deleted to filter from all queries
         deletedEventIds.insert(id)
     }

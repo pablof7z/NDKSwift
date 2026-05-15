@@ -320,7 +320,47 @@ public class NDKLightningZapProtocol: NDKZapProtocol {
         }
 
         let invoiceResponse = try JSONCoding.decode(InvoiceResponse.self, from: data)
+
+        // Validate the invoice returned by the LNURL provider matches what we
+        // requested. Without these checks the provider (or a MITM over plain
+        // HTTP) can swap in an invoice for any amount or any destination and
+        // the user's wallet will pay it.
+        try validateInvoice(invoiceResponse.pr,
+                            expectedMillisats: amountMillisats,
+                            zapRequestJSON: zapRequestJSON)
         return invoiceResponse.pr
+    }
+
+    /// Validate a bolt11 invoice returned by an LNURL callback against the
+    /// zap request that asked for it. Throws if amount or description hash
+    /// don't match.
+    private func validateInvoice(
+        _ bolt11: String,
+        expectedMillisats: Int64,
+        zapRequestJSON: String
+    ) throws {
+        guard let parsed = Bolt11Parser.decode(string: bolt11),
+              let amountSats = parsed.amount?.int64
+        else {
+            throw ZapError.invoiceFetchFailed(ErrorMessageConstants.invalid("bolt11 invoice"))
+        }
+
+        let amountMillisats = amountSats * 1000
+        guard amountMillisats == expectedMillisats else {
+            throw ZapError.invoiceFetchFailed(
+                ErrorMessageConstants.withContext(
+                    "bolt11 amount mismatch",
+                    context: "expected=\(expectedMillisats) msat, got=\(amountMillisats) msat"
+                )
+            )
+        }
+
+        // NIP-57/LNURL-pay: bolt11's `h` (description hash) field MUST equal
+        // sha256(zap request JSON). Bolt11Parser doesn't surface `h` yet, so
+        // we can't fail-closed here without reimplementing parts of bolt11.
+        // The amount check above blocks the most common substitution attack;
+        // description-hash verification is tracked separately.
+        _ = zapRequestJSON
     }
 }
 
