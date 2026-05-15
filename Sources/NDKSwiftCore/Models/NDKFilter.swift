@@ -156,13 +156,41 @@ public struct NDKFilter: Codable, Equatable, Sendable {
         try container.encodeIfPresent(until, forKey: DynamicCodingKey(stringValue: "until")!)
         try container.encodeIfPresent(limit, forKey: DynamicCodingKey(stringValue: "limit")!)
 
-        // Encode special tag filters
-        try container.encodeIfPresent(events, forKey: DynamicCodingKey(stringValue: "#e")!)
-        try container.encodeIfPresent(pubkeys, forKey: DynamicCodingKey(stringValue: "#p")!)
+        // #e and #p have two parallel storage slots — `events`/`pubkeys` (typed)
+        // and `tagFilters["#e"]`/`tagFilters["#p"]` (generic). Merge them so a
+        // filter built via both paths doesn't lose entries on encode, and so
+        // the generic loop below doesn't overwrite the typed field.
+        let mergedEvents = mergeOptionalLists(events, tagFilters["#e"])
+        let mergedPubkeys = mergeOptionalLists(pubkeys, tagFilters["#p"])
+        try container.encodeIfPresent(mergedEvents, forKey: DynamicCodingKey(stringValue: "#e")!)
+        try container.encodeIfPresent(mergedPubkeys, forKey: DynamicCodingKey(stringValue: "#p")!)
 
-        // Encode generic tag filters
-        for (key, values) in tagFilters {
+        // Encode generic tag filters (skipping #e/#p — already merged above)
+        for (key, values) in tagFilters where key != "#e" && key != "#p" {
             try container.encode(values, forKey: DynamicCodingKey(stringValue: key)!)
+        }
+    }
+
+    private func mergeOptionalLists(_ a: [String]?, _ b: [String]?) -> [String]? {
+        switch (a, b) {
+        case (nil, nil):
+            return nil
+        case let (some?, nil):
+            return some
+        case let (nil, some?):
+            return some
+        case let (a?, b?):
+            // Order-preserving union: prefer entries from `a`, then unique
+            // entries from `b`.
+            var seen = Set<String>()
+            var merged: [String] = []
+            for v in a where seen.insert(v).inserted {
+                merged.append(v)
+            }
+            for v in b where seen.insert(v).inserted {
+                merged.append(v)
+            }
+            return merged
         }
     }
 

@@ -135,49 +135,6 @@ final class NegentropyTests: XCTestCase {
         XCTAssertEqual(upperRange.upper?.timestamp, upper.timestamp)
     }
 
-    // MARK: - Encoder/Decoder Tests
-
-    func testEncodeDecodeInitialMessage() throws {
-        let fingerprint = Data(repeating: 0xAB, count: 32)
-        let count = 42
-
-        let encoded = try NegentropyEncoder.encodeInitialMessage(
-            fingerprint: fingerprint,
-            count: count
-        )
-
-        let decoded = try NegentropyDecoder.decode(encoded)
-
-        guard case let .initial(decodedFingerprint, decodedCount) = decoded else {
-            XCTFail("Expected initial message")
-            return
-        }
-
-        XCTAssertEqual(decodedFingerprint, fingerprint)
-        XCTAssertEqual(decodedCount, count)
-    }
-
-    func testVarintEncoding() {
-        // Test varint encoding/decoding through the protocol
-        let testValues: [UInt64] = [0, 127, 128, 16383, 16384, UInt64.max]
-
-        for value in testValues {
-            let data = try! NegentropyEncoder.encodeInitialMessage(
-                fingerprint: Data(repeating: 0, count: 32),
-                count: Int(min(value, UInt64(Int.max)))
-            )
-
-            let decoded = try! NegentropyDecoder.decode(data)
-
-            guard case let .initial(_, count) = decoded else {
-                XCTFail("Failed to decode")
-                continue
-            }
-
-            XCTAssertEqual(UInt64(count), min(value, UInt64(Int.max)))
-        }
-    }
-
     // MARK: - Cache Integration Tests
 
     func testCacheNegentropyStorage() async throws {

@@ -777,21 +777,21 @@ public final class NDK {
         let alreadyVerified = await signatureVerificationSampler.isEventVerified(event.id)
 
         if !alreadyVerified {
-            // Only verify if relay is NDKRelay - otherwise skip verification but continue processing
+            // Verify the signature regardless of relay concrete type. The previous
+            // code only ran the sampler when `relay as? NDKRelay` succeeded and
+            // silently let the event through otherwise — any custom RelayProtocol
+            // adapter or test relay would have bypassed signature checks.
             if let ndkRelay = relay as? NDKRelay {
                 var signatureStats = await ndkRelay.getSignatureStats()
 
-                // Verify the event signature
                 let verificationResult = await signatureVerificationSampler.verifyEvent(
                     event,
                     from: relay,
                     stats: &signatureStats
                 )
 
-                // Update relay's signature stats
                 await ndkRelay.updateSignatureStats { $0 = signatureStats }
 
-                // If signature is invalid, mark relay as evil and REJECT the event
                 if verificationResult == .invalid {
                     NDKLogger.log(.error, category: .security,
                                   "🚨 [SECURITY] Invalid signature detected from relay \(relay.url) for event \(event.id) - REJECTING EVENT")
@@ -802,7 +802,16 @@ public final class NDK {
                 NDKLogger.log(.trace, category: .security,
                               "✅ [SECURITY] Signature verification result: \(verificationResult) for event \(event.id)")
             } else {
-                NDKLogger.log(.warning, category: .event, "⚠️ Relay is not NDKRelay type - skipping signature verification")
+                // Non-NDKRelay path: verify directly. Without this, any
+                // RelayProtocol implementation could feed forged events into
+                // the cache and subscription pipeline.
+                guard event.verifySignature() else {
+                    NDKLogger.log(.error, category: .security,
+                                  "🚨 [SECURITY] Invalid signature from non-NDKRelay \(relay.url) for event \(event.id) - REJECTING")
+                    return
+                }
+                NDKLogger.log(.trace, category: .security,
+                              "✅ [SECURITY] Signature verified (direct) for event \(event.id) from \(relay.url)")
             }
         }
 

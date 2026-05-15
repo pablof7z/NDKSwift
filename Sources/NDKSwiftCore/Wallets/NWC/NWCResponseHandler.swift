@@ -5,11 +5,16 @@ public struct NWCResponseHandler {
     private let ndk: NDK
     private let signer: NDKSigner
     private let relayURLs: [String]
+    /// The wallet service's pubkey, taken from the trusted NWCConnectionURI.
+    /// Used to validate response/notification events instead of trusting an
+    /// arbitrary `p` tag on the wire (which any client can forge).
+    private let walletPubkey: String
 
-    public init(ndk: NDK, signer: NDKSigner, relayURLs: [String]) {
+    public init(ndk: NDK, signer: NDKSigner, relayURLs: [String], walletPubkey: String) {
         self.ndk = ndk
         self.signer = signer
         self.relayURLs = relayURLs
+        self.walletPubkey = walletPubkey
     }
 
     /// Execute a request and wait for response with proper sequencing
@@ -22,11 +27,14 @@ public struct NWCResponseHandler {
 
         NDKLogger.log(.debug, category: .wallet, "[NWC Response] Setting up response listener for request \(requestId)")
 
-        // 1. First, create filter for response events
+        // 1. First, create filter for response events. Restrict authors to the
+        // trusted wallet pubkey so attackers can't publish 23195 events that
+        // we'll try to decrypt.
         var filter = NDKFilter()
         filter.kinds = [.nostrWalletConnectRes]
+        filter.authors = [walletPubkey]
         filter.addTagFilter("e", values: [requestId])
-        NDKLogger.log(.trace, category: .wallet, "[NWC Response] Filter: kinds=\(filter.kinds ?? []), e-tag=\(requestId)")
+        NDKLogger.log(.trace, category: .wallet, "[NWC Response] Filter: kinds=\(filter.kinds ?? []), e-tag=\(requestId), author=\(walletPubkey)")
 
         // Get the connected relays
         let allRelays = await ndk.relays
@@ -68,12 +76,19 @@ public struct NWCResponseHandler {
                     NDKLogger.log(.trace, category: .wallet, "[NWC Response]   Pubkey: \(responseEvent.pubkey)")
                     NDKLogger.log(.trace, category: .wallet, "[NWC Response]   Tags: \(responseEvent.tags)")
 
-                    // Decrypt the content
-                    let senderPubkey = responseEvent.pubkey
-                    NDKLogger.log(.trace, category: .wallet, "[NWC Response] Decrypting content from \(senderPubkey)")
+                    // Defence-in-depth: the filter is authored-locked but a
+                    // misconfigured relay could still return foreign events.
+                    guard responseEvent.pubkey == walletPubkey else {
+                        NDKLogger.log(.warning, category: .wallet,
+                                      "[NWC Response] Ignoring event from non-wallet author \(responseEvent.pubkey)")
+                        continue
+                    }
+
+                    // Decrypt the content (sender is the trusted wallet).
+                    NDKLogger.log(.trace, category: .wallet, "[NWC Response] Decrypting content from \(walletPubkey)")
                     let eventContent = responseEvent.content
                     let decryptedContent = try await signer.decrypt(
-                        senderPubkey: senderPubkey,
+                        senderPubkey: walletPubkey,
                         value: eventContent,
                         scheme: .nip04
                     )
@@ -130,9 +145,11 @@ public struct NWCResponseHandler {
         expectedCount: Int,
         timeout: TimeInterval = NetworkConstants.timeoutStandardRequest
     ) async throws -> [String: Result<T, NDKError>] {
-        // Create filter for responses with this request ID
+        // Create filter for responses with this request ID, authored by the
+        // trusted wallet pubkey only.
         var filter = NDKFilter()
         filter.kinds = [.nostrWalletConnectRes]
+        filter.authors = [walletPubkey]
         filter.addTagFilter("e", values: [requestId])
 
         // Get connected relays that match our wallet relays
@@ -172,15 +189,14 @@ public struct NWCResponseHandler {
 
                     let dTagValue = dTag[1]
 
-                    // Decrypt and parse the response
-                    do {
-                        // Get wallet service pubkey from p-tag
-                        let eventTags = event.tags
-                        guard let pTag = eventTags.first(where: { $0.count >= 2 && $0[0] == "p" }) else {
-                            continue
-                        }
-                        let walletPubkey = pTag[1]
+                    // Decrypt and parse the response. Defence-in-depth check
+                    // that the event came from the wallet we trust — the filter
+                    // already enforces this but a misbehaving relay could lie.
+                    guard event.pubkey == walletPubkey else {
+                        continue
+                    }
 
+                    do {
                         let eventContent = event.content
                         let decrypted = try await signer.decrypt(
                             senderPubkey: walletPubkey,
@@ -229,8 +245,10 @@ public struct NWCResponseHandler {
     public func subscribeToNotifications() -> AsyncStream<NWCNotification<PaymentNotification>> {
         AsyncStream { continuation in
             Task {
-                // Create filter for notification events (no e-tag)
-                let filter = NDKFilter(kinds: [.nostrWalletConnectRes])
+                // Create filter for notification events (no e-tag). Restrict
+                // authors to the trusted wallet pubkey.
+                var filter = NDKFilter(kinds: [.nostrWalletConnectRes])
+                filter.authors = [walletPubkey]
 
                 // Get connected relays that match our wallet relays
                 var connectedRelays: [NDKRelay] = []
@@ -267,11 +285,11 @@ public struct NWCResponseHandler {
                                 continue
                             }
 
-                            // Get wallet service pubkey from p-tag
-                            guard let pTag = eventTags.first(where: { $0.count >= 2 && $0[0] == "p" }) else {
+                            // Defence-in-depth: only accept notifications from
+                            // the trusted wallet (filter already enforces this).
+                            guard event.pubkey == walletPubkey else {
                                 continue
                             }
-                            let walletPubkey = pTag[1]
 
                             // Decrypt the notification
                             do {

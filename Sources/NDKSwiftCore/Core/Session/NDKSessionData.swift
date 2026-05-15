@@ -223,17 +223,18 @@ public class NDKSessionData {
         // Use NDKContactList to properly parse the contact list
         let newContactList = NDKContactList.fromEvent(event, ndk: ndk)
 
-        // Update state based on whether this is initial load or update
         if latestContactListEventId == nil {
-            NDKLogger.log(.info, category: .subscription, "✅ Contact list loaded - \(newContactList.contactCount) contacts, fromCache: \(fromCache)")
-            contactListState = .ready(newContactList, fromCache: fromCache)
-        } else {
-            if case let .ready(current, _) = contactListState {
-                NDKLogger.log(.info, category: .subscription, "🔄 Contact list updating - from \(current.contactCount) to \(newContactList.contactCount) contacts")
-                contactListState = .updating(current: current, changes: newContactList)
-            }
+            NDKLogger.log(.info, category: .subscription,
+                          "✅ Contact list loaded - \(newContactList.contactCount) contacts, fromCache: \(fromCache)")
+        } else if case let .ready(current, _) = contactListState {
+            NDKLogger.log(.info, category: .subscription,
+                          "🔄 Contact list updating - from \(current.contactCount) to \(newContactList.contactCount) contacts")
         }
 
+        // The previous code wrote `.updating(current:, changes:)` then
+        // immediately overwrote it with `.ready` in the same synchronous call,
+        // so observers never saw `.updating`. Write the terminal `.ready` once.
+        contactListState = .ready(newContactList, fromCache: fromCache)
         latestContactListEventId = event.id
 
         // Trigger subscription updates if this is a change
@@ -242,9 +243,6 @@ public class NDKSessionData {
                 await triggerSubscriptionUpdates()
             }
         }
-
-        // Update to ready state after processing
-        contactListState = .ready(newContactList, fromCache: fromCache)
     }
 
     // MARK: - Mute List Management
@@ -255,19 +253,10 @@ public class NDKSessionData {
 
         let mutedPubkeys = extractMutedPubkeys(from: event)
 
-        // Update state based on whether this is initial load or update
-        if latestMuteListEventId == nil {
-            muteListState = .ready(mutedPubkeys, fromCache: fromCache)
-        } else {
-            if case let .ready(current, _) = muteListState {
-                muteListState = .updating(current: current, changes: mutedPubkeys)
-            }
-        }
-
-        latestMuteListEventId = event.id
-
-        // Update to ready state after processing
+        // See processFollowListEvent — the `.updating` write was unobservable
+        // because it was immediately overwritten. Write the terminal state once.
         muteListState = .ready(mutedPubkeys, fromCache: fromCache)
+        latestMuteListEventId = event.id
     }
 
     private func extractMutedPubkeys(from event: NDKEvent) -> Set<String> {
@@ -284,19 +273,10 @@ public class NDKSessionData {
 
         let blockedUrls = extractBlockedRelays(from: event)
 
-        // Update state based on whether this is initial load or update
-        if latestBlockedRelaysEventId == nil {
-            blockedRelaysState = .ready(blockedUrls, fromCache: fromCache)
-        } else {
-            if case let .ready(current, _) = blockedRelaysState {
-                blockedRelaysState = .updating(current: current, changes: blockedUrls)
-            }
-        }
-
-        latestBlockedRelaysEventId = event.id
-
-        // Update to ready state after processing
+        // See processFollowListEvent — `.updating` was unobservable. Write
+        // the terminal state once.
         blockedRelaysState = .ready(blockedUrls, fromCache: fromCache)
+        latestBlockedRelaysEventId = event.id
     }
 
     private func extractBlockedRelays(from event: NDKEvent) -> Set<String> {

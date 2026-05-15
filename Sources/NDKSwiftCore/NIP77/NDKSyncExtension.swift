@@ -186,27 +186,9 @@ extension NDKPool {
     }
 }
 
-// Extension for NIP77SyncHandler to support completion tracking
-extension NIP77SyncHandler {
-    struct CompletedSession {
-        let downloadedEventIds: [String]
-        let uploadedEventIds: [String]
-        let messageRounds: Int
-        let bytesTransferred: Int
-    }
-
-    private static var completedSessions = [String: CompletedSession]()
-
-    func getActiveSession(subscriptionId: String) async -> SyncSession? {
-        return activeSessions[subscriptionId]
-    }
-
-    func completeSession(_ session: SyncSession, subscriptionId: String) {
-        Self.completedSessions[subscriptionId] = CompletedSession(
-            downloadedEventIds: Array(session.downloadedEventIds),
-            uploadedEventIds: Array(session.uploadedEventIds),
-            messageRounds: session.messageRounds,
-            bytesTransferred: session.bytesTransferred
-        )
-    }
-}
+// Removed: dead extension that defined an unused `CompletedSession` struct,
+// a never-read `static var completedSessions` (a Swift-6 data race since actor
+// isolation doesn't cover statics), and a `completeSession` writer that no
+// code called. The instance-level `completedSessions` on NIP77SyncHandler is
+// what other code actually reads. A previous, unused `getActiveSession` is
+// also gone — nothing referenced it.

@@ -40,6 +40,9 @@ public enum NetworkConstants {
     public static let timeoutBunkerPing: TimeInterval = 8.0
     /// Bunker signing timeout when signer is known to be unhealthy - fail fast
     public static let timeoutBunkerSigningUnhealthy: TimeInterval = 2.0
+    /// Bunker nostrConnect handshake timeout — user-driven flow over relays,
+    /// so allow generous time before failing the suspended caller.
+    public static let timeoutBunkerHandshake: TimeInterval = 120.0
 
     // Cache Parameters
     /// TTL for tombstones (deletion markers) - prevents re-adding deleted items too soon

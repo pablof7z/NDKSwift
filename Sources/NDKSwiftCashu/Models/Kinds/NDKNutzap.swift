@@ -124,14 +124,41 @@ public struct NDKNutzap {
             }
         }
 
-        // 3. Verify DLEQ proofs if present
-        for proof in proofs where proof.dleq != nil {
-            // DLEQ verification would require complex cryptographic operations
-            // For now, we assume they're valid if present
-            continue
-        }
-
+        // 3. NIP-61/NUT-12 DLEQ verification cannot happen here because we
+        // don't hold a MintRepresenting reference. The previous code "iterated
+        // and assumed valid" which is misleading — remove the no-op loop.
+        //
+        // Callers SHOULD invoke `verifyDLEQ(against:)` below before crediting
+        // the proofs once they have access to the mint (e.g. NIP60Wallet).
         return true
+    }
+
+    /// Verify DLEQ (NUT-12) on every proof in this nutzap using CashuSwift's
+    /// verifier. Call this AFTER `validate()` and BEFORE crediting funds when
+    /// the mint reference is available.
+    ///
+    /// Returns:
+    /// - `.valid` if every proof carries a valid DLEQ (or none present),
+    /// - `.fail` if any proof's DLEQ is malformed/invalid,
+    /// - `.notVerifiable` if the mint doesn't expose the required keyset.
+    public func verifyDLEQ(against mint: MintRepresenting) -> CashuSwift.Crypto.DLEQVerificationResult {
+        do {
+            return try CashuSwift.Crypto.checkDLEQ(for: proofs, with: mint)
+        } catch {
+            // checkDLEQ throws when inputs are structurally invalid — treat
+            // that as a failure rather than swallowing it.
+            return .fail
+        }
+    }
+}
+
+// Re-export CashuSwift's DLEQVerificationResult for callers' convenience.
+extension CashuSwift.Crypto.DLEQVerificationResult {
+    /// `true` when DLEQ verification has positively succeeded for every proof.
+    /// Callers should only credit funds when this is `true`.
+    public var passes: Bool {
+        if case .valid = self { return true }
+        return false
     }
 
     /// Create nutzap preferences from a user's kind 10019 event

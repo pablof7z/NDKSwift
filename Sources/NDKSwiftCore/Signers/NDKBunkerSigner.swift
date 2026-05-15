@@ -383,14 +383,43 @@ public actor NDKBunkerSigner: NDKSigner {
     }
 
     private func connectNostrConnect() async throws -> PublicKey {
-        return try await withCheckedThrowingContinuation { continuation in
-            self.connectionContinuation = continuation
-
-            Task {
-                // Wait for connect response with our secret
-                // The response handler will resume the continuation
-            }
+        // If a previous nostrConnect attempt is still pending, fail it before
+        // overwriting the continuation — otherwise the old caller hangs forever
+        // and the continuation leaks.
+        if let stale = connectionContinuation {
+            stale.resume(throwing: NDKError.cancelled)
+            connectionContinuation = nil
         }
+
+        // Time the handshake out so a missing/wrong-secret response can't
+        // suspend the caller indefinitely.
+        let timeoutSeconds = NetworkConstants.timeoutBunkerHandshake
+        let timeoutTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(timeoutSeconds * Double(TimeConstants.nanosecondsPerSecond)))
+            await self?.failPendingNostrConnect(
+                error: NDKError.timeout(operation: "bunker nostrConnect handshake",
+                                        seconds: Int(timeoutSeconds))
+            )
+        }
+
+        do {
+            let result = try await withCheckedThrowingContinuation { continuation in
+                self.connectionContinuation = continuation
+            }
+            timeoutTask.cancel()
+            return result
+        } catch {
+            timeoutTask.cancel()
+            throw error
+        }
+    }
+
+    /// Resume the pending nostrConnect continuation (if any) with the given
+    /// error. Safe to call when no continuation is pending.
+    private func failPendingNostrConnect(error: Error) {
+        guard let continuation = connectionContinuation else { return }
+        connectionContinuation = nil
+        continuation.resume(throwing: error)
     }
 
     private func connectBunker() async throws -> PublicKey {
@@ -658,6 +687,14 @@ public actor NDKBunkerSigner: NDKSigner {
         return response.result
     }
 
+    public func encryptionEnabled() async -> [NDKEncryptionScheme] {
+        // NIP-46 bunkers MUST implement both nip04 and nip44 encryption methods.
+        // Without this override the protocol default returns [], so capability
+        // discovery would incorrectly report this signer as offering no
+        // encryption (e.g. NDKList.encrypt would refuse to use it).
+        return [.nip04, .nip44]
+    }
+
     public func encrypt(recipientPubkey: PublicKey, value: String, scheme: NDKEncryptionScheme) async throws -> String {
         let method = scheme == .nip04 ? "nip04_encrypt" : "nip44_encrypt"
         return try await performCrypto(method: method, params: [recipientPubkey, value], errorMessage: ErrorMessageConstants.Messages.encryptionFailed)
@@ -738,14 +775,23 @@ public actor NDKBunkerSigner: NDKSigner {
         subscriptionTask = nil
         rpcClient = nil
         isConnected = false
+        // Fail any pending nostrConnect handshake so a caller awaiting connect
+        // doesn't suspend forever after we've torn the session down.
+        if let continuation = connectionContinuation {
+            connectionContinuation = nil
+            continuation.resume(throwing: NDKError.cancelled)
+        }
         healthPublisher.send(.unknown)
     }
 
     deinit {
-        // Clean up synchronously
+        // Cancel any in-flight subscription task. Cancellation on a Task value
+        // is safe from `deinit` and doesn't require actor isolation.
+        // Previously we also wrote `rpcClient = nil` and `isConnected = false`
+        // here, but those are actor-isolated stored properties — mutating them
+        // from a nonisolated `deinit` is a data race. The actor going away
+        // releases its references anyway, so the explicit reset wasn't needed.
         subscriptionTask?.cancel()
-        rpcClient = nil
-        isConnected = false
     }
 
     // MARK: - Serialization (NDKSigner Protocol)

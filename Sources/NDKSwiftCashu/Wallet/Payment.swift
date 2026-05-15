@@ -149,16 +149,25 @@ public enum Payment {
                 throw NDKError.paymentFailed(reason: "Lightning payment was not successful")
             }
 
-            // Log DLEQ verification status
-            if case .fail = meltResult.dleqResult {
-                NDKLogger.log(.warning, category: .wallet, "⚠️ DLEQ verification failed but continuing since payment was successful. Mint: \(mintURL)")
+            // DLEQ on the change proofs. If verification failed the mint
+            // returned change we can't prove is valid — accepting it would let
+            // a malicious mint hand us unspendable / linkable proofs. The
+            // Lightning payment has already cleared so we can't refund, but we
+            // can avoid claiming the bad change as ours.
+            let dleqFailed: Bool = {
+                if case .fail = meltResult.dleqResult { return true }
+                return false
+            }()
+            if dleqFailed {
+                NDKLogger.log(.error, category: .wallet,
+                              "🚨 DLEQ verification failed on melt change from \(mintURL); discarding change proofs to avoid relying on unverifiable change")
             }
 
             // Mark used proofs as deleted
             await proofStateManager.markProofsAsDeleted(selectedProofs)
 
-            // Add change proofs if any
-            if let changeProofs = meltResult.change {
+            // Add change proofs if any — only if DLEQ verification didn't fail.
+            if !dleqFailed, let changeProofs = meltResult.change {
                 for proof in changeProofs {
                     await proofStateManager.addProof(proof, mint: mintURL)
                 }
