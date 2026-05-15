@@ -547,7 +547,8 @@ public actor NDKNostrDBCache {
         // Try native nostrdb query first
         do {
             let ndbFilter = try NdbFilter(from: nostrFilter)
-            let noteKeys = try nostrDB.query(filters: [ndbFilter], maxResults: filter.limit ?? 10000)
+            let maxResults = filter.tags == nil ? (filter.limit ?? 10000) : 10000
+            let noteKeys = try nostrDB.query(filters: [ndbFilter], maxResults: maxResults)
 
             // Convert note keys to NDKEvents, filtering out deleted/expired events
             for noteKey in noteKeys {
@@ -556,7 +557,8 @@ public actor NDKNostrDBCache {
                    let event = convertToNDKEvent(note) {
                     if !seenIds.contains(event.id),
                        !deletedEventIds.contains(event.id),
-                       !isExpired(event) {
+                       !isExpired(event),
+                       filter.matches(event: event) {
                         seenIds.insert(event.id)
                         results.append(event)
                     }
@@ -591,30 +593,10 @@ public actor NDKNostrDBCache {
 
     /// Fallback in-memory query when nostrdb query is unavailable
     private func queryEventsInMemory(_ filter: NDKFilter) -> [NDKEvent] {
-        var results = Array(events.values)
-
-        // Filter by IDs
-        if let ids = filter.ids {
-            results = results.filter { ids.contains($0.id) }
-        }
-
-        // Filter by authors
-        if let authors = filter.authors {
-            results = results.filter { authors.contains($0.pubkey) }
-        }
-
-        // Filter by kinds
-        if let kinds = filter.kinds {
-            results = results.filter { kinds.contains($0.kind) }
-        }
-
-        // Filter by timestamp
-        if let since = filter.since {
-            results = results.filter { $0.createdAt >= since }
-        }
-
-        if let until = filter.until {
-            results = results.filter { $0.createdAt <= until }
+        var results = events.values.filter { event in
+            !deletedEventIds.contains(event.id) &&
+                !isExpired(event) &&
+                filter.matches(event: event)
         }
 
         // Sort by created_at descending (most recent first)
@@ -640,10 +622,18 @@ public actor NDKNostrDBCache {
         let kinds: [NostrKind]? = filter.kinds?.compactMap { NostrKind(rawValue: UInt32($0)) }
 
         // Convert referenced event IDs (#e tags)
-        let referencedIds: [NdbNoteId]? = filter.events?.compactMap { hexToData($0).map { NdbNoteId($0) } }
+        let eventTagFilters = filter.tagFilter("e") ?? []
+        let referencedEventIds = (filter.events ?? []) + eventTagFilters
+        let referencedIds: [NdbNoteId]? = referencedEventIds.isEmpty
+            ? nil
+            : referencedEventIds.compactMap { hexToData($0).map { NdbNoteId($0) } }
 
         // Convert referenced pubkeys (#p tags)
-        let pubkeys: [NdbPubkey]? = filter.pubkeys?.compactMap { hexToData($0).map { NdbPubkey($0) } }
+        let pubkeyTagFilters = filter.tagFilter("p") ?? []
+        let referencedPubkeys = (filter.pubkeys ?? []) + pubkeyTagFilters
+        let pubkeys: [NdbPubkey]? = referencedPubkeys.isEmpty
+            ? nil
+            : referencedPubkeys.compactMap { hexToData($0).map { NdbPubkey($0) } }
 
         // Convert hashtags (#t tags)
         let hashtags: [String]? = filter.tagFilter("t")
