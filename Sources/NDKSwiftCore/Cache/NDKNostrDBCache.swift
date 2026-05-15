@@ -1295,9 +1295,11 @@ public actor NDKNostrDBCache {
     /// Clear all decrypted content from cache
     public func clearDecryptedContent() async {
         await decryptedContentCache.clear()
+        // Truncate ONLY the decrypted_content table. The previous code called
+        // store.clearAll() which wiped every SQLite table (KV / deletion
+        // markers / NIP-05 cache / fetch times) - user-impacting data loss.
         sqliteWriteThrough { store in
-            try await store.clearAll() // limited blast — but we don't have a per-table truncate yet
-            _ = store
+            try await store.clearDecryptedContent()
         }
     }
 

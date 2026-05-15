@@ -256,6 +256,12 @@ internal actor NDKCacheSQLiteStore {
         }
     }
 
+    /// Truncate the decrypted-content table only. Used by
+    /// NDKNostrDBCache.clearDecryptedContent - must NOT wipe other tables.
+    func clearDecryptedContent() throws {
+        try execOrThrow("DELETE FROM decrypted_content;")
+    }
+
     func loadRecentDecrypted(limit: Int) throws -> [(key: String, content: String)] {
         let sql = "SELECT key, content FROM decrypted_content ORDER BY cached_at DESC LIMIT ?;"
         var rows: [(key: String, content: String)] = []
