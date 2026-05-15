@@ -131,6 +131,7 @@ public struct NIP77Message {
         switch messageType {
         case .negOpen:
             if let filter = filter, let initialMessage = initialMessage {
+                _ = try NIP77PayloadValidation.validateHexPayload(initialMessage, field: "NEG-OPEN initialMessage")
                 array.append(filter.toDictionary())
                 array.append(initialMessage)
             } else {
@@ -139,6 +140,7 @@ public struct NIP77Message {
 
         case .negMsg:
             if let message = message {
+                _ = try NIP77PayloadValidation.validateHexPayload(message, field: "NEG-MSG message")
                 array.append(message)
             } else {
                 throw NIP77Error.missingRequiredField("message")
@@ -178,13 +180,14 @@ public struct NIP77Message {
 
         switch messageType {
         case .negOpen:
-            guard array.count >= 4,
+            guard array.count == 4,
                   let filterDict = array[2] as? [String: Any],
                   let initialMessage = array[3] as? String
             else {
                 throw NIP77Error.missingRequiredField("filter or initialMessage")
             }
 
+            _ = try NIP77PayloadValidation.validateHexPayload(initialMessage, field: "NEG-OPEN initialMessage")
             let filter = try NDKFilter.fromDictionary(filterDict)
             return NIP77Message(
                 messageType: .negOpen,
@@ -196,12 +199,13 @@ public struct NIP77Message {
             )
 
         case .negMsg:
-            guard array.count >= 3,
+            guard array.count == 3,
                   let message = array[2] as? String
             else {
                 throw NIP77Error.missingRequiredField("message")
             }
 
+            _ = try NIP77PayloadValidation.validateHexPayload(message, field: "NEG-MSG message")
             return NIP77Message(
                 messageType: .negMsg,
                 subscriptionId: subscriptionId,
@@ -212,10 +216,13 @@ public struct NIP77Message {
             )
 
         case .negErr:
-            guard array.count >= 3,
+            guard array.count == 3 || array.count == 4,
                   let reason = array[2] as? String
             else {
                 throw NIP77Error.missingRequiredField("reason")
+            }
+            if array.count == 4, !(array[3] is Int) {
+                throw NIP77Error.invalidMessageFormat("NEG-ERR record limit must be an integer")
             }
 
             return NIP77Message(
@@ -228,6 +235,9 @@ public struct NIP77Message {
             )
 
         case .negClose:
+            guard array.count == 2 else {
+                throw NIP77Error.invalidMessageFormat("NEG-CLOSE must contain exactly 2 elements")
+            }
             return NIP77Message(
                 messageType: .negClose,
                 subscriptionId: subscriptionId,

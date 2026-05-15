@@ -41,6 +41,18 @@ public enum NostrMessage {
         return .invalidMessage(ErrorMessageConstants.invalid("\(messageType) message"))
     }
 
+    private static func validateNIP77HexPayload(_ hex: String, field: String) throws {
+        if let reason = NIP77PayloadValidation.validationError(for: hex, field: field) {
+            throw NDKError.parseError(for: field, details: reason)
+        }
+    }
+
+    private static func validateNIP77NegErrRecordLimit(_ value: Any) throws {
+        guard value is Int else {
+            throw NDKError.parseError(for: "NEG-ERR record limit", details: "Expected integer maximum record count")
+        }
+    }
+
     /// Parse a message from relay
     public static func parse(from json: String) throws -> NostrMessage {
         let array = try JSONCoding.parseArray(from: json)
@@ -149,27 +161,29 @@ public enum NostrMessage {
             return .count(subscriptionId: subscriptionId, count: count)
 
         case .negOpen:
-            guard array.count >= 4,
+            guard array.count == 4,
                   let subscriptionId = array[1] as? String,
                   let filterDict = array[2] as? [String: Any],
                   let hexMessage = array[3] as? String
             else {
                 throw invalidMessageError(for: "NEG-OPEN")
             }
+            try validateNIP77HexPayload(hexMessage, field: "NEG-OPEN initialMessage")
             let filter = try NDKFilter.fromDictionary(filterDict)
             return .negOpen(subscriptionId: subscriptionId, filter: filter, message: hexMessage)
 
         case .negMsg:
-            guard array.count >= 3,
+            guard array.count == 3,
                   let subscriptionId = array[1] as? String,
                   let hexMessage = array[2] as? String
             else {
                 throw invalidMessageError(for: "NEG-MSG")
             }
+            try validateNIP77HexPayload(hexMessage, field: "NEG-MSG message")
             return .negMsg(subscriptionId: subscriptionId, message: hexMessage)
 
         case .negClose:
-            guard array.count >= 2,
+            guard array.count == 2,
                   let subscriptionId = array[1] as? String
             else {
                 throw invalidMessageError(for: "NEG-CLOSE")
@@ -177,11 +191,14 @@ public enum NostrMessage {
             return .negClose(subscriptionId: subscriptionId)
 
         case .negErr:
-            guard array.count >= 3,
+            guard array.count == 3 || array.count == 4,
                   let subscriptionId = array[1] as? String,
                   let error = array[2] as? String
             else {
                 throw invalidMessageError(for: "NEG-ERR")
+            }
+            if array.count == 4 {
+                try validateNIP77NegErrRecordLimit(array[3])
             }
             return .negErr(subscriptionId: subscriptionId, error: error)
         }
@@ -242,12 +259,14 @@ public enum NostrMessage {
             array.append(["count": count])
 
         case let .negOpen(subscriptionId, filter, message):
+            try Self.validateNIP77HexPayload(message, field: "NEG-OPEN initialMessage")
             array.append("NEG-OPEN")
             array.append(subscriptionId)
             array.append(filter.toDictionary())
             array.append(message)
 
         case let .negMsg(subscriptionId, message):
+            try Self.validateNIP77HexPayload(message, field: "NEG-MSG message")
             array.append("NEG-MSG")
             array.append(subscriptionId)
             array.append(message)

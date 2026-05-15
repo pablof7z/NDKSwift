@@ -135,12 +135,14 @@ public enum NDKNetworkLogger {
             output += "   TYPE: NEG-OPEN\n"
             output += "   SUBSCRIPTION: \(subscriptionId)\n"
             output += "   FILTER: \(filter)\n"
-            output += "   MESSAGE: \(message)"
+            output += "   PAYLOAD_BYTES: \(message.utf8.count / 2)\n"
+            output += "   HEX_CHARS: \(message.utf8.count)"
 
         case let .negMsg(subscriptionId, message):
             output += "   TYPE: NEG-MSG\n"
             output += "   SUBSCRIPTION: \(subscriptionId)\n"
-            output += "   MESSAGE: \(message)"
+            output += "   PAYLOAD_BYTES: \(message.utf8.count / 2)\n"
+            output += "   HEX_CHARS: \(message.utf8.count)"
 
         case let .negClose(subscriptionId):
             output += "   TYPE: NEG-CLOSE\n"

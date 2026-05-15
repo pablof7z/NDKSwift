@@ -69,12 +69,12 @@ final class NIP77MessageTests: XCTestCase {
         XCTAssertEqual(openMessage.initialMessage, "def456")
 
         // Test parsing NEG-MSG
-        let msgJSON: [Any] = ["NEG-MSG", "sub456", "message123"]
+        let msgJSON: [Any] = ["NEG-MSG", "sub456", "f00d1234"]
         let msgMessage = try NIP77Message.parse(from: msgJSON)
 
         XCTAssertEqual(msgMessage.messageType, .negMsg)
         XCTAssertEqual(msgMessage.subscriptionId, "sub456")
-        XCTAssertEqual(msgMessage.message, "message123")
+        XCTAssertEqual(msgMessage.message, "f00d1234")
 
         // Test parsing NEG-CLOSE
         let closeJSON: [Any] = ["NEG-CLOSE", "sub456"]
@@ -116,6 +116,26 @@ final class NIP77MessageTests: XCTestCase {
                 return
             }
         }
+
+        XCTAssertThrowsError(try NIP77Message.parse(from: ["NEG-MSG", "sub", "not-hex"]))
+        XCTAssertThrowsError(try NIP77Message.parse(from: ["NEG-MSG", "sub", "abc"]))
+        XCTAssertThrowsError(try NIP77Message.parse(from: ["NEG-MSG", "sub", "0x61"]))
+        XCTAssertThrowsError(try NIP77Message.parse(from: ["NEG-CLOSE", "sub", "extra"]))
+        XCTAssertThrowsError(try NIP77Message.parse(from: ["NEG-OPEN", "sub", ["kinds": [1]], "61", "extra"]))
+    }
+
+    func testNIP77MessageAllowsNegErrRecordLimit() throws {
+        let message = try NIP77Message.parse(from: ["NEG-ERR", "sub", "blocked: too many records", 10_000])
+
+        XCTAssertEqual(message.messageType, .negErr)
+        XCTAssertEqual(message.subscriptionId, "sub")
+        XCTAssertEqual(message.reason, "blocked: too many records")
+    }
+
+    func testNIP77MessageEncodingRejectsInvalidHexPayload() {
+        let message = NIP77Message.negMsg(subscriptionId: "sub", message: "not-hex")
+
+        XCTAssertThrowsError(try message.toJSON())
     }
 
     func testNIP77ErrorLocalizedDescription() {

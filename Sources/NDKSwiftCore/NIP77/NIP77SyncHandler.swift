@@ -133,11 +133,8 @@ public actor NIP77SyncHandler {
 
         switch message {
         case let .negMsg(_, dataHex):
-            NDKLogger.log(.debug, category: .network, "\(logPrefix) Received NEG-MSG with data: \(dataHex)")
-
-            guard let data = Data(hexString: dataHex) else {
-                throw NIP77Error.invalidMessageFormat("Unknown message type")
-            }
+            let data = try NIP77PayloadValidation.validateHexPayload(dataHex, field: "NEG-MSG message")
+            NDKLogger.log(.debug, category: .network, "\(logPrefix) Received NEG-MSG with \(data.count) payload bytes")
 
             // Update stats
             session.messageRounds += 1

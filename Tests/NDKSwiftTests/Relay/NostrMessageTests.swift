@@ -435,6 +435,31 @@ final class NostrMessageTests: XCTestCase {
         }
     }
 
+    func testParseNegMsgRejectsInvalidHexPayloads() throws {
+        let nonHexJSON = try JSONCoding.serializeToString(["NEG-MSG", testSubscriptionId, "not-hex"])
+        XCTAssertThrowsError(try NostrMessage.parse(from: nonHexJSON))
+
+        let oddLengthJSON = try JSONCoding.serializeToString(["NEG-MSG", testSubscriptionId, "abc"])
+        XCTAssertThrowsError(try NostrMessage.parse(from: oddLengthJSON))
+
+        let prefixedJSON = try JSONCoding.serializeToString(["NEG-MSG", testSubscriptionId, "0x61"])
+        XCTAssertThrowsError(try NostrMessage.parse(from: prefixedJSON))
+    }
+
+    func testParseNegMsgRejectsOversizedPayload() throws {
+        let oversizedPayload = String(repeating: "aa", count: NIP77PayloadValidation.maxPayloadBytes + 1)
+        let json = try JSONCoding.serializeToString(["NEG-MSG", testSubscriptionId, oversizedPayload])
+
+        XCTAssertThrowsError(try NostrMessage.parse(from: json))
+    }
+
+    func testParseNegOpenRejectsExtraElements() throws {
+        let filterDict = createTestFilter().dictionary
+        let json = try JSONCoding.serializeToString(["NEG-OPEN", testSubscriptionId, filterDict, "deadbeef", "extra"])
+
+        XCTAssertThrowsError(try NostrMessage.parse(from: json))
+    }
+
     func testParseNegCloseMessage() throws {
         let json = try JSONCoding.serializeToString(["NEG-CLOSE", testSubscriptionId])
 
@@ -445,6 +470,12 @@ final class NostrMessageTests: XCTestCase {
         } else {
             XCTFail("Expected negClose message")
         }
+    }
+
+    func testParseNegCloseRejectsExtraElements() throws {
+        let json = try JSONCoding.serializeToString(["NEG-CLOSE", testSubscriptionId, "extra"])
+
+        XCTAssertThrowsError(try NostrMessage.parse(from: json))
     }
 
     func testParseNegErrMessage() throws {
@@ -459,6 +490,25 @@ final class NostrMessageTests: XCTestCase {
         } else {
             XCTFail("Expected negErr message")
         }
+    }
+
+    func testParseNegErrAllowsOptionalRecordLimit() throws {
+        let json = try JSONCoding.serializeToString(["NEG-ERR", testSubscriptionId, "blocked: too many records", 10_000])
+
+        let message = try NostrMessage.parse(from: json)
+
+        if case let .negErr(subscriptionId, error) = message {
+            XCTAssertEqual(subscriptionId, testSubscriptionId)
+            XCTAssertEqual(error, "blocked: too many records")
+        } else {
+            XCTFail("Expected negErr message")
+        }
+    }
+
+    func testParseNegErrRejectsUnexpectedExtraElement() throws {
+        let json = try JSONCoding.serializeToString(["NEG-ERR", testSubscriptionId, "blocked: too many records", "extra"])
+
+        XCTAssertThrowsError(try NostrMessage.parse(from: json))
     }
 
     func testSerializeNegOpenMessage() throws {
@@ -476,11 +526,17 @@ final class NostrMessageTests: XCTestCase {
         XCTAssertEqual(parsed[3] as? String, hexMessage)
     }
 
+    func testSerializeNegMsgRejectsInvalidHexPayload() throws {
+        let message = NostrMessage.negMsg(subscriptionId: testSubscriptionId, message: "efgh")
+
+        XCTAssertThrowsError(try message.serialize())
+    }
+
     func testNegentropySuiteRoundTrip() throws {
         let filter = createTestFilter()
         let negMessages: [NostrMessage] = [
             .negOpen(subscriptionId: testSubscriptionId, filter: filter, message: "abcd"),
-            .negMsg(subscriptionId: testSubscriptionId, message: "efgh"),
+            .negMsg(subscriptionId: testSubscriptionId, message: "ef01"),
             .negClose(subscriptionId: testSubscriptionId),
             .negErr(subscriptionId: testSubscriptionId, error: "Error"),
         ]
