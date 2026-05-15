@@ -129,24 +129,34 @@ public enum NIP17 {
 
         // Include sender as the first recipient
         let senderPubkey = try await signer.pubkey
-        let allRecipients = [NIP17Recipient(pubkey: senderPubkey)] + targetRecipients
-
-        // Seal the event once
-        let sealedEvent = try await NIP59.seal(
-            rumor: event,
-            signer: signer,
-            recipientPubkey: senderPubkey // Self-encrypt for the seal
-        )
+        let allRecipients = [NIP17Recipient(pubkey: senderPubkey)] + targetRecipients.filter { $0.pubkey != senderPubkey }
 
         // Create wrapped events for each recipient
         var wrappedEvents: [PublicKey: NDKEvent] = [:]
+        var senderSealedEvent: NDKEvent?
 
         for recipient in allRecipients {
+            // The seal itself is encrypted to the recipient, so each recipient
+            // needs a distinct seal. Reusing the sender's self-encrypted seal
+            // makes non-sender copies undecryptable.
+            let sealedEvent = try await NIP59.seal(
+                rumor: event,
+                signer: signer,
+                recipientPubkey: recipient.pubkey
+            )
             let wrapped = try await NIP59.wrap(
                 seal: sealedEvent,
                 recipientPubkey: recipient.pubkey
             )
             wrappedEvents[recipient.pubkey] = wrapped
+
+            if recipient.pubkey == senderPubkey {
+                senderSealedEvent = sealedEvent
+            }
+        }
+
+        guard let sealedEvent = senderSealedEvent else {
+            throw NIP17Error.sealingFailed("failed to create sender seal")
         }
 
         return NIP17WrappedEvents(

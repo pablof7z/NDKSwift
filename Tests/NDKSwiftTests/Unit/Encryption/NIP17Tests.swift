@@ -3,11 +3,11 @@ import XCTest
 
 final class NIP17Tests: XCTestCase {
     // Test vectors from nostr-tools
-    let senderPrivateKey = "f09ac9b695d0a4c6daa418fe95b977eea20f54d9545592bc36a4f9e14f3eb840"
+    let senderPrivateKey = "0000000000000000000000000000000000000000000000000000000000000001"
     let senderPublicKey = "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
 
-    let recipientPrivateKey = "5393a825e5892d8e18d4a5ea61ced105e8bb2a106f42876be3a40522e0b13747"
-    let recipientPublicKey = "483e062bd1148c64e10abcdcc42444c2f6c5d9115a7925c9e0c0b4dc84cd8f0f"
+    let recipientPrivateKey = "0000000000000000000000000000000000000000000000000000000000000002"
+    let recipientPublicKey = "c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
 
     let testMessage = "Hello, this is a direct message!"
     let testSubject = "Private Group Conversation"
@@ -134,10 +134,13 @@ final class NIP17Tests: XCTestCase {
     func testWrapManyRecipients() async throws {
         _ = try await NDKTestFactory.createNDK()
         let senderSigner = try NDKPrivateKeySigner(privateKey: senderPrivateKey)
+        let recipientSigner = try NDKPrivateKeySigner(privateKey: recipientPrivateKey)
+        let secondRecipientSigner = try NDKPrivateKeySigner.generate()
+        let secondRecipientPubkey = try await secondRecipientSigner.pubkey
 
         let recipients = [
             NIP17Recipient(pubkey: recipientPublicKey, relayURL: "wss://relay1.com"),
-            NIP17Recipient(pubkey: "anotherPubkey", relayURL: "wss://relay2.com"),
+            NIP17Recipient(pubkey: secondRecipientPubkey, relayURL: "wss://relay2.com"),
         ]
 
         // Send to multiple recipients
@@ -160,6 +163,19 @@ final class NIP17Tests: XCTestCase {
             XCTAssertNotNil(wrapped)
             XCTAssertEqual(wrapped?.kind, EventKind.giftWrap)
             XCTAssertTrue(wrapped?.tags.contains { $0[0] == "p" && $0[1] == recipient.pubkey } ?? false)
+        }
+
+        let signerByPubkey: [PublicKey: NDKSigner] = [
+            senderPublicKey: senderSigner,
+            recipientPublicKey: recipientSigner,
+            secondRecipientPubkey: secondRecipientSigner,
+        ]
+
+        for (pubkey, signer) in signerByPubkey {
+            let wrapped = try XCTUnwrap(wrappedEvents.events[pubkey])
+            let unwrapped = try await NIP17.unwrapEvent(wrapped, recipientSigner: signer)
+            XCTAssertEqual(unwrapped.content, testMessage)
+            XCTAssertEqual(unwrapped.pubkey, senderPublicKey)
         }
 
         // Verify sealed event
