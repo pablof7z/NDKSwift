@@ -54,10 +54,7 @@ internal actor NDKCacheSQLiteStore {
         db = handle
         // WAL mode for better concurrency; busy_timeout so writers wait
         // briefly instead of returning SQLITE_BUSY on contention.
-        _ = exec("PRAGMA journal_mode=WAL;")
-        _ = exec("PRAGMA synchronous=NORMAL;")
-        _ = exec("PRAGMA busy_timeout=2000;")
-        try migrate()
+        try Self.initializeDatabase(handle)
     }
 
     deinit {
@@ -68,14 +65,21 @@ internal actor NDKCacheSQLiteStore {
 
     // MARK: - Migrations
 
-    private func migrate() throws {
+    private static func initializeDatabase(_ db: OpaquePointer?) throws {
+        _ = exec("PRAGMA journal_mode=WAL;", db: db)
+        _ = exec("PRAGMA synchronous=NORMAL;", db: db)
+        _ = exec("PRAGMA busy_timeout=2000;", db: db)
+        try migrate(db: db)
+    }
+
+    private static func migrate(db: OpaquePointer?) throws {
         try execOrThrow("""
         CREATE TABLE IF NOT EXISTS schema_version (
             version INTEGER PRIMARY KEY
         );
-        """)
+        """, db: db)
 
-        let currentVersion = currentSchemaVersion() ?? 0
+        let currentVersion = currentSchemaVersion(db: db) ?? 0
         if currentVersion < 1 {
             try execOrThrow("""
             CREATE TABLE IF NOT EXISTS kv (
@@ -112,11 +116,11 @@ internal actor NDKCacheSQLiteStore {
             );
 
             INSERT OR REPLACE INTO schema_version(version) VALUES (1);
-            """)
+            """, db: db)
         }
     }
 
-    private func currentSchemaVersion() -> Int? {
+    private static func currentSchemaVersion(db: OpaquePointer?) -> Int? {
         guard let db else { return nil }
         var stmt: OpaquePointer?
         defer { sqlite3_finalize(stmt) }
@@ -341,6 +345,29 @@ internal actor NDKCacheSQLiteStore {
     }
 
     // MARK: - Helpers
+
+    private static func exec(_ sql: String, db: OpaquePointer?) -> Bool {
+        guard let db else { return false }
+        var err: UnsafeMutablePointer<CChar>?
+        let r = sqlite3_exec(db, sql, nil, nil, &err)
+        if let err {
+            NDKLogger.log(.warning, category: .cache, "SQLite exec failed: \(String(cString: err)) for `\(sql)`")
+            sqlite3_free(err)
+        }
+        return r == SQLITE_OK
+    }
+
+    private static func execOrThrow(_ sql: String, db: OpaquePointer?) throws {
+        guard let db else { throw Error.stepFailed(code: -1, message: "db handle nil") }
+        var err: UnsafeMutablePointer<CChar>?
+        let r = sqlite3_exec(db, sql, nil, nil, &err)
+        if r != SQLITE_OK {
+            let message = err.map { String(cString: $0) } ?? "<no message>"
+            if let err { sqlite3_free(err) }
+            throw Error.stepFailed(code: r, message: message)
+        }
+        if let err { sqlite3_free(err) }
+    }
 
     private func exec(_ sql: String) -> Bool {
         guard let db else { return false }

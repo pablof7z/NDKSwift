@@ -237,7 +237,7 @@ public actor NDKNostrDBCache {
     private nonisolated func sqliteWriteThrough(_ work: @Sendable @escaping (NDKCacheSQLiteStore) async throws -> Void) {
         Task { [weak self] in
             guard let self else { return }
-            guard let store = await self.sqliteStore else { return }
+            guard let store = self.sqliteStore else { return }
             do {
                 try await work(store)
             } catch {
@@ -462,8 +462,9 @@ public actor NDKNostrDBCache {
             eventAccessOrder.removeAll { $0 == targetId }
         }
         if !newlyDeleted.isEmpty {
+            let idsToPersist = newlyDeleted
             sqliteWriteThrough { store in
-                for id in newlyDeleted {
+                for id in idsToPersist {
                     try? await store.addDeletedEvent(id)
                 }
                 _ = store
