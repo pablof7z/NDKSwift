@@ -26,6 +26,23 @@ public actor NIP77SyncHandler {
     /// Completed sessions (kept briefly for result retrieval)
     var completedSessions: [String: SyncSession] = [:]
 
+    /// Continuations awaiting the completion of a sync session (per id).
+    /// Replaces a previous 100ms `Task.sleep` polling loop in NDKSyncExtension
+    /// that hammered actor isolation ~10× per second per active sync.
+    private var completionWaiters: [String: [CheckedContinuation<SyncSession, Error>]] = [:]
+
+    private func resolveWaiters(subscriptionId: String, with result: Result<SyncSession, Error>) {
+        guard let waiters = completionWaiters.removeValue(forKey: subscriptionId) else { return }
+        for waiter in waiters {
+            switch result {
+            case let .success(session):
+                waiter.resume(returning: session)
+            case let .failure(error):
+                waiter.resume(throwing: error)
+            }
+        }
+    }
+
     public struct SyncSession {
         let filter: NDKFilter
         let relayURL: String
@@ -209,6 +226,7 @@ public actor NIP77SyncHandler {
 
                 // Remove self from NDKPool's static map to prevent memory leak
                 await ndk.pool.removeSyncHandler(for: session.relayURL)
+                resolveWaiters(subscriptionId: subscriptionId, with: .success(session))
             }
 
         case let .negErr(_, error):
@@ -217,6 +235,7 @@ public actor NIP77SyncHandler {
                 // Remove self from NDKPool's static map to prevent memory leak
                 await ndk.pool.removeSyncHandler(for: session.relayURL)
             }
+            resolveWaiters(subscriptionId: subscriptionId, with: .failure(NIP77Error.relayError(error)))
             throw NIP77Error.relayError(error)
 
         case .negClose:
@@ -224,6 +243,12 @@ public actor NIP77SyncHandler {
             if let session = activeSessions.removeValue(forKey: subscriptionId) {
                 // Remove self from NDKPool's static map to prevent memory leak
                 await ndk.pool.removeSyncHandler(for: session.relayURL)
+                // Treat a relay-side close as completion with whatever we have.
+                completedSessions[subscriptionId] = session
+                resolveWaiters(subscriptionId: subscriptionId, with: .success(session))
+            } else {
+                resolveWaiters(subscriptionId: subscriptionId,
+                               with: .failure(NIP77Error.relayError("Relay closed sync session before it started")))
             }
 
         default:
@@ -240,6 +265,42 @@ public actor NIP77SyncHandler {
     /// Get completed session
     public func getCompletedSession(subscriptionId: String) async -> SyncSession? {
         return completedSessions[subscriptionId]
+    }
+
+    /// Suspend until the given sync session completes (or `timeout` elapses).
+    /// Replaces a 100ms polling loop with a direct completion signal.
+    public func waitForCompletion(subscriptionId: String, timeout: TimeInterval) async throws -> SyncSession {
+        // Fast paths: already completed or never started.
+        if let session = completedSessions[subscriptionId] {
+            return session
+        }
+        guard activeSessions[subscriptionId] != nil else {
+            throw NIP77Error.relayError("No active sync session for id \(subscriptionId)")
+        }
+
+        let timeoutTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(timeout * Double(TimeConstants.nanosecondsPerSecond)))
+            await self?.timeOutWaiters(subscriptionId: subscriptionId, timeout: timeout)
+        }
+
+        do {
+            let session = try await withCheckedThrowingContinuation { continuation in
+                completionWaiters[subscriptionId, default: []].append(continuation)
+            }
+            timeoutTask.cancel()
+            return session
+        } catch {
+            timeoutTask.cancel()
+            throw error
+        }
+    }
+
+    /// Internal helper used by the timeout Task to fail pending waiters.
+    private func timeOutWaiters(subscriptionId: String, timeout: TimeInterval) {
+        resolveWaiters(
+            subscriptionId: subscriptionId,
+            with: .failure(NIP77Error.timeout("Sync timeout after \(timeout) seconds"))
+        )
     }
 
     // MARK: - Helper Methods

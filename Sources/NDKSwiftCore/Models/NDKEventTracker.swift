@@ -39,6 +39,54 @@ public actor NDKEventTracker {
     /// Tracks when events were first seen (for cleanup)
     private var firstSeenTimestamps: [EventID: Date] = [:]
 
+    /// Background task that periodically prunes stale entries.
+    /// Without this every tracking dict (seenOnRelays, relayPublishStatuses,
+    /// relayOKMessages, sourceRelays, customProperties, firstSeenTimestamps)
+    /// grows unboundedly for the process lifetime — `cleanupOldEvents` was
+    /// defined but never wired up.
+    private var cleanupTask: Task<Void, Never>?
+
+    /// How long to retain per-event metadata before pruning. Once an event's
+    /// `firstSeen` timestamp is older than this, all of its tracking entries
+    /// are dropped. Adjust on construction if you need longer retention.
+    public let retentionInterval: TimeInterval
+
+    /// How often the background cleanup runs.
+    public let cleanupInterval: TimeInterval
+
+    public init(
+        retentionInterval: TimeInterval = 24 * 60 * 60,
+        cleanupInterval: TimeInterval = 60 * 60
+    ) {
+        self.retentionInterval = retentionInterval
+        self.cleanupInterval = cleanupInterval
+
+        Task { [weak self] in
+            guard let self else { return }
+            await self.startCleanupTask()
+        }
+    }
+
+    deinit {
+        cleanupTask?.cancel()
+    }
+
+    private func startCleanupTask() {
+        // Avoid spawning a second loop if init is somehow called twice.
+        cleanupTask?.cancel()
+        let interval = cleanupInterval
+        let retention = retentionInterval
+        cleanupTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: UInt64(interval * Double(TimeConstants.nanosecondsPerSecond)))
+                if Task.isCancelled { return }
+                guard let self else { return }
+                let cutoff = Date().addingTimeInterval(-retention)
+                await self.cleanupOldEvents(cutoffDate: cutoff)
+            }
+        }
+    }
+
     // MARK: - Relay Tracking
 
     /// Mark an event as seen on a specific relay

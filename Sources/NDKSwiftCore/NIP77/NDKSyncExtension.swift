@@ -68,21 +68,10 @@ public extension NDK {
         // Start sync - this will send NEG-OPEN
         let subscriptionId = try await syncHandler.startSync(filter: filter, relayURL: relayURL)
 
-        // Wait for sync to complete (with timeout)
+        // Wait for sync to complete (with timeout). Direct completion signal
+        // instead of a 100ms polling loop.
         let timeout: TimeInterval = NetworkConstants.timeoutStandardRequest
-        let startWait = Date()
-
-        while await syncHandler.isSyncActive(subscriptionId: subscriptionId) {
-            if Date().timeIntervalSince(startWait) > timeout {
-                throw NIP77Error.timeout("Sync timeout after \(timeout) seconds")
-            }
-            try await Task.sleep(nanoseconds: 100 * TimeConstants.nanosecondsPerMillisecond) // 100ms
-        }
-
-        // Get completed session data
-        guard let session = await syncHandler.getCompletedSession(subscriptionId: subscriptionId) else {
-            throw NIP77Error.relayError("Sync session not found")
-        }
+        let session = try await syncHandler.waitForCompletion(subscriptionId: subscriptionId, timeout: timeout)
 
         // Use the actual events from the session
         let downloadedEvents = session.actualDownloadedEvents
