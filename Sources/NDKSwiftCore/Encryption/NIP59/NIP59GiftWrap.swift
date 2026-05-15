@@ -81,9 +81,7 @@ public enum NIP59 {
         recipientPubkey: PublicKey
     ) async throws -> NDKEvent {
         // Validate rumor is unsigned
-        guard rumor.id.isEmpty || rumor.sig.isEmpty else {
-            throw NIP59Error.invalidRumor("Rumor must be unsigned")
-        }
+        try validateRumor(rumor)
 
         // For NIP-59, we need direct access to private key for NIP-44 encryption
         // This is a limitation - NIP-59 requires NDKPrivateKeySigner
@@ -152,10 +150,7 @@ public enum NIP59 {
         recipientPubkey: PublicKey,
         randomSigner: NDKSigner? = nil
     ) async throws -> NDKEvent {
-        // Validate seal event
-        guard seal.kind == EventKind.seal else {
-            throw NIP59Error.wrapFailed("Event must be a seal (kind 13)")
-        }
+        try validateSealForWrapping(seal)
 
         // Generate random signer if not provided
         let signer = try randomSigner ?? NDKPrivateKeySigner.generate()
@@ -230,6 +225,15 @@ public enum NIP59 {
             throw NIP59Error.invalidGiftWrap("Event must be a gift wrap (kind 1059)")
         }
 
+        guard giftWrap.verifySignature() else {
+            throw NIP59Error.invalidGiftWrap("Gift wrap signature is invalid")
+        }
+
+        let recipientPubkey = try await recipientSigner.pubkey
+        guard hasRecipientTag(giftWrap, recipientPubkey: recipientPubkey) else {
+            throw NIP59Error.invalidGiftWrap("Gift wrap is not addressed to recipient")
+        }
+
         // For NIP-59, we need direct access to private key
         guard let privateKeySigner = recipientSigner as? NDKPrivateKeySigner else {
             throw NIP59Error.missingPrivateKey
@@ -255,6 +259,8 @@ public enum NIP59 {
             throw NIP59Error.unwrapFailed("Decrypted event is not a seal")
         }
 
+        try validateSealForUnwrapping(sealEvent)
+
         return sealEvent
     }
 
@@ -273,6 +279,8 @@ public enum NIP59 {
         guard seal.kind == EventKind.seal else {
             throw NIP59Error.invalidGiftWrap("Event must be a seal (kind 13)")
         }
+
+        try validateSealForUnwrapping(seal)
 
         // For NIP-59, we need direct access to private key
         guard let privateKeySigner = recipientSigner as? NDKPrivateKeySigner else {
@@ -293,6 +301,11 @@ public enum NIP59 {
 
         // Parse rumor event from JSON
         let rumor = try NDKEvent.fromJSON(decryptedJSON)
+        try validateRumor(rumor)
+
+        guard rumor.pubkey == seal.pubkey else {
+            throw NIP59Error.unwrapFailed("rumor.pubkey does not match seal.pubkey - sender forgery attempt")
+        }
 
         return rumor
     }
@@ -326,18 +339,53 @@ public enum NIP59 {
         let seal = try await unwrap(giftWrap: giftWrap, recipientSigner: recipientSigner)
         let rumor = try await unseal(seal: seal, recipientSigner: recipientSigner)
 
-        // NIP-59: the seal's pubkey is the true sender; the gift-wrap pubkey is an
-        // ephemeral wrapping key. A malicious wrapper can put any pubkey into the
-        // inner rumor, so we MUST verify the rumor's claimed author matches the
-        // seal author to prevent sender forgery.
-        guard rumor.pubkey == seal.pubkey else {
-            throw NIP59Error.unwrapFailed("rumor.pubkey does not match seal.pubkey — sender forgery attempt")
-        }
-
         return rumor
     }
 
     // MARK: - Utilities
+
+    private static func validateRumor(_ rumor: NDKEvent) throws {
+        guard rumor.sig.isEmpty else {
+            throw NIP59Error.invalidRumor("Rumor must be unsigned")
+        }
+
+        if !rumor.id.isEmpty {
+            let calculatedID = try rumor.calculateID()
+            guard rumor.id == calculatedID else {
+                throw NIP59Error.invalidRumor("Rumor ID does not match content")
+            }
+        }
+    }
+
+    private static func validateSealForWrapping(_ seal: NDKEvent) throws {
+        guard seal.kind == EventKind.seal else {
+            throw NIP59Error.wrapFailed("Event must be a seal (kind 13)")
+        }
+
+        guard seal.tags.isEmpty else {
+            throw NIP59Error.wrapFailed("Seal tags must be empty")
+        }
+
+        guard seal.verifySignature() else {
+            throw NIP59Error.wrapFailed("Seal signature is invalid")
+        }
+    }
+
+    private static func validateSealForUnwrapping(_ seal: NDKEvent) throws {
+        guard seal.tags.isEmpty else {
+            throw NIP59Error.unwrapFailed("Seal tags must be empty")
+        }
+
+        guard seal.verifySignature() else {
+            throw NIP59Error.unwrapFailed("Seal signature is invalid")
+        }
+    }
+
+    private static func hasRecipientTag(_ giftWrap: NDKEvent, recipientPubkey: PublicKey) -> Bool {
+        giftWrap.tags.contains { tag in
+            tag.count >= 2 && tag[0] == "p" && tag[1] == recipientPubkey
+        }
+    }
 
     /// Randomizes a timestamp into the recent past to prevent send-time leakage.
     /// NIP-59 requires the wrap created_at be a randomized past timestamp; future

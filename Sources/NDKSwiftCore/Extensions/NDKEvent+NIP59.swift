@@ -52,7 +52,7 @@ public extension NDKEvent {
 
     /// Check if this is an unsigned event (rumor)
     var isRumor: Bool {
-        return id.isEmpty || sig.isEmpty
+        return sig.isEmpty
     }
 
     /// Check if this is a seal event (kind 13)

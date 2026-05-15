@@ -2,11 +2,11 @@
 import XCTest
 
 final class NIP59Tests: XCTestCase {
-    let senderPrivateKey = "f09ac9b695d0a4c6daa418fe95b977eea20f54d9545592bc36a4f9e14f3eb840"
+    let senderPrivateKey = "0000000000000000000000000000000000000000000000000000000000000001"
     let senderPublicKey = "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
 
-    let recipientPrivateKey = "5393a825e5892d8e18d4a5ea61ced105e8bb2a106f42876be3a40522e0b13747"
-    let recipientPublicKey = "483e062bd1148c64e10abcdcc42444c2f6c5d9115a7925c9e0c0b4dc84cd8f0f"
+    let recipientPrivateKey = "0000000000000000000000000000000000000000000000000000000000000002"
+    let recipientPublicKey = "c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
 
     override func setUp() {
         super.setUp()
@@ -81,6 +81,30 @@ final class NIP59Tests: XCTestCase {
                 recipientPubkey: recipientPublicKey
             )
             XCTFail("Should not seal signed events")
+        } catch NIP59.NIP59Error.invalidRumor(_) {
+            // Expected
+        }
+    }
+
+    func testSealHalfSignedRumorFails() async throws {
+        let signer = try NDKPrivateKeySigner(privateKey: senderPrivateKey)
+        let malformedRumor = NDKEvent(
+            id: "",
+            pubkey: senderPublicKey,
+            createdAt: .now,
+            kind: EventKind.textNote,
+            tags: [],
+            content: "content",
+            sig: String(repeating: "0", count: 128)
+        )
+
+        do {
+            _ = try await NIP59.seal(
+                rumor: malformedRumor,
+                signer: signer,
+                recipientPubkey: recipientPublicKey
+            )
+            XCTFail("Should not seal events that still carry a signature")
         } catch NIP59.NIP59Error.invalidRumor(_) {
             // Expected
         }
@@ -183,6 +207,66 @@ final class NIP59Tests: XCTestCase {
         XCTAssertEqual(unwrappedSeal.id, seal.id, "Should recover original seal")
     }
 
+    func testUnwrapRejectsTamperedGiftWrapSignature() async throws {
+        let senderSigner = try NDKPrivateKeySigner(privateKey: senderPrivateKey)
+        let recipientSigner = try NDKPrivateKeySigner(privateKey: recipientPrivateKey)
+        let giftWrap = try await makeGiftWrap(senderSigner: senderSigner)
+
+        let tamperedGiftWrap = NDKEvent(
+            id: giftWrap.id,
+            pubkey: giftWrap.pubkey,
+            createdAt: giftWrap.createdAt,
+            kind: giftWrap.kind,
+            tags: giftWrap.tags,
+            content: giftWrap.content + "tampered",
+            sig: giftWrap.sig
+        )
+
+        do {
+            _ = try await NIP59.unwrap(
+                giftWrap: tamperedGiftWrap,
+                recipientSigner: recipientSigner
+            )
+            XCTFail("Should reject a gift wrap whose signed payload was changed")
+        } catch NIP59.NIP59Error.invalidGiftWrap(_) {
+            // Expected
+        }
+    }
+
+    func testUnwrapRejectsGiftWrapNotAddressedToRecipient() async throws {
+        let senderSigner = try NDKPrivateKeySigner(privateKey: senderPrivateKey)
+        let recipientSigner = try NDKPrivateKeySigner(privateKey: recipientPrivateKey)
+        let wrongRecipientSigner = try NDKPrivateKeySigner.generate()
+        let wrongRecipientPubkey = try await wrongRecipientSigner.pubkey
+
+        let rumor = NIP59.createRumor(
+            kind: EventKind.textNote,
+            content: "Secret message",
+            tags: [],
+            pubkey: senderPublicKey
+        )
+        let seal = try await NIP59.seal(
+            rumor: rumor,
+            signer: senderSigner,
+            recipientPubkey: recipientPublicKey
+        )
+        let wrongTaggedGiftWrap = try await signedGiftWrap(
+            seal: seal,
+            encryptedTo: recipientPublicKey,
+            taggedRecipient: wrongRecipientPubkey
+        )
+
+        do {
+            _ = try await NIP59.unwrap(
+                giftWrap: wrongTaggedGiftWrap,
+                recipientSigner: recipientSigner
+            )
+            XCTFail("Should reject a gift wrap whose p tag does not address the recipient")
+        } catch NIP59.NIP59Error.invalidGiftWrap(_) {
+            // Expected
+        }
+    }
+
     // MARK: - Unseal Tests
 
     func testUnsealEvent() async throws {
@@ -217,6 +301,68 @@ final class NIP59Tests: XCTestCase {
         XCTAssertEqual(unsealedRumor.pubkey, originalRumor.pubkey)
         XCTAssertEqual(unsealedRumor.createdAt, originalRumor.createdAt)
         XCTAssertEqual(unsealedRumor.tags, originalRumor.tags)
+    }
+
+    func testUnsealRejectsTamperedSealSignature() async throws {
+        let senderSigner = try NDKPrivateKeySigner(privateKey: senderPrivateKey)
+        let recipientSigner = try NDKPrivateKeySigner(privateKey: recipientPrivateKey)
+        let rumor = NIP59.createRumor(
+            kind: EventKind.textNote,
+            content: "Secret message",
+            tags: [],
+            pubkey: senderPublicKey
+        )
+        let seal = try await NIP59.seal(
+            rumor: rumor,
+            signer: senderSigner,
+            recipientPubkey: recipientPublicKey
+        )
+
+        let tamperedSeal = NDKEvent(
+            id: seal.id,
+            pubkey: seal.pubkey,
+            createdAt: seal.createdAt + 1,
+            kind: seal.kind,
+            tags: seal.tags,
+            content: seal.content,
+            sig: seal.sig
+        )
+
+        do {
+            _ = try await NIP59.unseal(
+                seal: tamperedSeal,
+                recipientSigner: recipientSigner
+            )
+            XCTFail("Should reject a seal whose signed payload was changed")
+        } catch NIP59.NIP59Error.unwrapFailed(_) {
+            // Expected
+        }
+    }
+
+    func testUnsealRejectsSignedInnerRumor() async throws {
+        let senderSigner = try NDKPrivateKeySigner(privateKey: senderPrivateKey)
+        let recipientSigner = try NDKPrivateKeySigner(privateKey: recipientPrivateKey)
+        let signedInnerEvent = try await signedEvent(
+            signer: senderSigner,
+            kind: EventKind.textNote,
+            content: "This should have stayed unsigned",
+            tags: []
+        )
+        let seal = try await signedSeal(
+            payloadJSON: signedInnerEvent.toJSON(),
+            signer: senderSigner,
+            recipientPubkey: recipientPublicKey
+        )
+
+        do {
+            _ = try await NIP59.unseal(
+                seal: seal,
+                recipientSigner: recipientSigner
+            )
+            XCTFail("Should reject a sealed payload that contains a signed inner event")
+        } catch NIP59.NIP59Error.invalidRumor(_) {
+            // Expected
+        }
     }
 
     // MARK: - Full Flow Tests
@@ -296,5 +442,97 @@ final class NIP59Tests: XCTestCase {
         XCTAssertTrue(recovered.isRumor)
         XCTAssertEqual(recovered.content, rumor.content)
         XCTAssertEqual(recovered.tags, rumor.tags)
+    }
+
+    private func makeGiftWrap(senderSigner: NDKPrivateKeySigner) async throws -> NDKEvent {
+        let rumor = NIP59.createRumor(
+            kind: EventKind.textNote,
+            content: "Secret message",
+            tags: [],
+            pubkey: senderPublicKey
+        )
+        let seal = try await NIP59.seal(
+            rumor: rumor,
+            signer: senderSigner,
+            recipientPubkey: recipientPublicKey
+        )
+        return try await NIP59.wrap(
+            seal: seal,
+            recipientPubkey: recipientPublicKey
+        )
+    }
+
+    private func signedEvent(
+        signer: NDKPrivateKeySigner,
+        kind: Kind,
+        content: String,
+        tags: [Tag]
+    ) async throws -> NDKEvent {
+        let unsignedEvent = NDKEvent(
+            id: "",
+            pubkey: try await signer.pubkey,
+            createdAt: .now,
+            kind: kind,
+            tags: tags,
+            content: content,
+            sig: ""
+        )
+        let eventID = try unsignedEvent.calculateID()
+        let eventToSign = NDKEvent(
+            id: eventID,
+            pubkey: unsignedEvent.pubkey,
+            createdAt: unsignedEvent.createdAt,
+            kind: unsignedEvent.kind,
+            tags: unsignedEvent.tags,
+            content: unsignedEvent.content,
+            sig: ""
+        )
+        let signature = try await signer.sign(eventToSign)
+        return NDKEvent(
+            id: eventID,
+            pubkey: unsignedEvent.pubkey,
+            createdAt: unsignedEvent.createdAt,
+            kind: unsignedEvent.kind,
+            tags: unsignedEvent.tags,
+            content: unsignedEvent.content,
+            sig: signature
+        )
+    }
+
+    private func signedSeal(
+        payloadJSON: String,
+        signer: NDKPrivateKeySigner,
+        recipientPubkey: PublicKey
+    ) async throws -> NDKEvent {
+        let encryptedContent = try NIP44.encrypt(
+            message: payloadJSON,
+            privateKey: signer.privateKeyForNIP59,
+            pubkey: recipientPubkey
+        )
+        return try await signedEvent(
+            signer: signer,
+            kind: EventKind.seal,
+            content: encryptedContent,
+            tags: []
+        )
+    }
+
+    private func signedGiftWrap(
+        seal: NDKEvent,
+        encryptedTo recipientPubkey: PublicKey,
+        taggedRecipient: PublicKey
+    ) async throws -> NDKEvent {
+        let wrapperSigner = try NDKPrivateKeySigner.generate()
+        let encryptedContent = try NIP44.encrypt(
+            message: seal.toJSON(),
+            privateKey: wrapperSigner.privateKeyForNIP59,
+            pubkey: recipientPubkey
+        )
+        return try await signedEvent(
+            signer: wrapperSigner,
+            kind: EventKind.giftWrap,
+            content: encryptedContent,
+            tags: [["p", taggedRecipient]]
+        )
     }
 }
