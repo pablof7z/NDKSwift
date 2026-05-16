@@ -228,12 +228,39 @@ internal actor NDKCacheSQLiteStore {
 
     // MARK: - Decrypted content cache
 
+    /// Hard cap on the decrypted-content table. Without this the table grew
+    /// unbounded because the in-memory LRU evicts rows but never deletes
+    /// them from SQLite. Matches the in-memory LRU capacity so hydration on
+    /// next launch saturates exactly.
+    private static let decryptedContentMaxRows: Int = 1000
+
     func setDecrypted(key: String, content: String) throws {
         let sql = "INSERT OR REPLACE INTO decrypted_content(key, content, cached_at) VALUES (?, ?, ?);"
         try exec(sql) { stmt in
             sqlite3_bind_text(stmt, 1, key, -1, SQLITE_TRANSIENT)
             sqlite3_bind_text(stmt, 2, content, -1, SQLITE_TRANSIENT)
             sqlite3_bind_int64(stmt, 3, Int64(Date().timeIntervalSince1970))
+        }
+        // Prune oldest rows when over cap. Done in the same actor message
+        // so the table size invariant is preserved on every write.
+        try pruneDecryptedContentIfNeeded()
+    }
+
+    private func pruneDecryptedContentIfNeeded() throws {
+        let maxRows = Self.decryptedContentMaxRows
+        // Single-statement prune; SQLite's `LIMIT` in DELETE requires the
+        // SQLITE_ENABLE_UPDATE_DELETE_LIMIT compile flag which Apple's
+        // system SQLite ships without, so use a subquery instead.
+        let sql = """
+        DELETE FROM decrypted_content
+        WHERE key IN (
+            SELECT key FROM decrypted_content
+            ORDER BY cached_at ASC
+            LIMIT MAX(0, (SELECT COUNT(*) FROM decrypted_content) - ?)
+        );
+        """
+        try exec(sql) { stmt in
+            sqlite3_bind_int(stmt, 1, Int32(maxRows))
         }
     }
 

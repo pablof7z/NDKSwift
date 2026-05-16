@@ -210,17 +210,29 @@ public actor NDKNostrDBCache {
         // NIP-05 verification cache.
         if let rows = try? await store.loadAllNIP05() {
             let decoder = JSONDecoder()
+            var decodedCount = 0
+            var failedCount = 0
             for row in rows {
-                if let entry = try? decoder.decode(NIP05CacheEntry.self, from: row.entryJSON) {
+                do {
+                    let entry = try decoder.decode(NIP05CacheEntry.self, from: row.entryJSON)
                     nip05Cache[row.identifier] = entry
                     if entry.status == .verified {
                         nip05ByPubkey[entry.pubkey] = entry.identifier
                     }
+                    decodedCount += 1
+                } catch {
+                    // Schema migration / corrupt row: log and skip so we
+                    // don't silently lose state on launch. The row stays
+                    // in SQLite; next save with the same identifier
+                    // overwrites it.
+                    failedCount += 1
+                    NDKLogger.log(.warning, category: .cache,
+                                  "Skipping NIP-05 hydration row '\(row.identifier)' — JSON decode failed: \(error.localizedDescription)")
                 }
             }
             if !rows.isEmpty {
                 NDKLogger.log(.debug, category: .cache,
-                              "Hydrated \(rows.count) NIP-05 entries from SQLite")
+                              "Hydrated \(decodedCount) NIP-05 entries from SQLite (\(failedCount) failed)")
             }
         }
 
@@ -245,21 +257,48 @@ public actor NDKNostrDBCache {
     /// the same actor.
     private var sqliteWriteTail: Task<Void, Never>?
 
+    /// Count of consecutive write-through failures. When this crosses
+    /// `sqliteWriteFailureThreshold`, the SQLite layer is disabled
+    /// for the rest of the process and we surface a single error log
+    /// instead of one per failed write. A successful write resets the
+    /// counter.
+    private var sqliteWriteFailures: Int = 0
+    private var sqliteDisabled: Bool = false
+    private static let sqliteWriteFailureThreshold: Int = 10
+
     /// Fire-and-forget write-through helper for SQLite persistence.
     /// Writes are serialized in caller submission order to preserve
     /// in-memory / on-disk consistency under concurrent mutations. Errors
-    /// are logged; the in-memory copy is authoritative for this process.
+    /// are logged; if consecutive failures exceed the threshold we
+    /// disable the SQLite side entirely so a wedged disk doesn't spam
+    /// the log every time the cache updates.
     private func sqliteWriteThrough(_ work: @Sendable @escaping (NDKCacheSQLiteStore) async throws -> Void) {
-        guard let store = sqliteStore else { return }
+        guard !sqliteDisabled, let store = sqliteStore else { return }
         let prior = sqliteWriteTail
-        sqliteWriteTail = Task {
+        sqliteWriteTail = Task { [weak self] in
             await prior?.value
             do {
                 try await work(store)
+                await self?.recordSqliteWriteSuccess()
             } catch {
-                NDKLogger.log(.warning, category: .cache,
-                              "SQLite write-through failed: \(error.localizedDescription)")
+                await self?.recordSqliteWriteFailure(error: error)
             }
+        }
+    }
+
+    private func recordSqliteWriteSuccess() {
+        sqliteWriteFailures = 0
+    }
+
+    private func recordSqliteWriteFailure(error: Error) {
+        sqliteWriteFailures += 1
+        if sqliteWriteFailures >= Self.sqliteWriteFailureThreshold, !sqliteDisabled {
+            sqliteDisabled = true
+            NDKLogger.log(.error, category: .cache,
+                          "Disabling SQLite write-through after \(sqliteWriteFailures) consecutive failures (last: \(error.localizedDescription)). In-memory cache remains operational; persistence is OFF for this process.")
+        } else {
+            NDKLogger.log(.warning, category: .cache,
+                          "SQLite write-through failed (\(sqliteWriteFailures)/\(Self.sqliteWriteFailureThreshold)): \(error.localizedDescription)")
         }
     }
 
