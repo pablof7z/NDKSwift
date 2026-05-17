@@ -108,9 +108,6 @@ actor NDKSubscriptionRequirement {
 
         // Only set up network operations if we should fetch from network
         if shouldFetchFromNetwork {
-            // Apply relay strategy
-            await applyRelayStrategy()
-
             // Set up subscription event handling
             await internalSubscription.setOnEvent { [weak self] event, relay in
                 await self?.handleNetworkEvent(event, from: relay)
@@ -123,6 +120,12 @@ actor NDKSubscriptionRequirement {
             await internalSubscription.setOnRelayAdded { [weak self] relayUrl in
                 await self?.handleRelayAdded(relayUrl)
             }
+
+            // Apply relay strategy only after handlers are installed. Fast
+            // relays can return EVENT+EOSE immediately after REQ, so creating
+            // relay subscriptions before these callbacks are ready drops the
+            // initial response.
+            await applyRelayStrategy()
 
             // Start the subscription
             await internalSubscription.start()
